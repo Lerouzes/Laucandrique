@@ -22,16 +22,16 @@ export function Header({ user, profile }: { user: User, profile: Profile | null 
     const initials = profile?.full_name?.substring(0, 2).toUpperCase() || user.email?.substring(0, 2).toUpperCase() || 'U'
 
     return (
-        <header className="flex h-16 items-center justify-end border-b border-zinc-800 bg-zinc-900 px-6">
+        <header className="flex h-16 items-center justify-end border-b border-white/20 bg-[#0f3f74]/70 backdrop-blur-md px-6">
             <div className="flex items-center gap-4">
                 <div className="flex flex-col items-end">
-                    <span className="text-sm font-medium text-zinc-100">{profile?.full_name || user.email}</span>
-                    <span className="text-xs text-zinc-400">{profile?.role === 'admin' ? 'Administrateur' : 'Employé'}</span>
+                    <span className="text-sm font-medium text-white">{profile?.full_name || user.email}</span>
+                    <span className="text-xs text-white/75">{profile?.role === 'admin' ? 'Administrateur' : 'Employé'}</span>
                 </div>
-                <Avatar className="h-9 w-9 border border-zinc-700">
-                    <AvatarFallback className="bg-zinc-800 text-zinc-100 font-medium">{initials}</AvatarFallback>
+                <Avatar className="h-9 w-9 border border-white/25">
+                    <AvatarFallback className="bg-zinc-800 text-white font-medium">{initials}</AvatarFallback>
                 </Avatar>
-                <Button variant="ghost" size="icon" onClick={handleSignOut} className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800">
+                <Button variant="ghost" size="icon" onClick={handleSignOut} className="text-white/75 hover:text-white hover:bg-zinc-800">
                     <LogOut className="h-4 w-4" />
                     <span className="sr-only">Se déconnecter</span>
                 </Button>
