@@ -133,31 +133,6 @@
 
 @layer utilities {
   .brand-surface {
-    background: #185FAD;
-  }
-}
-
-
-@layer components {
-  .dashboard-panel {
-    @apply bg-white/92 text-[#13406d] border border-white/60 shadow-sm rounded-lg;
-  }
-}
-
-@layer base {
-  [data-slot="card"] {
-    @apply bg-white border-[#d3e3f3] text-[#13406d];
-  }
-
-  [data-slot="table"] {
-    @apply bg-white;
-  }
-
-  [data-slot="table-header"] {
-    @apply bg-[#e8f1fb] text-[#185FAD];
-  }
-
-  input, textarea, [role="combobox"] {
-    @apply bg-white border-[#b8d0ea] text-[#13406d];
+    background: linear-gradient(165deg, #0f3f74 0%, #185FAD 52%, #62BD53 100%);
   }
 }
