@@ -42,10 +42,27 @@ export async function updateSettingsAction(formData: FormData, hasId: string | n
         updated_at: new Date().toISOString()
     }
 
+    const fallbackPayload = {
+        company_name: payload.company_name,
+        default_admin_percentage: payload.default_admin_percentage,
+        default_profit_percentage: payload.default_profit_percentage,
+        gst_rate: payload.gst_rate,
+        qst_rate: payload.qst_rate,
+        updated_at: payload.updated_at,
+    }
+
     if (hasId) {
-        await supabase.from('settings').update(payload).eq('id', hasId)
+        let result = await supabase.from('settings').update(payload).eq('id', hasId)
+        if (result.error && (result.error.message.includes('monthly_goal_enabled') || result.error.message.includes('monthly_goal_amount'))) {
+            result = await supabase.from('settings').update(fallbackPayload).eq('id', hasId)
+        }
+        if (result.error) throw new Error(result.error.message)
     } else {
-        await supabase.from('settings').insert(payload)
+        let result = await supabase.from('settings').insert(payload)
+        if (result.error && (result.error.message.includes('monthly_goal_enabled') || result.error.message.includes('monthly_goal_amount'))) {
+            result = await supabase.from('settings').insert(fallbackPayload)
+        }
+        if (result.error) throw new Error(result.error.message)
     }
 
     revalidatePath('/settings')

@@ -51,8 +51,6 @@ export async function createClientAction(formData: FormData) {
 
         if (error) {
             console.error('SUPABASE INSERT ERROR on client:', error)
-            const fs = require('fs')
-            fs.writeFileSync('client_error_log.txt', JSON.stringify(error, null, 2))
             return { success: false, error: error.message }
         }
 
@@ -60,8 +58,6 @@ export async function createClientAction(formData: FormData) {
         return { success: true }
     } catch (err: any) {
         console.error('SERVER ACTION EXCEPTION:', err)
-        const fs = require('fs')
-        fs.writeFileSync('client_error_log.txt', String(err.stack || err.message))
         return { success: false, error: err.message }
     }
 }
