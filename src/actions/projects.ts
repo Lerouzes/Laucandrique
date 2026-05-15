@@ -3,19 +3,30 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-export async function getProjects() {
+export async function getProjects(query?: string) {
     const supabase = await createClient()
 
     const { data, error } = await supabase
         .from('projects')
-        .select('*, clients(full_name)')
+        .select('*, clients(full_name, address), contractors(full_name, color), quotes(quote_number, total)')
         .order('created_at', { ascending: false })
 
     if (error) {
         console.error('Error fetching projects', error)
         return []
     }
-    return data
+
+    if (!query) return data
+    const normalized = query.trim().toLowerCase()
+    if (!normalized) return data
+
+    return (data || []).filter((project: any) => {
+        const clientName = String(project.clients?.full_name || '').toLowerCase()
+        const address = String(project.clients?.address || '').toLowerCase()
+        const quoteNumber = String(project.quotes?.quote_number || '')
+        const title = String(project.title || '').toLowerCase()
+        return clientName.includes(normalized) || address.includes(normalized) || quoteNumber.includes(normalized) || title.includes(normalized)
+    })
 }
 
 export async function updateProjectDates(projectId: string, startDate: string, endDate: string) {
@@ -39,6 +50,7 @@ export async function updateProjectStatus(projectId: string, status: 'unplanned'
     const supabase = await createClient()
 
     const updates: any = { status }
+    if (status === 'completed') updates.completed_at = new Date().toISOString()
     if (status === 'unplanned') {
         updates.start_date = null
         updates.end_date = null

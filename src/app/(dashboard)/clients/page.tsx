@@ -4,6 +4,7 @@ import { ClientsTable } from '@/components/features/clients/ClientsTable'
 import { ClientFormDialog } from '@/components/features/clients/ClientFormDialog'
 import { ClientExcelImport } from '@/components/features/clients/ClientExcelImport'
 import { ClientsSearch } from '@/components/features/clients/ClientsSearch'
+import { getManagers } from '@/actions/managers'
 
 export default async function ClientsPage({
     searchParams,
@@ -13,7 +14,7 @@ export default async function ClientsPage({
     const resolvedSearchParams = await searchParams;
     const query = resolvedSearchParams.query || ''
 
-    const clients = await getClients(query)
+    const [clients, managers] = await Promise.all([getClients(query), getManagers()])
 
     return (
         <div className="space-y-6">
@@ -26,7 +27,7 @@ export default async function ClientsPage({
                 </div>
                 <div className="flex gap-2">
                     <ClientExcelImport />
-                    <ClientFormDialog />
+                    <ClientFormDialog managers={managers} />
                 </div>
             </div>
 
