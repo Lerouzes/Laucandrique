@@ -92,12 +92,10 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                     {isGenerating ? 'Génération...' : 'Télécharger PDF'}
                 </Button>
 
-                <Button asChild variant="outline" className="border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 hover:text-zinc-100">
-                    <Link href={`/quotes/${quote.id}/edit`}>
+                <Link href={`/quotes/${quote.id}/edit`} className="group/button inline-flex h-8 items-center justify-center rounded-lg px-2.5 text-sm font-medium border border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 hover:text-zinc-100">
                         <Pencil className="mr-2 h-4 w-4" />
                         Modifier la soumission
-                    </Link>
-                </Button>
+                </Link>
 
                 {quote.status !== 'approved' && quote.status !== 'denied' && (
                     <>
