@@ -22,6 +22,8 @@ const STATUS_COLORS: Record<string, string> = {
     completed: 'bg-emerald-800 text-emerald-100',
 }
 
+const TYPE_DOT: Record<string, string> = { interior: '#60a5fa', exterior: '#f59e0b' }
+
 const STATUS_LABELS: Record<string, string> = {
     unplanned: 'Non planifié',
     planned: 'Planifié',
@@ -29,12 +31,13 @@ const STATUS_LABELS: Record<string, string> = {
     completed: 'Complété',
 }
 
-export function PlanningCalendar({ initialProjects }: { initialProjects: any[] }) {
+export function PlanningCalendar({ initialProjects, query = "" }: { initialProjects: any[], query?: string }) {
     const router = useRouter()
     const [projects, setProjects] = useState(initialProjects)
     const externalEventsRef = useRef<HTMLDivElement>(null)
     const [isPending, startTransition] = useTransition()
     const [filter, setFilter] = useState<StatusFilter>('unscheduled')
+    const normalizedQuery = query.trim().toLowerCase()
 
     // Reinitialize draggable whenever the project list changes (filter or data)
     useEffect(() => {
@@ -56,15 +59,24 @@ export function PlanningCalendar({ initialProjects }: { initialProjects: any[] }
         }
     }, [filter, projects])
 
+    const filteredProjects = projects.filter(p => {
+        if (!normalizedQuery) return true
+        const clientName = String(p.clients?.full_name || '').toLowerCase()
+        const address = String(p.clients?.address || '').toLowerCase()
+        const quoteNumber = String(p.quotes?.quote_number || '')
+        const title = String(p.title || '').toLowerCase()
+        return clientName.includes(normalizedQuery) || address.includes(normalizedQuery) || quoteNumber.includes(normalizedQuery) || title.includes(normalizedQuery)
+    })
+
     // Sidebar project list based on filter
-    const sidebarProjects = projects.filter(p => {
+    const sidebarProjects = filteredProjects.filter(p => {
         if (filter === 'unscheduled') return p.status === 'unplanned'
         if (filter === 'scheduled') return p.status !== 'unplanned'
         return true // 'all'
     })
 
     // Calendar events: all non-unplanned projects
-    const events = projects.filter(p => p.status !== 'unplanned').map(p => {
+    const events = filteredProjects.filter(p => p.status !== 'unplanned').map(p => {
         const endObj = p.end_date ? new Date(p.end_date) : new Date(p.start_date)
         endObj.setDate(endObj.getDate() + 1)
         return {
@@ -73,12 +85,13 @@ export function PlanningCalendar({ initialProjects }: { initialProjects: any[] }
             start: p.start_date,
             end: endObj.toISOString().split('T')[0],
             allDay: true,
-            backgroundColor: p.status === 'completed' ? '#065f46' : p.status === 'in_progress' ? '#1e3a8a' : '#78350f',
+            backgroundColor: p.contractors?.color || (p.status === 'completed' ? '#065f46' : p.status === 'in_progress' ? '#1e3a8a' : '#78350f'),
             borderColor: 'transparent',
             extendedProps: {
                 client: p.clients?.full_name,
                 status: p.status,
                 quoteId: p.quote_id,
+                projectType: p.project_type,
             }
         }
     })
@@ -226,7 +239,8 @@ export function PlanningCalendar({ initialProjects }: { initialProjects: any[] }
                                         className={`fc-event-external p-3 bg-zinc-950 border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                                     >
                                         <div className="flex items-start justify-between gap-2 mb-1">
-                                            <div className="font-medium text-zinc-100 text-sm leading-tight">{project.title}</div>
+                                            <div className="font-medium text-zinc-100 text-sm leading-tight flex items-center gap-2"><span className='inline-block h-2 w-2 rounded-full' style={{ backgroundColor: TYPE_DOT[project.project_type || 'interior'] }} />{project.title}</div>
+                                            {project.quotes?.quote_number && <div className='text-[11px] text-zinc-400'>Soumission #{project.quotes.quote_number}</div>}
                                             <button
                                                 onClick={() => handleProjectClick(project.quote_id)}
                                                 className="text-zinc-500 hover:text-zinc-200 transition-colors shrink-0 mt-0.5"
@@ -236,6 +250,7 @@ export function PlanningCalendar({ initialProjects }: { initialProjects: any[] }
                                             </button>
                                         </div>
                                         <div className="text-xs text-zinc-400 mb-2 truncate">{project.clients?.full_name}</div>
+                                        {project.contractors?.full_name && <div className='text-xs mb-2' style={{ color: project.contractors.color }}>👷 {project.contractors.full_name}</div>}
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-1.5">
                                                 <Badge variant="secondary" className="bg-zinc-800 text-zinc-300 pointer-events-none text-xs">
@@ -302,7 +317,7 @@ export function PlanningCalendar({ initialProjects }: { initialProjects: any[] }
                         }}
                         eventContent={(arg) => (
                             <div className="overflow-hidden p-1 text-xs cursor-pointer group">
-                                <div className="font-semibold text-white truncate">{arg.event.title}</div>
+                                <div className="font-semibold text-white truncate flex items-center gap-1.5"><span className='inline-block h-2 w-2 rounded-full' style={{ backgroundColor: TYPE_DOT[arg.event.extendedProps.projectType || 'interior'] }} />{arg.event.title}</div>
                                 <div className="opacity-70 mt-0.5 truncate">{arg.event.extendedProps.client}</div>
                                 <div className="opacity-0 group-hover:opacity-100 text-yellow-300 transition-opacity text-[10px] mt-0.5">Cliquer pour voir ↗</div>
                             </div>

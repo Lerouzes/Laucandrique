@@ -8,11 +8,18 @@ export async function getQuotes(query?: string, statusFilter?: string) {
 
     let request = supabase
         .from('quotes')
-        .select('*, clients(full_name, company_name)')
+        .select('*, clients(full_name, company_name), contractors(id, full_name, color)')
         .order('created_at', { ascending: false })
 
     if (query) {
-        request = request.ilike('title', `%${query}%`)
+        const sanitized = query.trim()
+        if (sanitized) {
+            if (/^\d+$/.test(sanitized)) {
+                request = request.or(`title.ilike.%${sanitized}%,quote_number.eq.${sanitized}`)
+            } else {
+                request = request.ilike('title', `%${sanitized}%`)
+            }
+        }
     }
 
     if (statusFilter && statusFilter !== 'all') {
@@ -32,10 +39,20 @@ export async function getQuotes(query?: string, statusFilter?: string) {
 export async function createQuoteAction(quoteData: any, itemsData: any[], imagesData: any[]) {
     const supabase = await createClient()
 
-    const { data: quote, error: quoteError } = await supabase.from('quotes').insert({
-        ...quoteData,
-        status: 'draft',
-    }).select().single()
+    let payload: any = { ...quoteData, status: 'draft' }
+    try {
+        const { data: clientData } = await supabase.from('clients').select('manager_id').eq('id', quoteData.client_id).single()
+        payload.manager_id = clientData?.manager_id || null
+    } catch {}
+
+    let { data: quote, error: quoteError } = await supabase.from('quotes').insert(payload).select().single()
+    if (quoteError && (quoteError.message.includes('manager_id') || quoteError.message.includes('project_type'))) {
+        delete payload.manager_id
+        delete payload.project_type
+        const retry = await supabase.from('quotes').insert(payload).select().single()
+        quote = retry.data
+        quoteError = retry.error
+    }
 
     if (quoteError || !quote) {
         throw new Error(quoteError?.message || 'Erreur lors de la création de la soumission')
@@ -97,13 +114,21 @@ export async function updateQuoteStatus(quoteId: string, status: 'approved' | 'd
     if (updateError) throw new Error(updateError.message)
 
     if (status === 'approved') {
-        await supabase.from('projects').insert({
+        const { data: quoteMeta } = await supabase.from('quotes').select('contractor_id, project_type').eq('id', quoteId).single()
+        const projectPayload: any = {
             quote_id: quoteId,
             client_id: clientId,
+            contractor_id: quoteMeta?.contractor_id || null,
+            project_type: quoteMeta?.project_type || 'interior',
             title: titleStr,
             status: 'unplanned',
             estimated_duration_days: durDays,
-        })
+        }
+        let inserted = await supabase.from('projects').insert(projectPayload)
+        if (inserted.error && inserted.error.message.includes('project_type')) {
+            delete projectPayload.project_type
+            inserted = await supabase.from('projects').insert(projectPayload)
+        }
     }
 
     revalidatePath('/quotes')
@@ -117,7 +142,7 @@ export async function getQuote(id: string) {
     const supabase = await createClient()
     const { data, error } = await supabase
         .from('quotes')
-        .select('*, clients(*), quote_items(*), quote_images(*)')
+        .select('*, clients(*), contractors(*), quote_items(*), quote_images(*)')
         .eq('id', id)
         .single()
 

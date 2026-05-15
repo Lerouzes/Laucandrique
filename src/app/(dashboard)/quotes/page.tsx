@@ -27,12 +27,10 @@ export default async function QuotesPage({
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button asChild className="bg-zinc-100 text-zinc-900 hover:bg-zinc-200">
-                        <Link href="/quotes/new">
+                    <Link href="/quotes/new" className="group/button inline-flex h-8 items-center justify-center rounded-lg px-2.5 text-sm font-medium bg-zinc-100 text-zinc-900 hover:bg-zinc-200">
                             <Plus className="mr-2 h-4 w-4" />
                             Nouvelle soumission
                         </Link>
-                    </Button>
                 </div>
             </div>
 
