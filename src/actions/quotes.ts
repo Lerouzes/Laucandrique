@@ -116,7 +116,12 @@ export async function updateQuoteStatus(quoteId: string, status: 'approved' | 'd
             title: titleStr,
             status: 'unplanned',
             estimated_duration_days: durDays,
-        })
+        }
+        let inserted = await supabase.from('projects').insert(projectPayload)
+        if (inserted.error && inserted.error.message.includes('project_type')) {
+            delete projectPayload.project_type
+            inserted = await supabase.from('projects').insert(projectPayload)
+        }
     }
 
     revalidatePath('/quotes')

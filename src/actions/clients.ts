@@ -42,7 +42,12 @@ export async function createClientAction(formData: FormData) {
     console.log('Inserting novel client:', newClient)
 
     try {
-        const { error } = await supabase.from('clients').insert(newClient)
+        let { error } = await supabase.from('clients').insert(newClient)
+        if (error && error.message.includes('manager_id')) {
+            const { manager_id, ...fallbackClient } = newClient as any
+            const retry = await supabase.from('clients').insert(fallbackClient)
+            error = retry.error
+        }
 
         if (error) {
             console.error('SUPABASE INSERT ERROR on client:', error)
