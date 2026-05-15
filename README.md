@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Gustav - Plateforme de Gestion
 
-## Getting Started
+Gustav est une application SaaS interne de gestion de soumissions, projets et planification, propulsée par Next.js et Supabase.
 
-First, run the development server:
+## 🚀 Fonctionnalités
+- **Clients** : Gestion des clients (CRUD, Import Excel).
+- **Soumissions** : Création avancée de soumissions avec calculs financiers et upload d'images.
+- **Facturation/PDF** : Génération de PDF professionnels pour les soumissions.
+- **Workflow** : Approbation des soumissions (création automatique de projets).
+- **Planification** : Calendrier interactif FullCalendar (Drag-and-Drop).
+- **Analytiques** : Tableau de bord & KPI via Recharts.
 
+## 🛠️ Stack Technique
+- **Framework:** Next.js 15 (App Router, Server Actions)
+- **UI:** Tailwind CSS, shadcn/ui, Recharts
+- **Formulaires:** React Hook Form + Zod
+- **Backend / BDD:** Supabase (PostgreSQL, SSR Auth, Storage)
+- **Utilitaires:** FullCalendar, xlsx, jsPDF + html2canvas
+
+## 📋 Prérequis et Installation locale
+
+1. Cloner le projet et installer les dépendances:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Configuration de Supabase :
+  - Créer un projet sur [Supabase](https://supabase.com).
+  - Allez dans le **SQL Editor** et exécutez le script `/supabase/migrations/0000_initial_schema.sql`.
+  - Activez l'authentification par courriel/mot de passe.
+  - Allez dans **Storage** et créez un Bucket public nommé `quote-images`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Variables d'environnement :
+  Modifiez le fichier `.env.local` avec vos clés :
+```env
+NEXT_PUBLIC_SUPABASE_URL=votre_url_supabase
+NEXT_PUBLIC_SUPABASE_ANON_KEY=votre_clé_anon_supabase
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Lancer le serveur local :
+```bash
+npm run dev
+```
 
-## Learn More
+## 🚀 Déploiement sur Vercel
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Pousser votre code source sur un dépôt GitHub.
+2. Connectez-vous à [Vercel](https://vercel.com) et cliquez sur **Add New Project**.
+3. Importez votre dépôt `gustav`.
+4. Dans **Environment Variables**, ajoutez :
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+5. Cliquez sur **Deploy**.
+# Laucandrique
