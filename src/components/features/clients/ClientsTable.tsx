@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 import { Database } from '@/types/supabase'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
@@ -28,8 +30,8 @@ export function ClientsTable({ data }: { data: Client[] }) {
                         </TableRow>
                     ) : (
                         data.map((client) => (
-                            <TableRow key={client.id} className="border-b border-zinc-800 hover:bg-zinc-800/50 cursor-pointer">
-                                <TableCell className="font-medium text-zinc-100">{client.full_name}</TableCell>
+                            <TableRow key={client.id} className="border-b border-zinc-800 hover:bg-zinc-800/50">
+                                <TableCell className="font-medium text-zinc-100"><Link href={`/clients/${client.id}`} className="hover:underline">{client.full_name}</Link></TableCell>
                                 <TableCell>
                                     {client.company_name ? (
                                         <Badge variant="secondary" className="bg-zinc-800 text-zinc-300 hover:bg-zinc-700">{client.company_name}</Badge>
