@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 export async function getClients(query?: string) {
     const supabase = await createClient()
 
-    let request = supabase.from('clients').select('*').order('created_at', { ascending: false })
+    let request = supabase.from('clients').select('*, managers(first_name,last_name,email)').order('created_at', { ascending: false })
 
     if (query) {
         request = request.ilike('full_name', `%${query}%`)
@@ -35,6 +35,7 @@ export async function createClientAction(formData: FormData) {
         province: formData.get('province') as string || null,
         postal_code: formData.get('postal_code') as string || null,
         manager: formData.get('manager') as string || null,
+        manager_id: formData.get('manager_id') as string || null,
         notes: formData.get('notes') as string || null,
     }
 

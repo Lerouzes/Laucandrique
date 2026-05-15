@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, FileText, CalendarDays, BarChart, Settings } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, CalendarDays, BarChart, Settings, HardHat } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
     { name: 'Clients', href: '/clients', icon: Users },
     { name: 'Soumissions', href: '/quotes', icon: FileText },
     { name: 'Planification', href: '/planification', icon: CalendarDays },
+    { name: 'Contracteurs', href: '/contractors', icon: HardHat },
     { name: 'Analytiques', href: '/analytics', icon: BarChart },
     { name: 'Paramètres', href: '/settings', icon: Settings },
 ]

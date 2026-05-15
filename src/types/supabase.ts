@@ -74,6 +74,12 @@ export interface Database {
         }
         Relationships: []
       }
+      managers: {
+        Row: { id: string; first_name: string; last_name: string; email: string | null; created_at: string }
+        Insert: { id?: string; first_name: string; last_name: string; email?: string | null; created_at?: string }
+        Update: { id?: string; first_name?: string; last_name?: string; email?: string | null; created_at?: string }
+        Relationships: []
+      }
       clients: {
         Row: {
           id: string
@@ -86,6 +92,7 @@ export interface Database {
           phone: string | null
           email: string | null
           manager: string | null
+          manager_id: string | null
           notes: string | null
           created_at: string
         }
@@ -100,6 +107,8 @@ export interface Database {
           phone?: string | null
           email?: string | null
           manager?: string | null
+          manager_id?: string | null
+          manager_id?: string | null
           notes?: string | null
           created_at?: string
         }
@@ -114,6 +123,7 @@ export interface Database {
           phone?: string | null
           email?: string | null
           manager?: string | null
+          manager_id?: string | null
           notes?: string | null
           created_at?: string
         }
@@ -127,6 +137,7 @@ export interface Database {
           title: string
           description: string | null
           internal_notes: string | null
+          manager_id: string | null
           status: 'draft' | 'sent' | 'approved' | 'denied'
           estimated_duration_days: number
           subtotal: number
@@ -148,6 +159,8 @@ export interface Database {
           title: string
           description?: string | null
           internal_notes?: string | null
+          manager_id?: string | null
+          manager_id?: string | null
           status?: 'draft' | 'sent' | 'approved' | 'denied'
           estimated_duration_days?: number
           subtotal?: number
@@ -169,6 +182,7 @@ export interface Database {
           title?: string
           description?: string | null
           internal_notes?: string | null
+          manager_id?: string | null
           status?: 'draft' | 'sent' | 'approved' | 'denied'
           estimated_duration_days?: number
           subtotal?: number

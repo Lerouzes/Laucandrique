@@ -15,6 +15,8 @@ export async function getSettings() {
             default_profit_percentage: 15,
             gst_rate: 0.05,
             qst_rate: 0.09975,
+            monthly_goal_enabled: false,
+            monthly_goal_amount: 0,
         }
     }
     return data
@@ -35,6 +37,8 @@ export async function updateSettingsAction(formData: FormData, hasId: string | n
         default_profit_percentage: parseFloat(formData.get('default_profit_percentage') as string || '0'),
         gst_rate: parseFloat(formData.get('gst_rate') as string || '0.05'),
         qst_rate: parseFloat(formData.get('qst_rate') as string || '0.09975'),
+        monthly_goal_enabled: formData.get('monthly_goal_enabled') === 'on',
+        monthly_goal_amount: parseFloat(formData.get('monthly_goal_amount') as string || '0'),
         updated_at: new Date().toISOString()
     }
 
