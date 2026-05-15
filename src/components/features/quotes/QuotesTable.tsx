@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { frCA } from 'date-fns/locale'
-import { CheckCircle, XCircle } from 'lucide-react'
+import { CheckCircle, Pencil, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { updateQuoteStatus } from '@/actions/quotes'
 
@@ -84,6 +84,15 @@ function QuoteRow({ quote }: { quote: any }) {
                             </Button>
                         </>
                     )}
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => router.push(`/quotes/${quote.id}/edit`)}
+                        className="h-7 px-2 text-amber-400 hover:text-amber-300 hover:bg-amber-950/50"
+                        title="Modifier"
+                    >
+                        <Pencil className="h-4 w-4" />
+                    </Button>
                     <span className="text-sm text-zinc-400 ml-1">Voir →</span>
                 </div>
             </TableCell>
