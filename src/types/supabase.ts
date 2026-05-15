@@ -74,6 +74,12 @@ export interface Database {
         }
         Relationships: []
       }
+      managers: {
+        Row: { id: string; first_name: string; last_name: string; email: string | null; created_at: string }
+        Insert: { id?: string; first_name: string; last_name: string; email?: string | null; created_at?: string }
+        Update: { id?: string; first_name?: string; last_name?: string; email?: string | null; created_at?: string }
+        Relationships: []
+      }
       clients: {
         Row: {
           id: string
@@ -86,6 +92,7 @@ export interface Database {
           phone: string | null
           email: string | null
           manager: string | null
+          manager_id: string | null
           notes: string | null
           created_at: string
         }
@@ -100,6 +107,8 @@ export interface Database {
           phone?: string | null
           email?: string | null
           manager?: string | null
+          manager_id?: string | null
+          manager_id?: string | null
           notes?: string | null
           created_at?: string
         }
@@ -114,6 +123,7 @@ export interface Database {
           phone?: string | null
           email?: string | null
           manager?: string | null
+          manager_id?: string | null
           notes?: string | null
           created_at?: string
         }
@@ -123,9 +133,11 @@ export interface Database {
         Row: {
           id: string
           client_id: string
+          quote_number: number
           title: string
           description: string | null
           internal_notes: string | null
+          manager_id: string | null
           status: 'draft' | 'sent' | 'approved' | 'denied'
           estimated_duration_days: number
           subtotal: number
@@ -143,9 +155,12 @@ export interface Database {
         Insert: {
           id?: string
           client_id: string
+          quote_number?: number
           title: string
           description?: string | null
           internal_notes?: string | null
+          manager_id?: string | null
+          manager_id?: string | null
           status?: 'draft' | 'sent' | 'approved' | 'denied'
           estimated_duration_days?: number
           subtotal?: number
@@ -163,9 +178,11 @@ export interface Database {
         Update: {
           id?: string
           client_id?: string
+          quote_number?: number
           title?: string
           description?: string | null
           internal_notes?: string | null
+          manager_id?: string | null
           status?: 'draft' | 'sent' | 'approved' | 'denied'
           estimated_duration_days?: number
           subtotal?: number
@@ -274,6 +291,7 @@ export interface Database {
           id: string
           quote_id: string
           client_id: string
+          quote_number?: number
           title: string
           status: 'unplanned' | 'planned' | 'in_progress' | 'completed'
           estimated_duration_days: number
@@ -285,6 +303,7 @@ export interface Database {
           id?: string
           quote_id: string
           client_id: string
+          quote_number?: number
           title: string
           status?: 'unplanned' | 'planned' | 'in_progress' | 'completed'
           estimated_duration_days?: number

@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import { Download, CheckCircle, XCircle, ChevronLeft } from 'lucide-react'
+import { Download, CheckCircle, XCircle, ChevronLeft, Pencil } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { jsPDF } from 'jspdf'
@@ -91,6 +91,11 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                     <Download className="mr-2 h-4 w-4" />
                     {isGenerating ? 'Génération...' : 'Télécharger PDF'}
                 </Button>
+
+                <Link href={`/quotes/${quote.id}/edit`} className="group/button inline-flex h-8 items-center justify-center rounded-lg px-2.5 text-sm font-medium border border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 hover:text-zinc-100">
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Modifier la soumission
+                </Link>
 
                 {quote.status !== 'approved' && quote.status !== 'denied' && (
                     <>

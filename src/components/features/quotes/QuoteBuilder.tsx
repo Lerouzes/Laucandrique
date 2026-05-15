@@ -28,6 +28,8 @@ const quoteItemSchema = z.object({
 
 const quoteSchema = z.object({
     client_id: z.string().min(1, 'Client requis'),
+    project_type: z.enum(['interior','exterior']).default('interior'),
+    contractor_id: z.string().optional(),
     title: z.string().min(1, 'Titre requis'),
     description: z.string().optional(),
     internal_notes: z.string().optional(),
@@ -39,7 +41,7 @@ const quoteSchema = z.object({
 
 type QuoteFormValues = z.infer<typeof quoteSchema>
 
-export function QuoteBuilder({ clients, settings, initialQuote }: { clients: any[], settings: any, initialQuote?: any }) {
+export function QuoteBuilder({ clients, contractors, settings, initialQuote }: { clients: any[], contractors: any[], settings: any, initialQuote?: any }) {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
     const supabase = createClient()
@@ -53,6 +55,8 @@ export function QuoteBuilder({ clients, settings, initialQuote }: { clients: any
         mode: 'onChange',
         defaultValues: {
             client_id: initialQuote?.client_id || '',
+            contractor_id: initialQuote?.contractor_id || 'none',
+            project_type: initialQuote?.project_type || 'interior',
             title: initialQuote?.title || '',
             description: initialQuote?.description || '',
             internal_notes: initialQuote?.internal_notes || '',
@@ -144,10 +148,12 @@ export function QuoteBuilder({ clients, settings, initialQuote }: { clients: any
 
                 const finalQuoteData = {
                     client_id: data.client_id,
+                    contractor_id: data.contractor_id && data.contractor_id !== 'none' ? data.contractor_id : null,
                     title: data.title,
                     description: data.description,
                     internal_notes: data.internal_notes,
                     estimated_duration_days: data.estimated_duration_days,
+                    project_type: data.project_type,
                     admin_percentage: data.admin_percentage,
                     profit_percentage: data.profit_percentage,
                     ...calculatedTotals
@@ -220,6 +226,30 @@ export function QuoteBuilder({ clients, settings, initialQuote }: { clients: any
                                 />
 
                                 <div className="grid grid-cols-2 gap-4">
+
+                                <FormField
+                                    control={form.control}
+                                    name="contractor_id"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-zinc-300">Contracteur (optionnel)</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value || 'none'}>
+                                                <FormControl>
+                                                    <SelectTrigger className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600">
+                                                        <SelectValue placeholder="Aucun contracteur" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent className="bg-zinc-900 border-zinc-800">
+                                                    <SelectItem value="none">Aucun</SelectItem>
+                                                    {contractors.map(c => (
+                                                        <SelectItem key={c.id} value={String(c.id)}>{c.full_name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </FormItem>
+                                    )}
+                                />
+
                                     <FormField
                                         control={form.control}
                                         name="estimated_duration_days"
@@ -234,6 +264,28 @@ export function QuoteBuilder({ clients, settings, initialQuote }: { clients: any
                                         )}
                                     />
                                 </div>
+
+
+                                <FormField
+                                    control={form.control}
+                                    name="project_type"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-zinc-300">Type de projet</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value || 'interior'}>
+                                                <FormControl>
+                                                    <SelectTrigger className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600">
+                                                        <SelectValue placeholder="Type" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent className="bg-zinc-900 border-zinc-800">
+                                                    <SelectItem value="interior">Intérieur</SelectItem>
+                                                    <SelectItem value="exterior">Extérieur</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </FormItem>
+                                    )}
+                                />
 
                                 <FormField
                                     control={form.control}
@@ -338,6 +390,8 @@ export function QuoteBuilder({ clients, settings, initialQuote }: { clients: any
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-2 gap-4">
+
+
                                         {images.map((img, idx) => (
                                             <div key={idx} className="relative group border border-zinc-800 rounded-md overflow-hidden bg-zinc-950">
                                                 <img src={img.previewUrl} alt="Preview" className="w-full h-32 object-cover" />

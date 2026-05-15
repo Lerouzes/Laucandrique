@@ -35,13 +35,19 @@ export async function createClientAction(formData: FormData) {
         province: formData.get('province') as string || null,
         postal_code: formData.get('postal_code') as string || null,
         manager: formData.get('manager') as string || null,
+        manager_id: formData.get('manager_id') as string || null,
         notes: formData.get('notes') as string || null,
     }
 
     console.log('Inserting novel client:', newClient)
 
     try {
-        const { error } = await supabase.from('clients').insert(newClient)
+        let { error } = await supabase.from('clients').insert(newClient)
+        if (error && error.message.includes('manager_id')) {
+            const { manager_id, ...fallbackClient } = newClient as any
+            const retry = await supabase.from('clients').insert(fallbackClient)
+            error = retry.error
+        }
 
         if (error) {
             console.error('SUPABASE INSERT ERROR on client:', error)

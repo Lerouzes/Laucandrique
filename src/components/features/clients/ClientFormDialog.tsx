@@ -37,7 +37,7 @@ const clientSchema = z.object({
     postal_code: z.string().optional(),
 })
 
-export function ClientFormDialog() {
+export function ClientFormDialog({ managers = [] }: { managers?: any[] }) {
     const [open, setOpen] = useState(false)
     const [isPending, startTransition] = useTransition()
 
@@ -60,8 +60,10 @@ export function ClientFormDialog() {
             try {
                 const formData = new FormData()
                 Object.entries(values).forEach(([key, value]) => {
-                    if (value) formData.append(key, value)
+                    if (value) formData.append(key, value as string)
                 })
+                const selected = managers.find((m: any) => `${m.first_name} ${m.last_name}` === values.manager)
+                if (selected) formData.append('manager_id', selected.id)
 
                 const res = await createClientAction(formData)
 
@@ -124,6 +126,25 @@ export function ClientFormDialog() {
                                     </FormItem>
                                 )}
                             />
+
+                            <FormField
+                                control={form.control}
+                                name="manager"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="text-zinc-300">Gestionnaire</FormLabel>
+                                        <FormControl>
+                                            <select {...field} className="h-10 w-full rounded-md border bg-zinc-900 border-zinc-800 px-3 text-zinc-100">
+                                                <option value="">Aucun</option>
+                                                {managers.map((m: any) => (
+                                                    <option key={m.id} value={`${m.first_name} ${m.last_name}`} data-id={m.id}>{m.first_name} {m.last_name}</option>
+                                                ))}
+                                            </select>
+                                        </FormControl>
+                                    </FormItem>
+                                )}
+                            />
+
                             <FormField
                                 control={form.control}
                                 name="email"
