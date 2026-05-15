@@ -1,0 +1,244 @@
+'use client'
+
+import { useRef, useState, useTransition } from 'react'
+import { Download, CheckCircle, XCircle, ChevronLeft } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { jsPDF } from 'jspdf'
+import html2canvas from 'html2canvas'
+import { toast } from 'sonner'
+import { format } from 'date-fns'
+import { frCA } from 'date-fns/locale'
+
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { updateQuoteStatus, revertQuoteToPending } from '@/actions/quotes'
+
+export function QuoteDetailView({ quote, settings }: { quote: any, settings: any }) {
+    const router = useRouter()
+    const pdfRef = useRef<HTMLDivElement>(null)
+    const [isGenerating, setIsGenerating] = useState(false)
+    const [isPending, startTransition] = useTransition()
+
+    const generatePDF = async () => {
+        if (!pdfRef.current) return
+        try {
+            setIsGenerating(true)
+            const canvas = await html2canvas(pdfRef.current, { scale: 2, useCORS: true })
+            const imgData = canvas.toDataURL('image/png')
+
+            const pdf = new jsPDF({
+                orientation: 'p',
+                unit: 'mm',
+                format: 'a4',
+            })
+
+            const pdfWidth = pdf.internal.pageSize.getWidth()
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width
+
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
+            pdf.save(`Soumission-${quote.title}.pdf`)
+            toast.success('PDF généré avec succès')
+        } catch (error) {
+            toast.error('Erreur lors de la génération du PDF')
+            console.error(error)
+        } finally {
+            setIsGenerating(false)
+        }
+    }
+
+    const handleStatusChange = (status: 'approved' | 'denied') => {
+        startTransition(async () => {
+            try {
+                await updateQuoteStatus(quote.id, status, quote.client_id, quote.title, quote.estimated_duration_days)
+                toast.success(`Soumission ${status === 'approved' ? 'approuvée' : 'refusée'}.`)
+                router.refresh()
+            } catch (err: any) {
+                toast.error("Erreur de mise à jour", { description: err.message })
+            }
+        })
+    }
+
+    const handleRevertToDraft = () => {
+        startTransition(async () => {
+            try {
+                await revertQuoteToPending(quote.id)
+                toast.success("Soumission repassée en brouillon. Le projet associé a été supprimé.")
+                router.refresh()
+            } catch (err: any) {
+                toast.error("Erreur", { description: err.message })
+            }
+        })
+    }
+
+    return (
+        <div className="space-y-6 max-w-4xl mx-auto pb-12 w-full overflow-x-auto">
+            <div className="flex items-center justify-between min-w-[700px]">
+                <Link href="/quotes" className="inline-flex items-center text-zinc-400 hover:text-zinc-100 text-sm transition-colors">
+                    <ChevronLeft className="mr-1 h-4 w-4" />
+                    Retour aux soumissions
+                </Link>
+                <div className="flex gap-2 text-sm text-zinc-400">
+                    {quote.status === 'draft' && <Badge className="bg-zinc-800 text-zinc-300">Brouillon</Badge>}
+                    {quote.status === 'sent' && <Badge className="bg-blue-900/50 text-blue-300 border-blue-800 border">Envoyée</Badge>}
+                    {quote.status === 'approved' && <Badge className="bg-green-900/50 text-green-300 border-green-800 border">Approuvée</Badge>}
+                    {quote.status === 'denied' && <Badge className="bg-red-900/50 text-red-300 border-red-800 border">Refusée</Badge>}
+                </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 mb-4 min-w-[700px]">
+                <Button onClick={generatePDF} disabled={isGenerating} className="bg-zinc-100 text-zinc-900 hover:bg-zinc-200">
+                    <Download className="mr-2 h-4 w-4" />
+                    {isGenerating ? 'Génération...' : 'Télécharger PDF'}
+                </Button>
+
+                {quote.status !== 'approved' && quote.status !== 'denied' && (
+                    <>
+                        <Button
+                            variant="outline"
+                            onClick={() => handleStatusChange('approved')}
+                            disabled={isPending}
+                            className="border-green-800 bg-green-950/20 text-green-400 hover:bg-green-900/50 hover:text-green-300"
+                        >
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            Approuver le projet
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => handleStatusChange('denied')}
+                            disabled={isPending}
+                            className="border-red-800 bg-red-950/20 text-red-400 hover:bg-red-900/50 hover:text-red-300"
+                        >
+                            <XCircle className="mr-2 h-4 w-4" />
+                            Refuser
+                        </Button>
+                    </>
+                )}
+
+                {quote.status === 'approved' && (
+                    <Button
+                        variant="outline"
+                        onClick={handleRevertToDraft}
+                        disabled={isPending}
+                        className="border-yellow-800 bg-yellow-950/20 text-yellow-400 hover:bg-yellow-900/50 hover:text-yellow-300"
+                    >
+                        <XCircle className="mr-2 h-4 w-4" />
+                        Repasser en brouillon
+                    </Button>
+                )}
+            </div>
+
+            <div className="bg-white text-black p-10 rounded-lg shadow-sm w-[800px] shrink-0" ref={pdfRef}>
+                <div className="flex justify-between items-start mb-8">
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight text-zinc-900">{settings.company_name || 'Gustav Inc.'}</h1>
+                        <p className="text-zinc-500 mt-1">Soumission Officielle</p>
+                    </div>
+                    <div className="text-right">
+                        <h2 className="text-xl font-semibold mb-2">SOUMISSION</h2>
+                        <div className="text-sm text-zinc-600">
+                            <p>Date: {format(new Date(quote.created_at), 'dd MMMM yyyy', { locale: frCA })}</p>
+                            <p>Durée estimée: {quote.estimated_duration_days} jours</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex justify-between mb-8">
+                    <div className="w-1/2">
+                        <h3 className="font-semibold text-zinc-900 mb-2 border-b pb-1">Client</h3>
+                        <div className="text-sm text-zinc-700 space-y-1">
+                            <p className="font-bold text-black">{quote.clients?.full_name}</p>
+                            {quote.clients?.company_name && <p>{quote.clients.company_name}</p>}
+                            <p>{quote.clients?.address || ''} {quote.clients?.city || ''}</p>
+                            <p>{quote.clients?.email}</p>
+                            <p>{quote.clients?.phone}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mb-8">
+                    <h3 className="text-xl font-semibold mb-2">{quote.title}</h3>
+                    {quote.description && (
+                        <p className="text-zinc-600 text-sm whitespace-pre-wrap">{quote.description}</p>
+                    )}
+                </div>
+
+                <div className="mb-8">
+                    <table className="w-full text-sm text-left">
+                        <thead>
+                            <tr className="border-b-2 border-zinc-300 text-zinc-900">
+                                <th className="py-2">Description</th>
+                                <th className="py-2 text-center">Quantité</th>
+                                <th className="py-2 text-center">Unité</th>
+                                <th className="py-2 text-right">Prix Unitaire</th>
+                                <th className="py-2 text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-zinc-700">
+                            {quote.quote_items?.map((item: any) => (
+                                <tr key={item.id} className="border-b border-zinc-200">
+                                    <td className="py-2 pr-4">{item.description}</td>
+                                    <td className="py-2 text-center">{item.quantity}</td>
+                                    <td className="py-2 text-center">{item.unit || '-'}</td>
+                                    <td className="py-2 text-right">${item.unit_cost?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
+                                    <td className="py-2 text-right font-medium text-zinc-900">${item.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="flex justify-end mb-8">
+                    <div className="w-64 space-y-2 text-sm text-zinc-700">
+                        <div className="flex justify-between">
+                            <span>Sous-total:</span>
+                            <span>${quote.subtotal?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        {quote.admin_amount > 0 && (
+                            <div className="flex justify-between">
+                                <span>Administration ({quote.admin_percentage}%):</span>
+                                <span>${quote.admin_amount?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                        )}
+                        {quote.profit_amount > 0 && (
+                            <div className="flex justify-between">
+                                <span>Profit ({quote.profit_percentage}%):</span>
+                                <span>${quote.profit_amount?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between">
+                            <span>TPS:</span>
+                            <span>${quote.gst_amount?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>TVQ:</span>
+                            <span>${quote.qst_amount?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between pt-2 border-t-2 border-zinc-300 font-bold text-lg text-black bg-zinc-50 px-2 rounded-sm pb-1">
+                            <span>Total:</span>
+                            <span>${quote.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {quote.quote_images?.length > 0 && (
+                    <div className="mt-12 pt-8 border-t-2 border-zinc-200">
+                        <h3 className="font-semibold text-zinc-900 mb-4">Photos du projet</h3>
+                        <div className="grid grid-cols-2 gap-6">
+                            {quote.quote_images.map((img: any) => (
+                                <div key={img.id} className="border border-zinc-200 rounded-md overflow-hidden bg-zinc-50">
+                                    <img src={img.image_url} alt="Photo" className="w-full h-48 object-cover object-center" crossOrigin="anonymous" />
+                                    {img.caption && <div className="p-3 text-sm text-zinc-700 font-medium bg-white">{img.caption}</div>}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <div className="mt-12 text-center text-xs text-zinc-400">
+                    Ce document est généré par {settings.company_name || 'Gustav'}. Merci de votre confiance.
+                </div>
+            </div>
+        </div>
+    )
+}

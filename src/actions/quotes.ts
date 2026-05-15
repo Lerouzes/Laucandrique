@@ -1,0 +1,150 @@
+'use server'
+
+import { createClient } from '@/utils/supabase/server'
+import { revalidatePath } from 'next/cache'
+
+export async function getQuotes(query?: string, statusFilter?: string) {
+    const supabase = await createClient()
+
+    let request = supabase
+        .from('quotes')
+        .select('*, clients(full_name, company_name)')
+        .order('created_at', { ascending: false })
+
+    if (query) {
+        request = request.ilike('title', `%${query}%`)
+    }
+
+    if (statusFilter && statusFilter !== 'all') {
+        request = request.eq('status', statusFilter as 'draft' | 'sent' | 'approved' | 'denied')
+    }
+
+    const { data, error } = await request
+
+    if (error) {
+        console.error('Error fetching quotes:', error)
+        return []
+    }
+
+    return data
+}
+
+export async function createQuoteAction(quoteData: any, itemsData: any[], imagesData: any[]) {
+    const supabase = await createClient()
+
+    const { data: quote, error: quoteError } = await supabase.from('quotes').insert({
+        ...quoteData,
+        status: 'draft',
+    }).select().single()
+
+    if (quoteError || !quote) {
+        throw new Error(quoteError?.message || 'Erreur lors de la création de la soumission')
+    }
+
+    if (itemsData && itemsData.length > 0) {
+        const itemsToInsert = itemsData.map(item => ({ ...item, quote_id: quote.id }))
+        const { error: itemsError } = await supabase.from('quote_items').insert(itemsToInsert)
+        if (itemsError) throw new Error(itemsError.message)
+    }
+
+    if (imagesData && imagesData.length > 0) {
+        const imagesToInsert = imagesData.map(img => ({ ...img, quote_id: quote.id }))
+        const { error: imagesError } = await supabase.from('quote_images').insert(imagesToInsert)
+        if (imagesError) throw new Error(imagesError.message)
+    }
+
+    revalidatePath('/quotes')
+    return { success: true, id: quote.id }
+}
+
+export async function updateQuoteAction(quoteId: string, quoteData: any, itemsData: any[], imagesData: any[], keepExistingImages: boolean = false) {
+    const supabase = await createClient()
+
+    const { error: quoteError } = await supabase.from('quotes').update(quoteData).eq('id', quoteId)
+    if (quoteError) throw new Error(quoteError.message)
+
+    // Replace all items
+    await supabase.from('quote_items').delete().eq('quote_id', quoteId)
+    if (itemsData && itemsData.length > 0) {
+        const itemsToInsert = itemsData.map(item => ({ ...item, quote_id: quoteId }))
+        const { error: itemsError } = await supabase.from('quote_items').insert(itemsToInsert)
+        if (itemsError) throw new Error(itemsError.message)
+    }
+
+    // Add new images (keep existing unless caller requests a full replace)
+    if (!keepExistingImages) {
+        await supabase.from('quote_images').delete().eq('quote_id', quoteId)
+    }
+    if (imagesData && imagesData.length > 0) {
+        const imagesToInsert = imagesData.map(img => ({ ...img, quote_id: quoteId }))
+        const { error: imagesError } = await supabase.from('quote_images').insert(imagesToInsert)
+        if (imagesError) throw new Error(imagesError.message)
+    }
+
+    revalidatePath('/quotes')
+    revalidatePath(`/quotes/${quoteId}`)
+    return { success: true, id: quoteId }
+}
+
+export async function updateQuoteStatus(quoteId: string, status: 'approved' | 'denied', clientId: string, titleStr: string, durDays: number) {
+    const supabase = await createClient()
+
+    const { error: updateError } = await supabase.from('quotes').update({
+        status,
+        ...(status === 'approved' ? { approved_at: new Date().toISOString() } : { denied_at: new Date().toISOString() })
+    }).eq('id', quoteId)
+
+    if (updateError) throw new Error(updateError.message)
+
+    if (status === 'approved') {
+        await supabase.from('projects').insert({
+            quote_id: quoteId,
+            client_id: clientId,
+            title: titleStr,
+            status: 'unplanned',
+            estimated_duration_days: durDays,
+        })
+    }
+
+    revalidatePath('/quotes')
+    revalidatePath(`/quotes/${quoteId}`)
+    revalidatePath('/planification')
+
+    return { success: true }
+}
+
+export async function getQuote(id: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('quotes')
+        .select('*, clients(*), quote_items(*), quote_images(*)')
+        .eq('id', id)
+        .single()
+
+    if (error) return null
+    return data
+}
+
+export async function revertQuoteToPending(quoteId: string) {
+    const supabase = await createClient()
+
+    // Status back to draft (for modifications)
+    const { error: quoteError } = await supabase.from('quotes').update({
+        status: 'draft' as const,
+        approved_at: null
+    }).eq('id', quoteId)
+
+    if (quoteError) throw new Error(quoteError.message)
+
+    // Delete associated project
+    const { error: projectError } = await supabase.from('projects').delete().eq('quote_id', quoteId)
+
+    if (projectError) throw new Error(projectError.message)
+
+    revalidatePath('/quotes')
+    revalidatePath(`/quotes/${quoteId}`)
+    revalidatePath('/planification')
+    revalidatePath('/dashboard')
+
+    return { success: true }
+}
