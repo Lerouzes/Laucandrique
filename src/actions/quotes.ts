@@ -108,7 +108,7 @@ export async function updateQuoteStatus(quoteId: string, status: 'approved' | 'd
 
     if (status === 'approved') {
         const { data: quoteMeta } = await supabase.from('quotes').select('contractor_id, project_type').eq('id', quoteId).single()
-        await supabase.from('projects').insert({
+        const projectPayload: any = {
             quote_id: quoteId,
             client_id: clientId,
             contractor_id: quoteMeta?.contractor_id || null,
