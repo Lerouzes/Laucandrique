@@ -1,10 +1,12 @@
 import { getClients } from '@/actions/clients'
 import { getSettings } from '@/actions/settings'
+import { getContractors } from '@/actions/contractors'
 import { QuoteBuilder } from '@/components/features/quotes/QuoteBuilder'
 
 export default async function NewQuotePage() {
     const clients = await getClients()
     const settings = await getSettings()
+    const contractors = await getContractors()
 
     return (
         <div className="space-y-6">
@@ -15,7 +17,7 @@ export default async function NewQuotePage() {
                 </p>
             </div>
 
-            <QuoteBuilder clients={clients} settings={settings} />
+            <QuoteBuilder clients={clients} contractors={contractors} settings={settings} />
         </div>
     )
 }

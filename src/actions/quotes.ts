@@ -8,11 +8,18 @@ export async function getQuotes(query?: string, statusFilter?: string) {
 
     let request = supabase
         .from('quotes')
-        .select('*, clients(full_name, company_name)')
+        .select('*, clients(full_name, company_name, manager_id), managers(first_name,last_name), contractors(id, full_name, color)')
         .order('created_at', { ascending: false })
 
     if (query) {
-        request = request.ilike('title', `%${query}%`)
+        const sanitized = query.trim()
+        if (sanitized) {
+            if (/^\d+$/.test(sanitized)) {
+                request = request.or(`title.ilike.%${sanitized}%,quote_number.eq.${sanitized}`)
+            } else {
+                request = request.ilike('title', `%${sanitized}%`)
+            }
+        }
     }
 
     if (statusFilter && statusFilter !== 'all') {
@@ -32,8 +39,11 @@ export async function getQuotes(query?: string, statusFilter?: string) {
 export async function createQuoteAction(quoteData: any, itemsData: any[], imagesData: any[]) {
     const supabase = await createClient()
 
+    const { data: clientData } = await supabase.from('clients').select('manager_id').eq('id', quoteData.client_id).single()
+
     const { data: quote, error: quoteError } = await supabase.from('quotes').insert({
         ...quoteData,
+        manager_id: clientData?.manager_id || null,
         status: 'draft',
     }).select().single()
 
@@ -97,9 +107,12 @@ export async function updateQuoteStatus(quoteId: string, status: 'approved' | 'd
     if (updateError) throw new Error(updateError.message)
 
     if (status === 'approved') {
+        const { data: quoteMeta } = await supabase.from('quotes').select('contractor_id, project_type').eq('id', quoteId).single()
         await supabase.from('projects').insert({
             quote_id: quoteId,
             client_id: clientId,
+            contractor_id: quoteMeta?.contractor_id || null,
+            project_type: quoteMeta?.project_type || 'interior',
             title: titleStr,
             status: 'unplanned',
             estimated_duration_days: durDays,
@@ -117,7 +130,7 @@ export async function getQuote(id: string) {
     const supabase = await createClient()
     const { data, error } = await supabase
         .from('quotes')
-        .select('*, clients(*), quote_items(*), quote_images(*)')
+        .select('*, clients(*), contractors(*), quote_items(*), quote_images(*)')
         .eq('id', id)
         .single()
 

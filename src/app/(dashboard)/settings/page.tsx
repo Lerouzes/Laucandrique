@@ -9,10 +9,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getSettings, updateSettingsAction } from '@/actions/settings'
+import { getManagers, createManagerAction } from '@/actions/managers'
 
 export default function SettingsPage() {
     const [isPending, startTransition] = useTransition()
     const [settingsId, setSettingsId] = useState<string | null>(null)
+    const [managers, setManagers] = useState<any[]>([])
 
     const form = useForm({
         defaultValues: {
@@ -20,7 +22,9 @@ export default function SettingsPage() {
             default_admin_percentage: 10,
             default_profit_percentage: 15,
             gst_rate: 0.05,
-            qst_rate: 0.09975
+            qst_rate: 0.09975,
+            monthly_goal_enabled: false,
+            monthly_goal_amount: 0
         }
     })
 
@@ -32,10 +36,16 @@ export default function SettingsPage() {
                 default_admin_percentage: data.default_admin_percentage || 10,
                 default_profit_percentage: data.default_profit_percentage || 15,
                 gst_rate: data.gst_rate || 0.05,
-                qst_rate: data.qst_rate || 0.09975
+                qst_rate: data.qst_rate || 0.09975,
+                monthly_goal_enabled: data.monthly_goal_enabled || false,
+                monthly_goal_amount: data.monthly_goal_amount || 0
             })
         })
     }, [form])
+
+    useEffect(() => {
+        getManagers().then(setManagers)
+    }, [])
 
     const onSubmit = (values: any) => {
         startTransition(async () => {
@@ -98,12 +108,42 @@ export default function SettingsPage() {
                     </CardContent>
                 </Card>
 
+
+                <Card className="bg-zinc-900 border-zinc-800">
+                    <CardHeader>
+                        <CardTitle className="text-zinc-100">Objectif mensuel</CardTitle>
+                        <CardDescription className="text-zinc-400">Activez/désactivez l'objectif de revenus mensuels.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <label className="flex items-center gap-2 text-zinc-300">
+                            <input type="checkbox" {...form.register('monthly_goal_enabled')} />
+                            Activer les objectifs mensuels
+                        </label>
+                        <div className="space-y-2">
+                            <Label className="text-zinc-300">Montant cible mensuel ($)</Label>
+                            <Input type="number" step="1" {...form.register('monthly_goal_amount')} className="bg-zinc-950 border-zinc-800 text-zinc-100 focus-visible:ring-zinc-600" />
+                        </div>
+                    </CardContent>
+                </Card>
+
                 <div className="flex justify-end">
                     <Button type="submit" disabled={isPending} className="bg-zinc-100 text-zinc-900 hover:bg-zinc-200">
                         <Save className="w-4 h-4 mr-2" />
                         {isPending ? 'Enregistrement...' : 'Enregistrer'}
                     </Button>
                 </div>
+                <Card className="bg-zinc-900 border-zinc-800">
+                    <CardHeader><CardTitle className="text-zinc-100">Gestionnaires</CardTitle></CardHeader>
+                    <CardContent className="space-y-3">
+                        <form action={async (fd) => { await createManagerAction(fd); setManagers(await getManagers()) }} className="grid grid-cols-4 gap-2">
+                            <Input name="first_name" placeholder="Prénom" required />
+                            <Input name="last_name" placeholder="Nom" required />
+                            <Input name="email" placeholder="Courriel" />
+                            <Button type="submit">Ajouter</Button>
+                        </form>
+                        <div className="space-y-1 text-sm">{managers.map((m: any) => <div key={m.id}>{m.first_name} {m.last_name} — {m.email || '-'} </div>)}</div>
+                    </CardContent>
+                </Card>
             </form>
         </div>
     )

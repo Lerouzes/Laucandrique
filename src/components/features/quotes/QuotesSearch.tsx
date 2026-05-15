@@ -35,7 +35,7 @@ export function QuotesSearch({ initialQuery, initialStatus }: { initialQuery: st
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-500" />
                 <Input
                     type="search"
-                    placeholder="Rechercher une soumission (titre)..."
+                    placeholder="Rechercher par numéro ou titre..."
                     className="w-full bg-zinc-900 border-zinc-800 pl-9 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-zinc-600 focus-visible:border-transparent"
                     value={val}
                     onChange={(e) => setVal(e.target.value)}
