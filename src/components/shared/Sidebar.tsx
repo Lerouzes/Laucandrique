@@ -18,9 +18,9 @@ export function Sidebar() {
     const pathname = usePathname()
 
     return (
-        <div className="flex h-full w-64 flex-col border-r border-zinc-800 bg-zinc-900">
-            <div className="flex h-16 items-center border-b border-zinc-800 px-6">
-                <h1 className="text-xl font-bold tracking-tight text-zinc-100">Gustav</h1>
+        <div className="flex h-full w-64 flex-col border-r border-white/20 bg-[#103f75]/80 backdrop-blur-md">
+            <div className="flex h-16 items-center border-b border-white/15 px-6">
+                <h1 className="text-xl font-bold tracking-tight text-white">Gustav</h1>
             </div>
             <nav className="flex-1 space-y-1 px-3 py-4">
                 {navItems.map((item) => {
@@ -31,14 +31,14 @@ export function Sidebar() {
                             href={item.href}
                             className={cn(
                                 isActive
-                                    ? 'bg-zinc-800 text-zinc-100'
-                                    : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100',
+                                    ? 'bg-white/20 text-white shadow-sm'
+                                    : 'text-white/75 hover:bg-white/12 hover:text-white',
                                 'group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors'
                             )}
                         >
                             <item.icon
                                 className={cn(
-                                    isActive ? 'text-zinc-100' : 'text-zinc-400 group-hover:text-zinc-300',
+                                    isActive ? 'text-white' : 'text-white/70 group-hover:text-white',
                                     'mr-3 flex-shrink-0 h-5 w-5 transition-colors'
                                 )}
                                 aria-hidden="true"

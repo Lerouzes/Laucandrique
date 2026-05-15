@@ -12,7 +12,14 @@ export async function getQuotes(query?: string, statusFilter?: string) {
         .order('created_at', { ascending: false })
 
     if (query) {
-        request = request.ilike('title', `%${query}%`)
+        const sanitized = query.trim()
+        if (sanitized) {
+            if (/^\d+$/.test(sanitized)) {
+                request = request.or(`title.ilike.%${sanitized}%,quote_number.eq.${sanitized}`)
+            } else {
+                request = request.ilike('title', `%${sanitized}%`)
+            }
+        }
     }
 
     if (statusFilter && statusFilter !== 'all') {

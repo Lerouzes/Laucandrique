@@ -123,6 +123,7 @@ export interface Database {
         Row: {
           id: string
           client_id: string
+          quote_number: number
           title: string
           description: string | null
           internal_notes: string | null
@@ -143,6 +144,7 @@ export interface Database {
         Insert: {
           id?: string
           client_id: string
+          quote_number?: number
           title: string
           description?: string | null
           internal_notes?: string | null
@@ -163,6 +165,7 @@ export interface Database {
         Update: {
           id?: string
           client_id?: string
+          quote_number?: number
           title?: string
           description?: string | null
           internal_notes?: string | null
@@ -274,6 +277,7 @@ export interface Database {
           id: string
           quote_id: string
           client_id: string
+          quote_number?: number
           title: string
           status: 'unplanned' | 'planned' | 'in_progress' | 'completed'
           estimated_duration_days: number
@@ -285,6 +289,7 @@ export interface Database {
           id?: string
           quote_id: string
           client_id: string
+          quote_number?: number
           title: string
           status?: 'unplanned' | 'planned' | 'in_progress' | 'completed'
           estimated_duration_days?: number

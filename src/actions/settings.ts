@@ -9,6 +9,7 @@ export async function getSettings() {
 
     if (error || !data) {
         return {
+            id: null,
             company_name: 'Gustav Inc.',
             default_admin_percentage: 10,
             default_profit_percentage: 15,
@@ -22,8 +23,14 @@ export async function getSettings() {
 export async function updateSettingsAction(formData: FormData, hasId: string | null) {
     const supabase = await createClient()
 
+    const companyName = formData.get('company_name')
+
+    if (typeof companyName !== 'string' || !companyName.trim()) {
+        throw new Error("Le nom de l'entreprise est requis")
+    }
+
     const payload = {
-        company_name: formData.get('company_name'),
+        company_name: companyName.trim(),
         default_admin_percentage: parseFloat(formData.get('default_admin_percentage') as string || '0'),
         default_profit_percentage: parseFloat(formData.get('default_profit_percentage') as string || '0'),
         gst_rate: parseFloat(formData.get('gst_rate') as string || '0.05'),
