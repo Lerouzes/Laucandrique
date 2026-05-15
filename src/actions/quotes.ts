@@ -122,6 +122,8 @@ export async function updateQuoteStatus(quoteId: string, status: 'approved' | 'd
             delete projectPayload.project_type
             inserted = await supabase.from('projects').insert(projectPayload)
         }
+
+        if (inserted.error) throw new Error(inserted.error.message)
     }
 
     revalidatePath('/quotes')
