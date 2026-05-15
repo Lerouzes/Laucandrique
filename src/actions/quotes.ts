@@ -8,7 +8,7 @@ export async function getQuotes(query?: string, statusFilter?: string) {
 
     let request = supabase
         .from('quotes')
-        .select('*, clients(full_name, company_name), contractors(id, full_name, color)')
+        .select('*, clients(full_name, company_name, manager_id), managers(first_name,last_name), contractors(id, full_name, color)')
         .order('created_at', { ascending: false })
 
     if (query) {
@@ -39,20 +39,13 @@ export async function getQuotes(query?: string, statusFilter?: string) {
 export async function createQuoteAction(quoteData: any, itemsData: any[], imagesData: any[]) {
     const supabase = await createClient()
 
-    let payload: any = { ...quoteData, status: 'draft' }
-    try {
-        const { data: clientData } = await supabase.from('clients').select('manager_id').eq('id', quoteData.client_id).single()
-        payload.manager_id = clientData?.manager_id || null
-    } catch {}
+    const { data: clientData } = await supabase.from('clients').select('manager_id').eq('id', quoteData.client_id).single()
 
-    let { data: quote, error: quoteError } = await supabase.from('quotes').insert(payload).select().single()
-    if (quoteError && (quoteError.message.includes('manager_id') || quoteError.message.includes('project_type'))) {
-        delete payload.manager_id
-        delete payload.project_type
-        const retry = await supabase.from('quotes').insert(payload).select().single()
-        quote = retry.data
-        quoteError = retry.error
-    }
+    const { data: quote, error: quoteError } = await supabase.from('quotes').insert({
+        ...quoteData,
+        manager_id: clientData?.manager_id || null,
+        status: 'draft',
+    }).select().single()
 
     if (quoteError || !quote) {
         throw new Error(quoteError?.message || 'Erreur lors de la création de la soumission')
@@ -114,13 +107,8 @@ export async function updateQuoteStatus(quoteId: string, status: 'approved' | 'd
     if (updateError) throw new Error(updateError.message)
 
     if (status === 'approved') {
-        const { data: quoteMeta } = await supabase
-            .from('quotes')
-            .select('contractor_id, project_type')
-            .eq('id', quoteId)
-            .single()
-
-        const projectPayload: Record<string, unknown> = {
+        const { data: quoteMeta } = await supabase.from('quotes').select('contractor_id, project_type').eq('id', quoteId).single()
+        await supabase.from('projects').insert({
             quote_id: quoteId,
             client_id: clientId,
             contractor_id: quoteMeta?.contractor_id || null,
@@ -129,7 +117,6 @@ export async function updateQuoteStatus(quoteId: string, status: 'approved' | 'd
             status: 'unplanned',
             estimated_duration_days: durDays,
         }
-
         let inserted = await supabase.from('projects').insert(projectPayload)
         if (inserted.error && inserted.error.message.includes('project_type')) {
             delete projectPayload.project_type
