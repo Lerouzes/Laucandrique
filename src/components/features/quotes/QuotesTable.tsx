@@ -43,6 +43,7 @@ function QuoteRow({ quote }: { quote: any }) {
             className="border-b border-zinc-800 hover:bg-zinc-800/50 cursor-pointer"
             onClick={() => router.push(`/quotes/${quote.id}`)}
         >
+            <TableCell className="text-zinc-300 font-mono">#{quote.quote_number}</TableCell>
             <TableCell className="font-medium text-zinc-100">{quote.title}</TableCell>
             <TableCell className="text-zinc-400">
                 {quote.clients?.full_name}
@@ -96,6 +97,7 @@ export function QuotesTable({ data }: { data: any[] }) {
             <Table>
                 <TableHeader className="bg-zinc-900 border-b border-zinc-800">
                     <TableRow className="border-b border-zinc-800 hover:bg-zinc-900">
+                        <TableHead className="text-zinc-400 font-medium">#</TableHead>
                         <TableHead className="text-zinc-400 font-medium">Titre</TableHead>
                         <TableHead className="text-zinc-400 font-medium">Client</TableHead>
                         <TableHead className="text-zinc-400 font-medium">Statut</TableHead>
@@ -107,7 +109,7 @@ export function QuotesTable({ data }: { data: any[] }) {
                 <TableBody>
                     {data.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={6} className="h-24 text-center text-zinc-500">
+                            <TableCell colSpan={7} className="h-24 text-center text-zinc-500">
                                 Aucune soumission trouvée.
                             </TableCell>
                         </TableRow>
