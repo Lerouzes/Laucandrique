@@ -11,6 +11,10 @@ import { frCA } from 'date-fns/locale'
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ managers?: string }> }) {
     const resolvedSearchParams = await searchParams
     const selectedManagers = (resolvedSearchParams.managers || '').split(',').filter(Boolean)
+    const now = new Date()
+    const rangeStart = new Date(now)
+    rangeStart.setFullYear(now.getFullYear() - 1)
+    const rangeEnd = now
     const quotes = await getQuotes()
     const projects = await getProjects()
     const settings = await getSettings()
@@ -18,7 +22,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     const filteredQuotes = quotes.filter((q: any) => {
         const dateRef = q.approved_at || q.created_at
         const d = new Date(dateRef)
-        return d >= range.start && d <= range.end
+        return d >= rangeStart && d <= rangeEnd
     })
     const approvedQuotes = filteredQuotes.filter((q: any) => q.status === 'approved')
     const deniedQuotes = filteredQuotes.filter((q: any) => q.status === 'denied')

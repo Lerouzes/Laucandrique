@@ -41,14 +41,21 @@ export async function createQuoteAction(quoteData: any, itemsData: any[], images
 
     const { data: clientData } = await supabase.from('clients').select('manager_id').eq('id', quoteData.client_id).single()
 
-    const { data: quote, error: quoteError } = await supabase.from('quotes').insert({
+    const quotePayload: any = {
         ...quoteData,
         manager_id: clientData?.manager_id || null,
         status: 'draft',
-    }).select().single()
+    }
 
-    if (quoteError || !quote) {
-        throw new Error(quoteError?.message || 'Erreur lors de la création de la soumission')
+    let quoteInsert = await supabase.from('quotes').insert(quotePayload).select().single()
+    if (quoteInsert.error && quoteInsert.error.message.includes('project_type')) {
+        delete quotePayload.project_type
+        quoteInsert = await supabase.from('quotes').insert(quotePayload).select().single()
+    }
+
+    const quote = quoteInsert.data
+    if (quoteInsert.error || !quote) {
+        throw new Error(quoteInsert.error?.message || 'Erreur lors de la création de la soumission')
     }
 
     if (itemsData && itemsData.length > 0) {
