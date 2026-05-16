@@ -46,7 +46,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         let draggableInstance: Draggable | null = null
         if (externalEventsRef.current) {
             draggableInstance = new Draggable(externalEventsRef.current, {
-                itemSelector: '.fc-event-external',
+                itemSelector: '.fc-event-external-draggable',
                 eventData: function (eventEl) {
                     const durationDays = Number(eventEl.getAttribute('data-duration-days') || '1')
                     const durationMinutes = Math.max(15, Math.round(durationDays * 24 * 60))
@@ -109,6 +109,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                 quoteId: p.quote_id,
                 projectType: p.project_type,
                 isHourly,
+                eventColor,
             }
         }
     })
@@ -268,7 +269,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                             <div className="font-medium text-zinc-100 text-sm leading-tight flex items-center gap-2"><span className='inline-block h-2 w-2 rounded-full' style={{ backgroundColor: TYPE_DOT[project.project_type || 'interior'] }} />{project.title}</div>
                                             {project.quotes?.quote_number && <div className='text-[11px] text-zinc-400'>Soumission #{project.quotes.quote_number}</div>}
                                             <button
-                                                onClick={() => handleProjectClick(project.quote_id)}
+                                                onClick={(e) => { e.stopPropagation(); handleProjectClick(project.quote_id) }}
                                                 className="text-zinc-500 hover:text-zinc-200 transition-colors shrink-0 mt-0.5"
                                                 title="Voir la soumission"
                                             >
@@ -343,6 +344,15 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                         eventDrop={handleEventDrop}
                         eventResize={handleEventResize}
                         eventClick={handleEventClick}
+                        eventDisplay="block"
+                        eventDidMount={(info) => {
+                            const color = info.event.extendedProps.eventColor
+                            if (color) {
+                                info.el.style.backgroundColor = color
+                                info.el.style.borderColor = color
+                                info.el.style.opacity = '1'
+                            }
+                        }}
                         height="100%"
                         locale="fr"
                         firstDay={1}
