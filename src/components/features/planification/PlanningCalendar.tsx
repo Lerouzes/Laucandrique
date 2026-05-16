@@ -10,7 +10,7 @@ import { updateProjectDates, updateProjectStatus } from '@/actions/projects'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { CalendarX, ExternalLink, CalendarClock } from 'lucide-react'
+import { CalendarX, ExternalLink, CalendarClock, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 type StatusFilter = 'unscheduled' | 'scheduled' | 'all'
@@ -86,6 +86,8 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         const isHourly = durationDays < 1
         const startObj = p.start_date ? new Date(p.start_date) : null
         const endObj = p.end_date ? new Date(p.end_date) : (startObj ? new Date(startObj) : null)
+        const contractorColor = String(p.contractors?.color || '').trim()
+        const eventColor = contractorColor || (p.status === 'completed' ? '#065f46' : p.status === 'in_progress' ? '#1e3a8a' : '#78350f')
 
         // Keep persisted all-day end as-is (FullCalendar already uses exclusive end dates for all-day events).
         // Only synthesize an end for hourly events when one is missing.
@@ -99,8 +101,8 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             start: startObj ? startObj.toISOString() : undefined,
             end: endObj ? endObj.toISOString() : undefined,
             allDay: !isHourly,
-            backgroundColor: p.contractors?.color || (p.status === 'completed' ? '#065f46' : p.status === 'in_progress' ? '#1e3a8a' : '#78350f'),
-            borderColor: 'transparent',
+            backgroundColor: eventColor,
+            borderColor: eventColor,
             extendedProps: {
                 client: p.clients?.full_name,
                 status: p.status,
@@ -183,6 +185,22 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             try {
                 await updateProjectStatus(projectId, 'unplanned')
                 toast.success("Projet retiré du calendrier.")
+            } catch (e: any) {
+                toast.error("Erreur", { description: e.message })
+            }
+        })
+    }
+
+
+    const handleMarkCompleted = (projectId: string) => {
+        setProjects(prev => prev.map(p => p.id === projectId ? {
+            ...p, status: 'completed', completed_at: new Date().toISOString()
+        } : p))
+
+        startTransition(async () => {
+            try {
+                await updateProjectStatus(projectId, 'completed')
+                toast.success("Projet marqué comme complété.")
             } catch (e: any) {
                 toast.error("Erreur", { description: e.message })
             }
@@ -272,13 +290,24 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                 </Badge>
                                             </div>
                                             {!isUnplanned && (
-                                                <button
-                                                    onClick={() => handleUnschedule(project.id)}
-                                                    className="text-zinc-500 hover:text-red-400 transition-colors"
-                                                    title="Retirer du calendrier"
-                                                >
-                                                    <CalendarX className="h-3.5 w-3.5" />
-                                                </button>
+                                                <div className="flex items-center gap-2">
+                                                    {project.status !== 'completed' && (
+                                                        <button
+                                                            onClick={() => handleMarkCompleted(project.id)}
+                                                            className="text-zinc-500 hover:text-emerald-400 transition-colors"
+                                                            title="Marquer comme complété"
+                                                        >
+                                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => handleUnschedule(project.id)}
+                                                        className="text-zinc-500 hover:text-red-400 transition-colors"
+                                                        title="Retirer du calendrier"
+                                                    >
+                                                        <CalendarX className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                         {project.start_date && (
