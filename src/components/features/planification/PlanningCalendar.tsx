@@ -10,7 +10,7 @@ import { updateProjectDates, updateProjectStatus } from '@/actions/projects'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { CalendarX, ExternalLink, CalendarClock } from 'lucide-react'
+import { CalendarX, ExternalLink, CalendarClock, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 type StatusFilter = 'unscheduled' | 'scheduled' | 'all'
@@ -40,7 +40,6 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     const normalizedQuery = query.trim().toLowerCase()
     const getDurationDays = (project: any) => Number(project?.estimated_duration_days || 1)
     const getDurationMinutes = (project: any) => Math.max(15, Math.round(getDurationDays(project) * 24 * 60))
-    const isHourlyProject = (project: any) => getDurationDays(project) < 1
 
     // Reinitialize draggable whenever the project list changes (filter or data)
     useEffect(() => {
@@ -87,13 +86,13 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         const isHourly = durationDays < 1
         const startObj = p.start_date ? new Date(p.start_date) : null
         const endObj = p.end_date ? new Date(p.end_date) : (startObj ? new Date(startObj) : null)
+        const contractorColor = String(p.contractors?.color || '').trim()
+        const eventColor = contractorColor || (p.status === 'completed' ? '#065f46' : p.status === 'in_progress' ? '#1e3a8a' : '#78350f')
 
-        if (startObj && endObj) {
-            if (isHourly) {
-                endObj.setTime(startObj.getTime() + durationMinutes * 60 * 1000)
-            } else {
-                endObj.setDate(endObj.getDate() + 1)
-            }
+        // Keep persisted all-day end as-is (FullCalendar already uses exclusive end dates for all-day events).
+        // Only synthesize an end for hourly events when one is missing.
+        if (startObj && endObj && isHourly && !p.end_date) {
+            endObj.setTime(startObj.getTime() + durationMinutes * 60 * 1000)
         }
 
         return {
@@ -102,8 +101,8 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             start: startObj ? startObj.toISOString() : undefined,
             end: endObj ? endObj.toISOString() : undefined,
             allDay: !isHourly,
-            backgroundColor: p.contractors?.color || (p.status === 'completed' ? '#065f46' : p.status === 'in_progress' ? '#1e3a8a' : '#78350f'),
-            borderColor: 'transparent',
+            backgroundColor: eventColor,
+            borderColor: eventColor,
             extendedProps: {
                 client: p.clients?.full_name,
                 status: p.status,
@@ -192,6 +191,22 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         })
     }
 
+
+    const handleMarkCompleted = (projectId: string) => {
+        setProjects(prev => prev.map(p => p.id === projectId ? {
+            ...p, status: 'completed', completed_at: new Date().toISOString()
+        } : p))
+
+        startTransition(async () => {
+            try {
+                await updateProjectStatus(projectId, 'completed')
+                toast.success("Projet marqué comme complété.")
+            } catch (e: any) {
+                toast.error("Erreur", { description: e.message })
+            }
+        })
+    }
+
     const handleEventClick = (info: any) => {
         const quoteId = info.event.extendedProps.quoteId
         if (quoteId) {
@@ -246,7 +261,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         key={project.id}
                                         data-id={project.id}
                                         data-title={project.title}
-                                        data-duration={project.estimated_duration_days}
+                                        data-duration-days={project.estimated_duration_days}
                                         className={`fc-event-external p-3 bg-transparent border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                                     >
                                         <div className="flex items-start justify-between gap-2 mb-1">
@@ -275,13 +290,24 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                 </Badge>
                                             </div>
                                             {!isUnplanned && (
-                                                <button
-                                                    onClick={() => handleUnschedule(project.id)}
-                                                    className="text-zinc-500 hover:text-red-400 transition-colors"
-                                                    title="Retirer du calendrier"
-                                                >
-                                                    <CalendarX className="h-3.5 w-3.5" />
-                                                </button>
+                                                <div className="flex items-center gap-2">
+                                                    {project.status !== 'completed' && (
+                                                        <button
+                                                            onClick={() => handleMarkCompleted(project.id)}
+                                                            className="text-zinc-500 hover:text-emerald-400 transition-colors"
+                                                            title="Marquer comme complété"
+                                                        >
+                                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => handleUnschedule(project.id)}
+                                                        className="text-zinc-500 hover:text-red-400 transition-colors"
+                                                        title="Retirer du calendrier"
+                                                    >
+                                                        <CalendarX className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                         {project.start_date && (

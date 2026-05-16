@@ -4,7 +4,7 @@ import { AnalyticsCharts } from '@/components/features/analytics/AnalyticsCharts
 import { FinancialForecast } from '@/components/features/analytics/FinancialForecast'
 import { getSettings } from '@/actions/settings'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle, XCircle, TrendingUp, Briefcase } from 'lucide-react'
+import { CheckCircle, XCircle, TrendingUp, CalendarCheck2 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { frCA } from 'date-fns/locale'
 
@@ -33,6 +33,10 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     const avgQuoteValue = filteredQuotes.length > 0 ? filteredQuotes.reduce((acc: number, q: any) => acc + (q.total || 0), 0) / filteredQuotes.length : 0
 
     const winRate = filteredQuotes.length > 0 ? (approvedQuotes.length / filteredQuotes.length) * 100 : 0
+
+    const completedProjects = projects.filter((p: any) => p.status === 'completed')
+    const completedProjectsCount = completedProjects.length
+    const completedProjectsValue = completedProjects.reduce((acc: number, p: any) => acc + Number(p.quotes?.total || 0), 0)
 
     const monthlyDataMap: Record<string, number> = {}
     approvedQuotes.forEach((q: any) => {
@@ -102,7 +106,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                 </p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                 <Card className="bg-transparent border-zinc-800">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium text-zinc-400">Taux d'approbation</CardTitle>
@@ -130,6 +134,17 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-zinc-100">${Math.round(totalApprovedValue).toLocaleString('fr-CA')}</div>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-transparent border-zinc-800">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium text-zinc-400">Projets complétés</CardTitle>
+                        <CalendarCheck2 className="h-4 w-4 text-emerald-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-zinc-100">{completedProjectsCount}</div>
+                        <p className="text-xs text-zinc-500 mt-1">${Math.round(completedProjectsValue).toLocaleString('fr-CA')}</p>
                     </CardContent>
                 </Card>
 
