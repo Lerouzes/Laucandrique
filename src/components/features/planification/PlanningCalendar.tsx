@@ -263,7 +263,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         data-id={project.id}
                                         data-title={project.title}
                                         data-duration-days={project.estimated_duration_days}
-                                        className={`fc-event-external p-3 bg-transparent border rounded-md transition-colors shadow-sm ${isUnplanned ? 'fc-event-external-draggable' : ''} ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+                                        className={`fc-event-external p-3 bg-transparent border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                                     >
                                         <div className="flex items-start justify-between gap-2 mb-1">
                                             <div className="font-medium text-zinc-100 text-sm leading-tight flex items-center gap-2"><span className='inline-block h-2 w-2 rounded-full' style={{ backgroundColor: TYPE_DOT[project.project_type || 'interior'] }} />{project.title}</div>
@@ -294,7 +294,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                 <div className="flex items-center gap-2">
                                                     {project.status !== 'completed' && (
                                                         <button
-                                                            onClick={(e) => { e.stopPropagation(); handleMarkCompleted(project.id) }}
+                                                            onClick={() => handleMarkCompleted(project.id)}
                                                             className="text-zinc-500 hover:text-emerald-400 transition-colors"
                                                             title="Marquer comme complété"
                                                         >
@@ -302,7 +302,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                         </button>
                                                     )}
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); handleUnschedule(project.id) }}
+                                                        onClick={() => handleUnschedule(project.id)}
                                                         className="text-zinc-500 hover:text-red-400 transition-colors"
                                                         title="Retirer du calendrier"
                                                     >
