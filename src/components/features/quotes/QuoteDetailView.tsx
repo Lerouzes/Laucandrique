@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { Download, CheckCircle, XCircle, ChevronLeft, Pencil, Send } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -200,6 +200,15 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                     >
                         <XCircle className="mr-2 h-4 w-4" />
                         Repasser en brouillon
+                    </Button>
+                )}
+                {quote.status === 'approved' && (
+                    <Button
+                        variant="outline"
+                        onClick={() => router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)}
+                        className="border-cyan-800 bg-cyan-950/20 text-cyan-300 hover:bg-cyan-900/50 hover:text-cyan-200"
+                    >
+                        Planifier la date
                     </Button>
                 )}
             </div>

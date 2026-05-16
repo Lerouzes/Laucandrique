@@ -38,6 +38,9 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     const [isPending, startTransition] = useTransition()
     const [filter, setFilter] = useState<StatusFilter>('unscheduled')
     const normalizedQuery = query.trim().toLowerCase()
+    const getDurationDays = (project: any) => Number(project?.estimated_duration_days || 1)
+    const getDurationMinutes = (project: any) => Math.max(15, Math.round(getDurationDays(project) * 24 * 60))
+    const isHourlyProject = (project: any) => getDurationDays(project) < 1
 
     // Reinitialize draggable whenever the project list changes (filter or data)
     useEffect(() => {
@@ -46,10 +49,15 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             draggableInstance = new Draggable(externalEventsRef.current, {
                 itemSelector: '.fc-event-external',
                 eventData: function (eventEl) {
+                    const durationDays = Number(eventEl.getAttribute('data-duration-days') || '1')
+                    const durationMinutes = Math.max(15, Math.round(durationDays * 24 * 60))
+                    const isHourly = durationDays < 1
                     return {
                         id: eventEl.getAttribute('data-id'),
                         title: eventEl.getAttribute('data-title'),
-                        duration: { days: parseInt(eventEl.getAttribute('data-duration') || '1', 10) }
+                        duration: { minutes: durationMinutes },
+                        allDay: !isHourly,
+                        ...(isHourly ? { startTime: '08:00' } : {})
                     }
                 }
             })
@@ -77,14 +85,25 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
 
     // Calendar events: all non-unplanned projects
     const events = filteredProjects.filter(p => p.status !== 'unplanned').map(p => {
-        const endObj = p.end_date ? new Date(p.end_date) : new Date(p.start_date)
-        endObj.setDate(endObj.getDate() + 1)
+        const durationMinutes = getDurationMinutes(p)
+        const isHourly = isHourlyProject(p)
+        const startObj = p.start_date ? new Date(p.start_date) : null
+        const endObj = p.end_date ? new Date(p.end_date) : (startObj ? new Date(startObj) : null)
+
+        if (startObj && endObj) {
+            if (isHourly) {
+                endObj.setTime(startObj.getTime() + durationMinutes * 60 * 1000)
+            } else {
+                endObj.setDate(endObj.getDate() + 1)
+            }
+        }
+
         return {
             id: p.id,
             title: p.title,
-            start: p.start_date,
-            end: endObj.toISOString().split('T')[0],
-            allDay: true,
+            start: startObj ? startObj.toISOString() : undefined,
+            end: endObj ? endObj.toISOString() : undefined,
+            allDay: !isHourly,
             backgroundColor: p.contractors?.color || (p.status === 'completed' ? '#065f46' : p.status === 'in_progress' ? '#1e3a8a' : '#78350f'),
             borderColor: 'transparent',
             extendedProps: {
@@ -92,6 +111,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                 status: p.status,
                 quoteId: p.quote_id,
                 projectType: p.project_type,
+                isHourly,
             }
         }
     })
@@ -100,11 +120,24 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     // automatically on drop; since we control the `events` array, remove the duplicated internal copy.
     const handleEventReceive = (info: any) => {
         const projectId = info.event.id
-        const startDate = info.event.startStr.split('T')[0]
-        const endDateObj = info.event.end
-            ? new Date(info.event.end.getTime() - 24 * 60 * 60 * 1000)
-            : new Date(info.event.start)
-        const endDate = endDateObj.toISOString().split('T')[0]
+        const project = projects.find((p: any) => p.id === projectId)
+        const hourly = isHourlyProject(project)
+        const durationMinutes = getDurationMinutes(project)
+
+        let startObj = info.event.start ? new Date(info.event.start) : null
+        if (startObj && hourly && info.event.allDay) {
+            startObj = new Date(startObj)
+            startObj.setHours(8, 0, 0, 0)
+        }
+
+        const endObj = startObj
+            ? hourly
+                ? new Date(startObj.getTime() + durationMinutes * 60 * 1000)
+                : (info.event.end ? new Date(info.event.end) : new Date(startObj))
+            : null
+
+        const startDate = startObj ? startObj.toISOString() : null
+        const endDate = endObj ? endObj.toISOString() : startDate
 
         // Remove the auto-added duplicate event from FullCalendar's internal state
         info.event.remove()
@@ -116,7 +149,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
 
         startTransition(async () => {
             try {
-                await updateProjectDates(projectId, startDate, endDate)
+                if (startDate && endDate) await updateProjectDates(projectId, startDate, endDate)
                 toast.success("Projet planifié.")
             } catch (e: any) {
                 toast.error("Erreur de planification", { description: e.message })
@@ -126,11 +159,8 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
 
     const handleEventDrop = (info: any) => {
         const projectId = info.event.id
-        const startDate = info.event.startStr.split('T')[0]
-        const endDateObj = info.event.end
-            ? new Date(info.event.end.getTime() - 24 * 60 * 60 * 1000)
-            : new Date(info.event.start)
-        const endDate = endDateObj.toISOString().split('T')[0]
+        const startDate = info.event.start ? info.event.start.toISOString() : null
+        const endDate = info.event.end ? info.event.end.toISOString() : startDate
 
         setProjects(prev => prev.map(p => p.id === projectId ? {
             ...p, start_date: startDate, end_date: endDate
@@ -138,7 +168,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
 
         startTransition(async () => {
             try {
-                await updateProjectDates(projectId, startDate, endDate)
+                if (startDate && endDate) await updateProjectDates(projectId, startDate, endDate)
                 toast.success("Dates mises à jour.")
             } catch (e: any) {
                 toast.error("Erreur", { description: e.message })
@@ -148,9 +178,8 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
 
     const handleEventResize = (info: any) => {
         const projectId = info.event.id
-        const startDate = info.event.startStr.split('T')[0]
-        const endDateObj = new Date(info.event.end.getTime() - 24 * 60 * 60 * 1000)
-        const endDate = endDateObj.toISOString().split('T')[0]
+        const startDate = info.event.start ? info.event.start.toISOString() : null
+        const endDate = info.event.end ? info.event.end.toISOString() : startDate
 
         setProjects(prev => prev.map(p => p.id === projectId ? {
             ...p, end_date: endDate
@@ -158,7 +187,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
 
         startTransition(async () => {
             try {
-                await updateProjectDates(projectId, startDate, endDate)
+                if (startDate && endDate) await updateProjectDates(projectId, startDate, endDate)
                 toast.success("Durée mise à jour.")
             } catch (e: any) {
                 toast.error("Erreur", { description: e.message })
@@ -197,18 +226,18 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     return (
         <div className="flex gap-6 h-full">
             {/* Sidebar */}
-            <Card className="w-80 h-full border-zinc-200 bg-white flex flex-col shrink-0">
-                <CardHeader className="border-b border-zinc-200 py-3 px-4">
-                    <CardTitle className="text-zinc-900 text-base font-semibold mb-2">Projets</CardTitle>
+            <Card className="w-80 h-full border-zinc-800 bg-transparent flex flex-col shrink-0">
+                <CardHeader className="border-b border-zinc-800 py-3 px-4">
+                    <CardTitle className="text-zinc-100 text-base font-semibold mb-2">Projets</CardTitle>
                     {/* Filter tabs */}
-                    <div className="flex gap-1 bg-white rounded-md p-1">
+                    <div className="flex gap-1 bg-zinc-900/40 rounded-md p-1 border border-zinc-800">
                         {(['unscheduled', 'scheduled', 'all'] as StatusFilter[]).map(f => (
                             <button
                                 key={f}
                                 onClick={() => setFilter(f)}
                                 className={`flex-1 text-xs py-1 rounded transition-colors ${filter === f
-                                    ? 'bg-zinc-700 text-zinc-900 font-medium'
-                                    : 'text-zinc-500 hover:text-zinc-700'
+                                    ? 'bg-zinc-700 text-zinc-100 font-medium'
+                                    : 'text-zinc-400 hover:text-zinc-200'
                                     }`}
                             >
                                 {f === 'unscheduled' ? 'Non planifiés' : f === 'scheduled' ? 'Planifiés' : 'Tous'}
@@ -235,12 +264,12 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         key={project.id}
                                         data-id={project.id}
                                         data-title={project.title}
-                                        data-duration={project.estimated_duration_days}
-                                        className={`fc-event-external p-3 bg-white border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+                                        data-duration-days={project.estimated_duration_days}
+                                        className={`fc-event-external p-3 bg-transparent border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                                     >
                                         <div className="flex items-start justify-between gap-2 mb-1">
-                                            <div className="font-medium text-zinc-900 text-sm leading-tight flex items-center gap-2"><span className='inline-block h-2 w-2 rounded-full' style={{ backgroundColor: TYPE_DOT[project.project_type || 'interior'] }} />{project.title}</div>
-                                            {project.quotes?.quote_number && <div className='text-[11px] text-zinc-600'>Soumission #{project.quotes.quote_number}</div>}
+                                            <div className="font-medium text-zinc-100 text-sm leading-tight flex items-center gap-2"><span className='inline-block h-2 w-2 rounded-full' style={{ backgroundColor: TYPE_DOT[project.project_type || 'interior'] }} />{project.title}</div>
+                                            {project.quotes?.quote_number && <div className='text-[11px] text-zinc-400'>Soumission #{project.quotes.quote_number}</div>}
                                             <button
                                                 onClick={() => handleProjectClick(project.quote_id)}
                                                 className="text-zinc-500 hover:text-zinc-200 transition-colors shrink-0 mt-0.5"
@@ -249,16 +278,18 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                 <ExternalLink className="h-3.5 w-3.5" />
                                             </button>
                                         </div>
-                                        <div className="text-xs text-zinc-600 mb-2 truncate">{project.clients?.full_name}</div>
+                                        <div className="text-xs text-zinc-400 mb-2 truncate">{project.clients?.full_name}</div>
                                         {project.contractors?.full_name && <div className='text-xs mb-2' style={{ color: project.contractors.color }}>👷 {project.contractors.full_name}</div>}
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-1.5">
-                                                <Badge variant="secondary" className="bg-zinc-800 text-zinc-700 pointer-events-none text-xs">
-                                                    {project.estimated_duration_days} j
+                                                <Badge variant="secondary" className="bg-zinc-800 text-zinc-100 pointer-events-none text-xs">
+                                                    {Number(project.estimated_duration_days) < 1
+                                                        ? `${Math.round(Number(project.estimated_duration_days) * 24 * 100) / 100} h`
+                                                        : `${project.estimated_duration_days} Jours`}
                                                 </Badge>
                                                 <Badge
                                                     variant="secondary"
-                                                    className={`pointer-events-none text-xs ${isUnplanned ? 'bg-zinc-800 text-zinc-600' : 'bg-yellow-900/60 text-yellow-300'}`}
+                                                    className={`pointer-events-none text-xs ${isUnplanned ? 'bg-zinc-800 text-zinc-300' : 'bg-yellow-900/60 text-yellow-300'}`}
                                                 >
                                                     {isUnplanned ? 'Non planifié' : 'Planifié'}
                                                 </Badge>
@@ -276,8 +307,8 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         {project.start_date && (
                                             <div className="mt-1.5 text-xs text-yellow-600 flex items-center gap-1">
                                                 <CalendarClock className="h-3 w-3" />
-                                                {new Date(project.start_date).toLocaleDateString('fr-CA')}
-                                                {project.end_date && ` → ${new Date(project.end_date).toLocaleDateString('fr-CA')}`}
+                                                {new Date(project.start_date).toLocaleString('fr-CA', { dateStyle: 'short', timeStyle: Number(project.estimated_duration_days) < 1 ? 'short' : undefined })}
+                                                {project.end_date && ` → ${new Date(project.end_date).toLocaleString('fr-CA', { dateStyle: 'short', timeStyle: Number(project.estimated_duration_days) < 1 ? 'short' : undefined })}`}
                                             </div>
                                         )}
                                     </div>
@@ -289,7 +320,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             </Card>
 
             {/* Calendar */}
-            <Card className="flex-1 h-full border-zinc-200 bg-white p-4 relative overflow-hidden">
+            <Card className="flex-1 h-full border-zinc-800 bg-transparent p-4 relative overflow-hidden">
                 <div className="fc-dark-theme-wrapper h-full">
                     <FullCalendar
                         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
