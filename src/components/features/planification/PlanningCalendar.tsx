@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { CalendarX, ExternalLink, CalendarClock, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
-type StatusFilter = 'unscheduled' | 'scheduled' | 'all'
+type StatusFilter = 'unscheduled' | 'scheduled' | 'completed' | 'all'
 
 const STATUS_COLORS: Record<string, string> = {
     unscheduled: 'bg-zinc-700 text-zinc-200',
@@ -36,7 +36,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     const [projects, setProjects] = useState(initialProjects)
     const externalEventsRef = useRef<HTMLDivElement>(null)
     const [isPending, startTransition] = useTransition()
-    const [filter, setFilter] = useState<StatusFilter>('unscheduled')
+    const [filter, setFilter] = useState<StatusFilter>('all')
     const normalizedQuery = query.trim().toLowerCase()
     const getDurationDays = (project: any) => Number(project?.estimated_duration_days || 1)
     const getDurationMinutes = (project: any) => Math.max(15, Math.round(getDurationDays(project) * 24 * 60))
@@ -75,7 +75,8 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     // Sidebar project list based on filter
     const sidebarProjects = filteredProjects.filter(p => {
         if (filter === 'unscheduled') return p.status === 'unplanned'
-        if (filter === 'scheduled') return p.status !== 'unplanned'
+        if (filter === 'scheduled') return p.status !== 'unplanned' && p.status !== 'completed'
+        if (filter === 'completed') return p.status === 'completed'
         return true // 'all'
     })
 
@@ -231,7 +232,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                     <CardTitle className="text-zinc-100 text-base font-semibold mb-2">Projets</CardTitle>
                     {/* Filter tabs */}
                     <div className="flex gap-1 bg-zinc-900/40 rounded-md p-1 border border-zinc-800">
-                        {(['unscheduled', 'scheduled', 'all'] as StatusFilter[]).map(f => (
+                        {(['unscheduled', 'scheduled', 'completed', 'all'] as StatusFilter[]).map(f => (
                             <button
                                 key={f}
                                 onClick={() => setFilter(f)}
@@ -240,7 +241,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                     : 'text-zinc-400 hover:text-zinc-200'
                                     }`}
                             >
-                                {f === 'unscheduled' ? 'Non planifiés' : f === 'scheduled' ? 'Planifiés' : 'Tous'}
+                                {f === 'unscheduled' ? 'Non planifiés' : f === 'scheduled' ? 'Planifiés' : f === 'completed' ? 'Complétés' : 'Tous'}
                             </button>
                         ))}
                     </div>
@@ -287,9 +288,9 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                 </Badge>
                                                 <Badge
                                                     variant="secondary"
-                                                    className={`pointer-events-none text-xs ${isUnplanned ? 'bg-zinc-800 text-zinc-300' : 'bg-yellow-900/60 text-yellow-300'}`}
+                                                    className={`pointer-events-none text-xs ${project.status === 'completed' ? 'bg-emerald-900/60 text-emerald-300' : isUnplanned ? 'bg-zinc-800 text-zinc-300' : project.status === 'in_progress' ? 'bg-blue-900/60 text-blue-300' : 'bg-yellow-900/60 text-yellow-300'}`}
                                                 >
-                                                    {isUnplanned ? 'Non planifié' : 'Planifié'}
+                                                    {project.status === 'completed' ? 'Complété' : isUnplanned ? 'Non planifié' : project.status === 'in_progress' ? 'En cours' : 'Planifié'}
                                                 </Badge>
                                             </div>
                                             {!isUnplanned && (
