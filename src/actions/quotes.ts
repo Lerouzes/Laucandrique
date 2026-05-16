@@ -70,8 +70,21 @@ export async function createQuoteAction(quoteData: any, itemsData: any[], images
 export async function updateQuoteAction(quoteId: string, quoteData: any, itemsData: any[], imagesData: any[], keepExistingImages: boolean = false) {
     const supabase = await createClient()
 
-    const { error: quoteError } = await supabase.from('quotes').update(quoteData).eq('id', quoteId)
-    if (quoteError) throw new Error(quoteError.message)
+    const { data: clientData } = await supabase.from('clients').select('manager_id').eq('id', quoteData.client_id).single()
+    const quotePayload: any = {
+        ...quoteData,
+        manager_id: clientData?.manager_id || null,
+        status: 'draft',
+        approved_at: null,
+        denied_at: null,
+    }
+
+    let quoteUpdate = await supabase.from('quotes').update(quotePayload).eq('id', quoteId)
+    if (quoteUpdate.error && quoteUpdate.error.message.includes('project_type')) {
+        delete quotePayload.project_type
+        quoteUpdate = await supabase.from('quotes').update(quotePayload).eq('id', quoteId)
+    }
+    if (quoteUpdate.error) throw new Error(quoteUpdate.error.message)
 
     // Replace all items
     await supabase.from('quote_items').delete().eq('quote_id', quoteId)
@@ -108,7 +121,7 @@ export async function updateQuoteStatus(quoteId: string, status: 'approved' | 'd
 
     if (status === 'approved') {
         const { data: quoteMeta } = await supabase.from('quotes').select('contractor_id, project_type').eq('id', quoteId).single()
-        await supabase.from('projects').insert({
+        const projectPayload: any = {
             quote_id: quoteId,
             client_id: clientId,
             contractor_id: quoteMeta?.contractor_id || null,
@@ -122,6 +135,8 @@ export async function updateQuoteStatus(quoteId: string, status: 'approved' | 'd
             delete projectPayload.project_type
             inserted = await supabase.from('projects').insert(projectPayload)
         }
+
+        if (inserted.error) throw new Error(inserted.error.message)
     }
 
     revalidatePath('/quotes')

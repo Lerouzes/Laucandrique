@@ -8,7 +8,9 @@ import { CheckCircle, XCircle, TrendingUp, Briefcase } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { frCA } from 'date-fns/locale'
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ managers?: string }> }) {
+    const resolvedSearchParams = await searchParams
+    const selectedManagers = (resolvedSearchParams.managers || '').split(',').filter(Boolean)
     const quotes = await getQuotes()
     const projects = await getProjects()
     const settings = await getSettings()
@@ -68,57 +70,63 @@ export default async function AnalyticsPage() {
     })
     const financialRows = months.map(m => monthMap[m.key])
 
-    const managerStats: Record<string, { total: number, approved: number }> = {}
+    const managerStats: Record<string, { total: number, approved: number, amount: number, denied: number, sent: number }> = {}
     quotes.forEach((q: any) => {
         const name = q.managers ? `${q.managers.first_name} ${q.managers.last_name}` : 'Sans gestionnaire'
-        managerStats[name] = managerStats[name] || { total: 0, approved: 0 }
+        const id = q.manager_id || 'none'
+        managerStats[name] = managerStats[name] || { total: 0, approved: 0, amount: 0, denied: 0, sent: 0 }
+        if (selectedManagers.length && !selectedManagers.includes(id)) return
         managerStats[name].total += 1
+        managerStats[name].amount += q.total || 0
         if (q.status === 'approved') managerStats[name].approved += 1
+        if (q.status === 'denied') managerStats[name].denied += 1
+        if (q.status === 'sent') managerStats[name].sent += 1
     })
+    const availableManagers = Array.from(new Set(quotes.map((q: any) => q.manager_id).filter(Boolean)))
 
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-2xl font-bold tracking-tight text-zinc-100">Analytiques</h2>
-                <p className="text-sm text-zinc-400">
+                <h2 className="text-2xl font-bold tracking-tight text-zinc-900">Analytiques</h2>
+                <p className="text-sm text-zinc-600">
                     Analyse approfondie de la performance de l'entreprise.
                 </p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-4">
-                <Card className="bg-zinc-900 border-zinc-800">
+                <Card className="bg-white border-zinc-200">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-zinc-400">Taux d'approbation</CardTitle>
+                        <CardTitle className="text-sm font-medium text-zinc-600">Taux d'approbation</CardTitle>
                         <TrendingUp className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-zinc-100">{Math.round(winRate)}%</div>
+                        <div className="text-2xl font-bold text-zinc-900">{Math.round(winRate)}%</div>
                     </CardContent>
                 </Card>
 
-                <Card className="bg-zinc-900 border-zinc-800">
+                <Card className="bg-white border-zinc-200">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-zinc-400">Moyenne / Soumission</CardTitle>
+                        <CardTitle className="text-sm font-medium text-zinc-600">Moyenne / Soumission</CardTitle>
                         <CheckCircle className="h-4 w-4 text-zinc-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-zinc-100">${Math.round(avgQuoteValue).toLocaleString('fr-CA')}</div>
+                        <div className="text-2xl font-bold text-zinc-900">${Math.round(avgQuoteValue).toLocaleString('fr-CA')}</div>
                     </CardContent>
                 </Card>
 
-                <Card className="bg-zinc-900 border-zinc-800">
+                <Card className="bg-white border-zinc-200">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-zinc-400">Valeur Approuvée</CardTitle>
+                        <CardTitle className="text-sm font-medium text-zinc-600">Valeur Approuvée</CardTitle>
                         <CheckCircle className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-zinc-100">${Math.round(totalApprovedValue).toLocaleString('fr-CA')}</div>
+                        <div className="text-2xl font-bold text-zinc-900">${Math.round(totalApprovedValue).toLocaleString('fr-CA')}</div>
                     </CardContent>
                 </Card>
 
-                <Card className="bg-zinc-900 border-zinc-800">
+                <Card className="bg-white border-zinc-200">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-zinc-400">Valeur Refusée</CardTitle>
+                        <CardTitle className="text-sm font-medium text-zinc-600">Valeur Refusée</CardTitle>
                         <XCircle className="h-4 w-4 text-red-500" />
                     </CardHeader>
                     <CardContent>
@@ -130,32 +138,59 @@ export default async function AnalyticsPage() {
             <div className="grid gap-6 md:grid-cols-2">
                 <AnalyticsCharts monthlyRevenue={monthlyRevenue} />
 
-                <Card className="bg-zinc-900 border-zinc-800">
+                <Card className="bg-white border-zinc-200">
                     <CardHeader>
-                        <CardTitle className="text-zinc-100">Statistiques Contracteurs</CardTitle>
+                        <CardTitle className="text-zinc-900">Statistiques Contracteurs</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="flex flex-col gap-4 mt-4">
                             {topContractors.map(([name, stat]) => (
-                                <div key={name} className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                                    <span className="text-sm text-zinc-400">{name}</span>
-                                    <span className="font-bold text-zinc-100">{stat.count} soum. · ${Math.round(stat.total).toLocaleString('fr-CA')}</span>
+                                <div key={name} className="flex items-center justify-between border-b border-zinc-200 pb-3">
+                                    <span className="text-sm text-zinc-600">{name}</span>
+                                    <span className="font-bold text-zinc-900">{stat.count} soum. · ${Math.round(stat.total).toLocaleString('fr-CA')}</span>
                                 </div>
                             ))}
                             {Object.entries(managerStats).map(([name, stat]) => (
-                                <div key={name} className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                                    <span className="text-sm text-zinc-400">{name} (approbation)</span>
-                                    <span className="font-bold text-zinc-100">{stat.total ? Math.round((stat.approved/stat.total)*100) : 0}%</span>
+                                <div key={name} className="flex items-center justify-between border-b border-zinc-200 pb-3">
+                                    <span className="text-sm text-zinc-600">{name} (approbation)</span>
+                                    <span className="font-bold text-zinc-900">{stat.total ? Math.round((stat.approved/stat.total)*100) : 0}%</span>
                                 </div>
                             ))}
                             <div className="flex items-center justify-between pt-2">
-                                <span className="text-sm text-zinc-400">Projets assignés</span>
-                                <span className="font-bold text-zinc-100">{projects.filter((p: any) => !!p.contractor_id).length}</span>
+                                <span className="text-sm text-zinc-600">Projets assignés</span>
+                                <span className="font-bold text-zinc-900">{projects.filter((p: any) => !!p.contractor_id).length}</span>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
             </div>
+
+
+            <Card className="bg-white border-zinc-200">
+                <CardHeader><CardTitle className="text-zinc-900">Analytiques par gestionnaire</CardTitle></CardHeader>
+                <CardContent>
+                    <form className="space-y-3">
+                        <p className="text-sm text-zinc-600">Filtrer un ou plusieurs gestionnaires</p>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                            {availableManagers.map((id: any) => {
+                                const q = quotes.find((x: any) => x.manager_id === id)
+                                const label = q?.managers ? `${q.managers.first_name} ${q.managers.last_name}` : id
+                                const checked = selectedManagers.includes(id)
+                                return <label key={id} className="flex items-center gap-2"><input type="checkbox" name="managers" value={id} defaultChecked={checked} />{label}</label>
+                            })}
+                        </div>
+                        <button className="px-3 py-1 rounded border" type="submit">Appliquer</button>
+                    </form>
+                    <div className="mt-4 space-y-2">
+                        {Object.entries(managerStats).map(([name, stat]) => (
+                            <div key={name} className="flex items-center justify-between border-b border-zinc-200 pb-2 text-sm">
+                                <span className="text-zinc-700">{name}</span>
+                                <span className="font-semibold text-zinc-900">{stat.total} soum. · {stat.total ? Math.round((stat.approved/stat.total)*100) : 0}% appr. · ${Math.round(stat.amount).toLocaleString('fr-CA')}</span>
+                            </div>
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
 
             <FinancialForecast rows={financialRows} goalEnabled={!!settings.monthly_goal_enabled} goalAmount={Number(settings.monthly_goal_amount || 0)} />
         </div>
