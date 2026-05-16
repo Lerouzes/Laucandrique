@@ -246,7 +246,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         key={project.id}
                                         data-id={project.id}
                                         data-title={project.title}
-                                        data-duration={project.estimated_duration_days}
+                                        data-duration-days={project.estimated_duration_days}
                                         className={`fc-event-external p-3 bg-transparent border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                                     >
                                         <div className="flex items-start justify-between gap-2 mb-1">
