@@ -34,12 +34,14 @@ const quoteSchema = z.object({
     description: z.string().optional(),
     internal_notes: z.string().optional(),
     estimated_duration_days: z.coerce.number().positive(),
+    duration_unit: z.enum(['days', 'hours']).default('days'),
+    duration_value: z.coerce.number().positive(),
     admin_percentage: z.coerce.number().min(0).max(100),
     profit_percentage: z.coerce.number().min(0).max(100),
     items: z.array(quoteItemSchema).min(1, 'Au moins un item est requis'),
 })
 
-type QuoteFormValues = z.infer<typeof quoteSchema> & { duration_unit?: 'days' | 'hours'; duration_value?: number }
+type QuoteFormValues = z.infer<typeof quoteSchema>
 
 export function QuoteBuilder({ clients, contractors, settings, initialQuote }: { clients: any[], contractors: any[], settings: any, initialQuote?: any }) {
     const router = useRouter()
@@ -165,7 +167,9 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                     title: data.title,
                     description: data.description,
                     internal_notes: data.internal_notes,
-                    estimated_duration_days: (data.duration_unit || 'days') === 'hours' ? Number(data.duration_value || 0) / 24 : Number(data.duration_value || data.estimated_duration_days),
+                    estimated_duration_days: data.duration_unit === 'hours'
+                        ? Number(data.duration_value) / 24
+                        : Number(data.duration_value),
                     project_type: data.project_type,
                     admin_percentage: data.admin_percentage,
                     profit_percentage: data.profit_percentage,
