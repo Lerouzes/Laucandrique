@@ -81,12 +81,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
                 <Card className="bg-transparent border-zinc-800">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-zinc-100">Soumissions envoyées</CardTitle>
+                        <CardTitle className="text-sm font-medium text-zinc-400">Soumissions envoyées</CardTitle>
                         <Send className="h-4 w-4 text-zinc-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-zinc-100">{sentQuotes.length}</div>
-                        <p className="text-xs text-zinc-300 mt-1">Prêtes pour décision (approuvée/refusée)</p>
+                        <p className="text-xs text-zinc-500 mt-1">Prêtes pour décision (approuvée/refusée)</p>
                     </CardContent>
                 </Card>
 

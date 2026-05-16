@@ -243,7 +243,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         key={project.id}
                                         data-id={project.id}
                                         data-title={project.title}
-                                        data-duration-days={project.estimated_duration_days}
+                                        data-duration={project.estimated_duration_days}
                                         className={`fc-event-external p-3 bg-transparent border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                                     >
                                         <div className="flex items-start justify-between gap-2 mb-1">
@@ -262,9 +262,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-1.5">
                                                 <Badge variant="secondary" className="bg-zinc-800 text-zinc-100 pointer-events-none text-xs">
-                                                    {Number(project.estimated_duration_days) < 1
-                                                        ? `${Math.round(Number(project.estimated_duration_days) * 24 * 100) / 100} h`
-                                                        : `${project.estimated_duration_days} j`}
+                                                    {project.estimated_duration_days} j
                                                 </Badge>
                                                 <Badge
                                                     variant="secondary"
