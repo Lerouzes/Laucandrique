@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 
 export function ContractorsTable({ data }: { data: any[] }) {
-  return <div className='rounded-md border overflow-hidden'>
+  return <div className='rounded-md border border-zinc-800 bg-transparent overflow-hidden'>
     <Table>
       <TableHeader><TableRow><TableHead>Nom</TableHead><TableHead>Contact</TableHead><TableHead>Couleur</TableHead><TableHead>Compétences</TableHead></TableRow></TableHeader>
       <TableBody>
