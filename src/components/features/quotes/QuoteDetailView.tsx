@@ -20,6 +20,12 @@ const sanitizePdfFileName = (value: string) => {
     return normalized || 'soumission'
 }
 
+
+const sanitizePdfFileName = (value: string) => {
+    const normalized = (value || 'soumission').trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '')
+    return normalized || 'soumission'
+}
+
 export function QuoteDetailView({ quote, settings }: { quote: any, settings: any }) {
     const router = useRouter()
     const pdfRef = useRef<HTMLDivElement>(null)
