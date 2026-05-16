@@ -40,7 +40,6 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     const normalizedQuery = query.trim().toLowerCase()
     const getDurationDays = (project: any) => Number(project?.estimated_duration_days || 1)
     const getDurationMinutes = (project: any) => Math.max(15, Math.round(getDurationDays(project) * 24 * 60))
-    const isHourlyProject = (project: any) => getDurationDays(project) < 1
 
     // Reinitialize draggable whenever the project list changes (filter or data)
     useEffect(() => {
@@ -88,12 +87,10 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         const startObj = p.start_date ? new Date(p.start_date) : null
         const endObj = p.end_date ? new Date(p.end_date) : (startObj ? new Date(startObj) : null)
 
-        if (startObj && endObj) {
-            if (isHourly) {
-                endObj.setTime(startObj.getTime() + durationMinutes * 60 * 1000)
-            } else {
-                endObj.setDate(endObj.getDate() + 1)
-            }
+        // Keep persisted all-day end as-is (FullCalendar already uses exclusive end dates for all-day events).
+        // Only synthesize an end for hourly events when one is missing.
+        if (startObj && endObj && isHourly && !p.end_date) {
+            endObj.setTime(startObj.getTime() + durationMinutes * 60 * 1000)
         }
 
         return {
@@ -246,7 +243,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         key={project.id}
                                         data-id={project.id}
                                         data-title={project.title}
-                                        data-duration={project.estimated_duration_days}
+                                        data-duration-days={project.estimated_duration_days}
                                         className={`fc-event-external p-3 bg-transparent border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                                     >
                                         <div className="flex items-start justify-between gap-2 mb-1">
