@@ -5,8 +5,8 @@ export function FinancialForecast({ rows, goalEnabled, goalAmount }: { rows: any
     <CardHeader><CardTitle className='text-zinc-100'>Prévision financière (12 mois)</CardTitle></CardHeader>
     <CardContent>
       <div className='overflow-x-auto'>
-        <table className='w-full text-sm'>
-          <thead><tr className='text-left text-zinc-400 border-b border-zinc-800'><th className='py-2'>Mois</th><th>Planifié</th><th>Réalisé</th>{goalEnabled && <th>Objectif</th>}{goalEnabled && <th>Écart</th>}</tr></thead>
+        <table className='w-full text-sm text-zinc-100'>
+          <thead><tr className='text-left text-zinc-300 border-b border-zinc-800'><th className='py-2'>Mois</th><th>Planifié</th><th>Réalisé</th>{goalEnabled && <th>Objectif</th>}{goalEnabled && <th>Écart</th>}</tr></thead>
           <tbody>
             {rows.map(r => <tr key={r.key} className='border-b border-zinc-800'>
               <td className='py-2 text-zinc-200'>{r.label}</td>
