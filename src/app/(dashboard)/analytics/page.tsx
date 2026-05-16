@@ -109,7 +109,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                 <Card className="bg-transparent border-zinc-800">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-zinc-400">Taux d'approbation</CardTitle>
+                        <CardTitle className="text-sm font-medium text-zinc-200">Taux d'approbation</CardTitle>
                         <TrendingUp className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
@@ -119,7 +119,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
                 <Card className="bg-transparent border-zinc-800">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-zinc-400">Moyenne / Soumission</CardTitle>
+                        <CardTitle className="text-sm font-medium text-zinc-200">Moyenne / Soumission</CardTitle>
                         <CheckCircle className="h-4 w-4 text-zinc-500" />
                     </CardHeader>
                     <CardContent>
@@ -129,7 +129,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
                 <Card className="bg-transparent border-zinc-800">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-zinc-400">Valeur Approuvée</CardTitle>
+                        <CardTitle className="text-sm font-medium text-zinc-200">Valeur Approuvée</CardTitle>
                         <CheckCircle className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>

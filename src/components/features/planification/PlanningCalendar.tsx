@@ -106,7 +106,9 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             extendedProps: {
                 client: p.clients?.full_name,
                 status: p.status,
+                projectId: p.id,
                 quoteId: p.quote_id,
+                quoteNumber: p.quotes?.quote_number,
                 projectType: p.project_type,
                 isHourly,
                 eventColor,
@@ -364,7 +366,17 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                         }}
                         eventContent={(arg) => (
                             <div className="overflow-hidden p-1 text-xs cursor-pointer group">
-                                <div className="font-semibold text-white truncate flex items-center gap-1.5"><span className='inline-block h-2 w-2 rounded-full' style={{ backgroundColor: TYPE_DOT[arg.event.extendedProps.projectType || 'interior'] }} />{arg.event.title}</div>
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="font-semibold text-white truncate flex items-center gap-1.5"><span className='inline-block h-2 w-2 rounded-full' style={{ backgroundColor: TYPE_DOT[arg.event.extendedProps.projectType || 'interior'] }} />{arg.event.title}{arg.event.extendedProps.quoteNumber ? ` · #${arg.event.extendedProps.quoteNumber}` : ''}</div>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); handleUnschedule(String(arg.event.extendedProps.projectId || arg.event.id)) }}
+                                        className="opacity-0 group-hover:opacity-100 text-white/80 hover:text-red-300 transition-opacity"
+                                        title="Retirer du calendrier"
+                                    >
+                                        <CalendarX className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
                                 <div className="opacity-70 mt-0.5 truncate">{arg.event.extendedProps.client}</div>
                                 <div className="opacity-0 group-hover:opacity-100 text-yellow-300 transition-opacity text-[10px] mt-0.5">Cliquer pour voir ↗</div>
                             </div>
