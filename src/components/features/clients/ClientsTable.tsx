@@ -19,12 +19,13 @@ export function ClientsTable({ data }: { data: Client[] }) {
                         <TableHead className="text-zinc-400 font-medium">Courriel</TableHead>
                         <TableHead className="text-zinc-400 font-medium">Téléphone</TableHead>
                         <TableHead className="text-zinc-400 font-medium">Ville</TableHead>
+                        <TableHead className="text-zinc-400 font-medium">Gestionnaire</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {data.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={5} className="h-24 text-center text-zinc-500">
+                            <TableCell colSpan={6} className="h-24 text-center text-zinc-500">
                                 Aucun client trouvé.
                             </TableCell>
                         </TableRow>
@@ -40,6 +41,7 @@ export function ClientsTable({ data }: { data: Client[] }) {
                                 <TableCell className="text-zinc-400">{client.email || '-'}</TableCell>
                                 <TableCell className="text-zinc-400">{client.phone || '-'}</TableCell>
                                 <TableCell className="text-zinc-400">{client.city || '-'}</TableCell>
+                                <TableCell className="text-zinc-400">{(client as any).managers ? `${(client as any).managers.first_name} ${(client as any).managers.last_name}` : '-'}</TableCell>
                             </TableRow>
                         ))
                     )}
