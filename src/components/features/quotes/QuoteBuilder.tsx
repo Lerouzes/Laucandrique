@@ -33,13 +33,13 @@ const quoteSchema = z.object({
     title: z.string().min(1, 'Titre requis'),
     description: z.string().optional(),
     internal_notes: z.string().optional(),
-    estimated_duration_days: z.coerce.number().min(1),
+    estimated_duration_days: z.coerce.number().positive(),
     admin_percentage: z.coerce.number().min(0).max(100),
     profit_percentage: z.coerce.number().min(0).max(100),
     items: z.array(quoteItemSchema).min(1, 'Au moins un item est requis'),
 })
 
-type QuoteFormValues = z.infer<typeof quoteSchema>
+type QuoteFormValues = z.infer<typeof quoteSchema> & { duration_unit?: 'days' | 'hours'; duration_value?: number }
 
 export function QuoteBuilder({ clients, contractors, settings, initialQuote }: { clients: any[], contractors: any[], settings: any, initialQuote?: any }) {
     const router = useRouter()
@@ -49,6 +49,11 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
 
     // Custom states for images (skip react-hook-form generic file handling for simplicity)
     const [images, setImages] = useState<{ file: File, caption: string, previewUrl: string }[]>([])
+
+
+    const initialDurationDays = Number(initialQuote?.estimated_duration_days || 1)
+    const initialDurationUnit: 'days' | 'hours' = initialDurationDays > 0 && initialDurationDays < 1 ? 'hours' : 'days'
+    const initialDurationValue = initialDurationUnit === 'hours' ? Math.round(initialDurationDays * 24 * 100) / 100 : initialDurationDays
 
     const form = useForm<QuoteFormValues>({
         resolver: zodResolver(quoteSchema),
@@ -60,7 +65,9 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
             title: initialQuote?.title || '',
             description: initialQuote?.description || '',
             internal_notes: initialQuote?.internal_notes || '',
-            estimated_duration_days: initialQuote?.estimated_duration_days || 1,
+            estimated_duration_days: initialDurationDays,
+            duration_unit: initialDurationUnit,
+            duration_value: initialDurationValue,
             admin_percentage: initialQuote?.admin_percentage ?? (settings?.default_admin_percentage || 10),
             profit_percentage: initialQuote?.profit_percentage ?? (settings?.default_profit_percentage || 15),
             items: initialQuote?.quote_items?.length
@@ -84,6 +91,12 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
     const watchItems = useWatch({ control: form.control, name: 'items' }) || []
     const adminPerc = useWatch({ control: form.control, name: 'admin_percentage' }) || 0
     const profitPerc = useWatch({ control: form.control, name: 'profit_percentage' }) || 0
+
+
+    const selectedClientName = clients.find((c: any) => String(c.id) === String(form.watch('client_id')))?.full_name
+    const selectedContractorName = form.watch('contractor_id') && form.watch('contractor_id') !== 'none'
+        ? contractors.find((c: any) => String(c.id) === String(form.watch('contractor_id')))?.full_name
+        : ''
 
     // Compute totals inline (no memo) — always fresh on every render
     const subtotal = watchItems.reduce((acc: number, item: any) => {
@@ -152,7 +165,7 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                     title: data.title,
                     description: data.description,
                     internal_notes: data.internal_notes,
-                    estimated_duration_days: data.estimated_duration_days,
+                    estimated_duration_days: (data.duration_unit || 'days') === 'hours' ? Number(data.duration_value || 0) / 24 : Number(data.duration_value || data.estimated_duration_days),
                     project_type: data.project_type,
                     admin_percentage: data.admin_percentage,
                     profit_percentage: data.profit_percentage,
@@ -209,7 +222,7 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                             <Select onValueChange={field.onChange} value={field.value || undefined}>
                                                 <FormControl>
                                                     <SelectTrigger className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600">
-                                                        <SelectValue placeholder="Sélectionner un client" />
+                                                        <SelectValue placeholder="Sélectionner un client">{selectedClientName || 'Sélectionner un client'}</SelectValue>
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent className="bg-zinc-900 border-zinc-800">
@@ -236,7 +249,7 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                             <Select onValueChange={field.onChange} value={field.value || 'none'}>
                                                 <FormControl>
                                                     <SelectTrigger className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600">
-                                                        <SelectValue placeholder="Aucun contracteur" />
+                                                        <SelectValue placeholder="Aucun contracteur">{selectedContractorName || 'Aucun contracteur'}</SelectValue>
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent className="bg-zinc-900 border-zinc-800">
@@ -250,19 +263,28 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                     )}
                                 />
 
-                                    <FormField
-                                        control={form.control}
-                                        name="estimated_duration_days"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel className="text-zinc-300">Durée estimée (jours)</FormLabel>
-                                                <FormControl>
-                                                    <Input type="number" step="1" {...field} className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600" />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                    <div className="space-y-2">
+                                        <FormLabel className="text-zinc-300">Durée estimée</FormLabel>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                type="number"
+                                                step="0.25"
+                                                min="0.25"
+                                                value={form.watch('duration_value') ?? 1}
+                                                onChange={(e) => form.setValue('duration_value', Number(e.target.value || 0), { shouldValidate: true })}
+                                                className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600"
+                                            />
+                                            <Select value={form.watch('duration_unit') || 'days'} onValueChange={(v) => form.setValue('duration_unit', v as any, { shouldValidate: true })}>
+                                                <SelectTrigger className="w-32 bg-zinc-950 border-zinc-800">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent className="bg-zinc-900 border-zinc-800">
+                                                    <SelectItem value="days">Jours</SelectItem>
+                                                    <SelectItem value="hours">Heures</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
                                 </div>
 
 

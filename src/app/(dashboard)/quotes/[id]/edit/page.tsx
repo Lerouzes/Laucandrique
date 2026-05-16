@@ -4,14 +4,16 @@ import { ChevronLeft } from 'lucide-react'
 import { getQuote } from '@/actions/quotes'
 import { getClients } from '@/actions/clients'
 import { getSettings } from '@/actions/settings'
+import { getContractors } from '@/actions/contractors'
 import { QuoteBuilder } from '@/components/features/quotes/QuoteBuilder'
 
 export default async function EditQuotePage({ params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = await params
-    const [quote, clients, settings] = await Promise.all([
+    const [quote, clients, settings, contractors] = await Promise.all([
         getQuote(resolvedParams.id),
         getClients(),
         getSettings(),
+        getContractors(),
     ])
 
     if (!quote) {
@@ -31,7 +33,7 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
                 </p>
             </div>
 
-            <QuoteBuilder clients={clients} settings={settings} initialQuote={quote} />
+            <QuoteBuilder clients={clients} contractors={contractors} settings={settings} initialQuote={quote} />
         </div>
     )
 }

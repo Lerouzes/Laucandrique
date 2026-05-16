@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getSettings, updateSettingsAction } from '@/actions/settings'
+import Link from 'next/link'
 import { getManagers, createManagerAction } from '@/actions/managers'
 
 export default function SettingsPage() {
@@ -141,23 +142,11 @@ export default function SettingsPage() {
                             <Input name="email" placeholder="Courriel" />
                             <Button type="submit">Ajouter</Button>
                         </form>
-                        <div className="space-y-1 text-sm">{managers.map((m: any) => <div key={m.id}>{m.first_name} {m.last_name} — {m.email || '-'} </div>)}</div>
+                        <div className="space-y-1 text-sm">{managers.map((m: any) => <Link key={m.id} href={`/managers/${m.id}`} className="block text-zinc-300 hover:text-zinc-100">{m.first_name} {m.last_name} — {m.email || '-'} </Link>)}</div>
                     </CardContent>
                 </Card>
             </form>
 
-            <Card className="bg-zinc-900 border-zinc-800">
-                <CardHeader><CardTitle className="text-zinc-100">Gestionnaires</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                    <form action={async (fd) => { await createManagerAction(fd); setManagers(await getManagers()) }} className="grid grid-cols-4 gap-2">
-                        <Input name="first_name" placeholder="Prénom" required />
-                        <Input name="last_name" placeholder="Nom" required />
-                        <Input name="email" placeholder="Courriel" />
-                        <Button type="submit">Ajouter</Button>
-                    </form>
-                    <div className="space-y-1 text-sm">{managers.map((m: any) => <div key={m.id}>{m.first_name} {m.last_name} — {m.email || '-'} </div>)}</div>
-                </CardContent>
-            </Card>
         </div>
     )
 }
