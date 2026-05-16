@@ -38,6 +38,9 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     const [isPending, startTransition] = useTransition()
     const [filter, setFilter] = useState<StatusFilter>('unscheduled')
     const normalizedQuery = query.trim().toLowerCase()
+    const getDurationDays = (project: any) => Number(project?.estimated_duration_days || 1)
+    const getDurationMinutes = (project: any) => Math.max(15, Math.round(getDurationDays(project) * 24 * 60))
+    const isHourlyProject = (project: any) => getDurationDays(project) < 1
 
     // Reinitialize draggable whenever the project list changes (filter or data)
     useEffect(() => {

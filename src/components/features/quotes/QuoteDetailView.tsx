@@ -202,6 +202,15 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                         Repasser en brouillon
                     </Button>
                 )}
+                {quote.status === 'approved' && (
+                    <Button
+                        variant="outline"
+                        onClick={() => router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)}
+                        className="border-cyan-800 bg-cyan-950/20 text-cyan-300 hover:bg-cyan-900/50 hover:text-cyan-200"
+                    >
+                        Planifier la date
+                    </Button>
+                )}
             </div>
 
             <div className="bg-white text-black p-10 rounded-lg shadow-sm w-[800px] shrink-0 relative overflow-hidden" ref={pdfRef}>

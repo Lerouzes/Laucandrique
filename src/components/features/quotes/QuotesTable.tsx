@@ -58,6 +58,22 @@ function QuoteRow({ quote }: { quote: any }) {
             <TableCell className="text-zinc-300">
                 {format(new Date(quote.created_at), 'dd MMM yyyy', { locale: frCA })}
             </TableCell>
+            <TableCell className="text-center">
+                {quote.status === 'approved' ? (
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)}
+                        className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50"
+                        title="Planifier ce projet"
+                    >
+                        <CalendarDays className="h-4 w-4" />
+                        <span className="ml-1 hidden md:inline">Planifier</span>
+                    </Button>
+                ) : (
+                    <span className="text-zinc-500">—</span>
+                )}
+            </TableCell>
             <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
                     {canChangeStatus && (
