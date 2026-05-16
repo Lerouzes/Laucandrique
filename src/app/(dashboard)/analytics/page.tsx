@@ -139,7 +139,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
                 <Card className="bg-transparent border-zinc-800">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-zinc-200">Projets complétés</CardTitle>
+                        <CardTitle className="text-sm font-medium text-zinc-400">Projets complétés</CardTitle>
                         <CalendarCheck2 className="h-4 w-4 text-emerald-500" />
                     </CardHeader>
                     <CardContent>
@@ -150,7 +150,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
                 <Card className="bg-transparent border-zinc-800">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-zinc-200">Valeur Refusée</CardTitle>
+                        <CardTitle className="text-sm font-medium text-zinc-400">Valeur Refusée</CardTitle>
                         <XCircle className="h-4 w-4 text-red-500" />
                     </CardHeader>
                     <CardContent>

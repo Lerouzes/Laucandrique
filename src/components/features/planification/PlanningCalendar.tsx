@@ -46,7 +46,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         let draggableInstance: Draggable | null = null
         if (externalEventsRef.current) {
             draggableInstance = new Draggable(externalEventsRef.current, {
-                itemSelector: '.fc-event-external[data-draggable="true"]',
+                itemSelector: '.fc-event-external-draggable',
                 eventData: function (eventEl) {
                     const durationDays = Number(eventEl.getAttribute('data-duration-days') || '1')
                     const durationMinutes = Math.max(15, Math.round(durationDays * 24 * 60))
@@ -87,7 +87,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         const isHourly = durationDays < 1
         const startObj = p.start_date ? new Date(p.start_date) : null
         const endObj = p.end_date ? new Date(p.end_date) : (startObj ? new Date(startObj) : null)
-        const contractorColor = String(p.contractors?.color || p.quotes?.contractors?.color || '').trim()
+        const contractorColor = String(p.contractors?.color || '').trim()
         const eventColor = contractorColor || (p.status === 'completed' ? '#065f46' : p.status === 'in_progress' ? '#1e3a8a' : '#78350f')
 
         // Keep persisted all-day end as-is (FullCalendar already uses exclusive end dates for all-day events).
@@ -266,7 +266,6 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         data-id={project.id}
                                         data-title={project.title}
                                         data-duration-days={project.estimated_duration_days}
-                                        data-draggable={isUnplanned ? 'true' : 'false'}
                                         className={`fc-event-external p-3 bg-transparent border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                                     >
                                         <div className="flex items-start justify-between gap-2 mb-1">
@@ -298,7 +297,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                 <div className="flex items-center gap-2">
                                                     {project.status !== 'completed' && (
                                                         <button
-                                                            onClick={(e) => { e.stopPropagation(); handleMarkCompleted(project.id) }}
+                                                            onClick={() => handleMarkCompleted(project.id)}
                                                             className="text-zinc-500 hover:text-emerald-400 transition-colors"
                                                             title="Marquer comme complété"
                                                         >
@@ -306,7 +305,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                         </button>
                                                     )}
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); handleUnschedule(project.id) }}
+                                                        onClick={() => handleUnschedule(project.id)}
                                                         className="text-zinc-500 hover:text-red-400 transition-colors"
                                                         title="Retirer du calendrier"
                                                     >
