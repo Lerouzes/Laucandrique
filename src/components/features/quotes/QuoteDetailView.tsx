@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { Download, CheckCircle, XCircle, ChevronLeft, Pencil, Send } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -13,6 +13,12 @@ import { frCA } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { updateQuoteStatus, revertQuoteToPending, markQuoteAsSent } from '@/actions/quotes'
+
+
+const sanitizePdfFileName = (value: string) => {
+    const normalized = (value || 'soumission').trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '')
+    return normalized || 'soumission'
+}
 
 
 const sanitizePdfFileName = (value: string) => {

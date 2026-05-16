@@ -8,21 +8,9 @@ import { CheckCircle, XCircle, TrendingUp, Briefcase } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { frCA } from 'date-fns/locale'
 
-function getRange(period: string, start?: string, end?: string) {
-    const now = new Date()
-    const yearStart = new Date(now.getFullYear(), 0, 1)
-    const yearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999)
-    if (period === 'last_30_days') return { start: new Date(now.getTime() - 29 * 86400000), end: now }
-    if (period === 'next_30_days') return { start: now, end: new Date(now.getTime() + 30 * 86400000) }
-    if (period === 'custom' && start && end) return { start: new Date(start), end: new Date(`${end}T23:59:59.999`) }
-    return { start: yearStart, end: yearEnd }
-}
-
-export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ managers?: string, period?: string, start?: string, end?: string }> }) {
+export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ managers?: string }> }) {
     const resolvedSearchParams = await searchParams
     const selectedManagers = (resolvedSearchParams.managers || '').split(',').filter(Boolean)
-    const period = resolvedSearchParams.period || 'current_year'
-    const range = getRange(period, resolvedSearchParams.start, resolvedSearchParams.end)
     const quotes = await getQuotes()
     const projects = await getProjects()
     const settings = await getSettings()
@@ -88,7 +76,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     const financialRows = months.map(m => monthMap[m.key])
 
     const managerStats: Record<string, { total: number, approved: number, amount: number, denied: number, sent: number }> = {}
-    filteredQuotes.forEach((q: any) => {
+    quotes.forEach((q: any) => {
         const name = q.managers ? `${q.managers.first_name} ${q.managers.last_name}` : 'Sans gestionnaire'
         const id = q.manager_id || 'none'
         managerStats[name] = managerStats[name] || { total: 0, approved: 0, amount: 0, denied: 0, sent: 0 }
@@ -188,16 +176,6 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                 <CardContent>
                     <form className="space-y-3">
                         <p className="text-sm text-zinc-600">Filtrer un ou plusieurs gestionnaires</p>
-                        <div className="grid md:grid-cols-4 gap-2">
-                            <select name="period" defaultValue={period} className="h-9 rounded border border-zinc-200 px-2 text-sm">
-                                <option value="current_year">Année en cours</option>
-                                <option value="last_30_days">30 derniers jours</option>
-                                <option value="next_30_days">30 prochains jours</option>
-                                <option value="custom">Personnalisé</option>
-                            </select>
-                            <input type="date" name="start" defaultValue={resolvedSearchParams.start || ''} className="h-9 rounded border border-zinc-200 px-2 text-sm" />
-                            <input type="date" name="end" defaultValue={resolvedSearchParams.end || ''} className="h-9 rounded border border-zinc-200 px-2 text-sm" />
-                        </div>
                         <div className="grid grid-cols-2 gap-2 text-sm">
                             {availableManagers.map((id: any) => {
                                 const q = quotes.find((x: any) => x.manager_id === id)

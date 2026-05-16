@@ -74,9 +74,6 @@ export async function updateQuoteAction(quoteId: string, quoteData: any, itemsDa
     const quotePayload: any = {
         ...quoteData,
         manager_id: clientData?.manager_id || null,
-        status: 'draft',
-        approved_at: null,
-        denied_at: null,
     }
 
     let quoteUpdate = await supabase.from('quotes').update(quotePayload).eq('id', quoteId)
