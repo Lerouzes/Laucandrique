@@ -31,12 +31,32 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
     const pdfRef = useRef<HTMLDivElement>(null)
     const [isGenerating, setIsGenerating] = useState(false)
     const [isPending, startTransition] = useTransition()
+    const [templateUrl, setTemplateUrl] = useState<string>('')
+
+    useEffect(() => {
+        const localTemplate = typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') || '' : ''
+        setTemplateUrl(settings?.pdf_template_url || localTemplate)
+    }, [settings?.pdf_template_url])
 
     const generatePDF = async () => {
         if (!pdfRef.current) return
         try {
             setIsGenerating(true)
-            const canvas = await html2canvas(pdfRef.current, { scale: 2, useCORS: true })
+            let canvas: HTMLCanvasElement
+            try {
+                canvas = await html2canvas(pdfRef.current, { scale: 2, useCORS: true, allowTaint: false, backgroundColor: '#ffffff' })
+            } catch {
+                const clone = pdfRef.current.cloneNode(true) as HTMLDivElement
+                clone.querySelectorAll('img').forEach((img) => img.remove())
+                clone.style.position = 'fixed'
+                clone.style.left = '-10000px'
+                clone.style.top = '0'
+                clone.style.width = '800px'
+                clone.style.background = '#fff'
+                document.body.appendChild(clone)
+                canvas = await html2canvas(clone, { scale: 2, useCORS: true, allowTaint: false, backgroundColor: '#ffffff' })
+                clone.remove()
+            }
             const imgData = canvas.toDataURL('image/png')
 
             const pdf = new jsPDF({
@@ -190,7 +210,8 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                 )}
             </div>
 
-            <div className="bg-white text-black p-10 rounded-lg shadow-sm w-[800px] shrink-0" ref={pdfRef}>
+            <div className="bg-white text-black p-10 rounded-lg shadow-sm w-[800px] shrink-0 relative overflow-hidden" ref={pdfRef}>
+                {templateUrl && <img src={templateUrl} alt="Template" className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none" crossOrigin="anonymous" />}
                 <div className="flex justify-between items-start mb-8">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight text-zinc-900">{settings.company_name || 'Gustav Inc.'}</h1>
