@@ -35,6 +35,7 @@ const clientSchema = z.object({
     city: z.string().optional(),
     province: z.string().optional(),
     postal_code: z.string().optional(),
+    manager_id: z.string().optional(),
 })
 
 export function ClientFormDialog({ managers = [] }: { managers?: any[] }) {
@@ -52,6 +53,7 @@ export function ClientFormDialog({ managers = [] }: { managers?: any[] }) {
             city: '',
             province: '',
             postal_code: '',
+            manager_id: '',
         },
     })
 
@@ -62,8 +64,7 @@ export function ClientFormDialog({ managers = [] }: { managers?: any[] }) {
                 Object.entries(values).forEach(([key, value]) => {
                     if (value) formData.append(key, value as string)
                 })
-                const selected = managers.find((m: any) => `${m.first_name} ${m.last_name}` === values.manager)
-                if (selected) formData.append('manager_id', selected.id)
+                if (values.manager_id) formData.append('manager_id', values.manager_id)
 
                 const res = await createClientAction(formData)
 
@@ -129,7 +130,7 @@ export function ClientFormDialog({ managers = [] }: { managers?: any[] }) {
 
                             <FormField
                                 control={form.control}
-                                name="manager"
+                                name="manager_id"
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="text-zinc-300">Gestionnaire</FormLabel>
@@ -137,7 +138,7 @@ export function ClientFormDialog({ managers = [] }: { managers?: any[] }) {
                                             <select {...field} className="h-10 w-full rounded-md border bg-zinc-900 border-zinc-800 px-3 text-zinc-100">
                                                 <option value="">Aucun</option>
                                                 {managers.map((m: any) => (
-                                                    <option key={m.id} value={`${m.first_name} ${m.last_name}`} data-id={m.id}>{m.first_name} {m.last_name}</option>
+                                                    <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
                                                 ))}
                                             </select>
                                         </FormControl>

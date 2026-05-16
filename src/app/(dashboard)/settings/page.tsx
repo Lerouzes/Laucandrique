@@ -9,12 +9,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getSettings, updateSettingsAction } from '@/actions/settings'
+import Link from 'next/link'
 import { getManagers, createManagerAction } from '@/actions/managers'
 
 export default function SettingsPage() {
     const [isPending, startTransition] = useTransition()
     const [settingsId, setSettingsId] = useState<string | null>(null)
     const [managers, setManagers] = useState<any[]>([])
+    const [templatePreview, setTemplatePreview] = useState<string>('')
 
     const form = useForm({
         defaultValues: {
@@ -46,6 +48,24 @@ export default function SettingsPage() {
     useEffect(() => {
         getManagers().then(setManagers)
     }, [])
+
+    useEffect(() => {
+        const localTemplate = localStorage.getItem('pdf_template_url') || ''
+        if (localTemplate) setTemplatePreview(localTemplate)
+    }, [])
+
+    const handleTemplateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        const reader = new FileReader()
+        reader.onload = () => {
+            const dataUrl = String(reader.result || '')
+            localStorage.setItem('pdf_template_url', dataUrl)
+            setTemplatePreview(dataUrl)
+            toast.success('Template PDF sauvegardé localement.')
+        }
+        reader.readAsDataURL(file)
+    }
 
     const onSubmit = (values: any) => {
         startTransition(async () => {
@@ -80,6 +100,17 @@ export default function SettingsPage() {
                             <Label className="text-zinc-300">Nom de l'entreprise *</Label>
                             <Input {...form.register('company_name')} required className="bg-zinc-950 border-zinc-800 text-zinc-100 focus-visible:ring-zinc-600" />
                         </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-zinc-900 border-zinc-800">
+                    <CardHeader>
+                        <CardTitle className="text-zinc-100">Template PDF personnalisé</CardTitle>
+                        <CardDescription className="text-zinc-400">Ajoutez une image modèle (entête/arrière-plan) pour personnaliser le look du PDF.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <Input type="file" accept="image/*" onChange={handleTemplateUpload} className="bg-zinc-950 border-zinc-800 text-zinc-100" />
+                        {templatePreview && <img src={templatePreview} alt="Template preview" className="max-h-40 rounded border border-zinc-800" />}
                     </CardContent>
                 </Card>
 
@@ -141,23 +172,11 @@ export default function SettingsPage() {
                             <Input name="email" placeholder="Courriel" />
                             <Button type="submit">Ajouter</Button>
                         </form>
-                        <div className="space-y-1 text-sm">{managers.map((m: any) => <div key={m.id}>{m.first_name} {m.last_name} — {m.email || '-'} </div>)}</div>
+                        <div className="space-y-1 text-sm">{managers.map((m: any) => <Link key={m.id} href={`/managers/${m.id}`} className="block text-zinc-300 hover:text-zinc-100">{m.first_name} {m.last_name} — {m.email || '-'} </Link>)}</div>
                     </CardContent>
                 </Card>
             </form>
 
-            <Card className="bg-zinc-900 border-zinc-800">
-                <CardHeader><CardTitle className="text-zinc-100">Gestionnaires</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                    <form action={async (fd) => { await createManagerAction(fd); setManagers(await getManagers()) }} className="grid grid-cols-4 gap-2">
-                        <Input name="first_name" placeholder="Prénom" required />
-                        <Input name="last_name" placeholder="Nom" required />
-                        <Input name="email" placeholder="Courriel" />
-                        <Button type="submit">Ajouter</Button>
-                    </form>
-                    <div className="space-y-1 text-sm">{managers.map((m: any) => <div key={m.id}>{m.first_name} {m.last_name} — {m.email || '-'} </div>)}</div>
-                </CardContent>
-            </Card>
         </div>
     )
 }

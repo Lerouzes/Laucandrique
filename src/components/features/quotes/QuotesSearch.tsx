@@ -36,21 +36,21 @@ export function QuotesSearch({ initialQuery, initialStatus }: { initialQuery: st
                 <Input
                     type="search"
                     placeholder="Rechercher par numéro ou titre..."
-                    className="w-full bg-zinc-900 border-zinc-800 pl-9 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-zinc-600 focus-visible:border-transparent"
+                    className="w-full bg-white border-zinc-200 pl-9 text-zinc-900 placeholder:text-zinc-500 focus-visible:ring-zinc-600 focus-visible:border-transparent"
                     value={val}
                     onChange={(e) => setVal(e.target.value)}
                 />
             </div>
             <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="w-[180px] bg-zinc-900 border-zinc-800 text-zinc-100">
+                <SelectTrigger className="w-[180px] bg-white border-zinc-200 text-zinc-900">
                     <SelectValue placeholder="Statut" />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-950 border-zinc-800 text-zinc-100">
-                    <SelectItem value="all" className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-100">Tous les statuts</SelectItem>
-                    <SelectItem value="draft" className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-100">Brouillon</SelectItem>
-                    <SelectItem value="sent" className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-100">Envoyée</SelectItem>
-                    <SelectItem value="approved" className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-100">Approuvée</SelectItem>
-                    <SelectItem value="denied" className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-100">Refusée</SelectItem>
+                <SelectContent className="bg-white border-zinc-200 text-zinc-900">
+                    <SelectItem value="all" className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-900">Tous les statuts</SelectItem>
+                    <SelectItem value="draft" className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-900">Brouillon</SelectItem>
+                    <SelectItem value="sent" className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-900">Envoyée</SelectItem>
+                    <SelectItem value="approved" className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-900">Approuvée</SelectItem>
+                    <SelectItem value="denied" className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-900">Refusée</SelectItem>
                 </SelectContent>
             </Select>
         </div>

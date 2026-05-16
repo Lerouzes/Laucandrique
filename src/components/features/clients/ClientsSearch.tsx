@@ -32,7 +32,7 @@ export function ClientsSearch({ initialQuery }: { initialQuery: string }) {
             <Input
                 type="search"
                 placeholder="Rechercher un client..."
-                className="w-full bg-zinc-900 border-zinc-800 pl-9 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-zinc-600 focus-visible:border-transparent"
+                className="w-full bg-white border-zinc-200 pl-9 text-zinc-900 placeholder:text-zinc-500 focus-visible:ring-zinc-600 focus-visible:border-transparent"
                 value={val}
                 onChange={(e) => setVal(e.target.value)}
             />

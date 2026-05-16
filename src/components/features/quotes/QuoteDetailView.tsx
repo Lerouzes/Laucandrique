@@ -1,7 +1,7 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
-import { Download, CheckCircle, XCircle, ChevronLeft, Pencil } from 'lucide-react'
+import { useEffect, useRef, useState, useTransition } from 'react'
+import { Download, CheckCircle, XCircle, ChevronLeft, Pencil, Send } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { jsPDF } from 'jspdf'
@@ -12,19 +12,45 @@ import { frCA } from 'date-fns/locale'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { updateQuoteStatus, revertQuoteToPending } from '@/actions/quotes'
+import { updateQuoteStatus, revertQuoteToPending, markQuoteAsSent } from '@/actions/quotes'
+
+
+const sanitizePdfFileName = (value: string) => {
+    const normalized = (value || 'soumission').trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '')
+    return normalized || 'soumission'
+}
 
 export function QuoteDetailView({ quote, settings }: { quote: any, settings: any }) {
     const router = useRouter()
     const pdfRef = useRef<HTMLDivElement>(null)
     const [isGenerating, setIsGenerating] = useState(false)
     const [isPending, startTransition] = useTransition()
+    const [templateUrl, setTemplateUrl] = useState<string>('')
+
+    useEffect(() => {
+        const localTemplate = typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') || '' : ''
+        setTemplateUrl(settings?.pdf_template_url || localTemplate)
+    }, [settings?.pdf_template_url])
 
     const generatePDF = async () => {
         if (!pdfRef.current) return
         try {
             setIsGenerating(true)
-            const canvas = await html2canvas(pdfRef.current, { scale: 2, useCORS: true })
+            let canvas: HTMLCanvasElement
+            try {
+                canvas = await html2canvas(pdfRef.current, { scale: 2, useCORS: true, allowTaint: false, backgroundColor: '#ffffff' })
+            } catch {
+                const clone = pdfRef.current.cloneNode(true) as HTMLDivElement
+                clone.querySelectorAll('img').forEach((img) => img.remove())
+                clone.style.position = 'fixed'
+                clone.style.left = '-10000px'
+                clone.style.top = '0'
+                clone.style.width = '800px'
+                clone.style.background = '#fff'
+                document.body.appendChild(clone)
+                canvas = await html2canvas(clone, { scale: 2, useCORS: true, allowTaint: false, backgroundColor: '#ffffff' })
+                clone.remove()
+            }
             const imgData = canvas.toDataURL('image/png')
 
             const pdf = new jsPDF({
@@ -36,8 +62,21 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
             const pdfWidth = pdf.internal.pageSize.getWidth()
             const pdfHeight = (canvas.height * pdfWidth) / canvas.width
 
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
-            pdf.save(`Soumission-${quote.title}.pdf`)
+            let heightLeft = pdfHeight
+            let position = 0
+
+            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight)
+            heightLeft -= pdf.internal.pageSize.getHeight()
+
+            while (heightLeft > 0) {
+                position = heightLeft - pdfHeight
+                pdf.addPage()
+                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight)
+                heightLeft -= pdf.internal.pageSize.getHeight()
+            }
+
+            const safeFileName = sanitizePdfFileName(quote.title)
+            pdf.save(`Soumission-${safeFileName}.pdf`)
             toast.success('PDF généré avec succès')
         } catch (error) {
             toast.error('Erreur lors de la génération du PDF')
@@ -59,6 +98,20 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
         })
     }
 
+
+
+    const handleMarkAsSent = () => {
+        startTransition(async () => {
+            try {
+                await markQuoteAsSent(quote.id)
+                toast.success('Soumission marquée comme envoyée.')
+                router.refresh()
+            } catch (err: any) {
+                toast.error('Erreur', { description: err.message })
+            }
+        })
+    }
+
     const handleRevertToDraft = () => {
         startTransition(async () => {
             try {
@@ -70,6 +123,10 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
             }
         })
     }
+
+    const durationLabel = quote.estimated_duration_days < 1
+        ? `${Math.round(quote.estimated_duration_days * 24 * 100) / 100} heures`
+        : `${quote.estimated_duration_days} jours`
 
     return (
         <div className="space-y-6 max-w-4xl mx-auto pb-12 w-full overflow-x-auto">
@@ -97,13 +154,27 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                         Modifier la soumission
                 </Link>
 
-                {quote.status !== 'approved' && quote.status !== 'denied' && (
+                {quote.status === 'draft' && (
+                    <>
+                        <Button
+                            variant="outline"
+                            onClick={handleMarkAsSent}
+                            disabled={isPending}
+                            className="border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                        >
+                            <Send className="mr-2 h-4 w-4" />
+                            Marquer envoyée
+                        </Button>
+                    </>
+                )}
+
+                {(quote.status === 'sent' || quote.status === 'denied') && (
                     <>
                         <Button
                             variant="outline"
                             onClick={() => handleStatusChange('approved')}
                             disabled={isPending}
-                            className="border-green-800 bg-green-950/20 text-green-400 hover:bg-green-900/50 hover:text-green-300"
+                            className="border-green-300 bg-green-50 text-green-700 hover:bg-green-100"
                         >
                             <CheckCircle className="mr-2 h-4 w-4" />
                             Approuver le projet
@@ -112,7 +183,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                             variant="outline"
                             onClick={() => handleStatusChange('denied')}
                             disabled={isPending}
-                            className="border-red-800 bg-red-950/20 text-red-400 hover:bg-red-900/50 hover:text-red-300"
+                            className="border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
                         >
                             <XCircle className="mr-2 h-4 w-4" />
                             Refuser
@@ -120,7 +191,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                     </>
                 )}
 
-                {quote.status === 'approved' && (
+                {(quote.status === 'approved' || quote.status === 'sent' || quote.status === 'denied') && (
                     <Button
                         variant="outline"
                         onClick={handleRevertToDraft}
@@ -133,7 +204,8 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                 )}
             </div>
 
-            <div className="bg-white text-black p-10 rounded-lg shadow-sm w-[800px] shrink-0" ref={pdfRef}>
+            <div className="bg-white text-black p-10 rounded-lg shadow-sm w-[800px] shrink-0 relative overflow-hidden" ref={pdfRef}>
+                {templateUrl && <img src={templateUrl} alt="Template" className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none" crossOrigin="anonymous" />}
                 <div className="flex justify-between items-start mb-8">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight text-zinc-900">{settings.company_name || 'Gustav Inc.'}</h1>
@@ -143,7 +215,8 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                         <h2 className="text-xl font-semibold mb-2">SOUMISSION</h2>
                         <div className="text-sm text-zinc-600">
                             <p>Date: {format(new Date(quote.created_at), 'dd MMMM yyyy', { locale: frCA })}</p>
-                            <p>Durée estimée: {quote.estimated_duration_days} jours</p>
+                            <p>Durée estimée: {durationLabel}</p>
+                            {quote.sent_at && <p>Envoyée le: {format(new Date(quote.sent_at), 'dd MMMM yyyy, HH:mm', { locale: frCA })}</p>}
                         </div>
                     </div>
                 </div>
