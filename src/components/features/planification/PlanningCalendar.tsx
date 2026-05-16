@@ -36,6 +36,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     const [projects, setProjects] = useState(initialProjects)
     const externalEventsRef = useRef<HTMLDivElement>(null)
     const [isPending, startTransition] = useTransition()
+    const [isDraggingEvent, setIsDraggingEvent] = useState(false)
     const [filter, setFilter] = useState<StatusFilter>('all')
     const normalizedQuery = query.trim().toLowerCase()
     const getDurationDays = (project: any) => Number(project?.estimated_duration_days || 1)
@@ -116,6 +117,20 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             }
         }
     })
+
+    const buildRangeFromEvent = (event: any) => {
+        const start = event.start as Date | null
+        const end = event.end as Date | null
+
+        if (!start || !end) {
+            return { startDate: null, endDate: null }
+        }
+
+        return {
+            startDate: start.toISOString(),
+            endDate: end.toISOString(),
+        }
+    }
 
     // FIX: call info.event.remove() to prevent duplication — FullCalendar adds the event
     // automatically on drop; since we control the `events` array, remove the duplicated internal copy.
