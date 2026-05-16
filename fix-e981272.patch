@@ -1,0 +1,123 @@
+From e981272f4ff9af7e05300a19d87bc77a3b985f3c Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sat, 16 May 2026 16:29:28 +0000
+Subject: [PATCH] Harden quote PDF export and add customizable template upload
+
+---
+ src/app/(dashboard)/settings/page.tsx         | 30 +++++++++++++++++++
+ .../features/quotes/QuoteDetailView.tsx       | 27 +++++++++++++++--
+ 2 files changed, 54 insertions(+), 3 deletions(-)
+
+diff --git a/src/app/(dashboard)/settings/page.tsx b/src/app/(dashboard)/settings/page.tsx
+index 8cbf975..8170ffb 100644
+--- a/src/app/(dashboard)/settings/page.tsx
++++ b/src/app/(dashboard)/settings/page.tsx
+@@ -16,6 +16,7 @@ export default function SettingsPage() {
+     const [isPending, startTransition] = useTransition()
+     const [settingsId, setSettingsId] = useState<string | null>(null)
+     const [managers, setManagers] = useState<any[]>([])
++    const [templatePreview, setTemplatePreview] = useState<string>('')
+ 
+     const form = useForm({
+         defaultValues: {
+@@ -48,6 +49,24 @@ export default function SettingsPage() {
+         getManagers().then(setManagers)
+     }, [])
+ 
++    useEffect(() => {
++        const localTemplate = localStorage.getItem('pdf_template_url') || ''
++        if (localTemplate) setTemplatePreview(localTemplate)
++    }, [])
++
++    const handleTemplateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
++        const file = e.target.files?.[0]
++        if (!file) return
++        const reader = new FileReader()
++        reader.onload = () => {
++            const dataUrl = String(reader.result || '')
++            localStorage.setItem('pdf_template_url', dataUrl)
++            setTemplatePreview(dataUrl)
++            toast.success('Template PDF sauvegardé localement.')
++        }
++        reader.readAsDataURL(file)
++    }
++
+     const onSubmit = (values: any) => {
+         startTransition(async () => {
+             try {
+@@ -84,6 +103,17 @@ export default function SettingsPage() {
+                     </CardContent>
+                 </Card>
+ 
++                <Card className="bg-zinc-900 border-zinc-800">
++                    <CardHeader>
++                        <CardTitle className="text-zinc-100">Template PDF personnalisé</CardTitle>
++                        <CardDescription className="text-zinc-400">Ajoutez une image modèle (entête/arrière-plan) pour personnaliser le look du PDF.</CardDescription>
++                    </CardHeader>
++                    <CardContent className="space-y-3">
++                        <Input type="file" accept="image/*" onChange={handleTemplateUpload} className="bg-zinc-950 border-zinc-800 text-zinc-100" />
++                        {templatePreview && <img src={templatePreview} alt="Template preview" className="max-h-40 rounded border border-zinc-800" />}
++                    </CardContent>
++                </Card>
++
+                 <Card className="bg-zinc-900 border-zinc-800">
+                     <CardHeader>
+                         <CardTitle className="text-zinc-100">Soumissions: Valeurs par défaut</CardTitle>
+diff --git a/src/components/features/quotes/QuoteDetailView.tsx b/src/components/features/quotes/QuoteDetailView.tsx
+index e80660b..b3a9b9f 100644
+--- a/src/components/features/quotes/QuoteDetailView.tsx
++++ b/src/components/features/quotes/QuoteDetailView.tsx
+@@ -1,6 +1,6 @@
+ 'use client'
+ 
+-import { useRef, useState, useTransition } from 'react'
++import { useEffect, useRef, useState, useTransition } from 'react'
+ import { Download, CheckCircle, XCircle, ChevronLeft, Pencil, Send } from 'lucide-react'
+ import Link from 'next/link'
+ import { useRouter } from 'next/navigation'
+@@ -25,12 +25,32 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
+     const pdfRef = useRef<HTMLDivElement>(null)
+     const [isGenerating, setIsGenerating] = useState(false)
+     const [isPending, startTransition] = useTransition()
++    const [templateUrl, setTemplateUrl] = useState<string>('')
++
++    useEffect(() => {
++        const localTemplate = typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') || '' : ''
++        setTemplateUrl(settings?.pdf_template_url || localTemplate)
++    }, [settings?.pdf_template_url])
+ 
+     const generatePDF = async () => {
+         if (!pdfRef.current) return
+         try {
+             setIsGenerating(true)
+-            const canvas = await html2canvas(pdfRef.current, { scale: 2, useCORS: true })
++            let canvas: HTMLCanvasElement
++            try {
++                canvas = await html2canvas(pdfRef.current, { scale: 2, useCORS: true, allowTaint: false, backgroundColor: '#ffffff' })
++            } catch {
++                const clone = pdfRef.current.cloneNode(true) as HTMLDivElement
++                clone.querySelectorAll('img').forEach((img) => img.remove())
++                clone.style.position = 'fixed'
++                clone.style.left = '-10000px'
++                clone.style.top = '0'
++                clone.style.width = '800px'
++                clone.style.background = '#fff'
++                document.body.appendChild(clone)
++                canvas = await html2canvas(clone, { scale: 2, useCORS: true, allowTaint: false, backgroundColor: '#ffffff' })
++                clone.remove()
++            }
+             const imgData = canvas.toDataURL('image/png')
+ 
+             const pdf = new jsPDF({
+@@ -184,7 +204,8 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
+                 )}
+             </div>
+ 
+-            <div className="bg-white text-black p-10 rounded-lg shadow-sm w-[800px] shrink-0" ref={pdfRef}>
++            <div className="bg-white text-black p-10 rounded-lg shadow-sm w-[800px] shrink-0 relative overflow-hidden" ref={pdfRef}>
++                {templateUrl && <img src={templateUrl} alt="Template" className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none" crossOrigin="anonymous" />}
+                 <div className="flex justify-between items-start mb-8">
+                     <div>
+                         <h1 className="text-3xl font-bold tracking-tight text-zinc-900">{settings.company_name || 'Gustav Inc.'}</h1>
+-- 
+2.43.0
