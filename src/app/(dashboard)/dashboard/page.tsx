@@ -54,7 +54,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </div>
 
             <div className="grid gap-4 md:grid-cols-4">
-                <Card className="bg-white border-zinc-200">
+                <Card className="bg-transparent border-zinc-800">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium text-zinc-400">Revenus Projetés</CardTitle>
                         <Banknote className="h-4 w-4 text-zinc-500" />
@@ -65,7 +65,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     </CardContent>
                 </Card>
 
-                <Card className="bg-white border-zinc-200">
+                <Card className="bg-transparent border-zinc-800">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium text-zinc-400">Taux d'approbation</CardTitle>
                         <CheckCircle className="h-4 w-4 text-zinc-500" />
@@ -79,18 +79,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 </Card>
 
 
-                <Card className="bg-white border-zinc-200">
+                <Card className="bg-transparent border-zinc-800">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-zinc-600">Soumissions envoyées</CardTitle>
+                        <CardTitle className="text-sm font-medium text-zinc-400">Soumissions envoyées</CardTitle>
                         <Send className="h-4 w-4 text-zinc-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-zinc-900">{sentQuotes.length}</div>
+                        <div className="text-2xl font-bold text-zinc-100">{sentQuotes.length}</div>
                         <p className="text-xs text-zinc-500 mt-1">Prêtes pour décision (approuvée/refusée)</p>
                     </CardContent>
                 </Card>
 
-                <Card className="bg-white border-zinc-200">
+                <Card className="bg-transparent border-zinc-800">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium text-zinc-400">Projets Actifs</CardTitle>
                         <Clock className="h-4 w-4 text-zinc-500" />
@@ -102,19 +102,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 </Card>
             </div>
 
-            <Card className="bg-white border-zinc-200">
+            <Card className="bg-transparent border-zinc-800">
                 <CardHeader>
-                    <CardTitle className="text-zinc-900">Revenus mensuels (période)</CardTitle>
+                    <CardTitle className="text-zinc-100">Revenus mensuels (période)</CardTitle>
                     <form className="mt-2 grid md:grid-cols-4 gap-2">
-                        <select name="period" defaultValue={period} className="h-9 rounded border border-zinc-200 px-2 text-sm">
+                        <select name="period" defaultValue={period} className="h-9 rounded border border-zinc-800 bg-transparent px-2 text-sm text-zinc-200">
                             <option value="current_year">Année en cours</option>
                             <option value="last_30_days">30 derniers jours</option>
                             <option value="next_30_days">30 prochains jours</option>
                             <option value="custom">Personnalisé</option>
                         </select>
-                        <input type="date" name="start" defaultValue={params.start || ''} className="h-9 rounded border border-zinc-200 px-2 text-sm" />
-                        <input type="date" name="end" defaultValue={params.end || ''} className="h-9 rounded border border-zinc-200 px-2 text-sm" />
-                        <button type="submit" className="h-9 rounded border border-zinc-200 px-3 text-sm">Appliquer</button>
+                        <input type="date" name="start" defaultValue={params.start || ''} className="h-9 rounded border border-zinc-800 bg-transparent px-2 text-sm text-zinc-200" />
+                        <input type="date" name="end" defaultValue={params.end || ''} className="h-9 rounded border border-zinc-800 bg-transparent px-2 text-sm text-zinc-200" />
+                        <button type="submit" className="h-9 rounded border border-zinc-800 px-3 text-sm text-zinc-200 hover:bg-zinc-800/40">Appliquer</button>
                     </form>
                 </CardHeader>
                 <CardContent>

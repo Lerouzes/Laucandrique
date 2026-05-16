@@ -197,18 +197,18 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     return (
         <div className="flex gap-6 h-full">
             {/* Sidebar */}
-            <Card className="w-80 h-full border-zinc-200 bg-white flex flex-col shrink-0">
-                <CardHeader className="border-b border-zinc-200 py-3 px-4">
-                    <CardTitle className="text-zinc-900 text-base font-semibold mb-2">Projets</CardTitle>
+            <Card className="w-80 h-full border-zinc-800 bg-transparent flex flex-col shrink-0">
+                <CardHeader className="border-b border-zinc-800 py-3 px-4">
+                    <CardTitle className="text-zinc-100 text-base font-semibold mb-2">Projets</CardTitle>
                     {/* Filter tabs */}
-                    <div className="flex gap-1 bg-white rounded-md p-1">
+                    <div className="flex gap-1 bg-zinc-900/40 rounded-md p-1 border border-zinc-800">
                         {(['unscheduled', 'scheduled', 'all'] as StatusFilter[]).map(f => (
                             <button
                                 key={f}
                                 onClick={() => setFilter(f)}
                                 className={`flex-1 text-xs py-1 rounded transition-colors ${filter === f
-                                    ? 'bg-zinc-700 text-zinc-900 font-medium'
-                                    : 'text-zinc-500 hover:text-zinc-700'
+                                    ? 'bg-zinc-700 text-zinc-100 font-medium'
+                                    : 'text-zinc-400 hover:text-zinc-200'
                                     }`}
                             >
                                 {f === 'unscheduled' ? 'Non planifiés' : f === 'scheduled' ? 'Planifiés' : 'Tous'}
@@ -236,11 +236,11 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         data-id={project.id}
                                         data-title={project.title}
                                         data-duration={project.estimated_duration_days}
-                                        className={`fc-event-external p-3 bg-white border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+                                        className={`fc-event-external p-3 bg-transparent border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                                     >
                                         <div className="flex items-start justify-between gap-2 mb-1">
-                                            <div className="font-medium text-zinc-900 text-sm leading-tight flex items-center gap-2"><span className='inline-block h-2 w-2 rounded-full' style={{ backgroundColor: TYPE_DOT[project.project_type || 'interior'] }} />{project.title}</div>
-                                            {project.quotes?.quote_number && <div className='text-[11px] text-zinc-600'>Soumission #{project.quotes.quote_number}</div>}
+                                            <div className="font-medium text-zinc-100 text-sm leading-tight flex items-center gap-2"><span className='inline-block h-2 w-2 rounded-full' style={{ backgroundColor: TYPE_DOT[project.project_type || 'interior'] }} />{project.title}</div>
+                                            {project.quotes?.quote_number && <div className='text-[11px] text-zinc-400'>Soumission #{project.quotes.quote_number}</div>}
                                             <button
                                                 onClick={() => handleProjectClick(project.quote_id)}
                                                 className="text-zinc-500 hover:text-zinc-200 transition-colors shrink-0 mt-0.5"
@@ -249,16 +249,16 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                 <ExternalLink className="h-3.5 w-3.5" />
                                             </button>
                                         </div>
-                                        <div className="text-xs text-zinc-600 mb-2 truncate">{project.clients?.full_name}</div>
+                                        <div className="text-xs text-zinc-400 mb-2 truncate">{project.clients?.full_name}</div>
                                         {project.contractors?.full_name && <div className='text-xs mb-2' style={{ color: project.contractors.color }}>👷 {project.contractors.full_name}</div>}
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-1.5">
-                                                <Badge variant="secondary" className="bg-zinc-800 text-zinc-700 pointer-events-none text-xs">
+                                                <Badge variant="secondary" className="bg-zinc-800 text-zinc-100 pointer-events-none text-xs">
                                                     {project.estimated_duration_days} j
                                                 </Badge>
                                                 <Badge
                                                     variant="secondary"
-                                                    className={`pointer-events-none text-xs ${isUnplanned ? 'bg-zinc-800 text-zinc-600' : 'bg-yellow-900/60 text-yellow-300'}`}
+                                                    className={`pointer-events-none text-xs ${isUnplanned ? 'bg-zinc-800 text-zinc-300' : 'bg-yellow-900/60 text-yellow-300'}`}
                                                 >
                                                     {isUnplanned ? 'Non planifié' : 'Planifié'}
                                                 </Badge>
@@ -289,7 +289,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             </Card>
 
             {/* Calendar */}
-            <Card className="flex-1 h-full border-zinc-200 bg-white p-4 relative overflow-hidden">
+            <Card className="flex-1 h-full border-zinc-800 bg-transparent p-4 relative overflow-hidden">
                 <div className="fc-dark-theme-wrapper h-full">
                     <FullCalendar
                         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
