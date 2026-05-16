@@ -10,7 +10,7 @@ import { updateProjectDates, updateProjectStatus } from '@/actions/projects'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { CalendarX, ExternalLink, CalendarClock } from 'lucide-react'
+import { CalendarX, ExternalLink, CalendarClock, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 type StatusFilter = 'unscheduled' | 'scheduled' | 'all'
@@ -40,14 +40,13 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     const normalizedQuery = query.trim().toLowerCase()
     const getDurationDays = (project: any) => Number(project?.estimated_duration_days || 1)
     const getDurationMinutes = (project: any) => Math.max(15, Math.round(getDurationDays(project) * 24 * 60))
-    const isHourlyProject = (project: any) => getDurationDays(project) < 1
 
     // Reinitialize draggable whenever the project list changes (filter or data)
     useEffect(() => {
         let draggableInstance: Draggable | null = null
         if (externalEventsRef.current) {
             draggableInstance = new Draggable(externalEventsRef.current, {
-                itemSelector: '.fc-event-external',
+                itemSelector: '.fc-event-external-draggable',
                 eventData: function (eventEl) {
                     const durationDays = Number(eventEl.getAttribute('data-duration-days') || '1')
                     const durationMinutes = Math.max(15, Math.round(durationDays * 24 * 60))
@@ -87,13 +86,13 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         const isHourly = durationDays < 1
         const startObj = p.start_date ? new Date(p.start_date) : null
         const endObj = p.end_date ? new Date(p.end_date) : (startObj ? new Date(startObj) : null)
+        const contractorColor = String(p.contractors?.color || p.quotes?.contractors?.color || '').trim()
+        const eventColor = contractorColor || (p.status === 'completed' ? '#065f46' : p.status === 'in_progress' ? '#1e3a8a' : '#78350f')
 
-        if (startObj && endObj) {
-            if (isHourly) {
-                endObj.setTime(startObj.getTime() + durationMinutes * 60 * 1000)
-            } else {
-                endObj.setDate(endObj.getDate() + 1)
-            }
+        // Keep persisted all-day end as-is (FullCalendar already uses exclusive end dates for all-day events).
+        // Only synthesize an end for hourly events when one is missing.
+        if (startObj && endObj && isHourly && !p.end_date) {
+            endObj.setTime(startObj.getTime() + durationMinutes * 60 * 1000)
         }
 
         return {
@@ -102,14 +101,17 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             start: startObj ? startObj.toISOString() : undefined,
             end: endObj ? endObj.toISOString() : undefined,
             allDay: !isHourly,
-            backgroundColor: p.contractors?.color || (p.status === 'completed' ? '#065f46' : p.status === 'in_progress' ? '#1e3a8a' : '#78350f'),
-            borderColor: 'transparent',
+            backgroundColor: eventColor,
+            borderColor: eventColor,
             extendedProps: {
                 client: p.clients?.full_name,
                 status: p.status,
+                projectId: p.id,
                 quoteId: p.quote_id,
+                quoteNumber: p.quotes?.quote_number,
                 projectType: p.project_type,
                 isHourly,
+                eventColor,
             }
         }
     })
@@ -192,6 +194,22 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         })
     }
 
+
+    const handleMarkCompleted = (projectId: string) => {
+        setProjects(prev => prev.map(p => p.id === projectId ? {
+            ...p, status: 'completed', completed_at: new Date().toISOString()
+        } : p))
+
+        startTransition(async () => {
+            try {
+                await updateProjectStatus(projectId, 'completed')
+                toast.success("Projet marqué comme complété.")
+            } catch (e: any) {
+                toast.error("Erreur", { description: e.message })
+            }
+        })
+    }
+
     const handleEventClick = (info: any) => {
         const quoteId = info.event.extendedProps.quoteId
         if (quoteId) {
@@ -246,14 +264,14 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         key={project.id}
                                         data-id={project.id}
                                         data-title={project.title}
-                                        data-duration={project.estimated_duration_days}
-                                        className={`fc-event-external p-3 bg-transparent border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+                                        data-duration-days={project.estimated_duration_days}
+                                        className={`fc-event-external p-3 bg-transparent border rounded-md transition-colors shadow-sm ${isUnplanned ? 'fc-event-external-draggable' : ''} ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                                     >
                                         <div className="flex items-start justify-between gap-2 mb-1">
                                             <div className="font-medium text-zinc-100 text-sm leading-tight flex items-center gap-2"><span className='inline-block h-2 w-2 rounded-full' style={{ backgroundColor: TYPE_DOT[project.project_type || 'interior'] }} />{project.title}</div>
                                             {project.quotes?.quote_number && <div className='text-[11px] text-zinc-400'>Soumission #{project.quotes.quote_number}</div>}
                                             <button
-                                                onClick={() => handleProjectClick(project.quote_id)}
+                                                onClick={(e) => { e.stopPropagation(); handleProjectClick(project.quote_id) }}
                                                 className="text-zinc-500 hover:text-zinc-200 transition-colors shrink-0 mt-0.5"
                                                 title="Voir la soumission"
                                             >
@@ -275,13 +293,24 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                 </Badge>
                                             </div>
                                             {!isUnplanned && (
-                                                <button
-                                                    onClick={() => handleUnschedule(project.id)}
-                                                    className="text-zinc-500 hover:text-red-400 transition-colors"
-                                                    title="Retirer du calendrier"
-                                                >
-                                                    <CalendarX className="h-3.5 w-3.5" />
-                                                </button>
+                                                <div className="flex items-center gap-2">
+                                                    {project.status !== 'completed' && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleMarkCompleted(project.id) }}
+                                                            className="text-zinc-500 hover:text-emerald-400 transition-colors"
+                                                            title="Marquer comme complété"
+                                                        >
+                                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleUnschedule(project.id) }}
+                                                        className="text-zinc-500 hover:text-red-400 transition-colors"
+                                                        title="Retirer du calendrier"
+                                                    >
+                                                        <CalendarX className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                         {project.start_date && (
@@ -317,6 +346,15 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                         eventDrop={handleEventDrop}
                         eventResize={handleEventResize}
                         eventClick={handleEventClick}
+                        eventDisplay="block"
+                        eventDidMount={(info) => {
+                            const color = info.event.extendedProps.eventColor
+                            if (color) {
+                                info.el.style.backgroundColor = color
+                                info.el.style.borderColor = color
+                                info.el.style.opacity = '1'
+                            }
+                        }}
                         height="100%"
                         locale="fr"
                         firstDay={1}
@@ -328,7 +366,17 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                         }}
                         eventContent={(arg) => (
                             <div className="overflow-hidden p-1 text-xs cursor-pointer group">
-                                <div className="font-semibold text-white truncate flex items-center gap-1.5"><span className='inline-block h-2 w-2 rounded-full' style={{ backgroundColor: TYPE_DOT[arg.event.extendedProps.projectType || 'interior'] }} />{arg.event.title}</div>
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="font-semibold text-white truncate flex items-center gap-1.5"><span className='inline-block h-2 w-2 rounded-full' style={{ backgroundColor: TYPE_DOT[arg.event.extendedProps.projectType || 'interior'] }} />{arg.event.title}{arg.event.extendedProps.quoteNumber ? ` · #${arg.event.extendedProps.quoteNumber}` : ''}</div>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); handleUnschedule(String(arg.event.extendedProps.projectId || arg.event.id)) }}
+                                        className="opacity-0 group-hover:opacity-100 text-white/80 hover:text-red-300 transition-opacity"
+                                        title="Retirer du calendrier"
+                                    >
+                                        <CalendarX className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
                                 <div className="opacity-70 mt-0.5 truncate">{arg.event.extendedProps.client}</div>
                                 <div className="opacity-0 group-hover:opacity-100 text-yellow-300 transition-opacity text-[10px] mt-0.5">Cliquer pour voir ↗</div>
                             </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { Download, CheckCircle, XCircle, ChevronLeft, Pencil, Send } from 'lucide-react'
+import { Download, CheckCircle, XCircle, ChevronLeft, Pencil, Send, CalendarCheck2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { jsPDF } from 'jspdf'
@@ -13,6 +13,7 @@ import { frCA } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { updateQuoteStatus, revertQuoteToPending, markQuoteAsSent } from '@/actions/quotes'
+import { markProjectCompletedByQuote } from '@/actions/projects'
 
 
 const sanitizePdfFileName = (value: string) => {
@@ -112,6 +113,19 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
         })
     }
 
+
+    const handleMarkProjectCompleted = () => {
+        startTransition(async () => {
+            try {
+                await markProjectCompletedByQuote(quote.id)
+                toast.success('Projet marqué comme complété.')
+                router.refresh()
+            } catch (err: any) {
+                toast.error('Erreur', { description: err.message })
+            }
+        })
+    }
+
     const handleRevertToDraft = () => {
         startTransition(async () => {
             try {
@@ -203,13 +217,24 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                     </Button>
                 )}
                 {quote.status === 'approved' && (
-                    <Button
-                        variant="outline"
-                        onClick={() => router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)}
-                        className="border-cyan-800 bg-cyan-950/20 text-cyan-300 hover:bg-cyan-900/50 hover:text-cyan-200"
-                    >
-                        Planifier la date
-                    </Button>
+                    <>
+                        <Button
+                            variant="outline"
+                            onClick={() => router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)}
+                            className="border-cyan-800 bg-cyan-950/20 text-cyan-300 hover:bg-cyan-900/50 hover:text-cyan-200"
+                        >
+                            Planifier la date
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={handleMarkProjectCompleted}
+                            disabled={isPending}
+                            className="border-emerald-800 bg-emerald-950/20 text-emerald-300 hover:bg-emerald-900/50 hover:text-emerald-200"
+                        >
+                            <CalendarCheck2 className="mr-2 h-4 w-4" />
+                            Marquer job complété
+                        </Button>
+                    </>
                 )}
             </div>
 
@@ -221,7 +246,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                         <p className="text-zinc-500 mt-1">Soumission Officielle</p>
                     </div>
                     <div className="text-right">
-                        <h2 className="text-xl font-semibold mb-2">SOUMISSION</h2>
+                        <h2 className="text-xl font-semibold mb-2">SOUMISSION #{quote.quote_number}</h2>
                         <div className="text-sm text-zinc-600">
                             <p>Date: {format(new Date(quote.created_at), 'dd MMMM yyyy', { locale: frCA })}</p>
                             <p>Durée estimée: {durationLabel}</p>

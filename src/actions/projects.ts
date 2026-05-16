@@ -8,7 +8,7 @@ export async function getProjects(query?: string) {
 
     const { data, error } = await supabase
         .from('projects')
-        .select('*, clients(full_name, address), contractors(full_name, color), quotes(quote_number, total)')
+        .select('*, clients(full_name, address), contractors(full_name, color), quotes(quote_number, total, contractor_id, contractors(full_name, color))')
         .order('created_at', { ascending: false })
 
     if (error) {
@@ -60,5 +60,31 @@ export async function updateProjectStatus(projectId: string, status: 'unplanned'
     if (error) throw new Error(error.message)
 
     revalidatePath('/planification')
+    return { success: true }
+}
+
+
+export async function markProjectCompletedByQuote(quoteId: string) {
+    const supabase = await createClient()
+
+    const { data: project, error: findError } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('quote_id', quoteId)
+        .maybeSingle()
+
+    if (findError) throw new Error(findError.message)
+    if (!project?.id) throw new Error('Aucun projet lié à cette soumission.')
+
+    const { error } = await supabase
+        .from('projects')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('id', project.id)
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/planification')
+    revalidatePath('/analytics')
+    revalidatePath(`/quotes/${quoteId}`)
     return { success: true }
 }

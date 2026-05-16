@@ -19,11 +19,11 @@ export function AnalyticsCharts({ monthlyRevenue }: { monthlyRevenue: any[] }) {
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={monthlyRevenue}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#3f3f46" />
-                                <XAxis dataKey="month" stroke="#a1a1aa" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis stroke="#a1a1aa" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
+                                <XAxis dataKey="month" stroke="#a1a1aa" fontSize={12} tickLine={false} axisLine={false} tick={{ fill: '#d4d4d8' }} />
+                                <YAxis stroke="#a1a1aa" fontSize={12} tickLine={false} axisLine={false} tick={{ fill: '#d4d4d8' }} tickFormatter={(value) => `$${value}`} />
                                 <Tooltip
                                     cursor={{ fill: '#27272a' }}
-                                    contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', color: '#f4f4f5' }}
+                                    contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', color: '#f4f4f5' }} itemStyle={{ color: '#f4f4f5' }}
                                     formatter={(value: number) => [`$${value.toLocaleString('fr-CA')}`, 'Revenus']}
                                     labelStyle={{ color: '#a1a1aa' }}
                                 />
