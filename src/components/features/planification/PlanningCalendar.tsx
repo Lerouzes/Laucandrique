@@ -41,32 +41,12 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     const getDurationDays = (project: any) => Number(project?.estimated_duration_days || 1)
     const getDurationMinutes = (project: any) => Math.max(15, Math.round(getDurationDays(project) * 24 * 60))
 
-    const buildRangeFromEvent = (event: any) => {
-        const project = projects.find((p: any) => String(p.id) === String(event.id))
-        const durationDays = Number(project?.estimated_duration_days || 1)
-        const durationMinutes = Math.max(15, Math.round(durationDays * 24 * 60))
-        const isHourly = durationDays < 1
-        const start = event.start ? new Date(event.start) : null
-        let end = event.end ? new Date(event.end) : null
-
-        if (start && !end) {
-            end = new Date(start)
-            if (isHourly) end.setTime(start.getTime() + durationMinutes * 60 * 1000)
-            else end.setDate(end.getDate() + 1)
-        }
-
-        return {
-            startDate: start ? start.toISOString() : null,
-            endDate: end ? end.toISOString() : (start ? start.toISOString() : null),
-        }
-    }
-
     // Reinitialize draggable whenever the project list changes (filter or data)
     useEffect(() => {
         let draggableInstance: Draggable | null = null
         if (externalEventsRef.current) {
             draggableInstance = new Draggable(externalEventsRef.current, {
-                itemSelector: '.fc-event-external[data-draggable="true"]',
+                itemSelector: '.fc-event-external-draggable',
                 eventData: function (eventEl) {
                     const durationDays = Number(eventEl.getAttribute('data-duration-days') || '1')
                     const durationMinutes = Math.max(15, Math.round(durationDays * 24 * 60))
@@ -107,7 +87,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         const isHourly = durationDays < 1
         const startObj = p.start_date ? new Date(p.start_date) : null
         const endObj = p.end_date ? new Date(p.end_date) : (startObj ? new Date(startObj) : null)
-        const contractorColor = String(p.contractors?.color || p.quotes?.contractors?.color || '').trim()
+        const contractorColor = String(p.contractors?.color || '').trim()
         const eventColor = contractorColor || (p.status === 'completed' ? '#065f46' : p.status === 'in_progress' ? '#1e3a8a' : '#78350f')
 
         // Keep persisted all-day end as-is (FullCalendar already uses exclusive end dates for all-day events).
@@ -228,8 +208,6 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         })
     }
 
-    const [isDraggingEvent, setIsDraggingEvent] = useState(false)
-
     const handleEventClick = (info: any) => {
         if (isDraggingEvent) return
         const quoteId = info.event.extendedProps.quoteId
@@ -286,7 +264,6 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         data-id={project.id}
                                         data-title={project.title}
                                         data-duration-days={project.estimated_duration_days}
-                                        data-draggable={isUnplanned ? 'true' : 'false'}
                                         className={`fc-event-external p-3 bg-transparent border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                                     >
                                         <div className="flex items-start justify-between gap-2 mb-1">
@@ -318,7 +295,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                 <div className="flex items-center gap-2">
                                                     {project.status !== 'completed' && (
                                                         <button
-                                                            onClick={(e) => { e.stopPropagation(); handleMarkCompleted(project.id) }}
+                                                            onClick={() => handleMarkCompleted(project.id)}
                                                             className="text-zinc-500 hover:text-emerald-400 transition-colors"
                                                             title="Marquer comme complété"
                                                         >
@@ -326,7 +303,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                         </button>
                                                     )}
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); handleUnschedule(project.id) }}
+                                                        onClick={() => handleUnschedule(project.id)}
                                                         className="text-zinc-500 hover:text-red-400 transition-colors"
                                                         title="Retirer du calendrier"
                                                     >
