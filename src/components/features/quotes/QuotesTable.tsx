@@ -43,9 +43,9 @@ function QuoteRow({ quote }: { quote: any }) {
             className="border-b border-zinc-800 hover:bg-zinc-800/50 cursor-pointer"
             onClick={() => router.push(`/quotes/${quote.id}`)}
         >
-            <TableCell className="text-zinc-100 font-mono">#{quote.quote_number}</TableCell>
-            <TableCell className="font-medium text-white">{quote.title}</TableCell>
-            <TableCell className="text-zinc-100">
+            <TableCell className="text-zinc-300 font-mono">#{quote.quote_number}</TableCell>
+            <TableCell className="font-medium text-zinc-100">{quote.title}</TableCell>
+            <TableCell className="text-zinc-300">
                 {quote.clients?.full_name}
                 {quote.clients?.company_name && <span className="text-zinc-300 text-xs block">{quote.clients.company_name}</span>}
             </TableCell>
@@ -54,8 +54,8 @@ function QuoteRow({ quote }: { quote: any }) {
                     {statusMap[quote.status]?.label || quote.status}
                 </Badge>
             </TableCell>
-            <TableCell className="text-white">${quote.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</TableCell>
-            <TableCell className="text-zinc-100">
+            <TableCell className="text-zinc-100">${quote.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</TableCell>
+            <TableCell className="text-zinc-300">
                 {format(new Date(quote.created_at), 'dd MMM yyyy', { locale: frCA })}
             </TableCell>
             <TableCell className="text-right">
@@ -93,18 +93,7 @@ function QuoteRow({ quote }: { quote: any }) {
                     >
                         <Pencil className="h-4 w-4" />
                     </Button>
-                    {quote.status === 'approved' && (
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)}
-                            className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50"
-                            title="Planifier ce projet"
-                        >
-                            <CalendarDays className="h-4 w-4" />
-                        </Button>
-                    )}
-                    <span className="text-sm text-zinc-200 ml-1">Voir →</span>
+                    <span className="text-sm text-zinc-400 ml-1">Voir →</span>
                 </div>
             </TableCell>
         </TableRow>
@@ -117,13 +106,13 @@ export function QuotesTable({ data }: { data: any[] }) {
             <Table>
                 <TableHeader className="bg-transparent border-b border-zinc-800">
                     <TableRow className="border-b border-zinc-800 hover:bg-transparent">
-                        <TableHead className="text-zinc-100 font-medium">#</TableHead>
-                        <TableHead className="text-zinc-100 font-medium">Titre</TableHead>
-                        <TableHead className="text-zinc-100 font-medium">Client</TableHead>
-                        <TableHead className="text-zinc-100 font-medium">Statut</TableHead>
-                        <TableHead className="text-zinc-100 font-medium">Montant Total</TableHead>
-                        <TableHead className="text-zinc-100 font-medium">Créée le</TableHead>
-                        <TableHead className="text-zinc-100 font-medium text-right">Actions</TableHead>
+                        <TableHead className="text-zinc-300 font-medium">#</TableHead>
+                        <TableHead className="text-zinc-300 font-medium">Titre</TableHead>
+                        <TableHead className="text-zinc-300 font-medium">Client</TableHead>
+                        <TableHead className="text-zinc-300 font-medium">Statut</TableHead>
+                        <TableHead className="text-zinc-300 font-medium">Montant Total</TableHead>
+                        <TableHead className="text-zinc-300 font-medium">Créée le</TableHead>
+                        <TableHead className="text-zinc-300 font-medium text-right">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
