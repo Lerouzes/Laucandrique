@@ -15,9 +15,9 @@ export async function getQuotes(query?: string, statusFilter?: string) {
         const sanitized = query.trim()
         if (sanitized) {
             if (/^\d+$/.test(sanitized)) {
-                request = request.or(`title.ilike.%${sanitized}%,quote_number.eq.${sanitized}`)
+                request = request.or(`title.ilike.%${sanitized}%,quote_number.eq.${sanitized},clients.full_name.ilike.%${sanitized}%,clients.company_name.ilike.%${sanitized}%`)
             } else {
-                request = request.ilike('title', `%${sanitized}%`)
+                request = request.or(`title.ilike.%${sanitized}%,clients.full_name.ilike.%${sanitized}%,clients.company_name.ilike.%${sanitized}%`)
             }
         }
     }

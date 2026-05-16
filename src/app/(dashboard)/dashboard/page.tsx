@@ -48,7 +48,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <div className="space-y-6">
             <div>
                 <h2 className="text-2xl font-bold tracking-tight text-zinc-100">Tableau de bord</h2>
-                <p className="text-sm text-zinc-400">
+                <p className="text-sm text-zinc-200">
                     Aperçu de vos activités récentes et métriques clés.
                 </p>
             </div>
@@ -56,25 +56,25 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <div className="grid gap-4 md:grid-cols-4">
                 <Card className="bg-transparent border-zinc-800">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-zinc-400">Revenus Projetés</CardTitle>
+                        <CardTitle className="text-sm font-medium text-zinc-100">Revenus Projetés</CardTitle>
                         <Banknote className="h-4 w-4 text-zinc-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-zinc-100">${totalApprovedValue.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</div>
-                        <p className="text-xs text-zinc-500 mt-1">Basé sur les soumissions approuvées</p>
+                        <p className="text-xs text-zinc-300 mt-1">Basé sur les soumissions approuvées</p>
                     </CardContent>
                 </Card>
 
                 <Card className="bg-transparent border-zinc-800">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-zinc-400">Taux d'approbation</CardTitle>
+                        <CardTitle className="text-sm font-medium text-zinc-100">Taux d'approbation</CardTitle>
                         <CheckCircle className="h-4 w-4 text-zinc-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-zinc-100">
                             {totalQuotesCount > 0 ? Math.round((approvedQuotes.length / totalQuotesCount) * 100) : 0}%
                         </div>
-                        <p className="text-xs text-zinc-500 mt-1">{approvedQuotes.length} approuvées sur {totalQuotesCount}</p>
+                        <p className="text-xs text-zinc-300 mt-1">{approvedQuotes.length} approuvées sur {totalQuotesCount}</p>
                     </CardContent>
                 </Card>
 
@@ -92,12 +92,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
                 <Card className="bg-transparent border-zinc-800">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-zinc-400">Projets Actifs</CardTitle>
+                        <CardTitle className="text-sm font-medium text-zinc-100">Projets Actifs</CardTitle>
                         <Clock className="h-4 w-4 text-zinc-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-zinc-100">{activeProjects.length}</div>
-                        <p className="text-xs text-zinc-500 mt-1">En cours ou planifiés</p>
+                        <p className="text-xs text-zinc-300 mt-1">En cours ou planifiés</p>
                     </CardContent>
                 </Card>
             </div>

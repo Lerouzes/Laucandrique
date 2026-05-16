@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { frCA } from 'date-fns/locale'
-import { CheckCircle, Pencil, XCircle } from 'lucide-react'
+import { CalendarDays, CheckCircle, Pencil, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { updateQuoteStatus } from '@/actions/quotes'
 
 const statusMap: Record<string, { label: string, styles: string }> = {
-    draft: { label: 'Brouillon', styles: 'bg-zinc-800 text-zinc-700' },
+    draft: { label: 'Brouillon', styles: 'bg-zinc-800 text-zinc-200 border-zinc-700' },
     sent: { label: 'Envoyée', styles: 'bg-blue-900/50 text-blue-300 border-blue-800' },
     approved: { label: 'Approuvée', styles: 'bg-green-900/50 text-green-300 border-green-800' },
     denied: { label: 'Refusée', styles: 'bg-red-900/50 text-red-300 border-red-800' },
@@ -47,7 +47,7 @@ function QuoteRow({ quote }: { quote: any }) {
             <TableCell className="font-medium text-zinc-100">{quote.title}</TableCell>
             <TableCell className="text-zinc-300">
                 {quote.clients?.full_name}
-                {quote.clients?.company_name && <span className="text-zinc-500 text-xs block">{quote.clients.company_name}</span>}
+                {quote.clients?.company_name && <span className="text-zinc-300 text-xs block">{quote.clients.company_name}</span>}
             </TableCell>
             <TableCell>
                 <Badge variant="outline" className={`border ${statusMap[quote.status]?.styles}`}>
@@ -118,7 +118,7 @@ export function QuotesTable({ data }: { data: any[] }) {
                 <TableBody>
                     {data.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={7} className="h-24 text-center text-zinc-500">
+                            <TableCell colSpan={7} className="h-24 text-center text-zinc-300">
                                 Aucune soumission trouvée.
                             </TableCell>
                         </TableRow>

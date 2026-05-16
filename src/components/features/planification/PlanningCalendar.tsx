@@ -46,10 +46,12 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             draggableInstance = new Draggable(externalEventsRef.current, {
                 itemSelector: '.fc-event-external',
                 eventData: function (eventEl) {
+                    const durationDays = Number(eventEl.getAttribute('data-duration-days') || '1')
+                    const durationMinutes = Math.max(15, Math.round(durationDays * 24 * 60))
                     return {
                         id: eventEl.getAttribute('data-id'),
                         title: eventEl.getAttribute('data-title'),
-                        duration: { days: parseInt(eventEl.getAttribute('data-duration') || '1', 10) }
+                        duration: { minutes: durationMinutes }
                     }
                 }
             })
@@ -77,14 +79,26 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
 
     // Calendar events: all non-unplanned projects
     const events = filteredProjects.filter(p => p.status !== 'unplanned').map(p => {
-        const endObj = p.end_date ? new Date(p.end_date) : new Date(p.start_date)
-        endObj.setDate(endObj.getDate() + 1)
+        const durationDays = Number(p.estimated_duration_days || 1)
+        const durationMinutes = Math.max(15, Math.round(durationDays * 24 * 60))
+        const isHourly = durationDays < 1
+        const startObj = p.start_date ? new Date(p.start_date) : null
+        const endObj = p.end_date ? new Date(p.end_date) : (startObj ? new Date(startObj) : null)
+
+        if (startObj && endObj) {
+            if (isHourly) {
+                endObj.setTime(startObj.getTime() + durationMinutes * 60 * 1000)
+            } else {
+                endObj.setDate(endObj.getDate() + 1)
+            }
+        }
+
         return {
             id: p.id,
             title: p.title,
-            start: p.start_date,
-            end: endObj.toISOString().split('T')[0],
-            allDay: true,
+            start: startObj ? startObj.toISOString() : undefined,
+            end: endObj ? endObj.toISOString() : undefined,
+            allDay: !isHourly,
             backgroundColor: p.contractors?.color || (p.status === 'completed' ? '#065f46' : p.status === 'in_progress' ? '#1e3a8a' : '#78350f'),
             borderColor: 'transparent',
             extendedProps: {
@@ -92,6 +106,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                 status: p.status,
                 quoteId: p.quote_id,
                 projectType: p.project_type,
+                isHourly,
             }
         }
     })
@@ -100,11 +115,8 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     // automatically on drop; since we control the `events` array, remove the duplicated internal copy.
     const handleEventReceive = (info: any) => {
         const projectId = info.event.id
-        const startDate = info.event.startStr.split('T')[0]
-        const endDateObj = info.event.end
-            ? new Date(info.event.end.getTime() - 24 * 60 * 60 * 1000)
-            : new Date(info.event.start)
-        const endDate = endDateObj.toISOString().split('T')[0]
+        const startDate = info.event.start ? info.event.start.toISOString() : null
+        const endDate = info.event.end ? info.event.end.toISOString() : startDate
 
         // Remove the auto-added duplicate event from FullCalendar's internal state
         info.event.remove()
@@ -116,7 +128,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
 
         startTransition(async () => {
             try {
-                await updateProjectDates(projectId, startDate, endDate)
+                if (startDate && endDate) await updateProjectDates(projectId, startDate, endDate)
                 toast.success("Projet planifié.")
             } catch (e: any) {
                 toast.error("Erreur de planification", { description: e.message })
@@ -126,11 +138,8 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
 
     const handleEventDrop = (info: any) => {
         const projectId = info.event.id
-        const startDate = info.event.startStr.split('T')[0]
-        const endDateObj = info.event.end
-            ? new Date(info.event.end.getTime() - 24 * 60 * 60 * 1000)
-            : new Date(info.event.start)
-        const endDate = endDateObj.toISOString().split('T')[0]
+        const startDate = info.event.start ? info.event.start.toISOString() : null
+        const endDate = info.event.end ? info.event.end.toISOString() : startDate
 
         setProjects(prev => prev.map(p => p.id === projectId ? {
             ...p, start_date: startDate, end_date: endDate
@@ -138,7 +147,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
 
         startTransition(async () => {
             try {
-                await updateProjectDates(projectId, startDate, endDate)
+                if (startDate && endDate) await updateProjectDates(projectId, startDate, endDate)
                 toast.success("Dates mises à jour.")
             } catch (e: any) {
                 toast.error("Erreur", { description: e.message })
@@ -148,9 +157,8 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
 
     const handleEventResize = (info: any) => {
         const projectId = info.event.id
-        const startDate = info.event.startStr.split('T')[0]
-        const endDateObj = new Date(info.event.end.getTime() - 24 * 60 * 60 * 1000)
-        const endDate = endDateObj.toISOString().split('T')[0]
+        const startDate = info.event.start ? info.event.start.toISOString() : null
+        const endDate = info.event.end ? info.event.end.toISOString() : startDate
 
         setProjects(prev => prev.map(p => p.id === projectId ? {
             ...p, end_date: endDate
@@ -158,7 +166,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
 
         startTransition(async () => {
             try {
-                await updateProjectDates(projectId, startDate, endDate)
+                if (startDate && endDate) await updateProjectDates(projectId, startDate, endDate)
                 toast.success("Durée mise à jour.")
             } catch (e: any) {
                 toast.error("Erreur", { description: e.message })
@@ -276,8 +284,8 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         {project.start_date && (
                                             <div className="mt-1.5 text-xs text-yellow-600 flex items-center gap-1">
                                                 <CalendarClock className="h-3 w-3" />
-                                                {new Date(project.start_date).toLocaleDateString('fr-CA')}
-                                                {project.end_date && ` → ${new Date(project.end_date).toLocaleDateString('fr-CA')}`}
+                                                {new Date(project.start_date).toLocaleString('fr-CA', { dateStyle: 'short', timeStyle: Number(project.estimated_duration_days) < 1 ? 'short' : undefined })}
+                                                {project.end_date && ` → ${new Date(project.end_date).toLocaleString('fr-CA', { dateStyle: 'short', timeStyle: Number(project.estimated_duration_days) < 1 ? 'short' : undefined })}`}
                                             </div>
                                         )}
                                     </div>
