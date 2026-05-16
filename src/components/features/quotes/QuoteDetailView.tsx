@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import { Download, CheckCircle, XCircle, ChevronLeft, Pencil } from 'lucide-react'
+import { Download, CheckCircle, XCircle, ChevronLeft, Pencil, Send } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { jsPDF } from 'jspdf'
@@ -12,7 +12,13 @@ import { frCA } from 'date-fns/locale'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { updateQuoteStatus, revertQuoteToPending } from '@/actions/quotes'
+import { updateQuoteStatus, revertQuoteToPending, markQuoteAsSent } from '@/actions/quotes'
+
+
+const sanitizePdfFileName = (value: string) => {
+    const normalized = (value || 'soumission').trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '')
+    return normalized || 'soumission'
+}
 
 
 const sanitizePdfFileName = (value: string) => {
@@ -78,6 +84,20 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
         })
     }
 
+
+
+    const handleMarkAsSent = () => {
+        startTransition(async () => {
+            try {
+                await markQuoteAsSent(quote.id)
+                toast.success('Soumission marquée comme envoyée.')
+                router.refresh()
+            } catch (err: any) {
+                toast.error('Erreur', { description: err.message })
+            }
+        })
+    }
+
     const handleRevertToDraft = () => {
         startTransition(async () => {
             try {
@@ -89,6 +109,10 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
             }
         })
     }
+
+    const durationLabel = quote.estimated_duration_days < 1
+        ? `${Math.round(quote.estimated_duration_days * 24 * 100) / 100} heures`
+        : `${quote.estimated_duration_days} jours`
 
     return (
         <div className="space-y-6 max-w-4xl mx-auto pb-12 w-full overflow-x-auto">
@@ -116,13 +140,27 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                         Modifier la soumission
                 </Link>
 
-                {quote.status !== 'approved' && quote.status !== 'denied' && (
+                {quote.status === 'draft' && (
+                    <>
+                        <Button
+                            variant="outline"
+                            onClick={handleMarkAsSent}
+                            disabled={isPending}
+                            className="border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                        >
+                            <Send className="mr-2 h-4 w-4" />
+                            Marquer envoyée
+                        </Button>
+                    </>
+                )}
+
+                {(quote.status === 'sent' || quote.status === 'denied') && (
                     <>
                         <Button
                             variant="outline"
                             onClick={() => handleStatusChange('approved')}
                             disabled={isPending}
-                            className="border-green-800 bg-green-950/20 text-green-400 hover:bg-green-900/50 hover:text-green-300"
+                            className="border-green-300 bg-green-50 text-green-700 hover:bg-green-100"
                         >
                             <CheckCircle className="mr-2 h-4 w-4" />
                             Approuver le projet
@@ -131,7 +169,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                             variant="outline"
                             onClick={() => handleStatusChange('denied')}
                             disabled={isPending}
-                            className="border-red-800 bg-red-950/20 text-red-400 hover:bg-red-900/50 hover:text-red-300"
+                            className="border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
                         >
                             <XCircle className="mr-2 h-4 w-4" />
                             Refuser
@@ -139,7 +177,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                     </>
                 )}
 
-                {quote.status === 'approved' && (
+                {(quote.status === 'approved' || quote.status === 'sent' || quote.status === 'denied') && (
                     <Button
                         variant="outline"
                         onClick={handleRevertToDraft}
@@ -162,7 +200,8 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                         <h2 className="text-xl font-semibold mb-2">SOUMISSION</h2>
                         <div className="text-sm text-zinc-600">
                             <p>Date: {format(new Date(quote.created_at), 'dd MMMM yyyy', { locale: frCA })}</p>
-                            <p>Durée estimée: {quote.estimated_duration_days} jours</p>
+                            <p>Durée estimée: {durationLabel}</p>
+                            {quote.sent_at && <p>Envoyée le: {format(new Date(quote.sent_at), 'dd MMMM yyyy, HH:mm', { locale: frCA })}</p>}
                         </div>
                     </div>
                 </div>

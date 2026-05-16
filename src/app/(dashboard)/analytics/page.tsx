@@ -15,15 +15,20 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     const projects = await getProjects()
     const settings = await getSettings()
 
-    const approvedQuotes = quotes.filter((q: any) => q.status === 'approved')
-    const deniedQuotes = quotes.filter((q: any) => q.status === 'denied')
+    const filteredQuotes = quotes.filter((q: any) => {
+        const dateRef = q.approved_at || q.created_at
+        const d = new Date(dateRef)
+        return d >= range.start && d <= range.end
+    })
+    const approvedQuotes = filteredQuotes.filter((q: any) => q.status === 'approved')
+    const deniedQuotes = filteredQuotes.filter((q: any) => q.status === 'denied')
 
     const totalApprovedValue = approvedQuotes.reduce((acc: number, q: any) => acc + (q.total || 0), 0)
     const totalDeniedValue = deniedQuotes.reduce((acc: number, q: any) => acc + (q.total || 0), 0)
 
-    const avgQuoteValue = quotes.length > 0 ? quotes.reduce((acc: number, q: any) => acc + (q.total || 0), 0) / quotes.length : 0
+    const avgQuoteValue = filteredQuotes.length > 0 ? filteredQuotes.reduce((acc: number, q: any) => acc + (q.total || 0), 0) / filteredQuotes.length : 0
 
-    const winRate = quotes.length > 0 ? (approvedQuotes.length / quotes.length) * 100 : 0
+    const winRate = filteredQuotes.length > 0 ? (approvedQuotes.length / filteredQuotes.length) * 100 : 0
 
     const monthlyDataMap: Record<string, number> = {}
     approvedQuotes.forEach((q: any) => {
@@ -36,7 +41,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     const monthlyRevenue = Object.entries(monthlyDataMap).map(([month, total]) => ({ month, total }))
 
     const contractorStats: Record<string, { count: number, total: number }> = {}
-    quotes.forEach((q: any) => {
+    filteredQuotes.forEach((q: any) => {
         const name = q.contractors?.full_name || 'Sans contracteur'
         contractorStats[name] = contractorStats[name] || { count: 0, total: 0 }
         contractorStats[name].count += 1

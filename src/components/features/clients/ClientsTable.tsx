@@ -10,7 +10,7 @@ type Client = Database['public']['Tables']['clients']['Row']
 
 export function ClientsTable({ data }: { data: Client[] }) {
     return (
-        <div className="rounded-md border border-zinc-800 bg-zinc-900 overflow-hidden">
+        <div className="rounded-md border border-zinc-200 bg-white overflow-hidden">
             <Table>
                 <TableHeader className="bg-zinc-900 border-b border-zinc-800">
                     <TableRow className="border-b border-zinc-800 hover:bg-zinc-900">
@@ -35,7 +35,7 @@ export function ClientsTable({ data }: { data: Client[] }) {
                                 <TableCell className="font-medium text-zinc-100"><Link href={`/clients/${client.id}`} className="hover:underline">{client.full_name}</Link></TableCell>
                                 <TableCell>
                                     {client.company_name ? (
-                                        <Badge variant="secondary" className="bg-zinc-800 text-zinc-300 hover:bg-zinc-700">{client.company_name}</Badge>
+                                        <Badge variant="secondary" className="bg-zinc-800 text-zinc-700 hover:bg-zinc-700">{client.company_name}</Badge>
                                     ) : <span className="text-zinc-600">-</span>}
                                 </TableCell>
                                 <TableCell className="text-zinc-400">{client.email || '-'}</TableCell>

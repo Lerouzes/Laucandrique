@@ -143,6 +143,27 @@ export async function updateQuoteStatus(quoteId: string, status: 'approved' | 'd
     return { success: true }
 }
 
+export async function markQuoteAsSent(quoteId: string) {
+    const supabase = await createClient()
+
+    const sentPayload: any = {
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        denied_at: null,
+    }
+
+    let result = await supabase.from('quotes').update(sentPayload).eq('id', quoteId)
+    if (result.error && result.error.message.includes('sent_at')) {
+        delete sentPayload.sent_at
+        result = await supabase.from('quotes').update(sentPayload).eq('id', quoteId)
+    }
+    if (result.error) throw new Error(result.error.message)
+
+    revalidatePath('/quotes')
+    revalidatePath(`/quotes/${quoteId}`)
+    return { success: true }
+}
+
 export async function getQuote(id: string) {
     const supabase = await createClient()
     const { data, error } = await supabase
