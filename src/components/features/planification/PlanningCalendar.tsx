@@ -121,8 +121,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     // automatically on drop; since we control the `events` array, remove the duplicated internal copy.
     const handleEventReceive = (info: any) => {
         const projectId = info.event.id
-        const startDate = info.event.start ? info.event.start.toISOString() : null
-        const endDate = info.event.end ? info.event.end.toISOString() : startDate
+        const { startDate, endDate } = buildRangeFromEvent(info.event)
 
         // Remove the auto-added duplicate event from FullCalendar's internal state
         info.event.remove()
@@ -144,8 +143,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
 
     const handleEventDrop = (info: any) => {
         const projectId = info.event.id
-        const startDate = info.event.start ? info.event.start.toISOString() : null
-        const endDate = info.event.end ? info.event.end.toISOString() : startDate
+        const { startDate, endDate } = buildRangeFromEvent(info.event)
 
         setProjects(prev => prev.map(p => p.id === projectId ? {
             ...p, start_date: startDate, end_date: endDate
@@ -163,8 +161,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
 
     const handleEventResize = (info: any) => {
         const projectId = info.event.id
-        const startDate = info.event.start ? info.event.start.toISOString() : null
-        const endDate = info.event.end ? info.event.end.toISOString() : startDate
+        const { startDate, endDate } = buildRangeFromEvent(info.event)
 
         setProjects(prev => prev.map(p => p.id === projectId ? {
             ...p, end_date: endDate
@@ -212,6 +209,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     }
 
     const handleEventClick = (info: any) => {
+        if (isDraggingEvent) return
         const quoteId = info.event.extendedProps.quoteId
         if (quoteId) {
             router.push(`/quotes/${quoteId}`)
@@ -346,6 +344,8 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                         eventReceive={handleEventReceive}
                         eventDrop={handleEventDrop}
                         eventResize={handleEventResize}
+                        eventDragStart={() => setIsDraggingEvent(true)}
+                        eventDragStop={() => setTimeout(() => setIsDraggingEvent(false), 0)}
                         eventClick={handleEventClick}
                         eventDisplay="block"
                         eventDidMount={(info) => {
