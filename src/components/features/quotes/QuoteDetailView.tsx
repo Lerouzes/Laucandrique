@@ -14,6 +14,12 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { updateQuoteStatus, revertQuoteToPending } from '@/actions/quotes'
 
+
+const sanitizePdfFileName = (value: string) => {
+    const normalized = (value || 'soumission').trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '')
+    return normalized || 'soumission'
+}
+
 export function QuoteDetailView({ quote, settings }: { quote: any, settings: any }) {
     const router = useRouter()
     const pdfRef = useRef<HTMLDivElement>(null)
@@ -36,8 +42,21 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
             const pdfWidth = pdf.internal.pageSize.getWidth()
             const pdfHeight = (canvas.height * pdfWidth) / canvas.width
 
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
-            pdf.save(`Soumission-${quote.title}.pdf`)
+            let heightLeft = pdfHeight
+            let position = 0
+
+            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight)
+            heightLeft -= pdf.internal.pageSize.getHeight()
+
+            while (heightLeft > 0) {
+                position = heightLeft - pdfHeight
+                pdf.addPage()
+                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight)
+                heightLeft -= pdf.internal.pageSize.getHeight()
+            }
+
+            const safeFileName = sanitizePdfFileName(quote.title)
+            pdf.save(`Soumission-${safeFileName}.pdf`)
             toast.success('PDF généré avec succès')
         } catch (error) {
             toast.error('Erreur lors de la génération du PDF')

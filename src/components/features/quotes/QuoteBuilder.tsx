@@ -85,6 +85,12 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
     const adminPerc = useWatch({ control: form.control, name: 'admin_percentage' }) || 0
     const profitPerc = useWatch({ control: form.control, name: 'profit_percentage' }) || 0
 
+
+    const selectedClientName = clients.find((c: any) => String(c.id) === String(form.watch('client_id')))?.full_name
+    const selectedContractorName = form.watch('contractor_id') && form.watch('contractor_id') !== 'none'
+        ? contractors.find((c: any) => String(c.id) === String(form.watch('contractor_id')))?.full_name
+        : ''
+
     // Compute totals inline (no memo) — always fresh on every render
     const subtotal = watchItems.reduce((acc: number, item: any) => {
         const q = typeof item?.quantity === 'number' ? item.quantity : parseFloat(item?.quantity) || 0
@@ -209,7 +215,7 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                             <Select onValueChange={field.onChange} value={field.value || undefined}>
                                                 <FormControl>
                                                     <SelectTrigger className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600">
-                                                        <SelectValue placeholder="Sélectionner un client" />
+                                                        <SelectValue placeholder="Sélectionner un client">{selectedClientName || 'Sélectionner un client'}</SelectValue>
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent className="bg-zinc-900 border-zinc-800">
@@ -236,7 +242,7 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                             <Select onValueChange={field.onChange} value={field.value || 'none'}>
                                                 <FormControl>
                                                     <SelectTrigger className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600">
-                                                        <SelectValue placeholder="Aucun contracteur" />
+                                                        <SelectValue placeholder="Aucun contracteur">{selectedContractorName || 'Aucun contracteur'}</SelectValue>
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent className="bg-zinc-900 border-zinc-800">

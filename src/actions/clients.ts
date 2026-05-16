@@ -72,3 +72,33 @@ export async function importClients(clientsData: any[]) {
     revalidatePath('/clients')
     return { success: true }
 }
+
+export async function getClientById(id: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase.from('clients').select('*').eq('id', id).single()
+    if (error) return null
+    return data
+}
+
+export async function updateClientAction(clientId: string, formData: FormData) {
+    const supabase = await createClient()
+    const payload = {
+        full_name: String(formData.get('full_name') || '').trim(),
+        company_name: String(formData.get('company_name') || '') || null,
+        email: String(formData.get('email') || '') || null,
+        phone: String(formData.get('phone') || '') || null,
+        address: String(formData.get('address') || '') || null,
+        city: String(formData.get('city') || '') || null,
+        province: String(formData.get('province') || '') || null,
+        postal_code: String(formData.get('postal_code') || '') || null,
+        manager_id: String(formData.get('manager_id') || '') || null,
+        notes: String(formData.get('notes') || '') || null,
+    }
+
+    const { error } = await supabase.from('clients').update(payload).eq('id', clientId)
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/clients')
+    revalidatePath(`/clients/${clientId}`)
+    return { success: true }
+}
