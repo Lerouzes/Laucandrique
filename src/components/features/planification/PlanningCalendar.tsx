@@ -51,13 +51,10 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                 eventData: function (eventEl) {
                     const durationDays = Number(eventEl.getAttribute('data-duration-days') || '1')
                     const durationMinutes = Math.max(15, Math.round(durationDays * 24 * 60))
-                    const isHourly = durationDays < 1
                     return {
                         id: eventEl.getAttribute('data-id'),
                         title: eventEl.getAttribute('data-title'),
-                        duration: { minutes: durationMinutes },
-                        allDay: !isHourly,
-                        ...(isHourly ? { startTime: '08:00' } : {})
+                        duration: { minutes: durationMinutes }
                     }
                 }
             })
@@ -85,8 +82,9 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
 
     // Calendar events: all non-unplanned projects
     const events = filteredProjects.filter(p => p.status !== 'unplanned').map(p => {
-        const durationMinutes = getDurationMinutes(p)
-        const isHourly = isHourlyProject(p)
+        const durationDays = Number(p.estimated_duration_days || 1)
+        const durationMinutes = Math.max(15, Math.round(durationDays * 24 * 60))
+        const isHourly = durationDays < 1
         const startObj = p.start_date ? new Date(p.start_date) : null
         const endObj = p.end_date ? new Date(p.end_date) : (startObj ? new Date(startObj) : null)
 
@@ -120,24 +118,8 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     // automatically on drop; since we control the `events` array, remove the duplicated internal copy.
     const handleEventReceive = (info: any) => {
         const projectId = info.event.id
-        const project = projects.find((p: any) => p.id === projectId)
-        const hourly = isHourlyProject(project)
-        const durationMinutes = getDurationMinutes(project)
-
-        let startObj = info.event.start ? new Date(info.event.start) : null
-        if (startObj && hourly && info.event.allDay) {
-            startObj = new Date(startObj)
-            startObj.setHours(8, 0, 0, 0)
-        }
-
-        const endObj = startObj
-            ? hourly
-                ? new Date(startObj.getTime() + durationMinutes * 60 * 1000)
-                : (info.event.end ? new Date(info.event.end) : new Date(startObj))
-            : null
-
-        const startDate = startObj ? startObj.toISOString() : null
-        const endDate = endObj ? endObj.toISOString() : startDate
+        const startDate = info.event.start ? info.event.start.toISOString() : null
+        const endDate = info.event.end ? info.event.end.toISOString() : startDate
 
         // Remove the auto-added duplicate event from FullCalendar's internal state
         info.event.remove()
@@ -264,7 +246,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         key={project.id}
                                         data-id={project.id}
                                         data-title={project.title}
-                                        data-duration-days={project.estimated_duration_days}
+                                        data-duration={project.estimated_duration_days}
                                         className={`fc-event-external p-3 bg-transparent border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                                     >
                                         <div className="flex items-start justify-between gap-2 mb-1">
@@ -283,9 +265,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-1.5">
                                                 <Badge variant="secondary" className="bg-zinc-800 text-zinc-100 pointer-events-none text-xs">
-                                                    {Number(project.estimated_duration_days) < 1
-                                                        ? `${Math.round(Number(project.estimated_duration_days) * 24 * 100) / 100} h`
-                                                        : `${project.estimated_duration_days} Jours`}
+                                                    {project.estimated_duration_days} j
                                                 </Badge>
                                                 <Badge
                                                     variant="secondary"
