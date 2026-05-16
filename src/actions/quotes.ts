@@ -70,8 +70,18 @@ export async function createQuoteAction(quoteData: any, itemsData: any[], images
 export async function updateQuoteAction(quoteId: string, quoteData: any, itemsData: any[], imagesData: any[], keepExistingImages: boolean = false) {
     const supabase = await createClient()
 
-    const { error: quoteError } = await supabase.from('quotes').update(quoteData).eq('id', quoteId)
-    if (quoteError) throw new Error(quoteError.message)
+    const { data: clientData } = await supabase.from('clients').select('manager_id').eq('id', quoteData.client_id).single()
+    const quotePayload: any = {
+        ...quoteData,
+        manager_id: clientData?.manager_id || null,
+    }
+
+    let quoteUpdate = await supabase.from('quotes').update(quotePayload).eq('id', quoteId)
+    if (quoteUpdate.error && quoteUpdate.error.message.includes('project_type')) {
+        delete quotePayload.project_type
+        quoteUpdate = await supabase.from('quotes').update(quotePayload).eq('id', quoteId)
+    }
+    if (quoteUpdate.error) throw new Error(quoteUpdate.error.message)
 
     // Replace all items
     await supabase.from('quote_items').delete().eq('quote_id', quoteId)
