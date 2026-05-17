@@ -40,8 +40,7 @@ function QuoteRow({ quote }: { quote: any }) {
     }
 
     const canChangeStatus = quote.status !== 'approved' && quote.status !== 'denied' && quote.status !== 'completed'
-    const isSchedulable = quote.status === 'approved'
-    const canEditQuote = quote.status !== 'completed'
+    const isSchedulable = quote.status === 'approved' || quote.status === 'completed'
     const scheduledDate = quote.projects?.[0]?.start_date
 
     return (
@@ -67,38 +66,18 @@ function QuoteRow({ quote }: { quote: any }) {
             <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
                     {isSchedulable ? (
-                        <Popover>
-                            <PopoverTrigger render={<Button size="sm" variant="ghost" className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50" title={scheduledDate ? 'Modifier la date de début' : 'Planifier ce projet'} />} >
-                                <CalendarDays className="h-4 w-4" />
-                                <span className="ml-1 hidden md:inline">
-                                    {scheduledDate ? format(new Date(scheduledDate), 'dd MMM yyyy', { locale: frCA }) : 'Planifier'}
-                                </span>
-                            </PopoverTrigger>
-                            <PopoverContent align="end" sideOffset={6} className="w-auto p-2 bg-zinc-950 border-zinc-800">
-                                <Calendar
-                                    mode="single"
-                                    selected={scheduledDate ? new Date(scheduledDate) : undefined}
-                                    onSelect={(date) => {
-                                        if (!date) return
-                                        startTransition(async () => {
-                                            try {
-                                                await scheduleProjectStartByQuote(quote.id, date.toISOString())
-                                                toast.success('Date planifiée mise à jour.')
-                                                router.refresh()
-                                            } catch (err: any) {
-                                                toast.error('Erreur', { description: err.message })
-                                            }
-                                        })
-                                    }}
-                                    locale={frCA}
-                                />
-                            </PopoverContent>
-                        </Popover>
-                    ) : quote.status === 'completed' && scheduledDate ? (
-                        <span className="inline-flex items-center gap-1 text-blue-300" title="Projet complété">
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)}
+                            className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50"
+                            title={scheduledDate ? 'Voir dans la planification' : 'Planifier ce projet'}
+                        >
                             <CalendarDays className="h-4 w-4" />
-                            <span className="hidden md:inline">{format(new Date(scheduledDate), 'dd MMM yyyy', { locale: frCA })}</span>
-                        </span>
+                            <span className="ml-1 hidden md:inline">
+                                {scheduledDate ? format(new Date(scheduledDate), 'dd MMM yyyy', { locale: frCA }) : 'Planifier'}
+                            </span>
+                        </Button>
                     ) : (
                         <span className="text-zinc-500">—</span>
                     )}
