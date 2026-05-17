@@ -211,7 +211,15 @@ export default function SettingsPage() {
                 <Card className="bg-zinc-900 border-zinc-800">
                     <CardHeader><CardTitle className="text-zinc-100">Gestionnaires</CardTitle></CardHeader>
                     <CardContent className="space-y-3">
-                        <form onSubmit={handleCreateManager} className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        <form action={async (fd) => {
+                            try {
+                                await createManagerAction(fd)
+                                setManagers(await getManagers())
+                                toast.success('Gestionnaire ajouté.')
+                            } catch (e: any) {
+                                toast.error('Erreur', { description: e.message || "Impossible d'ajouter le gestionnaire." })
+                            }
+                        }} className="grid grid-cols-2 md:grid-cols-3 gap-2">
                             <Input name="first_name" placeholder="Prénom" required />
                             <Input name="last_name" placeholder="Nom" required />
                             <Input name="email" placeholder="Courriel" />
@@ -226,7 +234,15 @@ export default function SettingsPage() {
 
                         <div className="pt-4 border-t border-zinc-800 space-y-2">
                             <p className="text-sm text-zinc-300">Équipes de gestionnaires</p>
-                            <form onSubmit={handleCreateManagerTeam} className="flex gap-2">
+                            <form action={async (fd) => {
+                                try {
+                                    await createManagerTeamAction(fd)
+                                    setManagerTeams(await getManagerTeams())
+                                    toast.success('Équipe ajoutée.')
+                                } catch (e: any) {
+                                    toast.error('Erreur', { description: e.message || "Impossible d'ajouter l'équipe." })
+                                }
+                            }} className="flex gap-2">
                                 <Input name="team_name" placeholder="Nom de l'équipe" required />
                                 <Button type="submit" variant="outline">Ajouter équipe</Button>
                             </form>
