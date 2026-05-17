@@ -3,11 +3,44 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
+type ManagerPayload = {
+  first_name: string
+  last_name: string
+  email: string | null
+  phone?: string | null
+  team_id?: string | null
+}
+
+function normalizeManagerPayload(formData: FormData): ManagerPayload {
+  return {
+    first_name: String(formData.get('first_name') || '').trim(),
+    last_name: String(formData.get('last_name') || '').trim(),
+    email: String(formData.get('email') || '') || null,
+    phone: String(formData.get('phone') || '') || null,
+    team_id: String(formData.get('team_id') || '') || null,
+  }
+}
+
+function isColumnError(errorMessage: string, column: string) {
+  const normalized = errorMessage.toLowerCase()
+  return normalized.includes(column.toLowerCase()) && normalized.includes('column')
+}
+
 export async function getManagers() {
   const supabase = await createClient()
-  const { data, error } = await supabase.from('managers').select('*, manager_teams(id, name)').order('last_name')
-  if (error) return []
-  return data
+
+  let result = await supabase.from('managers').select('*, manager_teams(id, name)').order('last_name')
+  if (result.error) {
+    console.error('Error fetching managers with teams:', result.error)
+    result = await supabase.from('managers').select('*').order('last_name')
+  }
+
+  if (result.error) {
+    console.error('Error fetching managers:', result.error)
+    return []
+  }
+
+  return result.data || []
 }
 
 export async function getManagerTeams() {
@@ -30,15 +63,19 @@ export async function createManagerTeamAction(formData: FormData) {
 
 export async function createManagerAction(formData: FormData) {
   const supabase = await createClient()
-  const payload = {
-    first_name: String(formData.get('first_name') || '').trim(),
-    last_name: String(formData.get('last_name') || '').trim(),
-    email: String(formData.get('email') || '') || null,
-    phone: String(formData.get('phone') || '') || null,
-    team_id: String(formData.get('team_id') || '') || null,
+  const basePayload = normalizeManagerPayload(formData)
+
+  let result = await supabase.from('managers').insert(basePayload)
+  if (result.error) {
+    const message = result.error.message || ''
+    if (isColumnError(message, 'phone')) {
+      const withoutPhone = { ...basePayload }
+      delete withoutPhone.phone
+      result = await supabase.from('managers').insert(withoutPhone)
+    }
   }
-  const { error } = await supabase.from('managers').insert(payload)
-  if (error) throw new Error(error.message)
+
+  if (result.error) throw new Error(result.error.message)
   revalidatePath('/settings')
   revalidatePath('/clients')
   return { success: true }
@@ -46,22 +83,32 @@ export async function createManagerAction(formData: FormData) {
 
 export async function getManagerById(id: string) {
   const supabase = await createClient()
-  const { data, error } = await supabase.from('managers').select('*, manager_teams(id, name)').eq('id', id).single()
-  if (error) return null
-  return data
+
+  let result = await supabase.from('managers').select('*, manager_teams(id, name)').eq('id', id).single()
+  if (result.error) {
+    console.error('Error fetching manager with team:', result.error)
+    result = await supabase.from('managers').select('*').eq('id', id).single()
+  }
+
+  if (result.error) return null
+  return result.data
 }
 
 export async function updateManagerAction(id: string, formData: FormData) {
   const supabase = await createClient()
-  const payload = {
-    first_name: String(formData.get('first_name') || '').trim(),
-    last_name: String(formData.get('last_name') || '').trim(),
-    email: String(formData.get('email') || '') || null,
-    phone: String(formData.get('phone') || '') || null,
-    team_id: String(formData.get('team_id') || '') || null,
+  const basePayload = normalizeManagerPayload(formData)
+
+  let result = await supabase.from('managers').update(basePayload).eq('id', id)
+  if (result.error) {
+    const message = result.error.message || ''
+    if (isColumnError(message, 'phone')) {
+      const withoutPhone = { ...basePayload }
+      delete withoutPhone.phone
+      result = await supabase.from('managers').update(withoutPhone).eq('id', id)
+    }
   }
-  const { error } = await supabase.from('managers').update(payload).eq('id', id)
-  if (error) throw new Error(error.message)
+
+  if (result.error) throw new Error(result.error.message)
   revalidatePath('/settings')
   revalidatePath('/clients')
   revalidatePath(`/managers/${id}`)
