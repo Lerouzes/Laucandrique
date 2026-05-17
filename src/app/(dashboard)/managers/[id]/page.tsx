@@ -1,13 +1,13 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getManagerById, updateManagerAction } from '@/actions/managers'
+import { getManagerById, getManagerTeams, updateManagerAction } from '@/actions/managers'
 import { getQuotes } from '@/actions/quotes'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
 export default async function ManagerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [manager, quotes] = await Promise.all([getManagerById(id), getQuotes()])
+  const [manager, quotes, managerTeams] = await Promise.all([getManagerById(id), getQuotes(), getManagerTeams()])
   if (!manager) notFound()
 
   const managerQuotes = quotes.filter((q: any) => q.manager_id === id)
@@ -21,7 +21,12 @@ export default async function ManagerDetailPage({ params }: { params: Promise<{ 
       <form action={async (fd) => { 'use server'; await updateManagerAction(id, fd) }} className="grid grid-cols-2 gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
         <Input name="first_name" defaultValue={manager.first_name || ''} required />
         <Input name="last_name" defaultValue={manager.last_name || ''} required />
-        <Input name="email" defaultValue={manager.email || ''} className="col-span-2" />
+        <Input name="email" type="email" defaultValue={manager.email || ''} placeholder="Adresse courriel" className="col-span-2" />
+        <Input name="phone" type="tel" defaultValue={manager.phone || ''} placeholder="Numéro de téléphone" className="col-span-2" />
+        <select name="team_id" defaultValue={manager.team_id || ''} className="col-span-2 h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm text-zinc-100">
+          <option value="">Sans équipe</option>
+          {managerTeams.map((team: any) => <option key={team.id} value={team.id}>{team.name}</option>)}
+        </select>
         <div className="col-span-2"><Button type="submit">Enregistrer</Button></div>
       </form>
       <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
