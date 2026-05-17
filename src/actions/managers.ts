@@ -26,6 +26,11 @@ function isColumnError(errorMessage: string, column: string) {
   return normalized.includes(column.toLowerCase()) && normalized.includes('column')
 }
 
+function isMissingTableError(errorMessage: string, tableName: string) {
+  const normalized = errorMessage.toLowerCase()
+  return normalized.includes('could not find the table') && normalized.includes(tableName.toLowerCase())
+}
+
 export async function getManagers() {
   const supabase = await createClient()
 
@@ -57,7 +62,11 @@ export async function getManagers() {
 export async function getManagerTeams() {
   const supabase = await createClient()
   const { data, error } = await supabase.from('manager_teams').select('*').order('name')
-  if (error) return []
+  if (error && isMissingTableError(error.message || '', 'manager_teams')) return []
+  if (error) {
+    console.error('Error fetching manager teams:', error)
+    return []
+  }
   return data
 }
 
