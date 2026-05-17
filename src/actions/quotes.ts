@@ -175,7 +175,7 @@ export async function getQuote(id: string) {
     const supabase = await createClient()
     const { data, error } = await supabase
         .from('quotes')
-        .select('*, clients(*), contractors(*), quote_items(*), quote_images(*)')
+        .select('*, clients(*), contractors(*), quote_items(*), quote_images(*), projects(status, completed_at)')
         .eq('id', id)
         .single()
 
