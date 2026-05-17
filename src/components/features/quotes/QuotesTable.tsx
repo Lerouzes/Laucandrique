@@ -22,6 +22,13 @@ const statusMap: Record<string, { label: string, styles: string }> = {
     denied: { label: 'Refusée', styles: 'bg-red-900/50 text-red-300 border-red-800' },
 }
 
+function formatSafeDate(value: string | null | undefined) {
+    if (!value) return null
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return null
+    return format(parsed, 'dd MMM yyyy', { locale: frCA })
+}
+
 function QuoteRow({ quote }: { quote: any }) {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
