@@ -57,11 +57,8 @@ function QuoteRow({ quote }: { quote: any }) {
         if (!date) return
         startTransition(async () => {
             try {
-                const yyyy = date.getFullYear()
-                const mm = String(date.getMonth() + 1).padStart(2, '0')
-                const dd = String(date.getDate()).padStart(2, '0')
-                const dateString = `${yyyy}-${mm}-${dd}`
-                await scheduleProjectStartByQuote(quote.id, dateString)
+                const iso = date.toISOString().slice(0, 10)
+                await scheduleProjectStartByQuote(quote.id, iso)
                 toast.success('Date de début enregistrée.')
                 setIsScheduleOpen(false)
                 router.refresh()
@@ -94,20 +91,6 @@ function QuoteRow({ quote }: { quote: any }) {
             <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
                     {isSchedulable ? (
-                        quote.status === 'completed' ? (
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)}
-                                className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50"
-                                title="Voir dans la planification"
-                            >
-                                <CalendarDays className="h-4 w-4" />
-                                <span className="ml-1 hidden md:inline">
-                                    {scheduledDate ? format(new Date(scheduledDate), 'dd MMM yyyy', { locale: frCA }) : 'Voir'}
-                                </span>
-                            </Button>
-                        ) : (
                         <Popover open={isScheduleOpen} onOpenChange={setIsScheduleOpen}>
                             <PopoverTrigger asChild>
                                 <Button
@@ -135,7 +118,6 @@ function QuoteRow({ quote }: { quote: any }) {
                                 </div>
                             </PopoverContent>
                         </Popover>
-                        )
                     ) : (
                         <span className="text-zinc-500">—</span>
                     )}
