@@ -63,16 +63,19 @@ export async function createManagerTeamAction(formData: FormData) {
 
 export async function createManagerAction(formData: FormData) {
   const supabase = await createClient()
-  const basePayload = normalizeManagerPayload(formData)
+  const payload: any = {
+    first_name: String(formData.get('first_name') || '').trim(),
+    last_name: String(formData.get('last_name') || '').trim(),
+    email: String(formData.get('email') || '') || null,
+    phone: String(formData.get('phone') || '') || null,
+    team_id: String(formData.get('team_id') || '') || null,
+  }
 
-  let result = await supabase.from('managers').insert(basePayload)
-  if (result.error) {
-    const message = result.error.message || ''
-    if (isColumnError(message, 'phone')) {
-      const withoutPhone = { ...basePayload }
-      delete withoutPhone.phone
-      result = await supabase.from('managers').insert(withoutPhone)
-    }
+  let result = await supabase.from('managers').insert(payload)
+  if (result.error && (result.error.message.includes('phone') || result.error.message.includes('team_id'))) {
+    delete payload.phone
+    delete payload.team_id
+    result = await supabase.from('managers').insert(payload)
   }
 
   if (result.error) throw new Error(result.error.message)
@@ -96,16 +99,19 @@ export async function getManagerById(id: string) {
 
 export async function updateManagerAction(id: string, formData: FormData) {
   const supabase = await createClient()
-  const basePayload = normalizeManagerPayload(formData)
+  const payload: any = {
+    first_name: String(formData.get('first_name') || '').trim(),
+    last_name: String(formData.get('last_name') || '').trim(),
+    email: String(formData.get('email') || '') || null,
+    phone: String(formData.get('phone') || '') || null,
+    team_id: String(formData.get('team_id') || '') || null,
+  }
 
-  let result = await supabase.from('managers').update(basePayload).eq('id', id)
-  if (result.error) {
-    const message = result.error.message || ''
-    if (isColumnError(message, 'phone')) {
-      const withoutPhone = { ...basePayload }
-      delete withoutPhone.phone
-      result = await supabase.from('managers').update(withoutPhone).eq('id', id)
-    }
+  let result = await supabase.from('managers').update(payload).eq('id', id)
+  if (result.error && (result.error.message.includes('phone') || result.error.message.includes('team_id'))) {
+    delete payload.phone
+    delete payload.team_id
+    result = await supabase.from('managers').update(payload).eq('id', id)
   }
 
   if (result.error) throw new Error(result.error.message)
