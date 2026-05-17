@@ -47,6 +47,7 @@ function QuoteRow({ quote }: { quote: any }) {
     }
 
     const canChangeStatus = quote.status !== 'approved' && quote.status !== 'denied' && quote.status !== 'completed'
+    const canEditQuote = quote.status !== 'completed'
     const isSchedulable = quote.status === 'approved' || quote.status === 'completed'
     const scheduledDate = quote.projects?.[0]?.start_date
 
