@@ -29,18 +29,29 @@ function isColumnError(errorMessage: string, column: string) {
 export async function getManagers() {
   const supabase = await createClient()
 
-  let result = await supabase.from('managers').select('*, manager_teams(id, name)').order('last_name')
-  if (result.error) {
-    console.error('Error fetching managers with teams:', result.error)
-    result = await supabase.from('managers').select('*').order('last_name')
-  }
+  const { data: managers, error: managersError } = await supabase
+    .from('managers')
+    .select('*')
+    .order('last_name')
 
-  if (result.error) {
-    console.error('Error fetching managers:', result.error)
+  if (managersError) {
+    console.error('Error fetching managers:', managersError)
     return []
   }
 
-  return result.data || []
+  const { data: teams } = await supabase
+    .from('manager_teams')
+    .select('id, name')
+
+  const teamById = new Map((teams || []).map((team: { id: string; name: string }) => [team.id, team]))
+
+  return (managers || []).map((manager: any) => {
+    const teamId = manager?.team_id
+    return {
+      ...manager,
+      manager_teams: teamId ? teamById.get(teamId) || null : null,
+    }
+  })
 }
 
 export async function getManagerTeams() {
@@ -87,14 +98,22 @@ export async function createManagerAction(formData: FormData) {
 export async function getManagerById(id: string) {
   const supabase = await createClient()
 
-  let result = await supabase.from('managers').select('*, manager_teams(id, name)').eq('id', id).single()
-  if (result.error) {
-    console.error('Error fetching manager with team:', result.error)
-    result = await supabase.from('managers').select('*').eq('id', id).single()
-  }
+  const { data: manager, error } = await supabase.from('managers').select('*').eq('id', id).single()
+  if (error || !manager) return null
 
-  if (result.error) return null
-  return result.data
+  const teamId = (manager as any)?.team_id
+  if (!teamId) return { ...manager, manager_teams: null }
+
+  const { data: team } = await supabase
+    .from('manager_teams')
+    .select('id, name')
+    .eq('id', teamId)
+    .single()
+
+  return {
+    ...manager,
+    manager_teams: team || null,
+  }
 }
 
 export async function updateManagerAction(id: string, formData: FormData) {
