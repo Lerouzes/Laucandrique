@@ -15,6 +15,7 @@ const statusMap: Record<string, { label: string, styles: string }> = {
     draft: { label: 'Brouillon', styles: 'bg-zinc-800 text-zinc-200 border-zinc-700' },
     sent: { label: 'Envoyée', styles: 'bg-blue-900/50 text-blue-300 border-blue-800' },
     approved: { label: 'Approuvée', styles: 'bg-green-900/50 text-green-300 border-green-800' },
+    completed: { label: 'Complétée', styles: 'bg-emerald-900/60 text-emerald-300 border-emerald-800' },
     denied: { label: 'Refusée', styles: 'bg-red-900/50 text-red-300 border-red-800' },
 }
 
@@ -35,7 +36,7 @@ function QuoteRow({ quote }: { quote: any }) {
         })
     }
 
-    const canChangeStatus = quote.status !== 'approved' && quote.status !== 'denied'
+    const canChangeStatus = quote.status !== 'approved' && quote.status !== 'denied' && quote.status !== 'completed'
 
     return (
         <TableRow
@@ -59,7 +60,7 @@ function QuoteRow({ quote }: { quote: any }) {
                 {format(new Date(quote.created_at), 'dd MMM yyyy', { locale: frCA })}
             </TableCell>
             <TableCell className="text-center">
-                {quote.status === 'approved' ? (
+                {quote.status === 'approved' || quote.status === 'completed' ? (
                     <Button
                         size="sm"
                         variant="ghost"

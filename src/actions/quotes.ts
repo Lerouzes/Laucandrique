@@ -23,7 +23,7 @@ export async function getQuotes(query?: string, statusFilter?: string) {
     }
 
     if (statusFilter && statusFilter !== 'all') {
-        request = request.eq('status', statusFilter as 'draft' | 'sent' | 'approved' | 'denied')
+        request = request.eq('status', statusFilter as 'draft' | 'sent' | 'approved' | 'denied' | 'completed')
     }
 
     const { data, error } = await request

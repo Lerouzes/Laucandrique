@@ -209,7 +209,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                     </>
                 )}
 
-                {(quote.status === 'approved' || quote.status === 'sent' || quote.status === 'denied') && (
+                {(quote.status === 'approved' || quote.status === 'sent' || quote.status === 'denied' || quote.status === 'completed') && (
                     <Button
                         variant="outline"
                         onClick={handleRevertToDraft}
