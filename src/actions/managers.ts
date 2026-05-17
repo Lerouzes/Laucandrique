@@ -65,11 +65,11 @@ export async function createManagerTeamAction(formData: FormData) {
   const supabase = await createClient()
   const name = String(formData.get('team_name') || '').trim()
   if (!name) throw new Error('Le nom de l’équipe est requis')
-  const { error } = await supabase.from('manager_teams').insert({ name })
-  if (error) throw new Error(error.message)
+  const { data, error } = await supabase.from('manager_teams').insert({ name }).select('*').single()
+  if (error || !data) throw new Error(error?.message || "Impossible d'ajouter l'équipe")
   revalidatePath('/settings')
   revalidatePath('/managers')
-  return { success: true }
+  return { success: true, team: data }
 }
 
 export async function createManagerAction(formData: FormData) {
@@ -82,17 +82,17 @@ export async function createManagerAction(formData: FormData) {
     team_id: String(formData.get('team_id') || '') || null,
   }
 
-  let result = await supabase.from('managers').insert(payload)
+  let result = await supabase.from('managers').insert(payload).select('*').single()
   if (result.error && (result.error.message.includes('phone') || result.error.message.includes('team_id'))) {
     delete payload.phone
     delete payload.team_id
-    result = await supabase.from('managers').insert(payload)
+    result = await supabase.from('managers').insert(payload).select('*').single()
   }
 
-  if (result.error) throw new Error(result.error.message)
+  if (result.error || !result.data) throw new Error(result.error?.message || "Impossible d'ajouter le gestionnaire")
   revalidatePath('/settings')
   revalidatePath('/clients')
-  return { success: true }
+  return { success: true, manager: result.data }
 }
 
 export async function getManagerById(id: string) {

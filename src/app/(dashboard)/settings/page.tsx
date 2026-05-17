@@ -82,6 +82,47 @@ export default function SettingsPage() {
         })
     }
 
+    const handleCreateManager = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault()
+        const fd = new FormData(e.currentTarget)
+        try {
+            const result = await createManagerAction(fd)
+            const createdManager = result?.manager
+            if (createdManager) {
+                const selectedTeamId = String(fd.get('team_id') || '')
+                const selectedTeam = selectedTeamId ? managerTeams.find((t: any) => String(t.id) === selectedTeamId) : null
+                setManagers(prev => [{ ...createdManager, manager_teams: selectedTeam || null }, ...prev])
+            } else {
+                setManagers(await getManagers())
+            }
+            toast.success('Gestionnaire ajouté.')
+            e.currentTarget.reset()
+        } catch (e: any) {
+            toast.error('Erreur', { description: e.message || "Impossible d'ajouter le gestionnaire." })
+        }
+    }
+
+    const handleCreateManagerTeam = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault()
+        const fd = new FormData(e.currentTarget)
+        try {
+            const result = await createManagerTeamAction(fd)
+            const createdTeam = result?.team
+            if (createdTeam) {
+                setManagerTeams(prev => {
+                    const next = [...prev, createdTeam]
+                    return next.sort((a: any, b: any) => String(a.name).localeCompare(String(b.name), 'fr-CA'))
+                })
+            } else {
+                setManagerTeams(await getManagerTeams())
+            }
+            toast.success('Équipe ajoutée.')
+            e.currentTarget.reset()
+        } catch (e: any) {
+            toast.error('Erreur', { description: e.message || "Impossible d'ajouter l'équipe." })
+        }
+    }
+
     return (
         <div className="space-y-6 max-w-2xl mx-auto">
             <div>
