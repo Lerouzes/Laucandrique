@@ -1,6 +1,6 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -32,6 +32,7 @@ function formatSafeDate(value: string | null | undefined) {
 function QuoteRow({ quote }: { quote: any }) {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
+    const [isScheduleOpen, setIsScheduleOpen] = useState(false)
 
     const handleStatusChange = (e: React.MouseEvent, status: 'approved' | 'denied') => {
         e.stopPropagation()
@@ -50,6 +51,22 @@ function QuoteRow({ quote }: { quote: any }) {
     const canEditQuote = quote.status !== 'completed'
     const isSchedulable = quote.status === 'approved' || quote.status === 'completed'
     const scheduledDate = quote.projects?.[0]?.start_date
+    const canPickDate = quote.status === 'approved'
+
+    const handleScheduleDate = (date: Date | undefined) => {
+        if (!date) return
+        startTransition(async () => {
+            try {
+                const iso = date.toISOString().slice(0, 10)
+                await scheduleProjectStartByQuote(quote.id, iso)
+                toast.success('Date de début enregistrée.')
+                setIsScheduleOpen(false)
+                router.refresh()
+            } catch (err: any) {
+                toast.error('Erreur', { description: err.message })
+            }
+        })
+    }
 
     return (
         <TableRow
@@ -74,18 +91,33 @@ function QuoteRow({ quote }: { quote: any }) {
             <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
                     {isSchedulable ? (
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)}
-                            className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50"
-                            title={scheduledDate ? 'Voir dans la planification' : 'Planifier ce projet'}
-                        >
-                            <CalendarDays className="h-4 w-4" />
-                            <span className="ml-1 hidden md:inline">
-                                {scheduledDate ? format(new Date(scheduledDate), 'dd MMM yyyy', { locale: frCA }) : 'Planifier'}
-                            </span>
-                        </Button>
+                        <Popover open={isScheduleOpen} onOpenChange={setIsScheduleOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50"
+                                    title={scheduledDate ? 'Voir / modifier la date' : 'Planifier ce projet'}
+                                >
+                                    <CalendarDays className="h-4 w-4" />
+                                    <span className="ml-1 hidden md:inline">
+                                        {scheduledDate ? format(new Date(scheduledDate), 'dd MMM yyyy', { locale: frCA }) : 'Planifier'}
+                                    </span>
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0 bg-zinc-950 border-zinc-800" align="end">
+                                <Calendar
+                                    mode="single"
+                                    selected={scheduledDate ? new Date(scheduledDate) : undefined}
+                                    onSelect={canPickDate ? handleScheduleDate : undefined}
+                                    disabled={quote.status === 'completed' || isPending}
+                                    initialFocus
+                                />
+                                <div className="px-3 pb-3 text-xs text-zinc-400">
+                                    {quote.status === 'completed' ? "Projet complété: date non modifiable." : "Sélectionnez une date pour enregistrer la planification."}
+                                </div>
+                            </PopoverContent>
+                        </Popover>
                     ) : (
                         <span className="text-zinc-500">—</span>
                     )}
