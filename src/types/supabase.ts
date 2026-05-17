@@ -138,7 +138,7 @@ export interface Database {
           description: string | null
           internal_notes: string | null
           manager_id: string | null
-          status: 'draft' | 'sent' | 'approved' | 'denied'
+          status: 'draft' | 'sent' | 'approved' | 'denied' | 'completed'
           estimated_duration_days: number
           subtotal: number
           admin_percentage: number
@@ -161,7 +161,7 @@ export interface Database {
           internal_notes?: string | null
           manager_id?: string | null
           manager_id?: string | null
-          status?: 'draft' | 'sent' | 'approved' | 'denied'
+          status?: 'draft' | 'sent' | 'approved' | 'denied' | 'completed'
           estimated_duration_days?: number
           subtotal?: number
           admin_percentage?: number
@@ -183,7 +183,7 @@ export interface Database {
           description?: string | null
           internal_notes?: string | null
           manager_id?: string | null
-          status?: 'draft' | 'sent' | 'approved' | 'denied'
+          status?: 'draft' | 'sent' | 'approved' | 'denied' | 'completed'
           estimated_duration_days?: number
           subtotal?: number
           admin_percentage?: number
@@ -347,7 +347,7 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
-      quote_status: 'draft' | 'sent' | 'approved' | 'denied'
+      quote_status: 'draft' | 'sent' | 'approved' | 'denied' | 'completed'
       project_status: 'unplanned' | 'planned' | 'in_progress' | 'completed'
     }
   }

@@ -56,8 +56,27 @@ export async function updateProjectStatus(projectId: string, status: 'unplanned'
         updates.end_date = null
     }
 
+    const { data: project, error: projectFetchError } = await supabase
+        .from('projects')
+        .select('quote_id')
+        .eq('id', projectId)
+        .maybeSingle()
+
+    if (projectFetchError) throw new Error(projectFetchError.message)
+
     const { error } = await supabase.from('projects').update(updates).eq('id', projectId)
     if (error) throw new Error(error.message)
+
+    if (project?.quote_id) {
+        const quoteStatus = status === 'completed' ? 'completed' : 'approved'
+        const { error: quoteError } = await supabase
+            .from('quotes')
+            .update({ status: quoteStatus })
+            .eq('id', project.quote_id)
+
+        if (quoteError) throw new Error(quoteError.message)
+        revalidatePath(`/quotes/${project.quote_id}`)
+    }
 
     revalidatePath('/planification')
     return { success: true }
@@ -82,6 +101,13 @@ export async function markProjectCompletedByQuote(quoteId: string) {
         .eq('id', project.id)
 
     if (error) throw new Error(error.message)
+
+    const { error: quoteError } = await supabase
+        .from('quotes')
+        .update({ status: 'completed' })
+        .eq('id', quoteId)
+
+    if (quoteError) throw new Error(quoteError.message)
 
     revalidatePath('/planification')
     revalidatePath('/analytics')

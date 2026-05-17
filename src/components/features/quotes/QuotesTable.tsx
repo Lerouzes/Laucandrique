@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useTransition } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ const statusMap: Record<string, { label: string, styles: string }> = {
     draft: { label: 'Brouillon', styles: 'bg-zinc-800 text-zinc-200 border-zinc-700' },
     sent: { label: 'Envoyée', styles: 'bg-blue-900/50 text-blue-300 border-blue-800' },
     approved: { label: 'Approuvée', styles: 'bg-green-900/50 text-green-300 border-green-800' },
+    completed: { label: 'Complétée', styles: 'bg-emerald-900/60 text-emerald-300 border-emerald-800' },
     denied: { label: 'Refusée', styles: 'bg-red-900/50 text-red-300 border-red-800' },
 }
 
@@ -35,7 +36,8 @@ function QuoteRow({ quote }: { quote: any }) {
         })
     }
 
-    const canChangeStatus = quote.status !== 'approved' && quote.status !== 'denied'
+    const canChangeStatus = quote.status !== 'approved' && quote.status !== 'denied' && quote.status !== 'completed'
+    const scheduledDate = Array.isArray(quote.projects) ? quote.projects[0]?.start_date : null
 
     return (
         <TableRow
@@ -59,17 +61,34 @@ function QuoteRow({ quote }: { quote: any }) {
                 {format(new Date(quote.created_at), 'dd MMM yyyy', { locale: frCA })}
             </TableCell>
             <TableCell className="text-center">
-                {quote.status === 'approved' ? (
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)}
-                        className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50"
-                        title="Planifier ce projet"
-                    >
-                        <CalendarDays className="h-4 w-4" />
-                        <span className="ml-1 hidden md:inline">Planifier</span>
-                    </Button>
+                {quote.status === 'approved' || quote.status === 'completed' ? (
+                    scheduledDate ? (
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)
+                            }}
+                            className="h-7 px-2 rounded text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50 text-sm"
+                            title="Modifier la date planifiée"
+                        >
+                            {format(new Date(scheduledDate), 'yyyy-MM-dd')}
+                        </button>
+                    ) : (
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)
+                            }}
+                            className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50"
+                            title="Planifier ce projet"
+                        >
+                            <CalendarDays className="h-4 w-4" />
+                            <span className="ml-1 hidden md:inline">A planifier</span>
+                        </Button>
+                    )
                 ) : (
                     <span className="text-zinc-500">—</span>
                 )}

@@ -8,7 +8,7 @@ export async function getQuotes(query?: string, statusFilter?: string) {
 
     let request = supabase
         .from('quotes')
-        .select('*, clients(full_name, company_name, manager_id), managers(first_name,last_name), contractors(id, full_name, color)')
+        .select('*, clients(full_name, company_name, manager_id), managers(first_name,last_name), contractors(id, full_name, color), projects(start_date)')
         .order('created_at', { ascending: false })
 
     if (query) {
@@ -23,7 +23,7 @@ export async function getQuotes(query?: string, statusFilter?: string) {
     }
 
     if (statusFilter && statusFilter !== 'all') {
-        request = request.eq('status', statusFilter as 'draft' | 'sent' | 'approved' | 'denied')
+        request = request.eq('status', statusFilter as 'draft' | 'sent' | 'approved' | 'denied' | 'completed')
     }
 
     const { data, error } = await request
@@ -175,7 +175,7 @@ export async function getQuote(id: string) {
     const supabase = await createClient()
     const { data, error } = await supabase
         .from('quotes')
-        .select('*, clients(*), contractors(*), quote_items(*), quote_images(*)')
+        .select('*, clients(*), contractors(*), quote_items(*), quote_images(*), projects(status, completed_at)')
         .eq('id', id)
         .single()
 

@@ -8,9 +8,10 @@ import { CheckCircle, XCircle, TrendingUp, CalendarCheck2 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { frCA } from 'date-fns/locale'
 
-export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ managers?: string }> }) {
+export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ managers?: string, revenue?: 'approved' | 'actual' }> }) {
     const resolvedSearchParams = await searchParams
     const selectedManagers = (resolvedSearchParams.managers || '').split(',').filter(Boolean)
+    const revenueMode: 'approved' | 'actual' = resolvedSearchParams.revenue === 'actual' ? 'actual' : 'approved'
     const now = new Date()
     const rangeStart = new Date(now)
     rangeStart.setFullYear(now.getFullYear() - 1)
@@ -37,24 +38,43 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     const completedProjects = projects.filter((p: any) => p.status === 'completed')
     const completedProjectsCount = completedProjects.length
     const completedProjectsValue = completedProjects.reduce((acc: number, p: any) => acc + Number(p.quotes?.total || 0), 0)
+    const totalRevenueValue = revenueMode === 'actual' ? completedProjectsValue : totalApprovedValue
 
     const monthlyDataMap: Record<string, number> = {}
-    approvedQuotes.forEach((q: any) => {
-        if (q.approved_at) {
-            const monthYear = format(parseISO(q.approved_at), 'MMM yy', { locale: frCA })
-            monthlyDataMap[monthYear] = (monthlyDataMap[monthYear] || 0) + (q.total || 0)
-        }
-    })
+    if (revenueMode === 'actual') {
+        completedProjects.forEach((p: any) => {
+            if (p.completed_at) {
+                const monthYear = format(new Date(p.completed_at), 'MMM yy', { locale: frCA })
+                monthlyDataMap[monthYear] = (monthlyDataMap[monthYear] || 0) + Number(p.quotes?.total || 0)
+            }
+        })
+    } else {
+        approvedQuotes.forEach((q: any) => {
+            if (q.approved_at) {
+                const monthYear = format(parseISO(q.approved_at), 'MMM yy', { locale: frCA })
+                monthlyDataMap[monthYear] = (monthlyDataMap[monthYear] || 0) + (q.total || 0)
+            }
+        })
+    }
 
     const monthlyRevenue = Object.entries(monthlyDataMap).map(([month, total]) => ({ month, total }))
 
     const contractorStats: Record<string, { count: number, total: number }> = {}
-    filteredQuotes.forEach((q: any) => {
-        const name = q.contractors?.full_name || 'Sans contracteur'
-        contractorStats[name] = contractorStats[name] || { count: 0, total: 0 }
-        contractorStats[name].count += 1
-        contractorStats[name].total += q.total || 0
-    })
+    if (revenueMode === 'actual') {
+        completedProjects.forEach((p: any) => {
+            const name = p.contractors?.full_name || p.quotes?.contractors?.full_name || 'Sans contracteur'
+            contractorStats[name] = contractorStats[name] || { count: 0, total: 0 }
+            contractorStats[name].count += 1
+            contractorStats[name].total += Number(p.quotes?.total || 0)
+        })
+    } else {
+        filteredQuotes.forEach((q: any) => {
+            const name = q.contractors?.full_name || 'Sans contracteur'
+            contractorStats[name] = contractorStats[name] || { count: 0, total: 0 }
+            contractorStats[name].count += 1
+            contractorStats[name].total += q.total || 0
+        })
+    }
     const topContractors = Object.entries(contractorStats).sort((a,b)=> b[1].total - a[1].total).slice(0,5)
 
 
@@ -84,17 +104,30 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     const financialRows = months.map(m => monthMap[m.key])
 
     const managerStats: Record<string, { total: number, approved: number, amount: number, denied: number, sent: number }> = {}
+    const quoteById: Record<string, any> = Object.fromEntries(quotes.map((q: any) => [q.id, q]))
     quotes.forEach((q: any) => {
         const name = q.managers ? `${q.managers.first_name} ${q.managers.last_name}` : 'Sans gestionnaire'
         const id = q.manager_id || 'none'
         managerStats[name] = managerStats[name] || { total: 0, approved: 0, amount: 0, denied: 0, sent: 0 }
         if (selectedManagers.length && !selectedManagers.includes(id)) return
         managerStats[name].total += 1
-        managerStats[name].amount += q.total || 0
+        if (revenueMode === 'approved') {
+            managerStats[name].amount += q.total || 0
+        }
         if (q.status === 'approved') managerStats[name].approved += 1
         if (q.status === 'denied') managerStats[name].denied += 1
         if (q.status === 'sent') managerStats[name].sent += 1
     })
+    if (revenueMode === 'actual') {
+        completedProjects.forEach((p: any) => {
+            const quote = quoteById[p.quote_id]
+            const managerId = quote?.manager_id || 'none'
+            if (selectedManagers.length && !selectedManagers.includes(managerId)) return
+            const managerName = quote?.managers ? `${quote.managers.first_name} ${quote.managers.last_name}` : 'Sans gestionnaire'
+            managerStats[managerName] = managerStats[managerName] || { total: 0, approved: 0, amount: 0, denied: 0, sent: 0 }
+            managerStats[managerName].amount += Number(p.quotes?.total || 0)
+        })
+    }
     const availableManagers = Array.from(new Set(quotes.map((q: any) => q.manager_id).filter(Boolean)))
 
     return (
@@ -104,6 +137,15 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                 <p className="text-sm text-zinc-400">
                     Analyse approfondie de la performance de l'entreprise.
                 </p>
+                <form className="mt-3">
+                    <label className="text-sm text-zinc-300 mr-2">Revenus:</label>
+                    <select name="revenue" defaultValue={revenueMode} className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm text-zinc-100">
+                        <option value="approved">Approuvés</option>
+                        <option value="actual">Réels (projets complétés)</option>
+                    </select>
+                    {selectedManagers.map((id) => <input key={id} type="hidden" name="managers" value={id} />)}
+                    <button className="ml-2 px-3 py-1 rounded border border-zinc-800 text-zinc-200 hover:bg-zinc-800/40" type="submit">Appliquer</button>
+                </form>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -129,11 +171,11 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
                 <Card className="bg-transparent border-zinc-800">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-zinc-200">Valeur Approuvée</CardTitle>
+                        <CardTitle className="text-sm font-medium text-zinc-200">{revenueMode === 'actual' ? 'Revenus Réels' : 'Valeur Approuvée'}</CardTitle>
                         <CheckCircle className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-zinc-100">${Math.round(totalApprovedValue).toLocaleString('fr-CA')}</div>
+                        <div className="text-2xl font-bold text-zinc-100">${Math.round(totalRevenueValue).toLocaleString('fr-CA')}</div>
                     </CardContent>
                 </Card>
 
