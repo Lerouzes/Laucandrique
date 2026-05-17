@@ -18,7 +18,7 @@ const statusMap: Record<string, { label: string, styles: string }> = {
     draft: { label: 'Brouillon', styles: 'bg-zinc-800 text-zinc-200 border-zinc-700' },
     sent: { label: 'Envoyée', styles: 'bg-blue-900/50 text-blue-300 border-blue-800' },
     approved: { label: 'Approuvée', styles: 'bg-green-900/50 text-green-300 border-green-800' },
-    completed: { label: 'Complétée', styles: 'bg-emerald-900/60 text-emerald-300 border-emerald-800' },
+    completed: { label: 'Complétée', styles: 'bg-blue-900/50 text-blue-300 border-blue-800' },
     denied: { label: 'Refusée', styles: 'bg-red-900/50 text-red-300 border-red-800' },
 }
 
@@ -46,8 +46,7 @@ function QuoteRow({ quote }: { quote: any }) {
     return (
         <TableRow
             key={quote.id}
-            className="border-b border-zinc-800 hover:bg-zinc-800/50 cursor-pointer"
-            onClick={() => router.push(`/quotes/${quote.id}`)}
+            className="border-b border-zinc-800 hover:bg-zinc-800/50"
         >
             <TableCell className="text-zinc-300 font-mono">#{quote.quote_number}</TableCell>
             <TableCell className="font-medium text-zinc-100">{quote.title}</TableCell>
@@ -110,13 +109,22 @@ function QuoteRow({ quote }: { quote: any }) {
                     <Button
                         size="sm"
                         variant="ghost"
+                        disabled={!canEditQuote}
                         onClick={() => router.push(`/quotes/${quote.id}/edit`)}
-                        className="h-7 px-2 text-amber-400 hover:text-amber-300 hover:bg-amber-950/50"
-                        title="Modifier"
+                        className="h-7 px-2 text-amber-400 hover:text-amber-300 hover:bg-amber-950/50 disabled:text-zinc-600 disabled:hover:bg-transparent"
+                        title={canEditQuote ? 'Modifier' : 'Modification désactivée (complétée)'}
                     >
                         <Pencil className="h-4 w-4" />
                     </Button>
-                    <span className="text-sm text-zinc-400 ml-1">Voir →</span>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => router.push(`/quotes/${quote.id}`)}
+                        className="h-7 px-2 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800"
+                        title="Voir la soumission"
+                    >
+                        Voir →
+                    </Button>
                 </div>
             </TableCell>
         </TableRow>
