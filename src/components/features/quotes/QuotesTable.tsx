@@ -10,6 +10,9 @@ import { frCA } from 'date-fns/locale'
 import { CalendarDays, CheckCircle, Pencil, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { updateQuoteStatus } from '@/actions/quotes'
+import { scheduleProjectStartByQuote } from '@/actions/projects'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
 
 const statusMap: Record<string, { label: string, styles: string }> = {
     draft: { label: 'Brouillon', styles: 'bg-zinc-800 text-zinc-200 border-zinc-700' },
@@ -37,6 +40,8 @@ function QuoteRow({ quote }: { quote: any }) {
     }
 
     const canChangeStatus = quote.status !== 'approved' && quote.status !== 'denied' && quote.status !== 'completed'
+    const isSchedulable = quote.status === 'approved' || quote.status === 'completed'
+    const scheduledDate = quote.projects?.[0]?.start_date
 
     return (
         <TableRow
@@ -59,24 +64,40 @@ function QuoteRow({ quote }: { quote: any }) {
             <TableCell className="text-zinc-300">
                 {format(new Date(quote.created_at), 'dd MMM yyyy', { locale: frCA })}
             </TableCell>
-            <TableCell className="text-center">
-                {quote.status === 'approved' || quote.status === 'completed' ? (
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)}
-                        className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50"
-                        title="Planifier ce projet"
-                    >
-                        <CalendarDays className="h-4 w-4" />
-                        <span className="ml-1 hidden md:inline">Planifier</span>
-                    </Button>
-                ) : (
-                    <span className="text-zinc-500">—</span>
-                )}
-            </TableCell>
             <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
+                    {isSchedulable ? (
+                        <Popover>
+                            <PopoverTrigger render={<Button size="sm" variant="ghost" className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50" title={scheduledDate ? 'Modifier la date de début' : 'Planifier ce projet'} />} >
+                                <CalendarDays className="h-4 w-4" />
+                                <span className="ml-1 hidden md:inline">
+                                    {scheduledDate ? format(new Date(scheduledDate), 'dd MMM yyyy', { locale: frCA }) : 'Planifier'}
+                                </span>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" sideOffset={6} className="w-auto p-2 bg-zinc-950 border-zinc-800">
+                                <Calendar
+                                    mode="single"
+                                    selected={scheduledDate ? new Date(scheduledDate) : undefined}
+                                    onSelect={(date) => {
+                                        if (!date) return
+                                        startTransition(async () => {
+                                            try {
+                                                await scheduleProjectStartByQuote(quote.id, date.toISOString())
+                                                toast.success('Date planifiée mise à jour.')
+                                                router.refresh()
+                                            } catch (err: any) {
+                                                toast.error('Erreur', { description: err.message })
+                                            }
+                                        })
+                                    }}
+                                    locale={frCA}
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    ) : (
+                        <span className="text-zinc-500">—</span>
+                    )}
+
                     {canChangeStatus && (
                         <>
                             <Button
