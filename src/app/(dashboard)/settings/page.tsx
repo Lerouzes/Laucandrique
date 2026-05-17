@@ -82,6 +82,41 @@ export default function SettingsPage() {
         })
     }
 
+    const handleCreateManager = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault()
+        const fd = new FormData(e.currentTarget)
+        try {
+            await createManagerAction(fd)
+            setManagers(await getManagers())
+            toast.success('Gestionnaire ajouté.')
+            e.currentTarget.reset()
+        } catch (e: any) {
+            toast.error('Erreur', { description: e.message || "Impossible d'ajouter le gestionnaire." })
+        }
+    }
+
+    const handleCreateManagerTeam = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault()
+        const fd = new FormData(e.currentTarget)
+        const submittedName = String(fd.get('team_name') || '').trim()
+        try {
+            await createManagerTeamAction(fd)
+
+            const refreshedTeams = await getManagerTeams()
+            setManagerTeams(refreshedTeams || [])
+
+            const createdVisible = (refreshedTeams || []).some((team: any) => String(team?.name || '').trim().toLowerCase() === submittedName.toLowerCase())
+            if (!createdVisible) {
+                throw new Error("L'équipe semble avoir été créée, mais elle n'est pas visible avec ce compte. Vérifiez les politiques RLS et rechargez la page.")
+            }
+
+            toast.success('Équipe ajoutée.')
+            e.currentTarget.reset()
+        } catch (e: any) {
+            toast.error('Erreur', { description: e.message || "Impossible d'ajouter l'équipe." })
+        }
+    }
+
     return (
         <div className="space-y-6 max-w-2xl mx-auto">
             <div>
@@ -91,7 +126,8 @@ export default function SettingsPage() {
                 </p>
             </div>
 
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <div className="space-y-6">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <Card className="bg-zinc-900 border-zinc-800">
                     <CardHeader>
                         <CardTitle className="text-zinc-100">Entreprise</CardTitle>
@@ -165,10 +201,11 @@ export default function SettingsPage() {
                         {isPending ? 'Enregistrement...' : 'Enregistrer'}
                     </Button>
                 </div>
+                </form>
                 <Card className="bg-zinc-900 border-zinc-800">
                     <CardHeader><CardTitle className="text-zinc-100">Gestionnaires</CardTitle></CardHeader>
                     <CardContent className="space-y-3">
-                        <form action={async (fd) => { await createManagerAction(fd); setManagers(await getManagers()) }} className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        <form onSubmit={handleCreateManager} className="grid grid-cols-2 md:grid-cols-3 gap-2">
                             <Input name="first_name" placeholder="Prénom" required />
                             <Input name="last_name" placeholder="Nom" required />
                             <Input name="email" placeholder="Courriel" />
@@ -183,7 +220,7 @@ export default function SettingsPage() {
 
                         <div className="pt-4 border-t border-zinc-800 space-y-2">
                             <p className="text-sm text-zinc-300">Équipes de gestionnaires</p>
-                            <form action={async (fd) => { await createManagerTeamAction(fd); setManagerTeams(await getManagerTeams()) }} className="flex gap-2">
+                            <form onSubmit={handleCreateManagerTeam} className="flex gap-2">
                                 <Input name="team_name" placeholder="Nom de l'équipe" required />
                                 <Button type="submit" variant="outline">Ajouter équipe</Button>
                             </form>
@@ -193,7 +230,7 @@ export default function SettingsPage() {
                         </div>
                     </CardContent>
                 </Card>
-            </form>
+            </div>
 
         </div>
     )
