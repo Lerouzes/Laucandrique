@@ -10,12 +10,15 @@ import { frCA } from 'date-fns/locale'
 import { CalendarDays, CheckCircle, Pencil, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { updateQuoteStatus } from '@/actions/quotes'
+import { scheduleProjectStartByQuote } from '@/actions/projects'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
 
 const statusMap: Record<string, { label: string, styles: string }> = {
     draft: { label: 'Brouillon', styles: 'bg-zinc-800 text-zinc-200 border-zinc-700' },
     sent: { label: 'Envoyée', styles: 'bg-blue-900/50 text-blue-300 border-blue-800' },
     approved: { label: 'Approuvée', styles: 'bg-green-900/50 text-green-300 border-green-800' },
-    completed: { label: 'Complétée', styles: 'bg-emerald-900/60 text-emerald-300 border-emerald-800' },
+    completed: { label: 'Complétée', styles: 'bg-blue-900/50 text-blue-300 border-blue-800' },
     denied: { label: 'Refusée', styles: 'bg-red-900/50 text-red-300 border-red-800' },
 }
 
@@ -37,12 +40,14 @@ function QuoteRow({ quote }: { quote: any }) {
     }
 
     const canChangeStatus = quote.status !== 'approved' && quote.status !== 'denied' && quote.status !== 'completed'
+    const isSchedulable = quote.status === 'approved'
+    const canEditQuote = quote.status !== 'completed'
+    const scheduledDate = quote.projects?.[0]?.start_date
 
     return (
         <TableRow
             key={quote.id}
-            className="border-b border-zinc-800 hover:bg-zinc-800/50 cursor-pointer"
-            onClick={() => router.push(`/quotes/${quote.id}`)}
+            className="border-b border-zinc-800 hover:bg-zinc-800/50"
         >
             <TableCell className="text-zinc-300 font-mono">#{quote.quote_number}</TableCell>
             <TableCell className="font-medium text-zinc-100">{quote.title}</TableCell>
@@ -59,24 +64,45 @@ function QuoteRow({ quote }: { quote: any }) {
             <TableCell className="text-zinc-300">
                 {format(new Date(quote.created_at), 'dd MMM yyyy', { locale: frCA })}
             </TableCell>
-            <TableCell className="text-center">
-                {quote.status === 'approved' || quote.status === 'completed' ? (
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)}
-                        className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50"
-                        title="Planifier ce projet"
-                    >
-                        <CalendarDays className="h-4 w-4" />
-                        <span className="ml-1 hidden md:inline">Planifier</span>
-                    </Button>
-                ) : (
-                    <span className="text-zinc-500">—</span>
-                )}
-            </TableCell>
             <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
+                    {isSchedulable ? (
+                        <Popover>
+                            <PopoverTrigger render={<Button size="sm" variant="ghost" className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50" title={scheduledDate ? 'Modifier la date de début' : 'Planifier ce projet'} />} >
+                                <CalendarDays className="h-4 w-4" />
+                                <span className="ml-1 hidden md:inline">
+                                    {scheduledDate ? format(new Date(scheduledDate), 'dd MMM yyyy', { locale: frCA }) : 'Planifier'}
+                                </span>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" sideOffset={6} className="w-auto p-2 bg-zinc-950 border-zinc-800">
+                                <Calendar
+                                    mode="single"
+                                    selected={scheduledDate ? new Date(scheduledDate) : undefined}
+                                    onSelect={(date) => {
+                                        if (!date) return
+                                        startTransition(async () => {
+                                            try {
+                                                await scheduleProjectStartByQuote(quote.id, date.toISOString())
+                                                toast.success('Date planifiée mise à jour.')
+                                                router.refresh()
+                                            } catch (err: any) {
+                                                toast.error('Erreur', { description: err.message })
+                                            }
+                                        })
+                                    }}
+                                    locale={frCA}
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    ) : quote.status === 'completed' && scheduledDate ? (
+                        <span className="inline-flex items-center gap-1 text-blue-300" title="Projet complété">
+                            <CalendarDays className="h-4 w-4" />
+                            <span className="hidden md:inline">{format(new Date(scheduledDate), 'dd MMM yyyy', { locale: frCA })}</span>
+                        </span>
+                    ) : (
+                        <span className="text-zinc-500">—</span>
+                    )}
+
                     {canChangeStatus && (
                         <>
                             <Button
@@ -104,13 +130,22 @@ function QuoteRow({ quote }: { quote: any }) {
                     <Button
                         size="sm"
                         variant="ghost"
+                        disabled={!canEditQuote}
                         onClick={() => router.push(`/quotes/${quote.id}/edit`)}
-                        className="h-7 px-2 text-amber-400 hover:text-amber-300 hover:bg-amber-950/50"
-                        title="Modifier"
+                        className="h-7 px-2 text-amber-400 hover:text-amber-300 hover:bg-amber-950/50 disabled:text-zinc-600 disabled:hover:bg-transparent"
+                        title={canEditQuote ? 'Modifier' : 'Modification désactivée (complétée)'}
                     >
                         <Pencil className="h-4 w-4" />
                     </Button>
-                    <span className="text-sm text-zinc-400 ml-1">Voir →</span>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => router.push(`/quotes/${quote.id}`)}
+                        className="h-7 px-2 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800"
+                        title="Voir la soumission"
+                    >
+                        Voir →
+                    </Button>
                 </div>
             </TableCell>
         </TableRow>
