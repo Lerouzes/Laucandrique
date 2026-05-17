@@ -91,7 +91,8 @@ export default function SettingsPage() {
                 </p>
             </div>
 
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <div className="space-y-6">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <Card className="bg-zinc-900 border-zinc-800">
                     <CardHeader>
                         <CardTitle className="text-zinc-100">Entreprise</CardTitle>
@@ -165,6 +166,7 @@ export default function SettingsPage() {
                         {isPending ? 'Enregistrement...' : 'Enregistrer'}
                     </Button>
                 </div>
+                </form>
                 <Card className="bg-zinc-900 border-zinc-800">
                     <CardHeader><CardTitle className="text-zinc-100">Gestionnaires</CardTitle></CardHeader>
                     <CardContent className="space-y-3">
@@ -193,7 +195,7 @@ export default function SettingsPage() {
                         </div>
                     </CardContent>
                 </Card>
-            </form>
+            </div>
 
         </div>
     )
