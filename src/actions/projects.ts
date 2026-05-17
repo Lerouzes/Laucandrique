@@ -129,9 +129,15 @@ export async function scheduleProjectStartByQuote(quoteId: string, startDate: st
     if (!project?.id) throw new Error('Aucun projet lié à cette soumission.')
 
     const durationDays = Math.max(1, Math.ceil(Number(project.estimated_duration_days || 1)))
-    const start = new Date(startDate)
-    const end = new Date(startDate)
-    end.setDate(end.getDate() + durationDays)
+
+    const [y, m, d] = String(startDate).split('-').map(Number)
+    if (!y || !m || !d) throw new Error('Date de début invalide.')
+
+    // Use UTC midnight from explicit YYYY-MM-DD to avoid timezone shifts.
+    const start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0))
+    const end = new Date(start)
+    // Inclusive duration: 1 day => same start/end day.
+    end.setUTCDate(end.getUTCDate() + (durationDays - 1))
 
     const { error } = await supabase
         .from('projects')
