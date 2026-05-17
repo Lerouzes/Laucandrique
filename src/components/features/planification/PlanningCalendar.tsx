@@ -37,7 +37,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     const externalEventsRef = useRef<HTMLDivElement>(null)
     const [isPending, startTransition] = useTransition()
     const [isDraggingEvent, setIsDraggingEvent] = useState(false)
-    const [filter, setFilter] = useState<StatusFilter>('all')
+    const [filter, setFilter] = useState<StatusFilter>('unscheduled')
     const normalizedQuery = query.trim().toLowerCase()
     const getDurationDays = (project: any) => Number(project?.estimated_duration_days || 1)
     const getDurationMinutes = (project: any) => Math.max(15, Math.round(getDurationDays(project) * 24 * 60))
