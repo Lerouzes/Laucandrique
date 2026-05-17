@@ -8,7 +8,7 @@ export async function getQuotes(query?: string, statusFilter?: string) {
 
     let request = supabase
         .from('quotes')
-        .select('*, clients(full_name, company_name, manager_id), managers(first_name,last_name), contractors(id, full_name, color)')
+        .select('*, clients(full_name, company_name, manager_id), managers(first_name,last_name), contractors(id, full_name, color), projects(start_date)')
         .order('created_at', { ascending: false })
 
     if (query) {

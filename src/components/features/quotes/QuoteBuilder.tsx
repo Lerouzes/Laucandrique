@@ -51,6 +51,7 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
 
     // Custom states for images (skip react-hook-form generic file handling for simplicity)
     const [images, setImages] = useState<{ file: File, caption: string, previewUrl: string }[]>([])
+    const [clientSearch, setClientSearch] = useState('')
 
 
     const initialDurationDays = Number(initialQuote?.estimated_duration_days || 1)
@@ -96,6 +97,14 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
 
 
     const selectedClientName = clients.find((c: any) => String(c.id) === String(form.watch('client_id')))?.full_name
+    const filteredClients = clients.filter((c: any) => {
+        const q = clientSearch.trim().toLowerCase()
+        if (!q) return true
+        const name = String(c.full_name || '').toLowerCase()
+        const company = String(c.company_name || '').toLowerCase()
+        const email = String(c.email || '').toLowerCase()
+        return name.includes(q) || company.includes(q) || email.includes(q)
+    })
     const selectedContractorName = form.watch('contractor_id') && form.watch('contractor_id') !== 'none'
         ? contractors.find((c: any) => String(c.id) === String(form.watch('contractor_id')))?.full_name
         : ''
@@ -223,6 +232,12 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="text-zinc-300">Client</FormLabel>
+                                            <Input
+                                                value={clientSearch}
+                                                onChange={(e) => setClientSearch(e.target.value)}
+                                                placeholder="Rechercher un client (nom, compagnie, courriel)"
+                                                className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600 mb-2"
+                                            />
                                             <Select onValueChange={field.onChange} value={field.value || undefined}>
                                                 <FormControl>
                                                     <SelectTrigger className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600">
@@ -230,11 +245,14 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent className="bg-zinc-900 border-zinc-800">
-                                                    {clients.map(c => (
+                                                    {filteredClients.map(c => (
                                                         <SelectItem key={c.id} value={String(c.id)} className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-100">
                                                             {c.full_name} {c.company_name ? `(${c.company_name})` : ''}
                                                         </SelectItem>
                                                     ))}
+                                                    {filteredClients.length === 0 && (
+                                                        <div className="px-2 py-2 text-xs text-zinc-400">Aucun client trouvé.</div>
+                                                    )}
                                                 </SelectContent>
                                             </Select>
                                             <FormMessage />
