@@ -37,7 +37,6 @@ function QuoteRow({ quote }: { quote: any }) {
     }
 
     const canChangeStatus = quote.status !== 'approved' && quote.status !== 'denied' && quote.status !== 'completed'
-    const scheduledDate = Array.isArray(quote.projects) ? quote.projects[0]?.start_date : null
 
     return (
         <TableRow
@@ -62,33 +61,16 @@ function QuoteRow({ quote }: { quote: any }) {
             </TableCell>
             <TableCell className="text-center">
                 {quote.status === 'approved' || quote.status === 'completed' ? (
-                    scheduledDate ? (
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)
-                            }}
-                            className="h-7 px-2 rounded text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50 text-sm"
-                            title="Modifier la date planifiée"
-                        >
-                            {format(new Date(scheduledDate), 'yyyy-MM-dd')}
-                        </button>
-                    ) : (
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)
-                            }}
-                            className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50"
-                            title="Planifier ce projet"
-                        >
-                            <CalendarDays className="h-4 w-4" />
-                            <span className="ml-1 hidden md:inline">A planifier</span>
-                        </Button>
-                    )
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => router.push(`/planification?query=${encodeURIComponent(String(quote.quote_number || ''))}`)}
+                        className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50"
+                        title="Planifier ce projet"
+                    >
+                        <CalendarDays className="h-4 w-4" />
+                        <span className="ml-1 hidden md:inline">Planifier</span>
+                    </Button>
                 ) : (
                     <span className="text-zinc-500">—</span>
                 )}
