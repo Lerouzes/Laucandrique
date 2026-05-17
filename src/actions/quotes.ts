@@ -8,19 +8,8 @@ export async function getQuotes(query?: string, statusFilter?: string) {
 
     let request = supabase
         .from('quotes')
-        .select('*, clients(full_name, company_name, manager_id), managers(first_name,last_name), contractors(id, full_name, color), projects(start_date)')
+        .select('*, clients(full_name, company_name, manager_id), managers(first_name,last_name,team_id,manager_teams(name)), contractors(id, full_name, color), projects(start_date, completed_at, status)')
         .order('created_at', { ascending: false })
-
-    if (query) {
-        const sanitized = query.trim()
-        if (sanitized) {
-            if (/^\d+$/.test(sanitized)) {
-                request = request.or(`title.ilike.%${sanitized}%,quote_number.eq.${sanitized},clients.full_name.ilike.%${sanitized}%,clients.company_name.ilike.%${sanitized}%`)
-            } else {
-                request = request.or(`title.ilike.%${sanitized}%,clients.full_name.ilike.%${sanitized}%,clients.company_name.ilike.%${sanitized}%`)
-            }
-        }
-    }
 
     if (statusFilter && statusFilter !== 'all') {
         request = request.eq('status', statusFilter as 'draft' | 'sent' | 'approved' | 'denied' | 'completed')
@@ -33,7 +22,27 @@ export async function getQuotes(query?: string, statusFilter?: string) {
         return []
     }
 
-    return data
+    if (!query) {
+        return data
+    }
+
+    const normalizedQuery = query.trim().toLowerCase()
+
+    if (!normalizedQuery) {
+        return data
+    }
+
+    return data.filter((quote: any) => {
+        const quoteNumber = String(quote.quote_number || '').toLowerCase()
+        const quoteTitle = String(quote.title || '').toLowerCase()
+        const clientFullName = String(quote.clients?.full_name || '').toLowerCase()
+        const clientCompanyName = String(quote.clients?.company_name || '').toLowerCase()
+
+        return quoteNumber.includes(normalizedQuery)
+            || quoteTitle.includes(normalizedQuery)
+            || clientFullName.includes(normalizedQuery)
+            || clientCompanyName.includes(normalizedQuery)
+    })
 }
 
 export async function createQuoteAction(quoteData: any, itemsData: any[], imagesData: any[]) {

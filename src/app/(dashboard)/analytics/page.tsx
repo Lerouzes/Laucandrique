@@ -8,9 +8,14 @@ import { CheckCircle, XCircle, TrendingUp, CalendarCheck2 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { frCA } from 'date-fns/locale'
 
-export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ managers?: string, revenue?: 'approved' | 'actual' }> }) {
+export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ managers?: string | string[], teams?: string | string[], revenue?: 'approved' | 'actual' }> }) {
     const resolvedSearchParams = await searchParams
-    const selectedManagers = (resolvedSearchParams.managers || '').split(',').filter(Boolean)
+    const asArray = (value?: string | string[]) => {
+        if (!value) return []
+        return Array.isArray(value) ? value : String(value).split(',').filter(Boolean)
+    }
+    const selectedManagers = asArray(resolvedSearchParams.managers)
+    const selectedTeams = asArray(resolvedSearchParams.teams)
     const revenueMode: 'approved' | 'actual' = resolvedSearchParams.revenue === 'actual' ? 'actual' : 'approved'
     const now = new Date()
     const rangeStart = new Date(now)
@@ -20,10 +25,21 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     const projects = await getProjects()
     const settings = await getSettings()
 
+    const managerTeamNameById: Record<string, string> = {}
+    quotes.forEach((q: any) => {
+        const managerId = q.manager_id || ''
+        const teamName = q.managers?.manager_teams?.name || ''
+        if (managerId && teamName) managerTeamNameById[managerId] = teamName
+    })
+
     const filteredQuotes = quotes.filter((q: any) => {
         const dateRef = q.approved_at || q.created_at
         const d = new Date(dateRef)
-        return d >= rangeStart && d <= rangeEnd
+        const managerId = q.manager_id || 'none'
+        const teamName = q.managers?.manager_teams?.name || ''
+        const managerMatch = selectedManagers.length === 0 || selectedManagers.includes(managerId)
+        const teamMatch = selectedTeams.length === 0 || selectedTeams.includes(teamName)
+        return d >= rangeStart && d <= rangeEnd && managerMatch && teamMatch
     })
     const approvedQuotes = filteredQuotes.filter((q: any) => q.status === 'approved')
     const deniedQuotes = filteredQuotes.filter((q: any) => q.status === 'denied')
@@ -35,7 +51,14 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
     const winRate = filteredQuotes.length > 0 ? (approvedQuotes.length / filteredQuotes.length) * 100 : 0
 
-    const completedProjects = projects.filter((p: any) => p.status === 'completed')
+    const completedProjects = projects.filter((p: any) => {
+        if (p.status !== 'completed') return false
+        const managerId = p.quotes?.manager_id || 'none'
+        const teamName = managerTeamNameById[managerId] || ''
+        const managerMatch = selectedManagers.length === 0 || selectedManagers.includes(managerId)
+        const teamMatch = selectedTeams.length === 0 || selectedTeams.includes(teamName)
+        return managerMatch && teamMatch
+    })
     const completedProjectsCount = completedProjects.length
     const completedProjectsValue = completedProjects.reduce((acc: number, p: any) => acc + Number(p.quotes?.total || 0), 0)
     const totalRevenueValue = revenueMode === 'actual' ? completedProjectsValue : totalApprovedValue
@@ -105,11 +128,10 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
     const managerStats: Record<string, { total: number, approved: number, amount: number, denied: number, sent: number }> = {}
     const quoteById: Record<string, any> = Object.fromEntries(quotes.map((q: any) => [q.id, q]))
-    quotes.forEach((q: any) => {
+    filteredQuotes.forEach((q: any) => {
         const name = q.managers ? `${q.managers.first_name} ${q.managers.last_name}` : 'Sans gestionnaire'
         const id = q.manager_id || 'none'
         managerStats[name] = managerStats[name] || { total: 0, approved: 0, amount: 0, denied: 0, sent: 0 }
-        if (selectedManagers.length && !selectedManagers.includes(id)) return
         managerStats[name].total += 1
         if (revenueMode === 'approved') {
             managerStats[name].amount += q.total || 0
@@ -122,13 +144,13 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         completedProjects.forEach((p: any) => {
             const quote = quoteById[p.quote_id]
             const managerId = quote?.manager_id || 'none'
-            if (selectedManagers.length && !selectedManagers.includes(managerId)) return
             const managerName = quote?.managers ? `${quote.managers.first_name} ${quote.managers.last_name}` : 'Sans gestionnaire'
             managerStats[managerName] = managerStats[managerName] || { total: 0, approved: 0, amount: 0, denied: 0, sent: 0 }
             managerStats[managerName].amount += Number(p.quotes?.total || 0)
         })
     }
     const availableManagers = Array.from(new Set(quotes.map((q: any) => q.manager_id).filter(Boolean)))
+    const availableTeams = Array.from(new Set(quotes.map((q: any) => q.managers?.manager_teams?.name).filter(Boolean)))
 
     return (
         <div className="space-y-6">
@@ -144,6 +166,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                         <option value="actual">Réels (projets complétés)</option>
                     </select>
                     {selectedManagers.map((id) => <input key={id} type="hidden" name="managers" value={id} />)}
+                    {selectedTeams.map((name) => <input key={name} type="hidden" name="teams" value={name} />)}
                     <button className="ml-2 px-3 py-1 rounded border border-zinc-800 text-zinc-200 hover:bg-zinc-800/40" type="submit">Appliquer</button>
                 </form>
             </div>
@@ -233,16 +256,22 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
 
             <Card className="bg-transparent border-zinc-800">
-                <CardHeader><CardTitle className="text-zinc-100">Analytiques par gestionnaire</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-zinc-100">Analytiques par gestionnaire / équipe</CardTitle></CardHeader>
                 <CardContent>
                     <form className="space-y-3">
-                        <p className="text-sm text-zinc-400">Filtrer un ou plusieurs gestionnaires</p>
+                        <p className="text-sm text-zinc-400">Filtrer plusieurs gestionnaires et équipes</p>
                         <div className="grid grid-cols-2 gap-2 text-sm">
                             {availableManagers.map((id: any) => {
                                 const q = quotes.find((x: any) => x.manager_id === id)
                                 const label = q?.managers ? `${q.managers.first_name} ${q.managers.last_name}` : id
                                 const checked = selectedManagers.includes(id)
                                 return <label key={id} className="flex items-center gap-2 text-zinc-300"><input type="checkbox" name="managers" value={id} defaultChecked={checked} />{label}</label>
+                            })}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm pt-2">
+                            {availableTeams.map((team: any) => {
+                                const checked = selectedTeams.includes(team)
+                                return <label key={team} className="flex items-center gap-2 text-zinc-300"><input type="checkbox" name="teams" value={team} defaultChecked={checked} />{team}</label>
                             })}
                         </div>
                         <button className="px-3 py-1 rounded border border-zinc-800 text-zinc-200 hover:bg-zinc-800/40" type="submit">Appliquer</button>

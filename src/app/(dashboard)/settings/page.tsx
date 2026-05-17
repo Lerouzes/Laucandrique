@@ -10,12 +10,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getSettings, updateSettingsAction } from '@/actions/settings'
 import Link from 'next/link'
-import { getManagers, createManagerAction } from '@/actions/managers'
+import { getManagers, createManagerAction, getManagerTeams, createManagerTeamAction } from '@/actions/managers'
 
 export default function SettingsPage() {
     const [isPending, startTransition] = useTransition()
     const [settingsId, setSettingsId] = useState<string | null>(null)
     const [managers, setManagers] = useState<any[]>([])
+    const [managerTeams, setManagerTeams] = useState<any[]>([])
     const [templatePreview, setTemplatePreview] = useState<string>('')
 
     const form = useForm({
@@ -47,6 +48,7 @@ export default function SettingsPage() {
 
     useEffect(() => {
         getManagers().then(setManagers)
+        getManagerTeams().then(setManagerTeams)
     }, [])
 
     useEffect(() => {
@@ -166,13 +168,29 @@ export default function SettingsPage() {
                 <Card className="bg-zinc-900 border-zinc-800">
                     <CardHeader><CardTitle className="text-zinc-100">Gestionnaires</CardTitle></CardHeader>
                     <CardContent className="space-y-3">
-                        <form action={async (fd) => { await createManagerAction(fd); setManagers(await getManagers()) }} className="grid grid-cols-4 gap-2">
+                        <form action={async (fd) => { await createManagerAction(fd); setManagers(await getManagers()) }} className="grid grid-cols-2 md:grid-cols-3 gap-2">
                             <Input name="first_name" placeholder="Prénom" required />
                             <Input name="last_name" placeholder="Nom" required />
                             <Input name="email" placeholder="Courriel" />
+                            <Input name="phone" placeholder="Téléphone" />
+                            <select name="team_id" className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm text-zinc-100">
+                                <option value="">Sans équipe</option>
+                                {managerTeams.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            </select>
                             <Button type="submit">Ajouter</Button>
                         </form>
-                        <div className="space-y-1 text-sm">{managers.map((m: any) => <Link key={m.id} href={`/managers/${m.id}`} className="block text-zinc-300 hover:text-zinc-100">{m.first_name} {m.last_name} — {m.email || '-'} </Link>)}</div>
+                        <div className="space-y-1 text-sm">{managers.map((m: any) => <Link key={m.id} href={`/managers/${m.id}`} className="block text-zinc-300 hover:text-zinc-100">{m.first_name} {m.last_name} — {m.email || '-'} — {m.phone || '-'} — {m.manager_teams?.name || 'Sans équipe'} </Link>)}</div>
+
+                        <div className="pt-4 border-t border-zinc-800 space-y-2">
+                            <p className="text-sm text-zinc-300">Équipes de gestionnaires</p>
+                            <form action={async (fd) => { await createManagerTeamAction(fd); setManagerTeams(await getManagerTeams()) }} className="flex gap-2">
+                                <Input name="team_name" placeholder="Nom de l'équipe" required />
+                                <Button type="submit" variant="outline">Ajouter équipe</Button>
+                            </form>
+                            <div className="text-sm text-zinc-400">
+                                {managerTeams.length === 0 ? 'Aucune équipe.' : managerTeams.map((t: any) => <span key={t.id} className="inline-block mr-2">{t.name}</span>)}
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
             </form>

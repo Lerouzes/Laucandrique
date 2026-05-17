@@ -14,22 +14,43 @@ function getRange(period: string, start?: string, end?: string) {
     return { start: firstDay, end: lastDay }
 }
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ period?: string, start?: string, end?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ period?: string, start?: string, end?: string, managers?: string | string[], teams?: string | string[] }> }) {
     const params = await searchParams
+    const asArray = (value?: string | string[]) => {
+        if (!value) return []
+        return Array.isArray(value) ? value : String(value).split(',').filter(Boolean)
+    }
+    const selectedManagers = asArray(params.managers)
+    const selectedTeams = asArray(params.teams)
     const period = params.period || 'current_year'
     const range = getRange(period, params.start, params.end)
     const quotes = await getQuotes()
     const projects = await getProjects()
 
-    const totalQuotesCount = quotes.length
-    const approvedQuotes = quotes.filter((q: any) => q.status === 'approved')
-    const sentQuotes = quotes.filter((q: any) => q.status === 'sent')
+    const filteredQuotes = quotes.filter((q: any) => {
+        const managerId = q.manager_id || 'none'
+        const teamName = q.managers?.manager_teams?.name || ''
+        const managerMatch = selectedManagers.length === 0 || selectedManagers.includes(managerId)
+        const teamMatch = selectedTeams.length === 0 || selectedTeams.includes(teamName)
+        return managerMatch && teamMatch
+    })
+
+    const totalQuotesCount = filteredQuotes.length
+    const approvedQuotes = filteredQuotes.filter((q: any) => q.status === 'approved')
+    const sentQuotes = filteredQuotes.filter((q: any) => q.status === 'sent')
     const totalApprovedValue = approvedQuotes.reduce((acc: number, q: any) => acc + (q.total || 0), 0)
 
-    const activeProjects = projects.filter((p: any) => p.status === 'in_progress' || p.status === 'planned')
+    const activeProjects = projects.filter((p: any) => {
+        if (!(p.status === 'in_progress' || p.status === 'planned')) return false
+        const managerId = p.quotes?.manager_id || 'none'
+        const teamName = p.quotes?.managers?.manager_teams?.name || ''
+        const managerMatch = selectedManagers.length === 0 || selectedManagers.includes(managerId)
+        const teamMatch = selectedTeams.length === 0 || selectedTeams.includes(teamName)
+        return managerMatch && teamMatch
+    })
 
     const monthlyMap: Record<string, number> = {}
-    quotes
+    filteredQuotes
         .filter((q: any) => q.status === 'approved' && q.approved_at)
         .filter((q: any) => {
             const d = new Date(q.approved_at)
@@ -44,6 +65,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([month, total]) => ({ month, total }))
 
+    const availableManagers = Array.from(new Set(quotes.map((q: any) => q.manager_id).filter(Boolean)))
+    const availableTeams = Array.from(new Set(quotes.map((q: any) => q.managers?.manager_teams?.name).filter(Boolean)))
+
     return (
         <div className="space-y-6">
             <div>
@@ -51,6 +75,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 <p className="text-sm text-zinc-200">
                     Aperçu de vos activités récentes et métriques clés.
                 </p>
+                <form className="mt-3 space-y-2">
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                        {availableManagers.map((id: any) => {
+                            const q = quotes.find((x: any) => x.manager_id === id)
+                            const label = q?.managers ? `${q.managers.first_name} ${q.managers.last_name}` : id
+                            return <label key={id} className="flex items-center gap-2 text-zinc-300"><input type="checkbox" name="managers" value={id} defaultChecked={selectedManagers.includes(id)} />{label}</label>
+                        })}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                        {availableTeams.map((team: any) => <label key={team} className="flex items-center gap-2 text-zinc-300"><input type="checkbox" name="teams" value={team} defaultChecked={selectedTeams.includes(team)} />{team}</label>)}
+                    </div>
+                    <button type="submit" className="h-9 rounded border border-zinc-800 px-3 text-sm text-zinc-200 hover:bg-zinc-800/40">Filtrer</button>
+                </form>
             </div>
 
             <div className="grid gap-4 md:grid-cols-4">
@@ -106,6 +143,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 <CardHeader>
                     <CardTitle className="text-zinc-100">Revenus mensuels (période)</CardTitle>
                     <form className="mt-2 grid md:grid-cols-4 gap-2">
+                        {selectedManagers.map((id) => <input key={id} type="hidden" name="managers" value={id} />)}
+                        {selectedTeams.map((team) => <input key={team} type="hidden" name="teams" value={team} />)}
                         <select name="period" defaultValue={period} className="h-9 rounded border border-zinc-800 bg-transparent px-2 text-sm text-zinc-200">
                             <option value="current_year">Année en cours</option>
                             <option value="last_30_days">30 derniers jours</option>
