@@ -36,6 +36,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     const [projects, setProjects] = useState(initialProjects)
     const externalEventsRef = useRef<HTMLDivElement>(null)
     const [isPending, startTransition] = useTransition()
+    const [isDraggingEvent, setIsDraggingEvent] = useState(false)
     const [filter, setFilter] = useState<StatusFilter>('all')
     const normalizedQuery = query.trim().toLowerCase()
     const getDurationDays = (project: any) => Number(project?.estimated_duration_days || 1)
@@ -116,6 +117,20 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             }
         }
     })
+
+    const buildRangeFromEvent = (event: any) => {
+        const start = event.start as Date | null
+        const end = event.end as Date | null
+
+        if (!start || !end) {
+            return { startDate: null, endDate: null }
+        }
+
+        return {
+            startDate: start.toISOString(),
+            endDate: end.toISOString(),
+        }
+    }
 
     // FIX: call info.event.remove() to prevent duplication — FullCalendar adds the event
     // automatically on drop; since we control the `events` array, remove the duplicated internal copy.
@@ -264,7 +279,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         data-id={project.id}
                                         data-title={project.title}
                                         data-duration-days={project.estimated_duration_days}
-                                        className={`fc-event-external p-3 bg-transparent border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+                                        className={`fc-event-external p-3 bg-transparent border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'fc-event-external-draggable cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                                     >
                                         <div className="flex items-start justify-between gap-2 mb-1">
                                             <div className="font-medium text-zinc-100 text-sm leading-tight flex items-center gap-2"><span className='inline-block h-2 w-2 rounded-full' style={{ backgroundColor: TYPE_DOT[project.project_type || 'interior'] }} />{project.title}</div>

@@ -141,6 +141,9 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
     const durationLabel = quote.estimated_duration_days < 1
         ? `${Math.round(quote.estimated_duration_days * 24 * 100) / 100} heures`
         : `${quote.estimated_duration_days} jours`
+    const linkedProject = Array.isArray(quote.projects) ? quote.projects[0] : null
+    const isProjectCompleted = linkedProject?.status === 'completed'
+    const displayStatus = isProjectCompleted && quote.status === 'approved' ? 'completed' : quote.status
 
     return (
         <div className="space-y-6 max-w-4xl mx-auto pb-12 w-full overflow-x-auto">
@@ -150,10 +153,11 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                     Retour aux soumissions
                 </Link>
                 <div className="flex gap-2 text-sm text-zinc-400">
-                    {quote.status === 'draft' && <Badge className="bg-zinc-800 text-zinc-300">Brouillon</Badge>}
-                    {quote.status === 'sent' && <Badge className="bg-blue-900/50 text-blue-300 border-blue-800 border">Envoyée</Badge>}
-                    {quote.status === 'approved' && <Badge className="bg-green-900/50 text-green-300 border-green-800 border">Approuvée</Badge>}
-                    {quote.status === 'denied' && <Badge className="bg-red-900/50 text-red-300 border-red-800 border">Refusée</Badge>}
+                    {displayStatus === 'draft' && <Badge className="bg-zinc-800 text-zinc-300">Brouillon</Badge>}
+                    {displayStatus === 'sent' && <Badge className="bg-blue-900/50 text-blue-300 border-blue-800 border">Envoyée</Badge>}
+                    {displayStatus === 'approved' && <Badge className="bg-green-900/50 text-green-300 border-green-800 border">Approuvée</Badge>}
+                    {displayStatus === 'completed' && <Badge className="bg-emerald-900/60 text-emerald-300 border-emerald-800 border">Complétée</Badge>}
+                    {displayStatus === 'denied' && <Badge className="bg-red-900/50 text-red-300 border-red-800 border">Refusée</Badge>}
                 </div>
             </div>
 
@@ -205,7 +209,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                     </>
                 )}
 
-                {(quote.status === 'approved' || quote.status === 'sent' || quote.status === 'denied') && (
+                {(quote.status === 'approved' || quote.status === 'sent' || quote.status === 'denied' || quote.status === 'completed') && (
                     <Button
                         variant="outline"
                         onClick={handleRevertToDraft}
@@ -216,7 +220,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                         Repasser en brouillon
                     </Button>
                 )}
-                {quote.status === 'approved' && (
+                {quote.status === 'approved' && !isProjectCompleted && (
                     <>
                         <Button
                             variant="outline"
