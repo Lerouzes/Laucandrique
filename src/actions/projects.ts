@@ -114,3 +114,37 @@ export async function markProjectCompletedByQuote(quoteId: string) {
     revalidatePath(`/quotes/${quoteId}`)
     return { success: true }
 }
+
+
+export async function scheduleProjectStartByQuote(quoteId: string, startDate: string) {
+    const supabase = await createClient()
+
+    const { data: project, error: findError } = await supabase
+        .from('projects')
+        .select('id, estimated_duration_days')
+        .eq('quote_id', quoteId)
+        .maybeSingle()
+
+    if (findError) throw new Error(findError.message)
+    if (!project?.id) throw new Error('Aucun projet lié à cette soumission.')
+
+    const durationDays = Math.max(1, Math.ceil(Number(project.estimated_duration_days || 1)))
+    const start = new Date(startDate)
+    const end = new Date(startDate)
+    end.setDate(end.getDate() + durationDays)
+
+    const { error } = await supabase
+        .from('projects')
+        .update({
+            start_date: start.toISOString(),
+            end_date: end.toISOString(),
+            status: 'planned',
+        })
+        .eq('id', project.id)
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/quotes')
+    revalidatePath('/planification')
+    return { success: true }
+}

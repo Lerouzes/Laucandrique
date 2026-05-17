@@ -10,6 +10,9 @@ import { frCA } from 'date-fns/locale'
 import { CalendarDays, CheckCircle, Pencil, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { updateQuoteStatus } from '@/actions/quotes'
+import { scheduleProjectStartByQuote } from '@/actions/projects'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
 
 const statusMap: Record<string, { label: string, styles: string }> = {
     draft: { label: 'Brouillon', styles: 'bg-zinc-800 text-zinc-200 border-zinc-700' },
