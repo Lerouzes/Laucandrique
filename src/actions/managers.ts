@@ -44,17 +44,9 @@ export async function getManagers() {
     return []
   }
 
-  const { data: teams, error: teamsError } = await supabase
+  const { data: teams } = await supabase
     .from('manager_teams')
     .select('id, name')
-
-  if (teamsError && !isMissingTableError(teamsError.message || '', 'manager_teams')) {
-    console.error('Error fetching manager teams:', teamsError)
-  }
-
-  if (teamsError && isMissingTableError(teamsError.message || '', 'manager_teams')) {
-    return (managers || []).map((manager: any) => ({ ...manager, manager_teams: null }))
-  }
 
   const teamById = new Map((teams || []).map((team: { id: string; name: string }) => [team.id, team]))
 
@@ -82,14 +74,11 @@ export async function createManagerTeamAction(formData: FormData) {
   const supabase = await createClient()
   const name = String(formData.get('team_name') || '').trim()
   if (!name) throw new Error('Le nom de l’équipe est requis')
-  const { error } = await supabase.from('manager_teams').insert({ name })
-  if (error && isMissingTableError(error.message || '', 'manager_teams')) {
-    throw new Error("La table des équipes de gestionnaires n'existe pas dans la base de données déployée. Exécutez la migration 0008_manager_teams_and_phone.sql sur l'environnement actif.")
-  }
-  if (error) throw new Error(error.message || "Impossible d'ajouter l'équipe")
+  const { data, error } = await supabase.from('manager_teams').insert({ name }).select('*').single()
+  if (error || !data) throw new Error(error?.message || "Impossible d'ajouter l'équipe")
   revalidatePath('/settings')
   revalidatePath('/managers')
-  return { success: true }
+  return { success: true, team: data }
 }
 
 export async function createManagerAction(formData: FormData) {
@@ -102,17 +91,17 @@ export async function createManagerAction(formData: FormData) {
     team_id: String(formData.get('team_id') || '') || null,
   }
 
-  let result = await supabase.from('managers').insert(payload)
+  let result = await supabase.from('managers').insert(payload).select('*').single()
   if (result.error && (result.error.message.includes('phone') || result.error.message.includes('team_id'))) {
     delete payload.phone
     delete payload.team_id
-    result = await supabase.from('managers').insert(payload)
+    result = await supabase.from('managers').insert(payload).select('*').single()
   }
 
-  if (result.error) throw new Error(result.error?.message || "Impossible d'ajouter le gestionnaire")
+  if (result.error || !result.data) throw new Error(result.error?.message || "Impossible d'ajouter le gestionnaire")
   revalidatePath('/settings')
   revalidatePath('/clients')
-  return { success: true }
+  return { success: true, manager: result.data }
 }
 
 export async function getManagerById(id: string) {
@@ -124,15 +113,11 @@ export async function getManagerById(id: string) {
   const teamId = (manager as any)?.team_id
   if (!teamId) return { ...manager, manager_teams: null }
 
-  const { data: team, error: teamError } = await supabase
+  const { data: team } = await supabase
     .from('manager_teams')
     .select('id, name')
     .eq('id', teamId)
     .single()
-
-  if (teamError && isMissingTableError(teamError.message || '', 'manager_teams')) {
-    return { ...manager, manager_teams: null }
-  }
 
   return {
     ...manager,
