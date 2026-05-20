@@ -34,50 +34,262 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
     }, [settings?.pdf_template_url])
 
     const generatePDF = async () => {
-        if (!pdfRef.current) return
         try {
             setIsGenerating(true)
-            let canvas: HTMLCanvasElement
-            try {
-                canvas = await html2canvas(pdfRef.current, { scale: 2, useCORS: true, allowTaint: false, backgroundColor: '#ffffff' })
-            } catch {
-                const clone = pdfRef.current.cloneNode(true) as HTMLDivElement
-                clone.querySelectorAll('img').forEach((img) => img.remove())
-                clone.style.position = 'fixed'
-                clone.style.left = '-10000px'
-                clone.style.top = '0'
-                clone.style.width = '800px'
-                clone.style.background = '#fff'
-                document.body.appendChild(clone)
-                canvas = await html2canvas(clone, { scale: 2, useCORS: true, allowTaint: false, backgroundColor: '#ffffff' })
-                clone.remove()
-            }
-            const imgData = canvas.toDataURL('image/png')
 
-            const pdf = new jsPDF({
+            const doc = new jsPDF({
                 orientation: 'p',
                 unit: 'mm',
                 format: 'a4',
             })
 
-            const pdfWidth = pdf.internal.pageSize.getWidth()
-            const pdfHeight = (canvas.height * pdfWidth) / canvas.width
+            const pageHeight = doc.internal.pageSize.getHeight() // 297
+            const pageWidth = doc.internal.pageSize.getWidth() // 210
+            const margin = 15
+            const contentWidth = pageWidth - 2 * margin // 180
+            let y = 20
 
-            let heightLeft = pdfHeight
-            let position = 0
-
-            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight)
-            heightLeft -= pdf.internal.pageSize.getHeight()
-
-            while (heightLeft > 0) {
-                position = heightLeft - pdfHeight
-                pdf.addPage()
-                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight)
-                heightLeft -= pdf.internal.pageSize.getHeight()
+            // Helper to add a new page and reset cursor
+            const checkNewPage = (heightNeeded: number) => {
+                if (y + heightNeeded > pageHeight - 20) {
+                    doc.addPage()
+                    y = 20
+                    return true
+                }
+                return false
             }
 
+            // --- 1. HEADER ---
+            doc.setFont('Helvetica', 'bold')
+            doc.setFontSize(22)
+            doc.setTextColor(15, 23, 42) // slate-900
+            doc.text(settings.company_name || 'Gustav Inc.', margin, y)
+
+            doc.setFontSize(10)
+            doc.setFont('Helvetica', 'normal')
+            doc.setTextColor(71, 85, 105) // slate-600
+            
+            let companyInfo = []
+            if (settings.company_email) companyInfo.push(settings.company_email)
+            if (settings.company_phone) companyInfo.push(settings.company_phone)
+            if (settings.company_address) companyInfo.push(settings.company_address)
+            
+            doc.text(companyInfo.join('  |  '), margin, y + 6)
+
+            // Right side quote info
+            doc.setFont('Helvetica', 'bold')
+            doc.setFontSize(16)
+            doc.setTextColor(15, 23, 42)
+            doc.text('SOUMISSION', pageWidth - margin, y, { align: 'right' })
+
+            doc.setFontSize(12)
+            doc.setTextColor(14, 116, 144) // cyan-700
+            doc.text(`#${quote.quote_number}`, pageWidth - margin, y + 6, { align: 'right' })
+
+            doc.setFont('Helvetica', 'normal')
+            doc.setFontSize(9)
+            doc.setTextColor(71, 85, 105)
+            doc.text(
+                `Date: ${format(new Date(quote.created_at), 'dd MMMM yyyy', { locale: frCA })}`,
+                pageWidth - margin,
+                y + 11,
+                { align: 'right' }
+            )
+            if (durationLabel) {
+                doc.text(`Durée estimée: ${durationLabel}`, pageWidth - margin, y + 15, { align: 'right' })
+            }
+
+            y += 24
+
+            // Draw a subtle horizontal line
+            doc.setDrawColor(226, 232, 240) // slate-200
+            doc.setLineWidth(0.5)
+            doc.line(margin, y, pageWidth - margin, y)
+
+            y += 8
+
+            // --- 2. CLIENT INFO ---
+            checkNewPage(40)
+            
+            // Draw client card background
+            doc.setFillColor(248, 250, 252) // slate-50
+            doc.setDrawColor(241, 245, 249) // slate-100
+            doc.roundedRect(margin, y, contentWidth, 34, 2, 2, 'FD')
+
+            doc.setFont('Helvetica', 'bold')
+            doc.setFontSize(9)
+            doc.setTextColor(100, 116, 139) // slate-500
+            doc.text('CLIENT / DESTINATAIRE', margin + 5, y + 6)
+
+            doc.setFont('Helvetica', 'bold')
+            doc.setFontSize(11)
+            doc.setTextColor(15, 23, 42)
+            doc.text(quote.clients?.full_name || '', margin + 5, y + 12)
+
+            doc.setFont('Helvetica', 'normal')
+            doc.setFontSize(9.5)
+            doc.setTextColor(51, 65, 85) // slate-700
+            
+            let clientDetails = []
+            if (quote.clients?.company_name) clientDetails.push(quote.clients.company_name)
+            if (quote.clients?.address) {
+                const addressStr = `${quote.clients.address}${quote.clients.city ? ', ' + quote.clients.city : ''}`
+                clientDetails.push(addressStr)
+            }
+            let contactDetails = []
+            if (quote.clients?.email) contactDetails.push(quote.clients.email)
+            if (quote.clients?.phone) contactDetails.push(quote.clients.phone)
+            if (contactDetails.length > 0) clientDetails.push(contactDetails.join('  |  '))
+
+            clientDetails.forEach((line, index) => {
+                doc.text(line, margin + 5, y + 18 + index * 5)
+            })
+
+            y += 42
+
+            // --- 3. QUOTE TITLE AND DESCRIPTION ---
+            const descText = quote.description || ''
+            const descLines = doc.splitTextToSize(descText, contentWidth)
+            const descHeight = descLines.length * 5
+            checkNewPage(12 + descHeight)
+
+            doc.setFont('Helvetica', 'bold')
+            doc.setFontSize(12)
+            doc.setTextColor(15, 23, 42)
+            doc.text(quote.title || '', margin, y)
+
+            y += 5
+
+            if (descText) {
+                doc.setFont('Helvetica', 'normal')
+                doc.setFontSize(9.5)
+                doc.setTextColor(71, 85, 105)
+                doc.text(descLines, margin, y)
+                y += descHeight
+            }
+
+            y += 8
+
+            // --- 4. ITEMS TABLE ---
+            // Table Header
+            checkNewPage(15)
+            doc.setFillColor(15, 23, 42) // dark background
+            doc.rect(margin, y, contentWidth, 8, 'F')
+
+            doc.setFont('Helvetica', 'bold')
+            doc.setFontSize(9)
+            doc.setTextColor(255, 255, 255)
+            doc.text('Description', margin + 3, y + 5.5)
+            doc.text('Qté', margin + 95, y + 5.5, { align: 'center' })
+            doc.text('Unité', margin + 112, y + 5.5, { align: 'center' })
+            doc.text('Prix Unit.', margin + 145, y + 5.5, { align: 'right' })
+            doc.text('Total', margin + 177, y + 5.5, { align: 'right' })
+
+            y += 8
+
+            // Table Rows
+            const items = quote.quote_items || []
+            doc.setFont('Helvetica', 'normal')
+            doc.setFontSize(9)
+
+            for (const item of items) {
+                const itemDescLines = doc.splitTextToSize(item.description || '', 88)
+                const rowHeight = Math.max(8, itemDescLines.length * 4.5 + 4)
+                
+                checkNewPage(rowHeight)
+
+                // Alternating light row backgrounds
+                doc.setFillColor(255, 255, 255)
+                doc.rect(margin, y, contentWidth, rowHeight, 'F')
+                doc.setDrawColor(241, 245, 249)
+                doc.line(margin, y + rowHeight, margin + contentWidth, y + rowHeight)
+
+                doc.setTextColor(51, 65, 85)
+                // Draw wrapped description
+                itemDescLines.forEach((line: string, i: number) => {
+                    doc.text(line, margin + 3, y + 5 + i * 4.5)
+                })
+
+                doc.text(String(item.quantity || 0), margin + 95, y + 5, { align: 'center' })
+                doc.text(item.unit || '-', margin + 112, y + 5, { align: 'center' })
+                doc.text(`$${Number(item.unit_cost || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 145, y + 5, { align: 'right' })
+                doc.text(`$${Number(item.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 177, y + 5, { align: 'right' })
+
+                y += rowHeight
+            }
+
+            y += 8
+
+            // --- 5. SUMMARY CARD ---
+            const summaryHeight = 40 + (quote.admin_amount > 0 ? 5 : 0) + (quote.profit_amount > 0 ? 5 : 0)
+            checkNewPage(summaryHeight)
+
+            const summaryX = margin + 105
+            const summaryWidth = 75
+
+            doc.setFont('Helvetica', 'normal')
+            doc.setFontSize(9)
+            doc.setTextColor(71, 85, 105)
+
+            let curY = y
+            
+            // Subtotal
+            doc.text('Sous-total:', summaryX, curY)
+            doc.text(`$${Number(quote.subtotal || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
+            curY += 5
+
+            // Admin
+            if (quote.admin_amount > 0) {
+                doc.text(`Administration (${quote.admin_percentage}%):`, summaryX, curY)
+                doc.text(`$${Number(quote.admin_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
+                curY += 5
+            }
+
+            // Profit
+            if (quote.profit_amount > 0) {
+                doc.text(`Profit (${quote.profit_percentage}%):`, summaryX, curY)
+                doc.text(`$${Number(quote.profit_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
+                curY += 5
+            }
+
+            // TPS
+            doc.text('TPS (5%):', summaryX, curY)
+            doc.text(`$${Number(quote.gst_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
+            curY += 5
+
+            // TVQ
+            doc.text('TVQ (9.975%):', summaryX, curY)
+            doc.text(`$${Number(quote.qst_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
+            curY += 6
+
+            // Grand Total
+            doc.setFillColor(248, 250, 252)
+            doc.setDrawColor(226, 232, 240)
+            doc.roundedRect(summaryX - 2, curY - 4.5, summaryWidth + 2, 8.5, 1.5, 1.5, 'FD')
+
+            doc.setFont('Helvetica', 'bold')
+            doc.setFontSize(11)
+            doc.setTextColor(15, 23, 42)
+            doc.text('Total:', summaryX, curY + 1)
+            doc.text(`$${Number(quote.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY + 1, { align: 'right' })
+
+            y = curY + 12
+
+            // --- 6. FOOTER note ---
+            checkNewPage(15)
+            doc.setFont('Helvetica', 'normal')
+            doc.setFontSize(8)
+            doc.setTextColor(148, 163, 184) // slate-400
+            doc.text(
+                `Ce document est généré par ${settings.company_name || 'Gustav'}. Merci de votre confiance.`,
+                pageWidth / 2,
+                y,
+                { align: 'center' }
+            )
+
+            // Save PDF
             const safeFileName = sanitizePdfFileName(quote.title)
-            pdf.save(`Soumission-${safeFileName}.pdf`)
+            doc.save(`Soumission-${safeFileName}.pdf`)
             toast.success('PDF généré avec succès')
         } catch (error) {
             toast.error('Erreur lors de la génération du PDF')
