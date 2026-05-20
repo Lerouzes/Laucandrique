@@ -26,7 +26,23 @@ function formatSafeDate(value: string | null | undefined) {
     if (!value) return null
     const parsed = new Date(value)
     if (Number.isNaN(parsed.getTime())) return null
-    return format(parsed, 'dd MMM yyyy', { locale: frCA })
+    const localDate = new Date(
+        parsed.getUTCFullYear(),
+        parsed.getUTCMonth(),
+        parsed.getUTCDate()
+    )
+    return format(localDate, 'dd MMM yyyy', { locale: frCA })
+}
+
+function parseCoercedLocalDate(value: string | null | undefined) {
+    if (!value) return undefined
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return undefined
+    return new Date(
+        parsed.getUTCFullYear(),
+        parsed.getUTCMonth(),
+        parsed.getUTCDate()
+    )
 }
 
 function QuoteRow({ quote }: { quote: any }) {
@@ -49,7 +65,7 @@ function QuoteRow({ quote }: { quote: any }) {
 
     const canChangeStatus = quote.status !== 'approved' && quote.status !== 'denied' && quote.status !== 'completed'
     const canEditQuote = quote.status !== 'completed'
-    const isSchedulable = quote.status === 'approved' || quote.status === 'completed'
+    const isSchedulable = quote.status === 'approved'
     const scheduledDate = quote.projects?.[0]?.start_date
     const canPickDate = quote.status === 'approved'
 
@@ -57,7 +73,10 @@ function QuoteRow({ quote }: { quote: any }) {
         if (!date) return
         startTransition(async () => {
             try {
-                const iso = date.toISOString().slice(0, 10)
+                const year = date.getFullYear()
+                const month = String(date.getMonth() + 1).padStart(2, '0')
+                const day = String(date.getDate()).padStart(2, '0')
+                const iso = `${year}-${month}-${day}`
                 await scheduleProjectStartByQuote(quote.id, iso)
                 toast.success('Date de début enregistrée.')
                 setIsScheduleOpen(false)
@@ -101,14 +120,14 @@ function QuoteRow({ quote }: { quote: any }) {
                                 >
                                     <CalendarDays className="h-4 w-4" />
                                     <span className="ml-1 hidden md:inline">
-                                        {scheduledDate ? format(new Date(scheduledDate), 'dd MMM yyyy', { locale: frCA }) : 'Planifier'}
+                                        {scheduledDate ? formatSafeDate(scheduledDate) : 'Planifier'}
                                     </span>
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0 bg-zinc-950 border-zinc-800" align="end">
                                 <Calendar
                                     mode="single"
-                                    selected={scheduledDate ? new Date(scheduledDate) : undefined}
+                                    selected={scheduledDate ? parseCoercedLocalDate(scheduledDate) : undefined}
                                     onSelect={canPickDate ? handleScheduleDate : undefined}
                                     disabled={quote.status === 'completed' || isPending}
                                     initialFocus

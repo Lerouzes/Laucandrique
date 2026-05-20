@@ -31,6 +31,20 @@ const STATUS_LABELS: Record<string, string> = {
     completed: 'Complété',
 }
 
+function formatProjectDate(dateStr: string, isHourly: boolean) {
+    const parsed = new Date(dateStr)
+    if (Number.isNaN(parsed.getTime())) return dateStr
+
+    if (isHourly) {
+        return parsed.toLocaleString('fr-CA', { dateStyle: 'short', timeStyle: 'short' })
+    } else {
+        const y = parsed.getUTCFullYear()
+        const m = String(parsed.getUTCMonth() + 1).padStart(2, '0')
+        const d = String(parsed.getUTCDate()).padStart(2, '0')
+        return `${y}-${m}-${d}`
+    }
+}
+
 export function PlanningCalendar({ initialProjects, query = "" }: { initialProjects: any[], query?: string }) {
     const router = useRouter()
     const [projects, setProjects] = useState(initialProjects)
@@ -86,22 +100,45 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         const durationDays = Number(p.estimated_duration_days || 1)
         const durationMinutes = Math.max(15, Math.round(durationDays * 24 * 60))
         const isHourly = durationDays < 1
-        const startObj = p.start_date ? new Date(p.start_date) : null
-        const endObj = p.end_date ? new Date(p.end_date) : (startObj ? new Date(startObj) : null)
         const contractorColor = String(p.contractors?.color || '').trim()
         const eventColor = contractorColor || (p.status === 'completed' ? '#065f46' : p.status === 'in_progress' ? '#1e3a8a' : '#78350f')
 
-        // Keep persisted all-day end as-is (FullCalendar already uses exclusive end dates for all-day events).
-        // Only synthesize an end for hourly events when one is missing.
-        if (startObj && endObj && isHourly && !p.end_date) {
-            endObj.setTime(startObj.getTime() + durationMinutes * 60 * 1000)
+        let startStr: string | undefined = undefined
+        let endStr: string | undefined = undefined
+
+        if (p.start_date) {
+            if (isHourly) {
+                const startObj = new Date(p.start_date)
+                startStr = startObj.toISOString()
+                
+                const endObj = p.end_date ? new Date(p.end_date) : new Date(startObj.getTime() + durationMinutes * 60 * 1000)
+                endStr = endObj.toISOString()
+            } else {
+                startStr = p.start_date.slice(0, 10)
+                const endDateBase = p.end_date || p.start_date
+                const parsedEnd = new Date(endDateBase)
+                if (!Number.isNaN(parsedEnd.getTime())) {
+                    const nextDay = new Date(Date.UTC(
+                        parsedEnd.getUTCFullYear(),
+                        parsedEnd.getUTCMonth(),
+                        parsedEnd.getUTCDate() + 1,
+                        0, 0, 0
+                    ))
+                    const y = nextDay.getUTCFullYear()
+                    const m = String(nextDay.getUTCMonth() + 1).padStart(2, '0')
+                    const d = String(nextDay.getUTCDate()).padStart(2, '0')
+                    endStr = `${y}-${m}-${d}`
+                } else {
+                    endStr = endDateBase.slice(0, 10)
+                }
+            }
         }
 
         return {
             id: p.id,
             title: p.title,
-            start: startObj ? startObj.toISOString() : undefined,
-            end: endObj ? endObj.toISOString() : undefined,
+            start: startStr,
+            end: endStr,
             allDay: !isHourly,
             backgroundColor: eventColor,
             borderColor: eventColor,
@@ -120,10 +157,26 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
 
     const buildRangeFromEvent = (event: any) => {
         const start = event.start as Date | null
-        const end = event.end as Date | null
+        let end = event.end as Date | null
 
-        if (!start || !end) {
+        if (!start) {
             return { startDate: null, endDate: null }
+        }
+
+        if (!end) {
+            end = new Date(start)
+        }
+
+        if (event.allDay) {
+            // For all-day events, the end date should be inclusive in the database.
+            // Subtract 1 day from FullCalendar's exclusive end date.
+            const adjustedEnd = new Date(end.getTime() - 24 * 60 * 60 * 1000)
+            const startUTC = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(), 0, 0, 0))
+            const endUTC = new Date(Date.UTC(adjustedEnd.getUTCFullYear(), adjustedEnd.getUTCMonth(), adjustedEnd.getUTCDate(), 0, 0, 0))
+            return {
+                startDate: startUTC.toISOString(),
+                endDate: endUTC.toISOString(),
+            }
         }
 
         return {
@@ -330,8 +383,8 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                         {project.start_date && (
                                             <div className="mt-1.5 text-xs text-yellow-600 flex items-center gap-1">
                                                 <CalendarClock className="h-3 w-3" />
-                                                {new Date(project.start_date).toLocaleString('fr-CA', { dateStyle: 'short', timeStyle: Number(project.estimated_duration_days) < 1 ? 'short' : undefined })}
-                                                {project.end_date && ` → ${new Date(project.end_date).toLocaleString('fr-CA', { dateStyle: 'short', timeStyle: Number(project.estimated_duration_days) < 1 ? 'short' : undefined })}`}
+                                                {formatProjectDate(project.start_date, Number(project.estimated_duration_days) < 1)}
+                                                {project.end_date && ` → ${formatProjectDate(project.end_date, Number(project.estimated_duration_days) < 1)}`}
                                             </div>
                                         )}
                                     </div>
