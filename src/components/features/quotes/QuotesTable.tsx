@@ -34,6 +34,13 @@ function formatSafeDate(value: string | null | undefined) {
     return format(localDate, 'dd MMM yyyy', { locale: frCA })
 }
 
+function formatSafeDateTime(value: string | null | undefined) {
+    if (!value) return null
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return null
+    return format(parsed, "dd MMM yyyy 'à' HH:mm", { locale: frCA })
+}
+
 function parseCoercedLocalDate(value: string | null | undefined) {
     if (!value) return undefined
     const parsed = new Date(value)
@@ -49,6 +56,8 @@ function QuoteRow({ quote }: { quote: any }) {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
     const [isScheduleOpen, setIsScheduleOpen] = useState(false)
+    const [tempDate, setTempDate] = useState<Date | undefined>(undefined)
+    const [tempTime, setTempTime] = useState<string>("08:00")
 
     const handleStatusChange = (e: React.MouseEvent, status: 'approved' | 'denied') => {
         e.stopPropagation()
@@ -67,18 +76,38 @@ function QuoteRow({ quote }: { quote: any }) {
     const canEditQuote = quote.status !== 'completed'
     const isSchedulable = quote.status === 'approved'
     const scheduledDate = quote.projects?.[0]?.start_date
-    const canPickDate = quote.status === 'approved'
 
-    const handleScheduleDate = (date: Date | undefined) => {
+    const handleOpenChange = (open: boolean) => {
+        setIsScheduleOpen(open)
+        if (open) {
+            if (scheduledDate) {
+                const dateObj = new Date(scheduledDate)
+                setTempDate(dateObj)
+                const hrs = String(dateObj.getHours()).padStart(2, '0')
+                const mins = String(dateObj.getMinutes()).padStart(2, '0')
+                setTempTime(`${hrs}:${mins}`)
+            } else {
+                setTempDate(undefined)
+                setTempTime("08:00")
+            }
+        }
+    }
+
+    const handleScheduleDate = (date: Date | undefined, timeStr: string) => {
         if (!date) return
         startTransition(async () => {
             try {
-                const year = date.getFullYear()
-                const month = String(date.getMonth() + 1).padStart(2, '0')
-                const day = String(date.getDate()).padStart(2, '0')
-                const iso = `${year}-${month}-${day}`
-                await scheduleProjectStartByQuote(quote.id, iso)
-                toast.success('Date de début enregistrée.')
+                const [hours, minutes] = timeStr.split(':').map(Number)
+                const localDateWithTime = new Date(
+                    date.getFullYear(),
+                    date.getMonth(),
+                    date.getDate(),
+                    hours || 0,
+                    minutes || 0,
+                    0
+                )
+                await scheduleProjectStartByQuote(quote.id, localDateWithTime.toISOString())
+                toast.success('Date et heure de début enregistrées.')
                 setIsScheduleOpen(false)
                 router.refresh()
             } catch (err: any) {
@@ -110,7 +139,7 @@ function QuoteRow({ quote }: { quote: any }) {
             <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
                     {isSchedulable ? (
-                        <Popover open={isScheduleOpen} onOpenChange={setIsScheduleOpen}>
+                        <Popover open={isScheduleOpen} onOpenChange={handleOpenChange}>
                             <PopoverTrigger asChild>
                                 <Button
                                     size="sm"
@@ -120,21 +149,41 @@ function QuoteRow({ quote }: { quote: any }) {
                                 >
                                     <CalendarDays className="h-4 w-4" />
                                     <span className="ml-1 hidden md:inline">
-                                        {scheduledDate ? formatSafeDate(scheduledDate) : 'Planifier'}
+                                        {scheduledDate ? formatSafeDateTime(scheduledDate) : 'Planifier'}
                                     </span>
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 bg-zinc-950 border-zinc-800" align="end">
+                            <PopoverContent className="w-80 p-4 bg-zinc-950 border-zinc-800 space-y-4" align="end">
+                                <div className="space-y-1">
+                                    <h4 className="font-medium text-sm text-zinc-100">Planifier le projet</h4>
+                                    <p className="text-xs text-zinc-400">Sélectionnez la date et l'heure de début.</p>
+                                </div>
                                 <Calendar
                                     mode="single"
-                                    selected={scheduledDate ? parseCoercedLocalDate(scheduledDate) : undefined}
-                                    onSelect={canPickDate ? handleScheduleDate : undefined}
+                                    selected={tempDate}
+                                    onSelect={setTempDate}
                                     disabled={quote.status === 'completed' || isPending}
                                     initialFocus
+                                    className="rounded-md border border-zinc-800 bg-zinc-950 p-1 mx-auto"
                                 />
-                                <div className="px-3 pb-3 text-xs text-zinc-400">
-                                    {quote.status === 'completed' ? "Projet complété: date non modifiable." : "Sélectionnez une date pour enregistrer la planification."}
+                                <div className="flex items-center justify-between gap-4 pt-2 border-t border-zinc-900">
+                                    <span className="text-xs font-medium text-zinc-300">Heure de début</span>
+                                    <input
+                                        type="time"
+                                        value={tempTime}
+                                        onChange={(e) => setTempTime(e.target.value)}
+                                        disabled={quote.status === 'completed' || isPending}
+                                        className="h-8 px-2 rounded border border-zinc-800 bg-zinc-900 text-zinc-100 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500 w-28"
+                                    />
                                 </div>
+                                <Button
+                                    size="sm"
+                                    disabled={!tempDate || isPending}
+                                    onClick={() => handleScheduleDate(tempDate, tempTime)}
+                                    className="w-full h-8 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold"
+                                >
+                                    {isPending ? 'Enregistrement...' : 'Enregistrer la planification'}
+                                </Button>
                             </PopoverContent>
                         </Popover>
                     ) : (

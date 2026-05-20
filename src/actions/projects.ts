@@ -116,7 +116,7 @@ export async function markProjectCompletedByQuote(quoteId: string) {
 }
 
 
-export async function scheduleProjectStartByQuote(quoteId: string, startDate: string) {
+export async function scheduleProjectStartByQuote(quoteId: string, startDateIso: string) {
     const supabase = await createClient()
 
     const { data: project, error: findError } = await supabase
@@ -128,16 +128,19 @@ export async function scheduleProjectStartByQuote(quoteId: string, startDate: st
     if (findError) throw new Error(findError.message)
     if (!project?.id) throw new Error('Aucun projet lié à cette soumission.')
 
-    const durationDays = Math.max(1, Math.ceil(Number(project.estimated_duration_days || 1)))
+    const durationDays = Math.max(0.01, Number(project.estimated_duration_days || 1))
 
-    const [y, m, d] = String(startDate).split('-').map(Number)
-    if (!y || !m || !d) throw new Error('Date de début invalide.')
+    const start = new Date(startDateIso)
+    if (Number.isNaN(start.getTime())) throw new Error('Date de début invalide.')
 
-    // Use UTC midnight from explicit YYYY-MM-DD to avoid timezone shifts.
-    const start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0))
-    const end = new Date(start)
-    // Inclusive duration: 1 day => same start/end day.
-    end.setUTCDate(end.getUTCDate() + (durationDays - 1))
+    const end = new Date(start.getTime())
+    if (durationDays < 1) {
+        const durationMinutes = Math.max(15, Math.round(durationDays * 24 * 60))
+        end.setTime(start.getTime() + durationMinutes * 60 * 1000)
+    } else {
+        // Inclusive duration: 1 day => same start/end day
+        end.setDate(end.getDate() + (Math.ceil(durationDays) - 1))
+    }
 
     const { error } = await supabase
         .from('projects')
