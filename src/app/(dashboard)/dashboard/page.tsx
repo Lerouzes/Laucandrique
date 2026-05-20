@@ -51,15 +51,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
     const monthlyMap: Record<string, number> = {}
     filteredQuotes
-        .filter((q: any) => q.status === 'approved' && q.approved_at)
-        .filter((q: any) => {
-            const d = new Date(q.approved_at)
-            return d >= range.start && d <= range.end
-        })
+        .filter((q: any) => q.status === 'approved')
         .forEach((q: any) => {
-            const d = new Date(q.approved_at)
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-            monthlyMap[key] = (monthlyMap[key] || 0) + (q.total || 0)
+            const project = q.projects?.[0]
+            const dateStr = project?.start_date || q.approved_at || q.created_at
+            const d = new Date(dateStr)
+            if (d >= range.start && d <= range.end) {
+                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+                monthlyMap[key] = (monthlyMap[key] || 0) + (q.total || 0)
+            }
         })
     const monthlyRevenue = Object.entries(monthlyMap)
         .sort((a, b) => a[0].localeCompare(b[0]))
