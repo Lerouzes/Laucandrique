@@ -8,7 +8,7 @@ export async function getQuotes(query?: string, statusFilter?: string) {
 
     let request = supabase
         .from('quotes')
-        .select('*, clients(full_name, company_name, manager_id), managers(first_name,last_name), contractors(id, full_name, color), projects(start_date, completed_at, status)')
+        .select('*, clients(full_name, company_name, manager_id), managers(first_name,last_name,team_id), contractors(id, full_name, color), projects(start_date, completed_at, status)')
         .order('created_at', { ascending: false })
 
     if (statusFilter && statusFilter !== 'all') {
@@ -22,17 +22,31 @@ export async function getQuotes(query?: string, statusFilter?: string) {
         return []
     }
 
+    // Fetch all manager teams to manually map them
+    const { data: teams } = await supabase
+        .from('manager_teams')
+        .select('id, name')
+
+    const teamById = new Map((teams || []).map((t: any) => [t.id, t]))
+    const mappedData = (data || []).map((quote: any) => {
+        if (quote.managers) {
+            const teamId = quote.managers.team_id
+            quote.managers.manager_teams = teamId ? teamById.get(teamId) || null : null
+        }
+        return quote
+    })
+
     if (!query) {
-        return data
+        return mappedData
     }
 
     const normalizedQuery = query.trim().toLowerCase()
 
     if (!normalizedQuery) {
-        return data
+        return mappedData
     }
 
-    return data.filter((quote: any) => {
+    return mappedData.filter((quote: any) => {
         const quoteNumber = String(quote.quote_number || '').toLowerCase()
         const quoteTitle = String(quote.title || '').toLowerCase()
         const clientFullName = String(quote.clients?.full_name || '').toLowerCase()
