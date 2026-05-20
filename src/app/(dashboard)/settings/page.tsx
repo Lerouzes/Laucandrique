@@ -3,11 +3,12 @@
 import { useTransition, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
-import { Save } from 'lucide-react'
+import { Save, Users, Layers, UserCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { getSettings, updateSettingsAction } from '@/actions/settings'
 import Link from 'next/link'
 import { getManagers, createManagerAction, getManagerTeams, createManagerTeamAction } from '@/actions/managers'
@@ -209,45 +210,92 @@ export default function SettingsPage() {
                 </div>
                 </form>
                 <Card className="bg-zinc-900 border-zinc-800">
-                    <CardHeader><CardTitle className="text-zinc-100">Gestionnaires</CardTitle></CardHeader>
-                    <CardContent className="space-y-3">
-                        <form action={async (fd) => {
-                            try {
-                                await createManagerAction(fd)
-                                setManagers(await getManagers())
-                                toast.success('Gestionnaire ajouté.')
-                            } catch (e: any) {
-                                toast.error('Erreur', { description: e.message || "Impossible d'ajouter le gestionnaire." })
-                            }
-                        }} className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                            <Input name="first_name" placeholder="Prénom" required />
-                            <Input name="last_name" placeholder="Nom" required />
-                            <Input name="email" placeholder="Courriel" />
-                            <Input name="phone" placeholder="Téléphone" />
-                            <select name="team_id" className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm text-zinc-100">
-                                <option value="">Sans équipe</option>
-                                {managerTeams.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                            </select>
-                            <Button type="submit">Ajouter</Button>
-                        </form>
-                        <div className="space-y-1 text-sm">{managers.map((m: any) => <Link key={m.id} href={`/managers/${m.id}`} className="block text-zinc-300 hover:text-zinc-100">{m.first_name} {m.last_name} — {m.email || '-'} — {m.phone || '-'} — {m.manager_teams?.name || 'Sans équipe'} </Link>)}</div>
-
-                        <div className="pt-4 border-t border-zinc-800 space-y-2">
-                            <p className="text-sm text-zinc-300">Équipes de gestionnaires</p>
-                            <form action={async (fd) => {
-                                try {
-                                    await createManagerTeamAction(fd)
-                                    setManagerTeams(await getManagerTeams())
-                                    toast.success('Équipe ajoutée.')
-                                } catch (e: any) {
-                                    toast.error('Erreur', { description: e.message || "Impossible d'ajouter l'équipe." })
-                                }
-                            }} className="flex gap-2">
-                                <Input name="team_name" placeholder="Nom de l'équipe" required />
-                                <Button type="submit" variant="outline">Ajouter équipe</Button>
+                    <CardHeader>
+                        <CardTitle className="text-zinc-100 flex items-center gap-2">
+                            <Users className="h-5 w-5 text-cyan-500" />
+                            Équipes & Gestionnaires
+                        </CardTitle>
+                        <CardDescription className="text-zinc-400">
+                            Gérez vos équipes et vos gestionnaires de projets.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        {/* 1. ÉQUIPES SECTION */}
+                        <div className="space-y-4">
+                            <h4 className="text-sm font-bold text-zinc-200 uppercase tracking-wider block border-b border-zinc-800 pb-1 flex items-center gap-1.5">
+                                <Layers className="h-4 w-4 text-cyan-500" />
+                                1. Équipes
+                            </h4>
+                            
+                            <form onSubmit={handleCreateManagerTeam} className="flex gap-2 max-w-md">
+                                <Input name="team_name" placeholder="Nom de la nouvelle équipe" required className="bg-zinc-950 border-zinc-800 text-zinc-100 focus-visible:ring-zinc-700" />
+                                <Button type="submit" variant="secondary" className="shrink-0 bg-zinc-800 text-zinc-100 hover:bg-zinc-700">
+                                    Ajouter l'équipe
+                                </Button>
                             </form>
-                            <div className="text-sm text-zinc-400">
-                                {managerTeams.length === 0 ? 'Aucune équipe.' : managerTeams.map((t: any) => <span key={t.id} className="inline-block mr-2">{t.name}</span>)}
+
+                            <div className="flex flex-wrap gap-2 text-sm">
+                                {managerTeams.length === 0 ? (
+                                    <span className="text-xs text-zinc-500 italic">Aucune équipe configurée pour le moment.</span>
+                                ) : (
+                                    managerTeams.map((t: any) => (
+                                        <Badge key={t.id} variant="secondary" className="bg-zinc-950 border border-zinc-800 text-zinc-300 px-2.5 py-1 flex items-center gap-1.5">
+                                            <Layers className="h-3 w-3 text-cyan-500" />
+                                            {t.name}
+                                        </Badge>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 2. GESTIONNAIRES SECTION */}
+                        <div className="space-y-4 pt-4 border-t border-zinc-800">
+                            <h4 className="text-sm font-bold text-zinc-200 uppercase tracking-wider block border-b border-zinc-800 pb-1 flex items-center gap-1.5">
+                                <UserCheck className="h-4 w-4 text-cyan-500" />
+                                2. Gestionnaires de Projet
+                            </h4>
+
+                            <form onSubmit={handleCreateManager} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                <Input name="first_name" placeholder="Prénom *" required className="bg-zinc-950 border-zinc-800 text-zinc-100 focus-visible:ring-zinc-700" />
+                                <Input name="last_name" placeholder="Nom *" required className="bg-zinc-950 border-zinc-800 text-zinc-100 focus-visible:ring-zinc-700" />
+                                <Input name="email" type="email" placeholder="Courriel (Optionnel)" className="bg-zinc-950 border-zinc-800 text-zinc-100 focus-visible:ring-zinc-700" />
+                                <Input name="phone" placeholder="Téléphone (Optionnel)" className="bg-zinc-950 border-zinc-800 text-zinc-100 focus-visible:ring-zinc-700" />
+                                <select name="team_id" className="h-10 rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-750">
+                                    <option value="" className="bg-zinc-900 text-zinc-400">Sans équipe (Individuel)</option>
+                                    {managerTeams.map((t: any) => (
+                                        <option key={t.id} value={t.id} className="bg-zinc-900 text-zinc-100">
+                                            Équipe: {t.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <Button type="submit" className="bg-cyan-600 text-white hover:bg-cyan-700">
+                                    Ajouter le gestionnaire
+                                </Button>
+                            </form>
+
+                            <div className="space-y-2 mt-4 max-h-[300px] overflow-y-auto pr-1">
+                                {managers.length === 0 ? (
+                                    <p className="text-xs text-zinc-500 italic">Aucun gestionnaire configuré.</p>
+                                ) : (
+                                    managers.map((m: any) => (
+                                        <Link
+                                            key={m.id}
+                                            href={`/managers/${m.id}`}
+                                            className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 rounded-xl border border-zinc-800 bg-zinc-950/40 hover:bg-zinc-900/50 hover:border-zinc-700 transition-all gap-2"
+                                        >
+                                            <div className="space-y-0.5">
+                                                <p className="text-sm font-semibold text-zinc-200">{m.first_name} {m.last_name}</p>
+                                                <p className="text-xs text-zinc-500">
+                                                    {m.email && <span className="mr-3">{m.email}</span>}
+                                                    {m.phone && <span>{m.phone}</span>}
+                                                </p>
+                                            </div>
+                                            <Badge variant="outline" className={`text-xxs px-2 py-0.5 shrink-0 ${m.manager_teams?.name ? 'bg-cyan-950/40 text-cyan-300 border-cyan-800' : 'bg-zinc-950 text-zinc-400 border-zinc-800'}`}>
+                                                {m.manager_teams?.name || 'Individuel'}
+                                            </Badge>
+                                        </Link>
+                                    ))
+                                )}
                             </div>
                         </div>
                     </CardContent>

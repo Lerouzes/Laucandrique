@@ -49,11 +49,15 @@ const PIE_COLORS = [COLORS.indigo, COLORS.cyan, COLORS.emerald, COLORS.amber, CO
 export function AnalyticsDashboard({
     initialQuotes,
     initialProjects,
-    settings
+    settings,
+    allTeams = [],
+    allManagers = []
 }: {
     initialQuotes: any[]
     initialProjects: any[]
     settings: any
+    allTeams?: any[]
+    allManagers?: any[]
 }) {
     // 1. Time Period presets and custom state
     const [period, setPeriod] = useState<'all' | 'this_year' | 'last_90_days' | 'next_90_days' | 'custom'>('this_year')
@@ -70,6 +74,12 @@ export function AnalyticsDashboard({
 
     // List of all unique managers, teams, and contractors in the system for filter dropdowns
     const availableManagers = useMemo(() => {
+        if (allManagers && allManagers.length > 0) {
+            return allManagers.map((m: any) => ({
+                id: m.id,
+                label: `${m.first_name} ${m.last_name}`
+            }))
+        }
         const map = new Map<string, string>()
         initialQuotes.forEach((q: any) => {
             if (q.manager_id && q.managers) {
@@ -77,16 +87,19 @@ export function AnalyticsDashboard({
             }
         })
         return Array.from(map.entries()).map(([id, label]) => ({ id, label }))
-    }, [initialQuotes])
+    }, [initialQuotes, allManagers])
 
     const availableTeams = useMemo(() => {
+        if (allTeams && allTeams.length > 0) {
+            return allTeams.map((t: any) => t.name)
+        }
         const set = new Set<string>()
         initialQuotes.forEach((q: any) => {
             const team = q.managers?.manager_teams?.name
             if (team) set.add(team)
         })
         return Array.from(set)
-    }, [initialQuotes])
+    }, [initialQuotes, allTeams])
 
     const availableContractors = useMemo(() => {
         const set = new Set<string>()

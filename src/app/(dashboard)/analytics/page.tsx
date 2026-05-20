@@ -1,12 +1,15 @@
 import { getQuotes } from '@/actions/quotes'
 import { getProjects } from '@/actions/projects'
 import { getSettings } from '@/actions/settings'
+import { getManagers, getManagerTeams } from '@/actions/managers'
 import { AnalyticsDashboard } from '@/components/features/analytics/AnalyticsDashboard'
 
 export default async function AnalyticsPage() {
     const quotes = await getQuotes()
     const projects = await getProjects()
     const settings = await getSettings()
+    const managers = await getManagers()
+    const teams = await getManagerTeams()
 
     return (
         <div className="space-y-6 h-full flex flex-col pb-6">
@@ -17,7 +20,13 @@ export default async function AnalyticsPage() {
                 </p>
             </div>
 
-            <AnalyticsDashboard initialQuotes={quotes} initialProjects={projects} settings={settings} />
+            <AnalyticsDashboard 
+                initialQuotes={quotes} 
+                initialProjects={projects} 
+                settings={settings} 
+                allManagers={managers}
+                allTeams={teams}
+            />
         </div>
     )
 }
