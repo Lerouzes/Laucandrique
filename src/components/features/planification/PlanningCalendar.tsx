@@ -50,13 +50,12 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     const [projects, setProjects] = useState(initialProjects)
     const externalEventsRef = useRef<HTMLDivElement>(null)
     const [isPending, startTransition] = useTransition()
-    const [isDraggingEvent, setIsDraggingEvent] = useState(false)
     const [filter, setFilter] = useState<StatusFilter>('unscheduled')
     const normalizedQuery = query.trim().toLowerCase()
     const getDurationDays = (project: any) => Number(project?.estimated_duration_days || 1)
     const getDurationMinutes = (project: any) => Math.max(15, Math.round(getDurationDays(project) * 24 * 60))
 
-    // Reinitialize draggable whenever the project list changes (filter or data)
+    // Initialize draggable only ONCE on mount for supreme DOM delegation performance
     useEffect(() => {
         let draggableInstance: Draggable | null = null
         if (externalEventsRef.current) {
@@ -76,84 +75,91 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         return () => {
             draggableInstance?.destroy()
         }
-    }, [filter, projects])
+    }, [])
 
-    const filteredProjects = projects.filter(p => {
-        if (!normalizedQuery) return true
-        const clientName = String(p.clients?.full_name || '').toLowerCase()
-        const address = String(p.clients?.address || '').toLowerCase()
-        const quoteNumber = String(p.quotes?.quote_number || '')
-        const title = String(p.title || '').toLowerCase()
-        return clientName.includes(normalizedQuery) || address.includes(normalizedQuery) || quoteNumber.includes(normalizedQuery) || title.includes(normalizedQuery)
-    })
+    // Memoize filtered projects to prevent CPU cycle wastes during render passes
+    const filteredProjects = useMemo(() => {
+        return projects.filter(p => {
+            if (!normalizedQuery) return true
+            const clientName = String(p.clients?.full_name || '').toLowerCase()
+            const address = String(p.clients?.address || '').toLowerCase()
+            const quoteNumber = String(p.quotes?.quote_number || '')
+            const title = String(p.title || '').toLowerCase()
+            return clientName.includes(normalizedQuery) || address.includes(normalizedQuery) || quoteNumber.includes(normalizedQuery) || title.includes(normalizedQuery)
+        })
+    }, [projects, normalizedQuery])
 
-    // Sidebar project list based on filter
-    const sidebarProjects = filteredProjects.filter(p => {
-        if (filter === 'unscheduled') return p.status === 'unplanned'
-        if (filter === 'scheduled') return p.status !== 'unplanned' && p.status !== 'completed'
-        if (filter === 'completed') return p.status === 'completed'
-        return true // 'all'
-    })
+    // Memoize sidebar project list based on filter to completely avoid recalculation lags
+    const sidebarProjects = useMemo(() => {
+        return filteredProjects.filter(p => {
+            if (filter === 'unscheduled') return p.status === 'unplanned'
+            if (filter === 'scheduled') return p.status !== 'unplanned' && p.status !== 'completed'
+            if (filter === 'completed') return p.status === 'completed'
+            return true // 'all'
+        })
+    }, [filteredProjects, filter])
 
-    // Calendar events: all non-unplanned projects
-    const events = filteredProjects.filter(p => p.status !== 'unplanned').map(p => {
-        const durationDays = Number(p.estimated_duration_days || 1)
-        const durationMinutes = Math.max(15, Math.round(durationDays * 24 * 60))
-        const isHourly = durationDays < 1
-        const contractorColor = String(p.contractors?.color || '').trim()
-        const eventColor = contractorColor || (p.status === 'completed' ? '#065f46' : p.status === 'in_progress' ? '#1e3a8a' : '#78350f')
+    // Memoize calendar events to ensure FullCalendar receives direct reference updates
+    const events = useMemo(() => {
+        return filteredProjects.filter(p => p.status !== 'unplanned').map(p => {
+            const durationDays = Number(p.estimated_duration_days || 1)
+            const durationMinutes = Math.max(15, Math.round(durationDays * 24 * 60))
+            const isHourly = durationDays < 1
+            const contractorColor = String(p.contractors?.color || '').trim()
+            const eventColor = contractorColor || (p.status === 'completed' ? '#065f46' : p.status === 'in_progress' ? '#1e3a8a' : '#78350f')
 
-        let startStr: string | undefined = undefined
-        let endStr: string | undefined = undefined
+            let startStr: string | undefined = undefined
+            let endStr: string | undefined = undefined
 
-        if (p.start_date) {
-            if (isHourly) {
-                const startObj = new Date(p.start_date)
-                startStr = startObj.toISOString()
-                
-                const endObj = p.end_date ? new Date(p.end_date) : new Date(startObj.getTime() + durationMinutes * 60 * 1000)
-                endStr = endObj.toISOString()
-            } else {
-                startStr = p.start_date.slice(0, 10)
-                const endDateBase = p.end_date || p.start_date
-                const parsedEnd = new Date(endDateBase)
-                if (!Number.isNaN(parsedEnd.getTime())) {
-                    const nextDay = new Date(Date.UTC(
-                        parsedEnd.getUTCFullYear(),
-                        parsedEnd.getUTCMonth(),
-                        parsedEnd.getUTCDate() + 1,
-                        0, 0, 0
-                    ))
-                    const y = nextDay.getUTCFullYear()
-                    const m = String(nextDay.getUTCMonth() + 1).padStart(2, '0')
-                    const d = String(nextDay.getUTCDate()).padStart(2, '0')
-                    endStr = `${y}-${m}-${d}`
+            if (p.start_date) {
+                if (isHourly) {
+                    const startObj = new Date(p.start_date)
+                    startStr = startObj.toISOString()
+                    
+                    const endObj = p.end_date ? new Date(p.end_date) : new Date(startObj.getTime() + durationMinutes * 60 * 1000)
+                    endStr = endObj.toISOString()
                 } else {
-                    endStr = endDateBase.slice(0, 10)
+                    startStr = p.start_date.slice(0, 10)
+                    const endDateBase = p.end_date || p.start_date
+                    const parsedEnd = new Date(endDateBase)
+                    if (!Number.isNaN(parsedEnd.getTime())) {
+                        const nextDay = new Date(Date.UTC(
+                            parsedEnd.getUTCFullYear(),
+                            parsedEnd.getUTCMonth(),
+                            parsedEnd.getUTCDate() + 1,
+                            0, 0, 0
+                        ))
+                        const y = nextDay.getUTCFullYear()
+                        const m = String(nextDay.getUTCMonth() + 1).padStart(2, '0')
+                        const d = String(nextDay.getUTCDate()).padStart(2, '0')
+                        endStr = `${y}-${m}-${d}`
+                    } else {
+                        endStr = endDateBase.slice(0, 10)
+                    }
                 }
             }
-        }
 
-        return {
-            id: p.id,
-            title: p.title,
-            start: startStr,
-            end: endStr,
-            allDay: !isHourly,
-            backgroundColor: eventColor,
-            borderColor: eventColor,
-            extendedProps: {
-                client: p.clients?.full_name,
-                status: p.status,
-                projectId: p.id,
-                quoteId: p.quote_id,
-                quoteNumber: p.quotes?.quote_number,
-                projectType: p.project_type,
-                isHourly,
-                eventColor,
+            return {
+                id: p.id,
+                title: p.title,
+                start: startStr,
+                end: endStr,
+                allDay: !isHourly,
+                backgroundColor: eventColor,
+                borderColor: eventColor,
+                extendedProps: {
+                    client: p.clients?.full_name,
+                    status: p.status,
+                    projectId: p.id,
+                    quoteId: p.quote_id,
+                    quoteNumber: p.quotes?.quote_number,
+                    projectType: p.project_type,
+                    isHourly,
+                    eventColor,
+                }
             }
-        }
-    })
+        })
+    }, [filteredProjects])
 
     const buildRangeFromEvent = (event: any) => {
         const start = event.start as Date | null
@@ -277,7 +283,6 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     }
 
     const handleEventClick = (info: any) => {
-        if (isDraggingEvent) return
         const quoteId = info.event.extendedProps.quoteId
         if (quoteId) {
             router.push(`/quotes/${quoteId}`)
@@ -412,8 +417,6 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                         eventReceive={handleEventReceive}
                         eventDrop={handleEventDrop}
                         eventResize={handleEventResize}
-                        eventDragStart={() => setIsDraggingEvent(true)}
-                        eventDragStop={() => setTimeout(() => setIsDraggingEvent(false), 0)}
                         eventClick={handleEventClick}
                         eventDisplay="block"
                         eventDidMount={(info) => {
