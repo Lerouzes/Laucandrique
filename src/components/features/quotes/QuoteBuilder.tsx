@@ -80,9 +80,11 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                     unit: i.unit || '',
                     unit_cost: i.unit_cost,
                 }))
-                : (initialQuote?.total && initialQuote.total > 0)
-                    ? [{ description: 'Montant forfaitaire importé', quantity: 1, unit: 'u', unit_cost: initialQuote.total }]
-                    : [{ description: '', quantity: 1, unit: 'h', unit_cost: 0 }],
+                : (initialQuote?.subtotal && initialQuote.subtotal > 0)
+                    ? [{ description: 'Montant forfaitaire importé', quantity: 1, unit: 'u', unit_cost: initialQuote.subtotal }]
+                    : (initialQuote?.total && initialQuote.total > 0)
+                        ? [{ description: 'Montant forfaitaire importé', quantity: 1, unit: 'u', unit_cost: initialQuote.total }]
+                        : [{ description: '', quantity: 1, unit: 'h', unit_cost: 0 }],
         },
     })
 

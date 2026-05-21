@@ -3,7 +3,7 @@
 import { useTransition, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
-import { Save, Users, Layers, UserCheck } from 'lucide-react'
+import { Save, Users, Layers, UserCheck, Wrench } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { getSettings, updateSettingsAction } from '@/actions/settings'
 import Link from 'next/link'
 import { getManagers, createManagerAction, getManagerTeams, createManagerTeamAction } from '@/actions/managers'
+import { fixExistingImportedQuotesAction } from '@/actions/quotes'
 
 export default function SettingsPage() {
     const [isPending, startTransition] = useTransition()
@@ -209,6 +210,51 @@ export default function SettingsPage() {
                     </Button>
                 </div>
                 </form>
+
+                <Card className="bg-zinc-900 border-zinc-800">
+                    <CardHeader>
+                        <CardTitle className="text-zinc-100 flex items-center gap-2">
+                            <Wrench className="h-5 w-5 text-cyan-500" />
+                            Maintenance & Actions
+                        </CardTitle>
+                        <CardDescription className="text-zinc-400">
+                            Actions de groupe pour nettoyer ou mettre à jour les données existantes.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex flex-col space-y-2">
+                            <p className="text-xs text-zinc-400">
+                                Calcule et applique automatiquement les taxes (TPS/TVQ) et les marges d'administration/profit (selon les valeurs de l'entreprise configurées ci-dessus) sur toutes les soumissions importées qui n'ont pas encore été allouées.
+                            </p>
+                            <div className="flex justify-start">
+                                <Button 
+                                    type="button" 
+                                    variant="secondary"
+                                    disabled={isPending}
+                                    onClick={() => {
+                                        startTransition(async () => {
+                                            try {
+                                                const res = await fixExistingImportedQuotesAction()
+                                                if (res.success) {
+                                                    toast.success(`${res.count} soumission(s) mise(s) à jour avec succès!`)
+                                                } else {
+                                                    toast.error('Erreur lors de la mise à jour', { description: res.error })
+                                                }
+                                            } catch (err: any) {
+                                                toast.error('Erreur', { description: err.message })
+                                            }
+                                        })
+                                    }}
+                                    className="bg-zinc-800 text-zinc-100 hover:bg-zinc-700 font-semibold"
+                                >
+                                    <Wrench className="w-4 h-4 mr-2" />
+                                    Calculer taxes & marges des soumissions importées
+                                </Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 <Card className="bg-zinc-900 border-zinc-800">
                     <CardHeader>
                         <CardTitle className="text-zinc-100 flex items-center gap-2">

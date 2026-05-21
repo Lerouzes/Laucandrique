@@ -251,6 +251,18 @@ export async function confirmBulkQuoteImportAction(rows: {
     let skipped = 0
     let failed = 0
 
+    // Load settings to calculate taxes and administration/profit percentage
+    const { data: settings } = await supabase
+        .from('settings')
+        .select('*')
+        .limit(1)
+        .maybeSingle()
+
+    const defaultAdminPerc = settings?.default_admin_percentage ?? 10
+    const defaultProfitPerc = settings?.default_profit_percentage ?? 15
+    const gstRate = settings?.gst_rate ?? 0.05
+    const qstRate = settings?.qst_rate ?? 0.09975
+
     // Load existing clients to pre-populate the cache
     const { data: existingClients, error: clientsError } = await supabase
         .from('clients')
@@ -307,6 +319,15 @@ export async function confirmBulkQuoteImportAction(rows: {
             clientsCreated++
         }
 
+        const subtotal = Number(row.amount.toFixed(2))
+        const adminAmount = Number((subtotal * (defaultAdminPerc / 100)).toFixed(2))
+        const subtotalWithAdmin = Number((subtotal + adminAmount).toFixed(2))
+        const profitAmount = Number((subtotalWithAdmin * (defaultProfitPerc / 100)).toFixed(2))
+        const totalWithoutTaxes = Number((subtotal + adminAmount + profitAmount).toFixed(2))
+        const gstAmount = Number((totalWithoutTaxes * gstRate).toFixed(2))
+        const qstAmount = Number((totalWithoutTaxes * qstRate).toFixed(2))
+        const total = Number((totalWithoutTaxes + gstAmount + qstAmount).toFixed(2))
+
         // 2. Insert or Update Quote
         const quotePayload: any = {
             quote_number: row.quote_number,
@@ -315,14 +336,14 @@ export async function confirmBulkQuoteImportAction(rows: {
             status: row.status,
             manager_id: row.manager_id || null,
             contractor_id: row.contractor_id || null,
-            total: row.amount,
-            subtotal: row.amount,
-            admin_percentage: 0.00,
-            admin_amount: 0.00,
-            profit_percentage: 0.00,
-            profit_amount: 0.00,
-            gst_amount: 0.00,
-            qst_amount: 0.00,
+            subtotal: subtotal,
+            admin_percentage: defaultAdminPerc,
+            admin_amount: adminAmount,
+            profit_percentage: defaultProfitPerc,
+            profit_amount: profitAmount,
+            gst_amount: gstAmount,
+            qst_amount: qstAmount,
+            total: total,
             approved_at: row.status === 'approved' || row.status === 'completed' ? new Date().toISOString() : null,
             denied_at: row.status === 'denied' ? new Date().toISOString() : null,
         }
@@ -570,5 +591,75 @@ export async function updateQuotesStatusAction(
     revalidatePath('/analytics')
 
     return { success: true }
+}
+
+export async function fixExistingImportedQuotesAction() {
+    const supabase = await createClient()
+
+    // 1. Fetch settings
+    const { data: settings } = await supabase
+        .from('settings')
+        .select('*')
+        .limit(1)
+        .maybeSingle()
+
+    const defaultAdminPerc = settings?.default_admin_percentage ?? 10
+    const defaultProfitPerc = settings?.default_profit_percentage ?? 15
+    const gstRate = settings?.gst_rate ?? 0.05
+    const qstRate = settings?.qst_rate ?? 0.09975
+
+    // 2. Fetch all quotes where admin_amount = 0 and gst_amount = 0 and subtotal > 0
+    const { data: quotes, error: fetchErr } = await supabase
+        .from('quotes')
+        .select('id, quote_number, subtotal, admin_amount, gst_amount')
+
+    if (fetchErr) {
+        console.error('Error fetching quotes to fix:', fetchErr)
+        return { success: false, error: fetchErr.message }
+    }
+
+    const quotesToFix = (quotes || []).filter(q => 
+        Number(q.admin_amount || 0) === 0 && 
+        Number(q.gst_amount || 0) === 0 && 
+        Number(q.subtotal || 0) > 0
+    )
+
+    let updatedCount = 0
+
+    for (const q of quotesToFix) {
+        const subtotal = Number(q.subtotal || 0)
+        const adminAmount = Number((subtotal * (defaultAdminPerc / 100)).toFixed(2))
+        const subtotalWithAdmin = Number((subtotal + adminAmount).toFixed(2))
+        const profitAmount = Number((subtotalWithAdmin * (defaultProfitPerc / 100)).toFixed(2))
+        const totalWithoutTaxes = Number((subtotal + adminAmount + profitAmount).toFixed(2))
+        const gstAmount = Number((totalWithoutTaxes * gstRate).toFixed(2))
+        const qstAmount = Number((totalWithoutTaxes * qstRate).toFixed(2))
+        const total = Number((totalWithoutTaxes + gstAmount + qstAmount).toFixed(2))
+
+        const { error: updateErr } = await supabase
+            .from('quotes')
+            .update({
+                admin_percentage: defaultAdminPerc,
+                admin_amount: adminAmount,
+                profit_percentage: defaultProfitPerc,
+                profit_amount: profitAmount,
+                gst_amount: gstAmount,
+                qst_amount: qstAmount,
+                total: total
+            })
+            .eq('id', q.id)
+
+        if (updateErr) {
+            console.error(`Failed to fix quote #${q.quote_number}:`, updateErr)
+        } else {
+            updatedCount++
+        }
+    }
+
+    revalidatePath('/quotes')
+    revalidatePath('/dashboard')
+    revalidatePath('/analytics')
+
+    return { success: true, count: updatedCount }
 }
 
