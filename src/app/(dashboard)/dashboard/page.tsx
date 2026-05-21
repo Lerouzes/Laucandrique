@@ -23,6 +23,7 @@ import {
     Briefcase
 } from 'lucide-react'
 import { AnalyticsCharts } from '@/components/features/analytics/AnalyticsCharts'
+import { DashboardFilters } from '@/components/features/dashboard/DashboardFilters'
 
 function getRange(period: string, start?: string, end?: string) {
     const now = new Date()
@@ -236,88 +237,17 @@ export default async function DashboardPage({
 
             {/* Collapsible Filters Card */}
             {showFilters && (
-                <Card className="bg-zinc-950/70 border-zinc-800 backdrop-blur-md p-5 rounded-2xl animate-in fade-in duration-200">
-                    <form className="space-y-4">
-                        <input type="hidden" name="period" value={period} />
-                        <input type="hidden" name="showFilters" value="true" />
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Managers Selector */}
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Filtrer par gestionnaire</Label>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {availableManagers.map((id: any) => {
-                                        const q = quotes.find((x: any) => x.manager_id === id)
-                                        const label = q?.managers ? `${q.managers.first_name} ${q.managers.last_name}` : id
-                                        const checked = selectedManagers.includes(id)
-                                        return (
-                                            <label 
-                                                key={id} 
-                                                className={`cursor-pointer transition-all text-xxs px-2.5 py-1 rounded-full border flex items-center gap-1.5 select-none ${
-                                                    checked
-                                                        ? 'bg-cyan-950/40 text-cyan-300 border-cyan-800'
-                                                        : 'bg-transparent text-zinc-400 border-zinc-850 hover:border-zinc-700'
-                                                }`}
-                                            >
-                                                <input 
-                                                    type="checkbox" 
-                                                    name="managers" 
-                                                    value={id} 
-                                                    defaultChecked={checked}
-                                                    className="sr-only" 
-                                                    onChange={(e) => {
-                                                        const form = e.target.form
-                                                        if (form) form.requestSubmit()
-                                                    }}
-                                                />
-                                                {label}
-                                            </label>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Teams Selector */}
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Filtrer par équipe</Label>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {availableTeams.map((team: any) => {
-                                        const checked = selectedTeams.includes(team)
-                                        return (
-                                            <label 
-                                                key={team} 
-                                                className={`cursor-pointer transition-all text-xxs px-2.5 py-1 rounded-full border flex items-center gap-1.5 select-none ${
-                                                    checked
-                                                        ? 'bg-indigo-950/40 text-indigo-300 border-indigo-800'
-                                                        : 'bg-transparent text-zinc-400 border-zinc-850 hover:border-zinc-700'
-                                                }`}
-                                            >
-                                                <input 
-                                                    type="checkbox" 
-                                                    name="teams" 
-                                                    value={team} 
-                                                    defaultChecked={checked}
-                                                    className="sr-only"
-                                                    onChange={(e) => {
-                                                        const form = e.target.form
-                                                        if (form) form.requestSubmit()
-                                                    }}
-                                                />
-                                                {team}
-                                            </label>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="flex justify-end gap-2 border-t border-zinc-900 pt-3">
-                            <Link href="/dashboard" className="h-8 rounded-lg bg-transparent px-3 text-xs text-zinc-400 flex items-center hover:text-zinc-200">
-                                Réinitialiser les filtres
-                            </Link>
-                        </div>
-                    </form>
-                </Card>
+                <DashboardFilters 
+                    availableManagers={availableManagers.map(id => {
+                        const q = quotes.find((x: any) => x.manager_id === id)
+                        const name = q?.managers ? `${q.managers.first_name} ${q.managers.last_name}` : id
+                        return { id, name }
+                    })}
+                    availableTeams={availableTeams as string[]}
+                    selectedManagers={selectedManagers}
+                    selectedTeams={selectedTeams}
+                    period={period}
+                />
             )}
 
             {/* Premium Metric Cards Row */}
