@@ -26,7 +26,7 @@ export default async function ClientsPage({
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <ClientExcelImport />
+                    <ClientExcelImport managers={managers} existingClients={clients} />
                     <ClientFormDialog managers={managers} />
                 </div>
             </div>

@@ -102,3 +102,94 @@ export async function updateClientAction(clientId: string, formData: FormData) {
     revalidatePath(`/clients/${clientId}`)
     return { success: true }
 }
+
+export async function confirmBulkImportAction(rows: {
+    id?: string
+    full_name: string
+    company_name?: string | null
+    email?: string | null
+    phone?: string | null
+    address?: string | null
+    city?: string | null
+    province?: string | null
+    postal_code?: string | null
+    manager?: string | null
+    manager_id?: string | null
+    import_action: 'create' | 'update' | 'skip'
+}[]) {
+    const supabase = await createClient()
+
+    let imported = 0
+    let updated = 0
+    let skipped = 0
+    let failed = 0
+
+    const toInsert = []
+
+    for (const row of rows) {
+        if (row.import_action === 'skip') {
+            skipped++
+            continue
+        }
+
+        // Backend required fields & basic validations
+        if (!row.full_name || row.full_name.trim() === '') {
+            failed++
+            continue
+        }
+
+        const clientPayload = {
+            full_name: row.full_name.trim(),
+            company_name: row.company_name || null,
+            email: row.email || null,
+            phone: row.phone || null,
+            address: row.address || null,
+            city: row.city || null,
+            province: row.province || null,
+            postal_code: row.postal_code || null,
+            manager: row.manager || null,
+            manager_id: row.manager_id || null,
+        }
+
+        if (row.import_action === 'update' && row.id) {
+            const { error } = await supabase
+                .from('clients')
+                .update(clientPayload)
+                .eq('id', row.id)
+            
+            if (error) {
+                console.error('Bulk Import update error:', error)
+                failed++
+            } else {
+                updated++
+            }
+        } else {
+            toInsert.push(clientPayload)
+        }
+    }
+
+    if (toInsert.length > 0) {
+        const { error } = await supabase
+            .from('clients')
+            .insert(toInsert)
+        
+        if (error) {
+            console.error('Bulk Import insert error:', error)
+            failed += toInsert.length
+        } else {
+            imported += toInsert.length
+        }
+    }
+
+    revalidatePath('/clients')
+    return {
+        success: true,
+        summary: {
+            total: rows.length,
+            imported,
+            updated,
+            skipped,
+            failed
+        }
+    }
+}
