@@ -467,3 +467,108 @@ export async function confirmBulkQuoteImportAction(rows: {
         }
     }
 }
+
+export async function deleteQuoteAction(quoteId: string) {
+    const supabase = await createClient()
+    const { error } = await supabase.from('quotes').delete().eq('id', quoteId)
+    if (error) throw new Error(error.message)
+    
+    revalidatePath('/quotes')
+    revalidatePath('/planification')
+    revalidatePath('/dashboard')
+    revalidatePath('/analytics')
+    return { success: true }
+}
+
+export async function deleteQuotesAction(quoteIds: string[]) {
+    const supabase = await createClient()
+    const { error } = await supabase.from('quotes').delete().in('id', quoteIds)
+    if (error) throw new Error(error.message)
+    
+    revalidatePath('/quotes')
+    revalidatePath('/planification')
+    revalidatePath('/dashboard')
+    revalidatePath('/analytics')
+    return { success: true }
+}
+
+export async function updateQuotesStatusAction(
+    quoteIds: string[],
+    status: 'draft' | 'sent' | 'approved' | 'denied' | 'completed'
+) {
+    const supabase = await createClient()
+
+    // Fetch details of quotes to handle project logic
+    const { data: quotes, error: fetchError } = await supabase
+        .from('quotes')
+        .select('id, client_id, title, estimated_duration_days, contractor_id')
+        .in('id', quoteIds)
+
+    if (fetchError) throw new Error(fetchError.message)
+
+    for (const quote of quotes || []) {
+        const updatePayload: any = {
+            status,
+            approved_at: (status === 'approved' || status === 'completed') ? new Date().toISOString() : null,
+            denied_at: status === 'denied' ? new Date().toISOString() : null
+        }
+        if (status === 'sent') {
+            updatePayload.sent_at = new Date().toISOString()
+        }
+
+        let updateResult = await supabase.from('quotes').update(updatePayload).eq('id', quote.id)
+        if (updateResult.error && status === 'sent' && updateResult.error.message.includes('sent_at')) {
+            delete updatePayload.sent_at
+            updateResult = await supabase.from('quotes').update(updatePayload).eq('id', quote.id)
+        }
+
+        if (updateResult.error) throw new Error(updateResult.error.message)
+
+        if (status === 'approved' || status === 'completed') {
+            const { data: existingProject } = await supabase
+                .from('projects')
+                .select('id')
+                .eq('quote_id', quote.id)
+                .maybeSingle()
+
+            if (existingProject) {
+                if (status === 'completed') {
+                    await supabase
+                        .from('projects')
+                        .update({
+                            status: 'completed',
+                            completed_at: new Date().toISOString()
+                        })
+                        .eq('id', existingProject.id)
+                }
+            } else {
+                const projectPayload: any = {
+                    quote_id: quote.id,
+                    client_id: quote.client_id,
+                    contractor_id: quote.contractor_id || null,
+                    title: quote.title,
+                    status: status === 'completed' ? 'completed' : 'unplanned',
+                    estimated_duration_days: quote.estimated_duration_days || 1,
+                    completed_at: status === 'completed' ? new Date().toISOString() : null
+                }
+                let inserted = await supabase.from('projects').insert(projectPayload)
+                if (inserted.error && inserted.error.message.includes('project_type')) {
+                    delete projectPayload.project_type
+                    inserted = await supabase.from('projects').insert(projectPayload)
+                }
+                if (inserted.error) throw new Error(inserted.error.message)
+            }
+        } else {
+            // draft, sent, denied: delete project if exists
+            await supabase.from('projects').delete().eq('quote_id', quote.id)
+        }
+    }
+
+    revalidatePath('/quotes')
+    revalidatePath('/planification')
+    revalidatePath('/dashboard')
+    revalidatePath('/analytics')
+
+    return { success: true }
+}
+
