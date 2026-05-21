@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { frCA } from 'date-fns/locale'
-import { CalendarDays, CheckCircle, Pencil, XCircle, Trash2, ShieldAlert } from 'lucide-react'
+import { CalendarDays, CheckCircle, Pencil, XCircle, Trash2, ShieldAlert, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { updateQuoteStatus, deleteQuoteAction, deleteQuotesAction, updateQuotesStatusAction } from '@/actions/quotes'
 import { scheduleProjectStartByQuote } from '@/actions/projects'
@@ -286,6 +286,62 @@ export function QuotesTable({ data }: { data: any[] }) {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [isPending, startTransition] = useTransition()
 
+    const [sortField, setSortField] = useState<string | null>('created_at')
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+
+    const handleSort = (field: string) => {
+        if (sortField === field) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+        } else {
+            setSortField(field)
+            setSortDirection('asc')
+        }
+    }
+
+    const sortedData = [...data].sort((a, b) => {
+        if (!sortField) return 0
+        
+        let aVal: any = a[sortField]
+        let bVal: any = b[sortField]
+        
+        if (sortField === 'client') {
+            aVal = a.clients?.full_name || ''
+            bVal = b.clients?.full_name || ''
+        }
+        
+        if (aVal === undefined || aVal === null) aVal = ''
+        if (bVal === undefined || bVal === null) bVal = ''
+        
+        if (typeof aVal === 'string') {
+            return sortDirection === 'asc'
+                ? aVal.localeCompare(bVal, 'fr-CA', { numeric: true, sensitivity: 'base' })
+                : bVal.localeCompare(aVal, 'fr-CA', { numeric: true, sensitivity: 'base' })
+        } else {
+            return sortDirection === 'asc'
+                ? (aVal > bVal ? 1 : aVal < bVal ? -1 : 0)
+                : (bVal > aVal ? 1 : bVal < aVal ? -1 : 0)
+        }
+    })
+
+    const renderHeader = (label: string, field: string) => {
+        const isSorted = sortField === field
+        return (
+            <TableHead 
+                className="text-zinc-300 font-medium cursor-pointer select-none hover:text-cyan-400 transition-colors"
+                onClick={() => handleSort(field)}
+            >
+                <div className="flex items-center gap-1">
+                    {label}
+                    {isSorted ? (
+                        sortDirection === 'asc' ? <ArrowUp className="h-3 w-3 text-cyan-400" /> : <ArrowDown className="h-3 w-3 text-cyan-400" />
+                    ) : (
+                        <ArrowUpDown className="h-3 w-3 text-zinc-600" />
+                    )}
+                </div>
+            </TableHead>
+        )
+    }
+
     // Confirmation dialog states
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [quoteToDelete, setQuoteToDelete] = useState<{ id: string, quoteNumber: number } | null>(null)
@@ -438,24 +494,24 @@ export function QuotesTable({ data }: { data: any[] }) {
                                     aria-label="Sélectionner tout"
                                 />
                             </TableHead>
-                            <TableHead className="text-zinc-300 font-medium">#</TableHead>
-                            <TableHead className="text-zinc-300 font-medium">Titre</TableHead>
-                            <TableHead className="text-zinc-300 font-medium">Client</TableHead>
-                            <TableHead className="text-zinc-300 font-medium">Statut</TableHead>
-                            <TableHead className="text-zinc-300 font-medium">Montant Total</TableHead>
-                            <TableHead className="text-zinc-300 font-medium">Créée le</TableHead>
+                            {renderHeader('#', 'quote_number')}
+                            {renderHeader('Titre', 'title')}
+                            {renderHeader('Client', 'client')}
+                            {renderHeader('Statut', 'status')}
+                            {renderHeader('Montant Total', 'total')}
+                            {renderHeader('Créée le', 'created_at')}
                             <TableHead className="text-zinc-300 font-medium text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {data.length === 0 ? (
+                        {sortedData.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={8} className="h-24 text-center text-zinc-300">
                                     Aucune soumission trouvée.
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            data.map((quote) => (
+                            sortedData.map((quote) => (
                                 <QuoteRow 
                                     key={quote.id} 
                                     quote={quote} 

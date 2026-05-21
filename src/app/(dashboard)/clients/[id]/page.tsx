@@ -5,6 +5,7 @@ import { getManagers } from '@/actions/managers'
 import { getQuotes } from '@/actions/quotes'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DeleteClientButton } from '@/components/features/clients/DeleteClientButton'
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -33,7 +34,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           <option value="">Aucun gestionnaire</option>
           {managers.map((m: any) => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
         </select>
-        <div className="col-span-2"><Button type="submit">Enregistrer</Button></div>
+        <div className="col-span-2 flex items-center justify-between border-t border-zinc-800/85 pt-4 mt-2">
+          <Button type="submit" className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold">Enregistrer les modifications</Button>
+          <DeleteClientButton clientId={id} clientName={client.full_name} />
+        </div>
       </form>
 
       <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">

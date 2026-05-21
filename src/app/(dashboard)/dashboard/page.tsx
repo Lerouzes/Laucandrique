@@ -5,6 +5,7 @@ import { getSettings } from '@/actions/settings'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { 
     Banknote, 
     CheckCircle, 
@@ -73,10 +74,22 @@ export default async function DashboardPage({
         return managerMatch && teamMatch
     })
 
-    const totalQuotesCount = filteredQuotes.length
     const approvedQuotes = filteredQuotes.filter((q: any) => q.status === 'approved')
     const sentQuotes = filteredQuotes.filter((q: any) => q.status === 'sent')
-    const totalApprovedValue = approvedQuotes.reduce((acc: number, q: any) => acc + (q.total || 0), 0)
+
+    // Filter approved quotes by date range
+    const rangeApprovedQuotes = approvedQuotes.filter((q: any) => {
+        const project = q.projects?.[0]
+        const d = new Date(project?.start_date || q.approved_at || q.created_at)
+        return d >= range.start && d <= range.end
+    })
+    const totalApprovedValue = rangeApprovedQuotes.reduce((acc: number, q: any) => acc + (q.total || 0), 0)
+
+    // Filter sent quotes by date range
+    const rangeSentQuotes = sentQuotes.filter((q: any) => {
+        const d = new Date(q.created_at)
+        return d >= range.start && d <= range.end
+    })
 
     const activeProjects = projects.filter((p: any) => {
         if (!(p.status === 'in_progress' || p.status === 'planned')) return false
@@ -87,6 +100,11 @@ export default async function DashboardPage({
         return managerMatch && teamMatch
     })
 
+    const rangeActiveProjects = activeProjects.filter((p: any) => {
+        const d = new Date(p.start_date || p.created_at)
+        return d >= range.start && d <= range.end
+    })
+
     // Unplanned projects (approved quotes with no calendar date yet)
     const unplannedProjects = projects.filter((p: any) => {
         if (p.status !== 'unplanned') return false
@@ -95,6 +113,11 @@ export default async function DashboardPage({
         const managerMatch = selectedManagers.length === 0 || selectedManagers.includes(managerId)
         const teamMatch = selectedTeams.length === 0 || selectedTeams.includes(teamName)
         return managerMatch && teamMatch
+    })
+
+    const rangeUnplannedProjects = unplannedProjects.filter((p: any) => {
+        const d = new Date(p.start_date || p.created_at)
+        return d >= range.start && d <= range.end
     })
 
     // Monthly aggregation
@@ -117,9 +140,15 @@ export default async function DashboardPage({
     const availableManagers = Array.from(new Set(quotes.map((q: any) => q.manager_id).filter(Boolean)))
     const availableTeams = Array.from(new Set(quotes.map((q: any) => q.managers?.manager_teams?.name).filter(Boolean)))
 
-    // Calculate win rate
-    const approvedCount = approvedQuotes.length
-    const deniedCount = filteredQuotes.filter((q: any) => q.status === 'denied').length
+    // Calculate win rate using date range
+    const rangeDeniedQuotes = filteredQuotes
+        .filter((q: any) => q.status === 'denied')
+        .filter((q: any) => {
+            const d = new Date(q.approved_at || q.created_at)
+            return d >= range.start && d <= range.end
+        })
+    const approvedCount = rangeApprovedQuotes.length
+    const deniedCount = rangeDeniedQuotes.length
     const winRate = approvedCount + deniedCount > 0 ? Math.round((approvedCount / (approvedCount + deniedCount)) * 100) : 0
 
     // Recent activity list
@@ -303,7 +332,7 @@ export default async function DashboardPage({
                         ${Math.round(totalApprovedValue).toLocaleString('fr-CA')}
                     </h3>
                     <p className="mt-2 text-xxs text-zinc-500 flex items-center gap-1">
-                        Sur {approvedQuotes.length} soumissions approuvées
+                        Sur {rangeApprovedQuotes.length} soumissions approuvées
                     </p>
                 </div>
 
@@ -328,7 +357,7 @@ export default async function DashboardPage({
                     </div>
                     <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Envoyées en attente</p>
                     <h3 className="mt-3 text-2xl sm:text-3xl font-extrabold text-zinc-100 tracking-tight">
-                        {sentQuotes.length}
+                        {rangeSentQuotes.length}
                     </h3>
                     <p className="mt-2 text-xxs text-zinc-500">
                         En attente d'une décision client
@@ -342,7 +371,7 @@ export default async function DashboardPage({
                     </div>
                     <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Projets Actifs</p>
                     <h3 className="mt-3 text-2xl sm:text-3xl font-extrabold text-zinc-100 tracking-tight">
-                        {activeProjects.length}
+                        {rangeActiveProjects.length}
                     </h3>
                     <p className="mt-2 text-xxs text-zinc-500">
                         En planification ou en cours de réalisation
@@ -478,7 +507,7 @@ export default async function DashboardPage({
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-3">
-                                {unplannedProjects.length === 0 ? (
+                                {rangeUnplannedProjects.length === 0 ? (
                                     <div className="p-4 rounded-xl bg-cyan-950/10 border border-cyan-900/30 text-center">
                                         <p className="text-xxs font-bold text-cyan-400">Opérations Fluides</p>
                                         <p className="text-xxs text-zinc-400 mt-1">Tous les projets signés sont planifiés sur le calendrier!</p>
@@ -486,7 +515,7 @@ export default async function DashboardPage({
                                 ) : (
                                     <>
                                         <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                                            {unplannedProjects.map((p: any) => (
+                                            {rangeUnplannedProjects.map((p: any) => (
                                                 <div 
                                                     key={p.id} 
                                                     className="p-3 rounded-xl border border-zinc-800 bg-zinc-950/40 flex justify-between items-center gap-2 hover:bg-zinc-900/30 transition-all"

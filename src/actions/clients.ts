@@ -194,3 +194,23 @@ export async function confirmBulkImportAction(rows: {
         }
     }
 }
+
+export async function deleteClientAction(clientId: string) {
+    const supabase = await createClient()
+
+    const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', clientId)
+
+    if (error) {
+        console.error('Error deleting client:', error)
+        if (error.code === '23503') {
+            return { success: false, error: 'Impossible de supprimer ce client car il est lié à des soumissions ou des projets existants.' }
+        }
+        return { success: false, error: error.message }
+    }
+
+    revalidatePath('/clients')
+    return { success: true }
+}
