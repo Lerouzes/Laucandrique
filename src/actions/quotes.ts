@@ -229,3 +229,241 @@ export async function revertQuoteToPending(quoteId: string) {
 
     return { success: true }
 }
+
+export async function confirmBulkQuoteImportAction(rows: {
+    id?: string
+    quote_number: number
+    sdc_num: string
+    client_name?: string | null
+    manager_id?: string | null
+    contractor_id?: string | null
+    title: string
+    start_date_str?: string | null
+    amount: number
+    status: 'draft' | 'sent' | 'approved' | 'denied' | 'completed'
+    import_action: 'create' | 'update' | 'skip'
+}[]) {
+    const supabase = await createClient()
+
+    let quotesCreated = 0
+    let quotesUpdated = 0
+    let clientsCreated = 0
+    let skipped = 0
+    let failed = 0
+
+    // Load existing clients to pre-populate the cache
+    const { data: existingClients, error: clientsError } = await supabase
+        .from('clients')
+        .select('id, full_name')
+    if (clientsError) {
+        console.error('Error fetching clients for cache:', clientsError)
+        return { success: false, error: clientsError.message }
+    }
+
+    const sdcToClientIdMap = new Map<string, string>()
+    for (const ec of existingClients || []) {
+        if (ec.full_name) {
+            sdcToClientIdMap.set(ec.full_name.trim().toLowerCase(), ec.id)
+        }
+    }
+
+    for (const row of rows) {
+        if (row.import_action === 'skip') {
+            skipped++
+            continue
+        }
+
+        // Basic validation
+        if (!row.quote_number || !row.sdc_num || !row.title) {
+            failed++
+            continue
+        }
+
+        // 1. Resolve or Create Client
+        const sdcClean = row.sdc_num.trim()
+        const sdcLower = sdcClean.toLowerCase()
+        let clientId = sdcToClientIdMap.get(sdcLower)
+
+        if (!clientId) {
+            const newClientPayload = {
+                full_name: sdcClean,
+                company_name: row.client_name?.trim() || `SDC ${sdcClean}`,
+                manager: sdcClean,
+                manager_id: row.manager_id || null,
+            }
+            const { data: newClient, error: clientErr } = await supabase
+                .from('clients')
+                .insert(newClientPayload)
+                .select('id')
+                .single()
+
+            if (clientErr || !newClient) {
+                console.error('Failed to create client in bulk import:', clientErr)
+                failed++
+                continue
+            }
+            clientId = newClient.id
+            sdcToClientIdMap.set(sdcLower, clientId)
+            clientsCreated++
+        }
+
+        // 2. Insert or Update Quote
+        const quotePayload: any = {
+            quote_number: row.quote_number,
+            client_id: clientId,
+            title: row.title.trim(),
+            status: row.status,
+            manager_id: row.manager_id || null,
+            contractor_id: row.contractor_id || null,
+            total: row.amount,
+            subtotal: row.amount,
+            admin_percentage: 0.00,
+            admin_amount: 0.00,
+            profit_percentage: 0.00,
+            profit_amount: 0.00,
+            gst_amount: 0.00,
+            qst_amount: 0.00,
+            approved_at: row.status === 'approved' || row.status === 'completed' ? new Date().toISOString() : null,
+            denied_at: row.status === 'denied' ? new Date().toISOString() : null,
+        }
+
+        let quoteId = row.id
+
+        if (row.import_action === 'update' && quoteId) {
+            const { error: quoteUpdateErr } = await supabase
+                .from('quotes')
+                .update(quotePayload)
+                .eq('id', quoteId)
+            
+            if (quoteUpdateErr) {
+                console.error(`Failed to update quote #${row.quote_number}:`, quoteUpdateErr)
+                failed++
+                continue
+            }
+            quotesUpdated++
+        } else {
+            // Check if quote_number already exists, to avoid unique constraint violations if user chose to create but it existed
+            // (though UI would warn, let's be safe)
+            const { data: duplicateCheck } = await supabase
+                .from('quotes')
+                .select('id')
+                .eq('quote_number', row.quote_number)
+                .maybeSingle()
+            
+            if (duplicateCheck?.id) {
+                // If it exists, update it instead of inserting to avoid failure
+                quoteId = duplicateCheck.id
+                const { error: quoteUpdateErr } = await supabase
+                    .from('quotes')
+                    .update(quotePayload)
+                    .eq('id', quoteId)
+                
+                if (quoteUpdateErr) {
+                    console.error(`Failed to update duplicate quote #${row.quote_number}:`, quoteUpdateErr)
+                    failed++
+                    continue
+                }
+                quotesUpdated++
+            } else {
+                const { data: newQuote, error: quoteInsertErr } = await supabase
+                    .from('quotes')
+                    .insert(quotePayload)
+                    .select('id')
+                    .single()
+                
+                if (quoteInsertErr || !newQuote) {
+                    console.error(`Failed to insert quote #${row.quote_number}:`, quoteInsertErr)
+                    failed++
+                    continue
+                }
+                quoteId = newQuote.id
+                quotesCreated++
+            }
+        }
+
+        // 3. Project handling
+        const shouldHaveProject = row.status === 'approved' || row.status === 'completed' || !!row.start_date_str
+
+        // Check if project exists
+        const { data: existingProject } = await supabase
+            .from('projects')
+            .select('id')
+            .eq('quote_id', quoteId)
+            .maybeSingle()
+
+        if (shouldHaveProject) {
+            let startDate: string | null = null
+            let endDate: string | null = null
+            let projectStatus: 'unplanned' | 'planned' | 'completed' = 'unplanned'
+
+            if (row.start_date_str) {
+                const dateParts = row.start_date_str.split('-')
+                if (dateParts.length === 3) {
+                    const year = parseInt(dateParts[0], 10)
+                    const month = parseInt(dateParts[1], 10) - 1
+                    const day = parseInt(dateParts[2], 10)
+                    
+                    const startObj = new Date(year, month, day, 8, 0, 0)
+                    const endObj = new Date(year, month, day, 17, 0, 0)
+                    
+                    startDate = startObj.toISOString()
+                    endDate = endObj.toISOString()
+                    projectStatus = 'planned'
+                }
+            }
+
+            if (row.status === 'completed') {
+                projectStatus = 'completed'
+            }
+
+            const projectPayload: any = {
+                quote_id: quoteId,
+                client_id: clientId,
+                contractor_id: row.contractor_id || null,
+                title: row.title.trim(),
+                status: projectStatus,
+                estimated_duration_days: 1.0000,
+                start_date: startDate,
+                end_date: endDate,
+                completed_at: row.status === 'completed' ? new Date().toISOString() : null
+            }
+
+            if (existingProject?.id) {
+                const { error: projUpdateErr } = await supabase
+                    .from('projects')
+                    .update(projectPayload)
+                    .eq('id', existingProject.id)
+                if (projUpdateErr) {
+                    console.error('Failed to update project for quote:', projUpdateErr)
+                }
+            } else {
+                const { error: projInsertErr } = await supabase
+                    .from('projects')
+                    .insert(projectPayload)
+                if (projInsertErr) {
+                    console.error('Failed to insert project for quote:', projInsertErr)
+                }
+            }
+        } else if (existingProject?.id) {
+            // Delete project if it shouldn't exist anymore
+            await supabase.from('projects').delete().eq('id', existingProject.id)
+        }
+    }
+
+    revalidatePath('/quotes')
+    revalidatePath('/planification')
+    revalidatePath('/dashboard')
+    revalidatePath('/analytics')
+
+    return {
+        success: true,
+        summary: {
+            total: rows.length,
+            imported: quotesCreated,
+            updated: quotesUpdated,
+            clientsCreated,
+            skipped,
+            failed
+        }
+    }
+}
