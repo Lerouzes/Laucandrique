@@ -99,7 +99,7 @@ function QuoteRow({
     }
 
     const canChangeStatus = quote.status !== 'approved' && quote.status !== 'denied' && quote.status !== 'completed'
-    const canEditQuote = quote.status !== 'completed'
+    const canEditQuote = true
     const isSchedulable = quote.status === 'approved'
     const scheduledDate = quote.projects?.[0]?.start_date
 
@@ -145,7 +145,8 @@ function QuoteRow({
     return (
         <TableRow
             key={quote.id}
-            className={`border-b border-zinc-800 hover:bg-zinc-800/50 ${isSelected ? 'bg-zinc-800/20' : ''}`}
+            className={`border-b border-zinc-800 hover:bg-zinc-800/50 cursor-pointer ${isSelected ? 'bg-zinc-800/20' : ''}`}
+            onClick={() => router.push(`/quotes/${quote.id}/edit`)}
         >
             <TableCell className="w-12" onClick={e => e.stopPropagation()}>
                 <Checkbox 
@@ -153,7 +154,7 @@ function QuoteRow({
                     onCheckedChange={() => onToggleSelect(quote.id)}
                 />
             </TableCell>
-            <TableCell className="text-zinc-300 font-mono">#{quote.quote_number}</TableCell>
+            <TableCell className="text-cyan-400 font-mono font-medium hover:text-cyan-300 hover:underline transition-colors">#{quote.quote_number}</TableCell>
             <TableCell className="font-medium text-zinc-100">{quote.title}</TableCell>
             <TableCell className="text-zinc-300">
                 {quote.clients?.full_name}
