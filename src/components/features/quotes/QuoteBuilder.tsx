@@ -96,7 +96,10 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
     const profitPerc = useWatch({ control: form.control, name: 'profit_percentage' }) || 0
 
 
-    const selectedClientName = clients.find((c: any) => String(c.id) === String(form.watch('client_id')))?.full_name
+    const selectedClient = clients.find((c: any) => String(c.id) === String(form.watch('client_id')))
+    const selectedClientLabel = selectedClient
+        ? `${selectedClient.full_name}${selectedClient.company_name ? ` - ${selectedClient.company_name}` : ''}`
+        : 'Sélectionner un client'
     const filteredClients = clients.filter((c: any) => {
         const q = clientSearch.trim().toLowerCase()
         if (!q) return true
@@ -235,19 +238,19 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                             <Input
                                                 value={clientSearch}
                                                 onChange={(e) => setClientSearch(e.target.value)}
-                                                placeholder="Rechercher un client (nom, compagnie, courriel)"
+                                                placeholder="Rechercher un client (SDC #, nom complet, courriel)"
                                                 className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600 mb-2"
                                             />
                                             <Select onValueChange={field.onChange} value={field.value || undefined}>
                                                 <FormControl>
                                                     <SelectTrigger className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600">
-                                                        <SelectValue placeholder="Sélectionner un client">{selectedClientName || 'Sélectionner un client'}</SelectValue>
+                                                        <SelectValue placeholder="Sélectionner un client">{selectedClientLabel}</SelectValue>
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent className="bg-zinc-900 border-zinc-800">
                                                     {filteredClients.map(c => (
                                                         <SelectItem key={c.id} value={String(c.id)} className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-100">
-                                                            {c.full_name} {c.company_name ? `(${c.company_name})` : ''}
+                                                            {c.full_name}{c.company_name ? ` - ${c.company_name}` : ''}
                                                         </SelectItem>
                                                     ))}
                                                     {filteredClients.length === 0 && (

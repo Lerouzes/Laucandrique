@@ -27,7 +27,7 @@ import { Input } from '@/components/ui/input'
 import { createClientAction } from '@/actions/clients'
 
 const clientSchema = z.object({
-    full_name: z.string().min(2, 'Le nom complet est requis'),
+    full_name: z.string().min(2, 'Le SDC # est requis'),
     company_name: z.string().optional(),
     email: z.string().email('Courriel invalide').optional().or(z.literal('')),
     phone: z.string().optional(),
@@ -106,9 +106,9 @@ export function ClientFormDialog({ managers = [] }: { managers?: any[] }) {
                                 name="full_name"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-zinc-300">Nom complet *</FormLabel>
+                                        <FormLabel className="text-zinc-300">SDC # *</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="Jean Tremblay" {...field} className="bg-zinc-900 border-zinc-800 focus-visible:ring-zinc-600" />
+                                            <Input placeholder="S007" {...field} className="bg-zinc-900 border-zinc-800 focus-visible:ring-zinc-600" />
                                         </FormControl>
                                         <FormMessage className="text-red-400" />
                                     </FormItem>
@@ -119,9 +119,9 @@ export function ClientFormDialog({ managers = [] }: { managers?: any[] }) {
                                 name="company_name"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-zinc-300">Compagnie</FormLabel>
+                                        <FormLabel className="text-zinc-300">Nom complet</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="Tremblay Inc." {...field} className="bg-zinc-900 border-zinc-800 focus-visible:ring-zinc-600" />
+                                            <Input placeholder="Syndicat des copropriétaires Tonnacourt I" {...field} className="bg-zinc-900 border-zinc-800 focus-visible:ring-zinc-600" />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>

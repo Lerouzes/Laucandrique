@@ -9,7 +9,7 @@ export async function getClients(query?: string) {
     let request = supabase.from('clients').select('*, managers(first_name,last_name,email)').order('created_at', { ascending: false })
 
     if (query) {
-        request = request.ilike('full_name', `%${query}%`)
+        request = request.or(`full_name.ilike.%${query}%,company_name.ilike.%${query}%`)
     }
 
     const { data, error } = await request
@@ -34,7 +34,7 @@ export async function createClientAction(formData: FormData) {
         city: formData.get('city') as string || null,
         province: formData.get('province') as string || null,
         postal_code: formData.get('postal_code') as string || null,
-        manager: formData.get('manager') as string || null,
+        manager: (formData.get('manager') as string) || (formData.get('full_name') as string) || null,
         manager_id: formData.get('manager_id') as string || null,
         notes: formData.get('notes') as string || null,
     }
@@ -91,6 +91,7 @@ export async function updateClientAction(clientId: string, formData: FormData) {
         city: String(formData.get('city') || '') || null,
         province: String(formData.get('province') || '') || null,
         postal_code: String(formData.get('postal_code') || '') || null,
+        manager: String(formData.get('full_name') || '').trim() || null,
         manager_id: String(formData.get('manager_id') || '') || null,
         notes: String(formData.get('notes') || '') || null,
     }

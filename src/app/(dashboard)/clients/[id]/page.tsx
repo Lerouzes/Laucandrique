@@ -17,12 +17,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     <div className="space-y-6 max-w-3xl">
       <div>
         <Link href="/clients" className="text-sm text-zinc-400 hover:text-zinc-100">← Retour aux clients</Link>
-        <h2 className="text-2xl font-bold text-zinc-100 mt-2">{client.full_name}</h2>
+        <h2 className="text-2xl font-bold text-zinc-100 mt-2">{client.full_name}{client.company_name ? ` - ${client.company_name}` : ''}</h2>
       </div>
 
       <form action={async (fd) => { 'use server'; await updateClientAction(id, fd) }} className="grid grid-cols-2 gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-        <Input name="full_name" defaultValue={client.full_name || ''} placeholder="Nom complet" required />
-        <Input name="company_name" defaultValue={client.company_name || ''} placeholder="Compagnie" />
+        <Input name="full_name" defaultValue={client.full_name || ''} placeholder="SDC #" required />
+        <Input name="company_name" defaultValue={client.company_name || ''} placeholder="Nom complet" />
         <Input name="email" defaultValue={client.email || ''} placeholder="Courriel" />
         <Input name="phone" defaultValue={client.phone || ''} placeholder="Téléphone" />
         <Input name="address" defaultValue={client.address || ''} placeholder="Adresse" className="col-span-2" />

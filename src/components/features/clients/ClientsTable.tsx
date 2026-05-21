@@ -14,8 +14,8 @@ export function ClientsTable({ data }: { data: Client[] }) {
             <Table>
                 <TableHeader className="bg-zinc-900 border-b border-zinc-800">
                     <TableRow className="border-b border-zinc-800 hover:bg-zinc-900">
-                        <TableHead className="text-zinc-400 font-medium">Nom Complet</TableHead>
-                        <TableHead className="text-zinc-400 font-medium">Compagnie</TableHead>
+                        <TableHead className="text-zinc-400 font-medium">SDC #</TableHead>
+                        <TableHead className="text-zinc-400 font-medium">Nom complet</TableHead>
                         <TableHead className="text-zinc-400 font-medium">Courriel</TableHead>
                         <TableHead className="text-zinc-400 font-medium">Téléphone</TableHead>
                         <TableHead className="text-zinc-400 font-medium">Ville</TableHead>
@@ -33,10 +33,8 @@ export function ClientsTable({ data }: { data: Client[] }) {
                         data.map((client) => (
                             <TableRow key={client.id} className="border-b border-zinc-800 hover:bg-zinc-800/50">
                                 <TableCell className="font-medium text-zinc-100"><Link href={`/clients/${client.id}`} className="hover:underline">{client.full_name}</Link></TableCell>
-                                <TableCell>
-                                    {client.company_name ? (
-                                        <Badge variant="secondary" className="bg-zinc-800 text-zinc-200 hover:bg-zinc-700">{client.company_name}</Badge>
-                                    ) : <span className="text-zinc-600">-</span>}
+                                <TableCell className="text-zinc-300">
+                                    {client.company_name || <span className="text-zinc-600">-</span>}
                                 </TableCell>
                                 <TableCell className="text-zinc-400">{client.email || '-'}</TableCell>
                                 <TableCell className="text-zinc-400">{client.phone || '-'}</TableCell>

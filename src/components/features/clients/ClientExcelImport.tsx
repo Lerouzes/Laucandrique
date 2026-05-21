@@ -47,8 +47,9 @@ interface ExistingClient {
 interface ImportRow {
     temp_id: string
     id?: string // Match existing client id if update
-    manager: string // SDC #
-    full_name: string // SDC Name
+    manager: string // SDC # (legacy column)
+    full_name: string // SDC # (database full_name column)
+    company_name: string // SDC Name / Nom complet (database company_name column)
     address: string
     email: string
     phone: string
@@ -89,7 +90,7 @@ export function ClientExcelImport({
             
             // Sheet 1: Main template data
             const wsData = [
-                ["SDC #", "SDC Name", "Address", "Email", "Phone", "City", "Province", "Postal Code", "Manager"],
+                ["SDC #", "Nom complet", "Address", "Email", "Phone", "City", "Province", "Postal Code", "Manager"],
                 ["SDC-001", "Laucandrique Brossard", "123 Boulevard Taschereau", "brossard@laucandrique.com", "450-123-4567", "Brossard", "QC", "J4Z 2G8", managers[0] ? `${managers[0].first_name} ${managers[0].last_name}` : ""],
                 ["SDC-002", "Laucandrique Longueuil", "456 Chemin de Chambly", "longueuil@laucandrique.com", "450-987-6543", "Longueuil", "QC", "J4H 3M4", ""]
             ]
@@ -143,7 +144,7 @@ export function ClientExcelImport({
                 // Format & Map data to rows
                 const parsed: ImportRow[] = rawData.map((row: any, index) => {
                     const sdcNum = String(row['SDC #'] || row['sdc_#'] || row['manager'] || '').trim()
-                    const sdcName = String(row['SDC Name'] || row['sdc_name'] || row['Nom Complet'] || row['full_name'] || '').trim()
+                    const sdcName = String(row['SDC Name'] || row['sdc_name'] || row['Nom complet'] || row['Nom Complet'] || row['full_name'] || row['company_name'] || '').trim()
                     
                     // Match Manager fuzzy/exact by name
                     const managerNameRef = String(row['Manager'] || row['manager_name'] || row['Gestionnaire'] || '').trim()
@@ -155,16 +156,20 @@ export function ClientExcelImport({
                         if (match) matchedManagerId = match.id
                     }
 
-                    // Check for existing duplicate in client table matching SDC # (column `manager`)
+                    // Check for existing duplicate in client table matching SDC # (column `full_name` or `manager`)
                     const duplicateMatch = sdcNum 
-                        ? existingClients.find(ec => ec.manager?.toLowerCase() === sdcNum.toLowerCase())
+                        ? existingClients.find(ec => 
+                            ec.full_name?.toLowerCase() === sdcNum.toLowerCase() || 
+                            ec.manager?.toLowerCase() === sdcNum.toLowerCase()
+                          )
                         : null
 
                     return {
                         temp_id: `row-${index}-${Date.now()}`,
                         id: duplicateMatch?.id,
                         manager: sdcNum,
-                        full_name: sdcName,
+                        full_name: sdcNum,
+                        company_name: sdcName,
                         address: String(row['Address'] || row['Adresse'] || row['address'] || '').trim(),
                         email: String(row['Email'] || row['Courriel'] || row['email'] || '').trim(),
                         phone: String(row['Phone'] || row['Téléphone'] || row['phone'] || '').trim(),
@@ -194,9 +199,14 @@ export function ClientExcelImport({
         return rows.map(row => {
             const errors: string[] = []
             
-            // Required: SDC Name (full_name)
+            // Required: SDC # (full_name)
             if (!row.full_name) {
-                errors.push("Le nom SDC est obligatoire.")
+                errors.push("Le SDC # est obligatoire.")
+            }
+
+            // Required: Nom complet (company_name)
+            if (!row.company_name) {
+                errors.push("Le nom complet est obligatoire.")
             }
 
             // Optional: Email check format
@@ -205,19 +215,19 @@ export function ClientExcelImport({
             }
 
             // Warning: SDC # duplicated
-            const isDuplicate = row.manager 
-                ? existingClients.some(ec => ec.manager?.toLowerCase() === row.manager.toLowerCase() && ec.id !== row.id)
+            const isDuplicate = row.full_name 
+                ? existingClients.some(ec => (ec.full_name?.toLowerCase() === row.full_name.toLowerCase() || ec.manager?.toLowerCase() === row.full_name.toLowerCase()) && ec.id !== row.id)
                 : false
             
-            const matchedClient = row.manager
-                ? existingClients.find(ec => ec.manager?.toLowerCase() === row.manager.toLowerCase())
+            const matchedClient = row.full_name
+                ? existingClients.find(ec => ec.full_name?.toLowerCase() === row.full_name.toLowerCase() || ec.manager?.toLowerCase() === row.full_name.toLowerCase())
                 : null
 
             return {
                 ...row,
                 errors,
                 is_duplicate: !!matchedClient,
-                duplicate_matched_name: matchedClient?.full_name || ''
+                duplicate_matched_name: matchedClient?.company_name || matchedClient?.full_name || ''
             }
         })
     }, [rows, existingClients])
@@ -239,9 +249,14 @@ export function ClientExcelImport({
                 updated.manager_name_ref = match ? `${match.first_name} ${match.last_name}` : ''
             }
 
-            // Recalculate duplicate on client ID update
-            if (field === 'manager') {
-                const dup = existingClients.find(ec => ec.manager?.toLowerCase() === String(value).trim().toLowerCase())
+            // Recalculate duplicate on SDC # update
+            if (field === 'full_name') {
+                const sdcValue = String(value).trim()
+                updated.manager = sdcValue
+                const dup = existingClients.find(ec => 
+                    ec.full_name?.toLowerCase() === sdcValue.toLowerCase() ||
+                    ec.manager?.toLowerCase() === sdcValue.toLowerCase()
+                )
                 updated.id = dup?.id
                 updated.import_action = dup ? 'update' : 'create'
             }
@@ -260,7 +275,10 @@ export function ClientExcelImport({
         setRows(prev => prev.map(r => {
             // Only update duplicates if trying to set 'update'
             if (action === 'update') {
-                const isDup = r.manager && existingClients.some(ec => ec.manager?.toLowerCase() === r.manager.toLowerCase())
+                const isDup = r.full_name && existingClients.some(ec => 
+                    ec.full_name?.toLowerCase() === r.full_name.toLowerCase() ||
+                    ec.manager?.toLowerCase() === r.full_name.toLowerCase()
+                )
                 return { ...r, import_action: isDup ? 'update' : r.import_action }
             }
             return { ...r, import_action: action }
@@ -460,10 +478,15 @@ export function ClientExcelImport({
                                                             {/* SDC # */}
                                                             <td className="p-2">
                                                                 <Input 
-                                                                    value={row.manager} 
-                                                                    onChange={(e) => handleUpdateRowField(row.temp_id, 'manager', e.target.value)}
-                                                                    className="bg-zinc-950/60 border-zinc-850 h-8 text-xs focus-visible:ring-zinc-800"
+                                                                    value={row.full_name} 
+                                                                    onChange={(e) => handleUpdateRowField(row.temp_id, 'full_name', e.target.value)}
+                                                                    className={`bg-zinc-950/60 h-8 text-xs focus-visible:ring-zinc-800 ${
+                                                                        !row.full_name ? 'border-rose-700 focus-visible:ring-rose-800' : 'border-zinc-850'
+                                                                    }`}
                                                                 />
+                                                                {!row.full_name && (
+                                                                    <span className="text-[10px] text-rose-500 mt-1 block">Le SDC # est requis.</span>
+                                                                )}
                                                                 {row.is_duplicate && (
                                                                     <p className="text-xxs text-amber-500 font-medium mt-1">
                                                                         Double: '{row.duplicate_matched_name}'
@@ -474,14 +497,14 @@ export function ClientExcelImport({
                                                             {/* SDC Name (Required) */}
                                                             <td className="p-2">
                                                                 <Input 
-                                                                    value={row.full_name} 
-                                                                    onChange={(e) => handleUpdateRowField(row.temp_id, 'full_name', e.target.value)}
+                                                                    value={row.company_name} 
+                                                                    onChange={(e) => handleUpdateRowField(row.temp_id, 'company_name', e.target.value)}
                                                                     className={`bg-zinc-950/60 h-8 text-xs focus-visible:ring-zinc-800 ${
-                                                                        !row.full_name ? 'border-rose-700 focus-visible:ring-rose-800' : 'border-zinc-850'
+                                                                        !row.company_name ? 'border-rose-700 focus-visible:ring-rose-800' : 'border-zinc-850'
                                                                     }`}
                                                                 />
-                                                                {!row.full_name && (
-                                                                    <span className="text-[10px] text-rose-500 mt-1 block">Le nom SDC est requis.</span>
+                                                                {!row.company_name && (
+                                                                    <span className="text-[10px] text-rose-500 mt-1 block">Le nom complet est requis.</span>
                                                                 )}
                                                             </td>
 
