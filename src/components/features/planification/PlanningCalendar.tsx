@@ -401,7 +401,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             </Card>
 
             {/* Calendar */}
-            <Card className="flex-1 h-full border-zinc-800 bg-transparent p-4 relative overflow-hidden">
+            <Card className="flex-1 h-full border-zinc-800 bg-transparent p-4 relative overflow-visible">
                 <div className="fc-dark-theme-wrapper h-full">
                     <FullCalendar
                         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
