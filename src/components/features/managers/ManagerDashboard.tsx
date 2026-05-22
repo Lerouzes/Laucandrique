@@ -45,7 +45,7 @@ export function ManagerDashboard({
         return quotes.filter((q: any) => q.manager_id === manager.id)
     }, [quotes, manager.id])
 
-    const approvedQuotes = useMemo(() => managerQuotes.filter((q: any) => q.status === 'approved'), [managerQuotes])
+    const approvedQuotes = useMemo(() => managerQuotes.filter((q: any) => q.status === 'approved' || q.status === 'completed'), [managerQuotes])
     const deniedQuotes = useMemo(() => managerQuotes.filter((q: any) => q.status === 'denied'), [managerQuotes])
     const sentQuotes = useMemo(() => managerQuotes.filter((q: any) => q.status === 'sent'), [managerQuotes])
 
@@ -54,9 +54,9 @@ export function ManagerDashboard({
     }, [approvedQuotes])
 
     const winRate = useMemo(() => {
-        const totalDecisions = approvedQuotes.length + deniedQuotes.length
-        return totalDecisions > 0 ? (approvedQuotes.length / totalDecisions) * 100 : 0
-    }, [approvedQuotes, deniedQuotes])
+        const totalPresented = approvedQuotes.length + deniedQuotes.length + sentQuotes.length
+        return totalPresented > 0 ? (approvedQuotes.length / totalPresented) * 100 : 0
+    }, [approvedQuotes, deniedQuotes, sentQuotes])
 
     const avgQuoteValue = useMemo(() => {
         return approvedQuotes.length > 0 ? totalRevenue / approvedQuotes.length : 0
@@ -64,7 +64,7 @@ export function ManagerDashboard({
 
     // 2. Global Company / Other Managers Comparison Stats
     const allManagersStats = useMemo(() => {
-        const statsMap: Record<string, { id: string, name: string, revenue: number, approvedCount: number, totalCount: number, winRate: number }> = {}
+        const statsMap: Record<string, { id: string, name: string, revenue: number, approvedCount: number, deniedCount: number, sentCount: number, totalCount: number, winRate: number }> = {}
 
         // Prepopulate all active managers
         managers.forEach(m => {
@@ -73,6 +73,8 @@ export function ManagerDashboard({
                 name: `${m.first_name} ${m.last_name}`,
                 revenue: 0,
                 approvedCount: 0,
+                deniedCount: 0,
+                sentCount: 0,
                 totalCount: 0,
                 winRate: 0
             }
@@ -84,10 +86,20 @@ export function ManagerDashboard({
             if (!mId || !statsMap[mId]) return
 
             statsMap[mId].totalCount += 1
-            if (q.status === 'approved') {
+            if (q.status === 'approved' || q.status === 'completed') {
                 statsMap[mId].approvedCount += 1
                 statsMap[mId].revenue += (q.total || 0)
+            } else if (q.status === 'denied') {
+                statsMap[mId].deniedCount += 1
+            } else if (q.status === 'sent') {
+                statsMap[mId].sentCount += 1
             }
+        })
+
+        // Calculate winRate for each manager
+        Object.values(statsMap).forEach(m => {
+            const presented = m.approvedCount + m.deniedCount + m.sentCount
+            m.winRate = presented > 0 ? (m.approvedCount / presented) * 100 : 0
         })
 
         // Sort by revenue
@@ -107,15 +119,21 @@ export function ManagerDashboard({
     }, [allManagersStats])
 
     const averageManagerWinRate = useMemo(() => {
-        const managersWithQuotes = allManagersStats.filter(m => m.totalCount > 0)
-        if (managersWithQuotes.length === 0) return 0
-        const total = managersWithQuotes.reduce((acc, m) => {
-            const approved = quotes.filter(q => q.manager_id === m.id && q.status === 'approved').length
+        const managersWithPresentedQuotes = allManagersStats.filter(m => {
+            const approved = quotes.filter(q => q.manager_id === m.id && (q.status === 'approved' || q.status === 'completed')).length
             const denied = quotes.filter(q => q.manager_id === m.id && q.status === 'denied').length
-            const decisions = approved + denied
-            return acc + (decisions > 0 ? (approved / decisions) * 100 : 0)
+            const sent = quotes.filter(q => q.manager_id === m.id && q.status === 'sent').length
+            return (approved + denied + sent) > 0
+        })
+        if (managersWithPresentedQuotes.length === 0) return 0
+        const total = managersWithPresentedQuotes.reduce((acc, m) => {
+            const approved = quotes.filter(q => q.manager_id === m.id && (q.status === 'approved' || q.status === 'completed')).length
+            const denied = quotes.filter(q => q.manager_id === m.id && q.status === 'denied').length
+            const sent = quotes.filter(q => q.manager_id === m.id && q.status === 'sent').length
+            const presented = approved + denied + sent
+            return acc + (presented > 0 ? (approved / presented) * 100 : 0)
         }, 0)
-        return total / managersWithQuotes.length
+        return total / managersWithPresentedQuotes.length
     }, [allManagersStats, quotes])
 
     const revenueDifferencePercentage = useMemo(() => {
@@ -194,7 +212,7 @@ export function ManagerDashboard({
                         {Math.round(winRate)}%
                     </h3>
                     <p className="mt-2 text-xxs text-zinc-500">
-                        {deniedQuotes.length} refusées · {sentQuotes.length} en attente
+                        {approvedQuotes.length} acceptées · {deniedQuotes.length} refusées · {sentQuotes.length} en attente
                     </p>
                 </div>
 
@@ -443,7 +461,7 @@ export function ManagerDashboard({
                                         />
                                     </div>
                                     <p className="text-xxs text-zinc-500 mt-2">
-                                        Sur un total de {approvedQuotes.length + deniedQuotes.length} soumissions tranchées.
+                                        Sur un total de {approvedQuotes.length + deniedQuotes.length + sentQuotes.length} soumissions présentées.
                                     </p>
                                 </div>
                             </div>

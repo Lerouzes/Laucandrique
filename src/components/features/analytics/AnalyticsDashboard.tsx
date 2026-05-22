@@ -196,7 +196,7 @@ export function AnalyticsDashboard({
     }, [initialProjects, dateRange, selectedManagers, selectedTeams, selectedContractors])
 
     // --- METRIC CALCULATIONS ---
-    const approvedQuotes = useMemo(() => filteredQuotes.filter((q: any) => q.status === 'approved'), [filteredQuotes])
+    const approvedQuotes = useMemo(() => filteredQuotes.filter((q: any) => q.status === 'approved' || q.status === 'completed'), [filteredQuotes])
     const completedProjects = useMemo(() => filteredProjects.filter((p: any) => p.status === 'completed'), [filteredProjects])
     const deniedQuotes = useMemo(() => filteredQuotes.filter((q: any) => q.status === 'denied'), [filteredQuotes])
     const sentQuotes = useMemo(() => filteredQuotes.filter((q: any) => q.status === 'sent'), [filteredQuotes])
@@ -222,9 +222,9 @@ export function AnalyticsDashboard({
     }, [deniedQuotes])
 
     const winRate = useMemo(() => {
-        const totalDecisions = approvedQuotes.length + deniedQuotes.length
-        return totalDecisions > 0 ? (approvedQuotes.length / totalDecisions) * 100 : 0
-    }, [approvedQuotes, deniedQuotes])
+        const totalPresented = approvedQuotes.length + deniedQuotes.length + sentQuotes.length
+        return totalPresented > 0 ? (approvedQuotes.length / totalPresented) * 100 : 0
+    }, [approvedQuotes, deniedQuotes, sentQuotes])
 
     const averageDealSize = useMemo(() => {
         const count = pipelineMode === 'all' ? (approvedQuotes.length + sentQuotes.length) : approvedQuotes.length
@@ -294,21 +294,26 @@ export function AnalyticsDashboard({
 
     // 3. Manager Performance Segmentation
     const managerSegmentation = useMemo(() => {
-        const stats: Record<string, { name: string, total: number, approved: number, denied: number, revenue: number }> = {}
+        const stats: Record<string, { name: string, total: number, approved: number, denied: number, revenue: number, presented: number }> = {}
 
         filteredQuotes.forEach((q: any) => {
             const name = q.managers ? `${q.managers.first_name} ${q.managers.last_name}` : 'Sans gestionnaire'
             if (!stats[name]) {
-                stats[name] = { name, total: 0, approved: 0, denied: 0, revenue: 0 }
+                stats[name] = { name, total: 0, approved: 0, denied: 0, revenue: 0, presented: 0 }
             }
             stats[name].total += 1
-            const isApproved = q.status === 'approved'
+            const isApproved = q.status === 'approved' || q.status === 'completed'
             const isSent = q.status === 'sent'
+            const isDenied = q.status === 'denied'
             const countsAsRevenue = isApproved || (pipelineMode === 'all' && isSent)
+
+            if (isApproved || isSent || isDenied) {
+                stats[name].presented += 1
+            }
 
             if (isApproved) {
                 stats[name].approved += 1
-            } else if (q.status === 'denied') {
+            } else if (isDenied) {
                 stats[name].denied += 1
             }
 
@@ -578,8 +583,8 @@ export function AnalyticsDashboard({
                         {Math.round(winRate)}%
                     </h3>
                     <p className="mt-2 text-xxs text-zinc-500 flex items-center gap-1">
-                        <XCircle className="h-3 w-3 text-rose-500" />
-                        {deniedQuotes.length} refusées · {sentQuotes.length} en attente
+                        <CheckCircle2 className="h-3 w-3 text-indigo-500" />
+                        {approvedQuotes.length} acceptées · {deniedQuotes.length} refusées · {sentQuotes.length} en attente
                     </p>
                 </div>
 
@@ -926,12 +931,12 @@ export function AnalyticsDashboard({
                                             {pipelineMode === 'all' ? 'Pipeline par Gestionnaire' : 'Revenus par Gestionnaire'}
                                         </span>
                                         {managerSegmentation.slice(0, 4).map((mgr) => {
-                                            const conversion = mgr.total ? Math.round((mgr.approved / mgr.total) * 100) : 0
+                                            const conversion = mgr.presented ? Math.round((mgr.approved / mgr.presented) * 100) : 0
                                             return (
                                                 <div key={mgr.name} className="flex items-center justify-between border-b border-zinc-900 pb-2 text-xs">
                                                     <div className="space-y-0.5">
                                                         <p className="font-semibold text-zinc-200">{mgr.name}</p>
-                                                        <p className="text-xxs text-zinc-500">{mgr.total} soumissions · {conversion}% conversion</p>
+                                                        <p className="text-xxs text-zinc-500">{mgr.presented} présentées · {conversion}% conversion</p>
                                                     </div>
                                                     <span className="font-bold text-cyan-400">${Math.round(mgr.revenue).toLocaleString('fr-CA')}</span>
                                                 </div>
@@ -945,12 +950,12 @@ export function AnalyticsDashboard({
                                     <>
                                         <span className="text-xxs font-bold text-zinc-500 uppercase tracking-wider block">Conversion par Gestionnaire</span>
                                         {managerSegmentation.map((mgr) => {
-                                            const conversion = mgr.total ? Math.round((mgr.approved / mgr.total) * 100) : 0
+                                            const conversion = mgr.presented ? Math.round((mgr.approved / mgr.presented) * 100) : 0
                                             return (
                                                 <div key={mgr.name} className="flex items-center justify-between border-b border-zinc-900 pb-2 text-xs">
                                                     <div className="space-y-0.5">
                                                         <p className="font-semibold text-zinc-200">{mgr.name}</p>
-                                                        <p className="text-xxs text-zinc-500">{mgr.approved} approuvées / {mgr.total}</p>
+                                                        <p className="text-xxs text-zinc-500">{mgr.approved} approuvées / {mgr.presented} présentées</p>
                                                     </div>
                                                     <Badge className={`${conversion >= 60 ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800' : conversion >= 40 ? 'bg-amber-950/40 text-amber-300 border-amber-800' : 'bg-rose-950/40 text-rose-300 border-rose-800'} text-xxs border`}>
                                                         {conversion}%

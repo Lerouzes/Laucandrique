@@ -1,9 +1,11 @@
 'use client'
 
 import { User } from '@supabase/supabase-js'
-import { LogOut } from 'lucide-react'
+import { LogOut, Menu } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import { SidebarContent } from '@/components/shared/Sidebar'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Database } from '@/types/supabase'
@@ -22,8 +24,24 @@ export function Header({ user, profile }: { user: User, profile: Profile | null 
     const initials = profile?.full_name?.substring(0, 2).toUpperCase() || user.email?.substring(0, 2).toUpperCase() || 'U'
 
     return (
-        <header className="flex h-16 items-center justify-end border-b border-white/20 bg-[#0f3f74]/70 backdrop-blur-md px-6">
-            <div className="flex items-center gap-4">
+        <header className="flex h-16 items-center justify-between border-b border-white/20 bg-[#0f3f74]/70 backdrop-blur-md px-6">
+            <div className="flex items-center gap-4 md:hidden">
+                <Sheet>
+                    <SheetTrigger asChild>
+                        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
+                            <Menu className="h-6 w-6" />
+                            <span className="sr-only">Ouvrir le menu</span>
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="w-64 p-0 bg-[#103f75] border-r border-white/20 text-white">
+                        <div className="flex h-full flex-col">
+                            <SidebarContent />
+                        </div>
+                    </SheetContent>
+                </Sheet>
+            </div>
+
+            <div className="flex items-center gap-4 ml-auto">
                 <div className="flex flex-col items-end">
                     <span className="text-sm font-medium text-white">{profile?.full_name || user.email}</span>
                     <span className="text-xs text-white/75">{profile?.role === 'admin' ? 'Administrateur' : 'Employé'}</span>

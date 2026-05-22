@@ -418,6 +418,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                         eventDrop={handleEventDrop}
                         eventResize={handleEventResize}
                         eventClick={handleEventClick}
+                        dayMaxEvents={true}
                         eventDisplay="block"
                         eventDidMount={(info) => {
                             const color = info.event.extendedProps.eventColor
@@ -473,7 +474,72 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         .fc .fc-day-today { background-color: #18181b !important; }
         .fc-event-main { padding: 2px; }
         .fc-event { cursor: pointer; }
-      `}} />
+        
+        /* Premium custom styling for "+X more" links */
+        .fc-daygrid-more-link {
+            color: #f59e0b !important;
+            font-size: 0.72rem !important;
+            font-weight: 600 !important;
+            padding: 2px 6px !important;
+            background-color: #27272a !important;
+            border-radius: 4px !important;
+            display: inline-block !important;
+            margin: 2px 0 !important;
+            transition: all 0.2s ease !important;
+            border: 1px solid #3f3f46 !important;
+        }
+        .fc-daygrid-more-link:hover {
+            background-color: #3f3f46 !important;
+            text-decoration: none !important;
+            color: #fbbf24 !important;
+            border-color: #f59e0b !important;
+        }
+
+        /* Dark Mode Popover Styling */
+        .fc-popover {
+            background-color: #18181b !important;
+            border: 1px solid #27272a !important;
+            border-radius: 8px !important;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.3) !important;
+            z-index: 9999 !important;
+        }
+        .fc-popover-header {
+            background-color: #27272a !important;
+            border-bottom: 1px solid #3f3f46 !important;
+            padding: 8px 12px !important;
+            border-top-left-radius: 7px !important;
+            border-top-right-radius: 7px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+        }
+        .fc-popover-title {
+            color: #f4f4f5 !important;
+            font-size: 0.875rem !important;
+            font-weight: 600 !important;
+            text-transform: capitalize;
+        }
+        .fc-popover-close {
+            color: #a1a1aa !important;
+            opacity: 0.8 !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+        }
+        .fc-popover-close:hover {
+            opacity: 1 !important;
+            color: #ef4444 !important;
+        }
+        .fc-popover-body {
+            background-color: #18181b !important;
+            padding: 8px !important;
+            max-height: 280px !important;
+            overflow-y: auto !important;
+        }
+        .fc-popover-body .fc-daygrid-event {
+            margin-bottom: 4px !important;
+            border-radius: 4px !important;
+        }
+        `}} />
         </div>
     )
 }

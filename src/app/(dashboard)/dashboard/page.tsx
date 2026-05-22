@@ -75,7 +75,7 @@ export default async function DashboardPage({
         return managerMatch && teamMatch
     })
 
-    const approvedQuotes = filteredQuotes.filter((q: any) => q.status === 'approved')
+    const approvedQuotes = filteredQuotes.filter((q: any) => q.status === 'approved' || q.status === 'completed')
     const sentQuotes = filteredQuotes.filter((q: any) => q.status === 'sent')
 
     // Filter approved quotes by date range
@@ -127,7 +127,7 @@ export default async function DashboardPage({
     const monthlyMap: Record<string, { approved: number, sent: number }> = {}
     filteredQuotes
         .forEach((q: any) => {
-            if (q.status !== 'approved' && q.status !== 'sent') return
+            if (q.status !== 'approved' && q.status !== 'completed' && q.status !== 'sent') return
             const project = q.projects?.[0]
             const dateStr = project?.start_date || q.approved_at || q.created_at
             const d = new Date(dateStr)
@@ -136,7 +136,7 @@ export default async function DashboardPage({
                 if (!monthlyMap[key]) {
                     monthlyMap[key] = { approved: 0, sent: 0 }
                 }
-                if (q.status === 'approved') {
+                if (q.status === 'approved' || q.status === 'completed') {
                     monthlyMap[key].approved += (q.total || 0)
                 } else {
                     monthlyMap[key].sent += (q.total || 0)
@@ -168,7 +168,9 @@ export default async function DashboardPage({
         })
     const approvedCount = rangeApprovedQuotes.length
     const deniedCount = rangeDeniedQuotes.length
-    const winRate = approvedCount + deniedCount > 0 ? Math.round((approvedCount / (approvedCount + deniedCount)) * 100) : 0
+    const sentCount = rangeSentQuotes.length
+    const totalPresented = approvedCount + deniedCount + sentCount
+    const winRate = totalPresented > 0 ? Math.round((approvedCount / totalPresented) * 100) : 0
 
     // Recent activity list
     const recentQuotes = [...filteredQuotes]
@@ -269,7 +271,7 @@ export default async function DashboardPage({
             )}
 
             {/* Premium Metric Cards Row */}
-            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                 {/* Projected Revenue */}
                 <div className="group relative rounded-2xl bg-zinc-950/60 border border-zinc-800/80 p-5 shadow-lg backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-zinc-700 hover:bg-zinc-900/50">
                     <div className="absolute top-4 right-4 rounded-xl bg-cyan-950/50 p-2 border border-cyan-800/30 group-hover:scale-110 transition-transform">
@@ -294,7 +296,7 @@ export default async function DashboardPage({
                         {winRate}%
                     </h3>
                     <p className="mt-2 text-xxs text-zinc-500">
-                        {approvedCount} gagnées · {deniedCount} perdues
+                        {approvedCount} acceptées · {deniedCount} refusées · {sentCount} en attente
                     </p>
                 </div>
 

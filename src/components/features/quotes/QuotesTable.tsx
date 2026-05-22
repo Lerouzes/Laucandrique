@@ -483,7 +483,7 @@ export function QuotesTable({ data }: { data: any[] }) {
                 </div>
             )}
 
-            <div className="rounded-md border border-zinc-800 bg-transparent overflow-hidden">
+            <div className="rounded-md border border-zinc-800 bg-transparent overflow-x-auto">
                 <Table>
                     <TableHeader className="bg-transparent border-b border-zinc-800">
                         <TableRow className="border-b border-zinc-800 hover:bg-transparent">

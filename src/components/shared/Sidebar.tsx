@@ -15,11 +15,11 @@ const navItems = [
     { name: 'Paramètres', href: '/settings', icon: Settings },
 ]
 
-export function Sidebar() {
+export function SidebarContent() {
     const pathname = usePathname()
 
     return (
-        <div className="flex h-full w-64 flex-col border-r border-white/20 bg-[#103f75]/80 backdrop-blur-md">
+        <>
             <div className="flex h-16 items-center border-b border-white/15 px-6">
                 <h1 className="text-xl font-bold tracking-tight text-white">Gustav</h1>
             </div>
@@ -49,6 +49,14 @@ export function Sidebar() {
                     )
                 })}
             </nav>
+        </>
+    )
+}
+
+export function Sidebar() {
+    return (
+        <div className="hidden md:flex h-full w-64 flex-col border-r border-white/20 bg-[#103f75]/80 backdrop-blur-md">
+            <SidebarContent />
         </div>
     )
 }

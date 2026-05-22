@@ -71,7 +71,7 @@ export function ClientsTable({ data }: { data: Client[] }) {
     }
 
     return (
-        <div className="rounded-md border border-zinc-800 bg-transparent overflow-hidden">
+        <div className="rounded-md border border-zinc-800 bg-transparent overflow-x-auto">
             <Table>
                 <TableHeader className="bg-zinc-900 border-b border-zinc-800">
                     <TableRow className="border-b border-zinc-800 hover:bg-zinc-900">
