@@ -343,6 +343,139 @@ export async function downloadQuotePDF(quote: any, settings: any) {
             }
         }
 
+        const renderRoomItemsTable = (room: any, linkedItems: any[]) => {
+            if (linkedItems.length === 0) return
+
+            // Render table header
+            checkNewPage(15)
+            doc.setFillColor(51, 65, 85) // Slate-700
+            doc.rect(margin, y, contentWidth, 7, 'F')
+
+            doc.setFont('Helvetica', 'bold')
+            doc.setFontSize(8.5)
+            doc.setTextColor(255, 255, 255)
+            doc.text('Description', margin + 3, y + 4.8)
+            doc.text('Qté', margin + 95, y + 4.8, { align: 'center' })
+            doc.text('Unité', margin + 112, y + 4.8, { align: 'center' })
+            doc.text('Prix Unit.', margin + 145, y + 4.8, { align: 'right' })
+            doc.text('Total', margin + 177, y + 4.8, { align: 'right' })
+
+            y += 7
+
+            let roomSubtotal = 0
+
+            for (const item of linkedItems) {
+                roomSubtotal += Number(item.total || 0)
+
+                const refNums = item.image_urls?.map((url: string) => itemPhotoRefMap[url]).filter(Boolean) || []
+                const refText = refNums.length > 0 ? ` (Photos Réf. ${refNums.map((n: number) => `#${n}`).join(', ')})` : ''
+
+                const titleText = (item.title || 'Sans titre') + refText
+
+                let sourceLabel = ''
+                if (item.planning_measurement_source === 'perimeter') {
+                    sourceLabel = 'Périmètre'
+                } else if (item.planning_measurement_source === 'area') {
+                    sourceLabel = 'Aire au sol'
+                } else if (item.planning_measurement_source === 'wall_surface') {
+                    sourceLabel = 'Surface murs'
+                } else if (item.planning_measurement_source === 'selected_walls_linear') {
+                    const segments = item.planning_selected_segments || []
+                    const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
+                    sourceLabel = `Murs spéc. (linéaire: ${wallList})`
+                } else if (item.planning_measurement_source === 'selected_walls_surface') {
+                    const segments = item.planning_selected_segments || []
+                    const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
+                    sourceLabel = `Murs spéc. (surface: ${wallList})`
+                }
+
+                const descText = item.description || ''
+                const subDescText = sourceLabel ? `Calculé via : ${sourceLabel}` : ''
+
+                doc.setFont('Helvetica', 'bold')
+                doc.setFontSize(8.5)
+                const titleLines = doc.splitTextToSize(titleText, 88)
+
+                doc.setFont('Helvetica', 'normal')
+                doc.setFontSize(8)
+                const descLines = descText ? doc.splitTextToSize(descText, 88) : []
+
+                doc.setFont('Helvetica', 'italic')
+                doc.setFontSize(7.5)
+                const sourceLines = subDescText ? doc.splitTextToSize(subDescText, 88) : []
+
+                const rowHeight = Math.max(7,
+                    titleLines.length * 3.5 +
+                    (descLines.length > 0 ? descLines.length * 3.5 + 1.5 : 0) +
+                    (sourceLines.length > 0 ? sourceLines.length * 3.5 + 1.5 : 0) +
+                    3
+                )
+
+                checkNewPage(rowHeight)
+
+                // White background row with slate separator
+                doc.setFillColor(255, 255, 255)
+                doc.rect(margin, y, contentWidth, rowHeight, 'F')
+                doc.setDrawColor(241, 245, 249)
+                doc.line(margin, y + rowHeight, margin + contentWidth, y + rowHeight)
+
+                // Draw wrapped title
+                doc.setFont('Helvetica', 'bold')
+                doc.setFontSize(8.5)
+                doc.setTextColor(15, 23, 42)
+                let textY = y + 3.5
+                titleLines.forEach((line: string) => {
+                    doc.text(line, margin + 3, textY)
+                    textY += 3.5
+                })
+
+                // Draw description
+                if (descLines.length > 0) {
+                    textY += 0.5
+                    doc.setFont('Helvetica', 'normal')
+                    doc.setFontSize(8)
+                    doc.setTextColor(71, 85, 105)
+                    descLines.forEach((line: string) => {
+                        doc.text(line, margin + 3, textY)
+                        textY += 3.5
+                    })
+                }
+
+                // Draw source label
+                if (sourceLines.length > 0) {
+                    textY += 0.5
+                    doc.setFont('Helvetica', 'italic')
+                    doc.setFontSize(7.5)
+                    doc.setTextColor(100, 116, 139)
+                    sourceLines.forEach((line: string) => {
+                        doc.text(line, margin + 3, textY)
+                        textY += 3.5
+                    })
+                }
+
+                // Draw columns: Qty, Unit, Unit Cost, Total
+                doc.setFont('Helvetica', 'normal')
+                doc.setFontSize(8)
+                doc.setTextColor(51, 65, 85)
+                doc.text(String(item.quantity || 0), margin + 95, y + 4, { align: 'center' })
+                doc.text(item.unit || '-', margin + 112, y + 4, { align: 'center' })
+                doc.text(`$${Number(item.unit_cost || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 145, y + 4, { align: 'right' })
+                doc.text(`$${Number(item.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 177, y + 4, { align: 'right' })
+
+                y += rowHeight
+            }
+
+            // Print bold subtotal
+            checkNewPage(10)
+            y += 3
+            doc.setFont('Helvetica', 'bold')
+            doc.setFontSize(9)
+            doc.setTextColor(15, 23, 42)
+            const subtotalText = `Total pour ${room.name} : $${roomSubtotal.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`
+            doc.text(subtotalText, margin + contentWidth, y, { align: 'right' })
+            y += 6
+        }
+
         // --- 1. HEADER ---
         doc.setFont('Helvetica', 'bold')
         doc.setFontSize(22)
@@ -463,120 +596,96 @@ export async function downloadQuotePDF(quote: any, settings: any) {
         y += 8
 
         // --- 4. ITEMS TABLE ---
-        // Table Header
-        checkNewPage(15)
-        doc.setFillColor(15, 23, 42) // dark background
-        doc.rect(margin, y, contentWidth, 8, 'F')
+        const unlinkedItems = (quote.quote_items || []).filter((item: any) => !item.planning_room_id)
 
-        doc.setFont('Helvetica', 'bold')
-        doc.setFontSize(9)
-        doc.setTextColor(255, 255, 255)
-        doc.text('Description', margin + 3, y + 5.5)
-        doc.text('Qté', margin + 95, y + 5.5, { align: 'center' })
-        doc.text('Unité', margin + 112, y + 5.5, { align: 'center' })
-        doc.text('Prix Unit.', margin + 145, y + 5.5, { align: 'right' })
-        doc.text('Total', margin + 177, y + 5.5, { align: 'right' })
-
-        y += 8
-
-        // Table Rows
-        const roomMap: Record<string, { name: string; sectionName: string }> = {}
-        const planningSections = quote.quote_planning_sections || []
-        planningSections.forEach((sec: any) => {
-            const rooms = sec.quote_planning_rooms || []
-            rooms.forEach((room: any) => {
-                roomMap[room.id] = {
-                    name: room.name,
-                    sectionName: sec.name
-                }
-            })
-        })
-
-        const items = quote.quote_items || []
-        doc.setFont('Helvetica', 'normal')
-        doc.setFontSize(9)
-
-        for (const item of items) {
-            const refNums = item.image_urls?.map((url: string) => itemPhotoRefMap[url]).filter(Boolean) || []
-            const refText = refNums.length > 0 ? ` (Photos Réf. ${refNums.map((n: number) => `#${n}`).join(', ')})` : ''
+        if (unlinkedItems.length > 0) {
+            // Table Header
+            checkNewPage(15)
+            doc.setFillColor(15, 23, 42) // dark background
+            doc.rect(margin, y, contentWidth, 8, 'F')
 
             doc.setFont('Helvetica', 'bold')
-            const titleLines = doc.splitTextToSize((item.title || 'Sans titre') + refText, 88)
-            
-            const descText = item.description || ''
-            let fullDesc = descText
-            if (item.planning_room_id && roomMap[item.planning_room_id]) {
-                const roomInfo = roomMap[item.planning_room_id]
-                let sourceLabel = ''
-                if (item.planning_measurement_source === 'perimeter') {
-                    sourceLabel = `Périmètre (${roomInfo.name})`
-                } else if (item.planning_measurement_source === 'area') {
-                    sourceLabel = `Aire (${roomInfo.name})`
-                } else if (item.planning_measurement_source === 'wall_surface') {
-                    sourceLabel = `Surf. Murs (${roomInfo.name})`
-                } else if (item.planning_measurement_source === 'selected_walls_linear') {
-                    const segments = item.planning_selected_segments || []
-                    const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
-                    sourceLabel = `Murs spéc. (M${wallList}) (${roomInfo.name})`
-                } else if (item.planning_measurement_source === 'selected_walls_surface') {
-                    const segments = item.planning_selected_segments || []
-                    const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
-                    sourceLabel = `Murs spéc. (M${wallList}) (${roomInfo.name})`
-                }
-                
-                if (sourceLabel) {
-                    if (fullDesc) {
-                        fullDesc += `\n[Plan] ${sourceLabel}`
-                    } else {
-                        fullDesc = `[Plan] ${sourceLabel}`
+            doc.setFontSize(9)
+            doc.setTextColor(255, 255, 255)
+            doc.text('Description', margin + 3, y + 5.5)
+            doc.text('Qté', margin + 95, y + 5.5, { align: 'center' })
+            doc.text('Unité', margin + 112, y + 5.5, { align: 'center' })
+            doc.text('Prix Unit.', margin + 145, y + 5.5, { align: 'right' })
+            doc.text('Total', margin + 177, y + 5.5, { align: 'right' })
+
+            y += 8
+
+            // Table Rows
+            const roomMap: Record<string, { name: string; sectionName: string }> = {}
+            const planningSections = quote.quote_planning_sections || []
+            planningSections.forEach((sec: any) => {
+                const rooms = sec.quote_planning_rooms || []
+                rooms.forEach((room: any) => {
+                    roomMap[room.id] = {
+                        name: room.name,
+                        sectionName: sec.name
                     }
-                }
-            }
+                })
+            })
 
             doc.setFont('Helvetica', 'normal')
-            const descLines = fullDesc ? doc.splitTextToSize(fullDesc, 88) : []
-            
-            const rowHeight = Math.max(8, titleLines.length * 4 + (descLines.length > 0 ? descLines.length * 4 + 2 : 0) + 4)
-            
-            checkNewPage(rowHeight)
+            doc.setFontSize(9)
 
-            // Alternating light row backgrounds
-            doc.setFillColor(255, 255, 255)
-            doc.rect(margin, y, contentWidth, rowHeight, 'F')
-            doc.setDrawColor(241, 245, 249)
-            doc.line(margin, y + rowHeight, margin + contentWidth, y + rowHeight)
+            for (const item of unlinkedItems) {
+                const refNums = item.image_urls?.map((url: string) => itemPhotoRefMap[url]).filter(Boolean) || []
+                const refText = refNums.length > 0 ? ` (Photos Réf. ${refNums.map((n: number) => `#${n}`).join(', ')})` : ''
 
-            // Draw wrapped title
-            doc.setFont('Helvetica', 'bold')
-            doc.setTextColor(15, 23, 42) // slate-900
-            let textY = y + 5
-            titleLines.forEach((line: string) => {
-                doc.text(line, margin + 3, textY)
-                textY += 4
-            })
+                doc.setFont('Helvetica', 'bold')
+                const titleLines = doc.splitTextToSize((item.title || 'Sans titre') + refText, 88)
+                
+                const descText = item.description || ''
+                let fullDesc = descText
 
-            // Draw wrapped description
-            if (descLines.length > 0) {
-                textY += 1
                 doc.setFont('Helvetica', 'normal')
-                doc.setTextColor(71, 85, 105) // slate-600
-                descLines.forEach((line: string) => {
+                const descLines = fullDesc ? doc.splitTextToSize(fullDesc, 88) : []
+                
+                const rowHeight = Math.max(8, titleLines.length * 4 + (descLines.length > 0 ? descLines.length * 4 + 2 : 0) + 4)
+                
+                checkNewPage(rowHeight)
+
+                // Alternating light row backgrounds
+                doc.setFillColor(255, 255, 255)
+                doc.rect(margin, y, contentWidth, rowHeight, 'F')
+                doc.setDrawColor(241, 245, 249)
+                doc.line(margin, y + rowHeight, margin + contentWidth, y + rowHeight)
+
+                // Draw wrapped title
+                doc.setFont('Helvetica', 'bold')
+                doc.setTextColor(15, 23, 42) // slate-900
+                let textY = y + 5
+                titleLines.forEach((line: string) => {
                     doc.text(line, margin + 3, textY)
                     textY += 4
                 })
+
+                // Draw wrapped description
+                if (descLines.length > 0) {
+                    textY += 1
+                    doc.setFont('Helvetica', 'normal')
+                    doc.setTextColor(71, 85, 105) // slate-600
+                    descLines.forEach((line: string) => {
+                        doc.text(line, margin + 3, textY)
+                        textY += 4
+                    })
+                }
+
+                doc.setFont('Helvetica', 'normal')
+                doc.setTextColor(51, 65, 85)
+                doc.text(String(item.quantity || 0), margin + 95, y + 5, { align: 'center' })
+                doc.text(item.unit || '-', margin + 112, y + 5, { align: 'center' })
+                doc.text(`$${Number(item.unit_cost || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 145, y + 5, { align: 'right' })
+                doc.text(`$${Number(item.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 177, y + 5, { align: 'right' })
+
+                y += rowHeight
             }
 
-            doc.setFont('Helvetica', 'normal')
-            doc.setTextColor(51, 65, 85)
-            doc.text(String(item.quantity || 0), margin + 95, y + 5, { align: 'center' })
-            doc.text(item.unit || '-', margin + 112, y + 5, { align: 'center' })
-            doc.text(`$${Number(item.unit_cost || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 145, y + 5, { align: 'right' })
-            doc.text(`$${Number(item.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 177, y + 5, { align: 'right' })
-
-            y += rowHeight
+            y += 8
         }
-
-        y += 8
 
         // --- 5. SUMMARY CARD ---
         const summaryHeight = 40 + (quote.admin_amount > 0 ? 5 : 0) + (quote.profit_amount > 0 ? 5 : 0)
@@ -914,47 +1023,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
 
                             // List linked items below
                             const linkedItems = (quote.quote_items || []).filter((item: any) => item.planning_room_id === room.id)
-                            if (linkedItems.length > 0) {
-                                checkNewPage(15)
-                                doc.setFont('Helvetica', 'bold')
-                                doc.setFontSize(9)
-                                doc.setTextColor(15, 23, 42)
-                                doc.text('Items liés à cette pièce :', margin, y)
-                                y += 5
-
-                                doc.setFont('Helvetica', 'normal')
-                                doc.setFontSize(8.5)
-                                doc.setTextColor(71, 85, 105)
-
-                                for (const item of linkedItems) {
-                                    let sourceLabel = ''
-                                    if (item.planning_measurement_source === 'perimeter') {
-                                        sourceLabel = 'Périmètre'
-                                    } else if (item.planning_measurement_source === 'area') {
-                                        sourceLabel = 'Aire au sol'
-                                    } else if (item.planning_measurement_source === 'wall_surface') {
-                                        sourceLabel = 'Surface murs'
-                                    } else if (item.planning_measurement_source === 'selected_walls_linear') {
-                                        const segments = item.planning_selected_segments || []
-                                        const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
-                                        sourceLabel = `Murs spéc. (linéaire: ${wallList})`
-                                    } else if (item.planning_measurement_source === 'selected_walls_surface') {
-                                        const segments = item.planning_selected_segments || []
-                                        const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
-                                        sourceLabel = `Murs spéc. (surface: ${wallList})`
-                                    }
-
-                                    const formattedQty = Number(item.quantity || 0).toLocaleString('fr-CA', { maximumFractionDigits: 2 })
-                                    const itemText = `- ${item.title} (${formattedQty} ${item.unit || ''} - via ${sourceLabel})`
-                                    const lines = doc.splitTextToSize(itemText, contentWidth - 4)
-
-                                    checkNewPage(lines.length * 4)
-                                    lines.forEach((line: string) => {
-                                        doc.text(line, margin + 2, y)
-                                        y += 4
-                                    })
-                                }
-                            }
+                            renderRoomItemsTable(room, linkedItems)
                         } catch (err) {
                             console.error('Error drawing room in PDF:', err)
                             y += 5
@@ -978,47 +1047,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
                     y += 6
 
                     const linkedItems = (quote.quote_items || []).filter((item: any) => item.planning_room_id === room.id)
-                    if (linkedItems.length > 0) {
-                        checkNewPage(15)
-                        doc.setFont('Helvetica', 'bold')
-                        doc.setFontSize(9)
-                        doc.setTextColor(15, 23, 42)
-                        doc.text('Items liés à cette pièce :', margin, y)
-                        y += 5
-
-                        doc.setFont('Helvetica', 'normal')
-                        doc.setFontSize(8.5)
-                        doc.setTextColor(71, 85, 105)
-
-                        for (const item of linkedItems) {
-                            let sourceLabel = ''
-                            if (item.planning_measurement_source === 'perimeter') {
-                                sourceLabel = 'Périmètre'
-                            } else if (item.planning_measurement_source === 'area') {
-                                sourceLabel = 'Aire au sol'
-                            } else if (item.planning_measurement_source === 'wall_surface') {
-                                sourceLabel = 'Surface murs'
-                            } else if (item.planning_measurement_source === 'selected_walls_linear') {
-                                const segments = item.planning_selected_segments || []
-                                const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
-                                sourceLabel = `Murs spéc. (linéaire: ${wallList})`
-                            } else if (item.planning_measurement_source === 'selected_walls_surface') {
-                                const segments = item.planning_selected_segments || []
-                                const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
-                                sourceLabel = `Murs spéc. (surface: ${wallList})`
-                            }
-
-                            const formattedQty = Number(item.quantity || 0).toLocaleString('fr-CA', { maximumFractionDigits: 2 })
-                            const itemText = `- ${item.title} (${formattedQty} ${item.unit || ''} - via ${sourceLabel})`
-                            const lines = doc.splitTextToSize(itemText, contentWidth - 4)
-
-                            checkNewPage(lines.length * 4)
-                            lines.forEach((line: string) => {
-                                doc.text(line, margin + 2, y)
-                                y += 4
-                            })
-                        }
-                    }
+                    renderRoomItemsTable(room, linkedItems)
                 }
                 
                 y += 6
