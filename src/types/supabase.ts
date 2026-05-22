@@ -50,6 +50,7 @@ export interface Database {
           default_profit_percentage: number
           gst_rate: number
           qst_rate: number
+          work_types_options: string[]
           updated_at: string
         }
         Insert: {
@@ -60,6 +61,7 @@ export interface Database {
           default_profit_percentage?: number
           gst_rate?: number
           qst_rate?: number
+          work_types_options?: string[]
           updated_at?: string
         }
         Update: {
@@ -70,6 +72,7 @@ export interface Database {
           default_profit_percentage?: number
           gst_rate?: number
           qst_rate?: number
+          work_types_options?: string[]
           updated_at?: string
         }
         Relationships: []
@@ -140,6 +143,8 @@ export interface Database {
           manager_id: string | null
           status: 'draft' | 'sent' | 'approved' | 'denied' | 'completed'
           estimated_duration_days: number
+          work_types: string[]
+          hide_duration: boolean
           subtotal: number
           admin_percentage: number
           admin_amount: number
@@ -160,9 +165,10 @@ export interface Database {
           description?: string | null
           internal_notes?: string | null
           manager_id?: string | null
-          manager_id?: string | null
           status?: 'draft' | 'sent' | 'approved' | 'denied' | 'completed'
           estimated_duration_days?: number
+          work_types?: string[]
+          hide_duration?: boolean
           subtotal?: number
           admin_percentage?: number
           admin_amount?: number
@@ -185,6 +191,8 @@ export interface Database {
           manager_id?: string | null
           status?: 'draft' | 'sent' | 'approved' | 'denied' | 'completed'
           estimated_duration_days?: number
+          work_types?: string[]
+          hide_duration?: boolean
           subtotal?: number
           admin_percentage?: number
           admin_amount?: number
@@ -211,33 +219,39 @@ export interface Database {
         Row: {
           id: string
           quote_id: string
-          description: string
+          title: string | null
+          description: string | null
           quantity: number
           unit: string | null
           unit_cost: number
           total: number
+          image_urls: string[]
           notes: string | null
           created_at: string
         }
         Insert: {
           id?: string
           quote_id: string
-          description: string
+          title?: string | null
+          description?: string | null
           quantity?: number
           unit?: string | null
           unit_cost?: number
           total?: number
+          image_urls?: string[]
           notes?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           quote_id?: string
-          description?: string
+          title?: string | null
+          description?: string | null
           quantity?: number
           unit?: string | null
           unit_cost?: number
           total?: number
+          image_urls?: string[]
           notes?: string | null
           created_at?: string
         }

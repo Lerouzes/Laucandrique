@@ -29,7 +29,8 @@ export default function SettingsPage() {
             gst_rate: 0.05,
             qst_rate: 0.09975,
             monthly_goal_enabled: false,
-            monthly_goal_amount: 0
+            monthly_goal_amount: 0,
+            work_types_options: '',
         }
     })
 
@@ -43,7 +44,8 @@ export default function SettingsPage() {
                 gst_rate: data.gst_rate || 0.05,
                 qst_rate: data.qst_rate || 0.09975,
                 monthly_goal_enabled: data.monthly_goal_enabled || false,
-                monthly_goal_amount: data.monthly_goal_amount || 0
+                monthly_goal_amount: data.monthly_goal_amount || 0,
+                work_types_options: Array.isArray(data.work_types_options) ? data.work_types_options.join(', ') : '',
             })
         })
     }, [form])
@@ -145,6 +147,20 @@ export default function SettingsPage() {
                         <div className="space-y-2">
                             <Label className="text-zinc-300">Nom de l'entreprise *</Label>
                             <Input {...form.register('company_name')} required className="bg-zinc-950 border-zinc-800 text-zinc-100 focus-visible:ring-zinc-600" />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-zinc-900 border-zinc-800">
+                    <CardHeader>
+                        <CardTitle className="text-zinc-100">Types de travaux</CardTitle>
+                        <CardDescription className="text-zinc-400">Configurez les types de travaux sélectionnables dans les soumissions.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label className="text-zinc-300">Types de travaux (séparés par des virgules)</Label>
+                            <Input {...form.register('work_types_options')} placeholder="Peinture, Plâtre, Maçonnerie..." className="bg-zinc-950 border-zinc-800 text-zinc-100 focus-visible:ring-zinc-600" />
+                            <p className="text-xs text-zinc-500">Ex: Peinture, Plâtre, Maçonnerie, Menuiserie</p>
                         </div>
                     </CardContent>
                 </Card>

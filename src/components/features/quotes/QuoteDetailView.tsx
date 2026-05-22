@@ -21,6 +21,16 @@ const sanitizePdfFileName = (value: string) => {
     return normalized || 'soumission'
 }
 
+const loadImage = (url: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => resolve(img)
+        img.onerror = (e) => reject(e)
+        img.src = url
+    })
+}
+
 export function QuoteDetailView({ quote, settings }: { quote: any, settings: any }) {
     const router = useRouter()
     const pdfRef = useRef<HTMLDivElement>(null)
@@ -95,7 +105,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                 y + 11,
                 { align: 'right' }
             )
-            if (durationLabel) {
+            if (durationLabel && !quote.hide_duration) {
                 doc.text(`Durée estimée: ${durationLabel}`, pageWidth - margin, y + 15, { align: 'right' })
             }
 
@@ -151,7 +161,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
             const descText = quote.description || ''
             const descLines = doc.splitTextToSize(descText, contentWidth)
             const descHeight = descLines.length * 5
-            checkNewPage(12 + descHeight)
+            checkNewPage(18 + descHeight)
 
             doc.setFont('Helvetica', 'bold')
             doc.setFontSize(12)
@@ -159,6 +169,14 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
             doc.text(quote.title || '', margin, y)
 
             y += 5
+
+            if (quote.work_types && quote.work_types.length > 0) {
+                doc.setFont('Helvetica', 'italic')
+                doc.setFontSize(9)
+                doc.setTextColor(71, 85, 105)
+                doc.text(`Type(s) de travaux: ${quote.work_types.join(', ')}`, margin, y)
+                y += 5
+            }
 
             if (descText) {
                 doc.setFont('Helvetica', 'normal')
@@ -193,8 +211,13 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
             doc.setFontSize(9)
 
             for (const item of items) {
-                const itemDescLines = doc.splitTextToSize(item.description || '', 88)
-                const rowHeight = Math.max(8, itemDescLines.length * 4.5 + 4)
+                doc.setFont('Helvetica', 'bold')
+                const titleLines = doc.splitTextToSize(item.title || 'Sans titre', 88)
+                
+                doc.setFont('Helvetica', 'normal')
+                const descLines = item.description ? doc.splitTextToSize(item.description, 88) : []
+                
+                const rowHeight = Math.max(8, titleLines.length * 4 + (descLines.length > 0 ? descLines.length * 4 + 2 : 0) + 4)
                 
                 checkNewPage(rowHeight)
 
@@ -204,12 +227,28 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                 doc.setDrawColor(241, 245, 249)
                 doc.line(margin, y + rowHeight, margin + contentWidth, y + rowHeight)
 
-                doc.setTextColor(51, 65, 85)
-                // Draw wrapped description
-                itemDescLines.forEach((line: string, i: number) => {
-                    doc.text(line, margin + 3, y + 5 + i * 4.5)
+                // Draw wrapped title
+                doc.setFont('Helvetica', 'bold')
+                doc.setTextColor(15, 23, 42) // slate-900
+                let textY = y + 5
+                titleLines.forEach((line: string) => {
+                    doc.text(line, margin + 3, textY)
+                    textY += 4
                 })
 
+                // Draw wrapped description
+                if (descLines.length > 0) {
+                    textY += 1
+                    doc.setFont('Helvetica', 'normal')
+                    doc.setTextColor(71, 85, 105) // slate-600
+                    descLines.forEach((line: string) => {
+                        doc.text(line, margin + 3, textY)
+                        textY += 4
+                    })
+                }
+
+                doc.setFont('Helvetica', 'normal')
+                doc.setTextColor(51, 65, 85)
                 doc.text(String(item.quantity || 0), margin + 95, y + 5, { align: 'center' })
                 doc.text(item.unit || '-', margin + 112, y + 5, { align: 'center' })
                 doc.text(`$${Number(item.unit_cost || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 145, y + 5, { align: 'right' })
@@ -274,6 +313,119 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
             doc.text(`$${Number(quote.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY + 1, { align: 'right' })
 
             y = curY + 12
+
+            // --- 5.5 ANNEXE PHOTOS ---
+            const allAnnexPhotos: { url: string, caption: string }[] = []
+            if (quote.quote_images && quote.quote_images.length > 0) {
+                quote.quote_images.forEach((img: any) => {
+                    allAnnexPhotos.push({
+                        url: img.image_url,
+                        caption: img.caption || 'Photo du projet'
+                    })
+                })
+            }
+            if (itemPhotos.length > 0) {
+                itemPhotos.forEach((photo) => {
+                    allAnnexPhotos.push({
+                        url: photo.url,
+                        caption: photo.itemTitle
+                    })
+                })
+            }
+
+            if (allAnnexPhotos.length > 0) {
+                // Load all images first
+                const loadedImages = await Promise.all(
+                    allAnnexPhotos.map(async (photo) => {
+                        try {
+                            const imgEl = await loadImage(photo.url)
+                            return { imgEl, caption: photo.caption }
+                        } catch (err) {
+                            console.error(`Failed to load image ${photo.url}:`, err)
+                            return { imgEl: null, caption: photo.caption }
+                        }
+                    })
+                )
+
+                doc.addPage()
+                y = 20
+
+                doc.setFont('Helvetica', 'bold')
+                doc.setFontSize(14)
+                doc.setTextColor(15, 23, 42)
+                doc.text('ANNEXE : PHOTOS', margin, y)
+                y += 8
+
+                const colWidth = 85
+                const imageHeight = 55
+                const captionHeight = 10
+                const blockHeight = imageHeight + captionHeight + 5 // 70mm total per row block
+                let rowStartY = y
+
+                for (let idx = 0; idx < loadedImages.length; idx++) {
+                    const item = loadedImages[idx]
+
+                    // If we are at the start of a new row (col == 0) and it's not the very start
+                    if (idx > 0 && idx % 2 === 0) {
+                        y += blockHeight
+                        rowStartY = y
+                    }
+
+                    // Check if we need a new page for the current row
+                    if (idx % 2 === 0) {
+                        if (y + blockHeight > pageHeight - 15) {
+                            doc.addPage()
+                            y = 20
+                            rowStartY = y
+                        }
+                    }
+
+                    const col = idx % 2
+                    const x = margin + col * (colWidth + 10) // 10mm gap
+
+                    if (item.imgEl) {
+                        try {
+                            doc.setDrawColor(226, 232, 240) // slate-200
+                            doc.setLineWidth(0.3)
+                            doc.rect(x, rowStartY, colWidth, imageHeight)
+                            doc.addImage(item.imgEl, 'JPEG', x, rowStartY, colWidth, imageHeight)
+                        } catch (err) {
+                            console.error('Error adding image to PDF:', err)
+                            doc.setFillColor(241, 245, 249)
+                            doc.rect(x, rowStartY, colWidth, imageHeight, 'F')
+                            doc.setFont('Helvetica', 'normal')
+                            doc.setFontSize(8)
+                            doc.setTextColor(148, 163, 184)
+                            doc.text('Image non disponible', x + colWidth/2, rowStartY + imageHeight/2, { align: 'center' })
+                        }
+                    } else {
+                        doc.setFillColor(241, 245, 249)
+                        doc.rect(x, rowStartY, colWidth, imageHeight, 'F')
+                        doc.setDrawColor(226, 232, 240)
+                        doc.setLineWidth(0.3)
+                        doc.rect(x, rowStartY, colWidth, imageHeight)
+
+                        doc.setFont('Helvetica', 'normal')
+                        doc.setFontSize(8)
+                        doc.setTextColor(148, 163, 184)
+                        doc.text('Image non disponible', x + colWidth/2, rowStartY + imageHeight/2, { align: 'center' })
+                    }
+
+                    // Print caption
+                    doc.setFont('Helvetica', 'bold')
+                    doc.setFontSize(9)
+                    doc.setTextColor(51, 65, 85)
+
+                    const captionLines = doc.splitTextToSize(item.caption, colWidth - 4)
+                    let capY = rowStartY + imageHeight + 4
+                    captionLines.slice(0, 2).forEach((line: string) => {
+                        doc.text(line, x + 2, capY)
+                        capY += 4
+                    })
+                }
+                
+                y = rowStartY + blockHeight
+            }
 
             // --- 6. FOOTER note ---
             checkNewPage(15)
@@ -353,6 +505,18 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
     const durationLabel = quote.estimated_duration_days < 1
         ? `${Math.round(quote.estimated_duration_days * 24 * 100) / 100} heures`
         : `${quote.estimated_duration_days} jours`
+
+    const itemPhotos: { itemTitle: string, url: string }[] = []
+    for (const item of quote.quote_items || []) {
+        if (item.image_urls && item.image_urls.length > 0) {
+            for (const url of item.image_urls) {
+                itemPhotos.push({
+                    itemTitle: item.title || 'Sans titre',
+                    url: url
+                })
+            }
+        }
+    }
     const linkedProject = Array.isArray(quote.projects) ? quote.projects[0] : null
     const isProjectCompleted = linkedProject?.status === 'completed'
     const displayStatus = isProjectCompleted && quote.status === 'approved' ? 'completed' : quote.status
@@ -465,7 +629,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                         <h2 className="text-xl font-semibold mb-2">SOUMISSION #{quote.quote_number}</h2>
                         <div className="text-sm text-zinc-600">
                             <p>Date: {format(new Date(quote.created_at), 'dd MMMM yyyy', { locale: frCA })}</p>
-                            <p>Durée estimée: {durationLabel}</p>
+                            {durationLabel && !quote.hide_duration && <p>Durée estimée: {durationLabel}</p>}
                             {quote.sent_at && <p>Envoyée le: {format(new Date(quote.sent_at), 'dd MMMM yyyy, HH:mm', { locale: frCA })}</p>}
                         </div>
                     </div>
@@ -486,6 +650,15 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
 
                 <div className="mb-8">
                     <h3 className="text-xl font-semibold mb-2">{quote.title}</h3>
+                    {quote.work_types && quote.work_types.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-3">
+                            {quote.work_types.map((type: string) => (
+                                <Badge key={type} variant="secondary" className="bg-zinc-100 text-zinc-800 hover:bg-zinc-100 border border-zinc-200 font-medium text-xs py-0.5 px-2">
+                                    {type}
+                                </Badge>
+                            ))}
+                        </div>
+                    )}
                     {quote.description && (
                         <p className="text-zinc-600 text-sm whitespace-pre-wrap">{quote.description}</p>
                     )}
@@ -505,11 +678,16 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                         <tbody className="text-zinc-700">
                             {quote.quote_items?.map((item: any) => (
                                 <tr key={item.id} className="border-b border-zinc-200">
-                                    <td className="py-2 pr-4">{item.description}</td>
-                                    <td className="py-2 text-center">{item.quantity}</td>
-                                    <td className="py-2 text-center">{item.unit || '-'}</td>
-                                    <td className="py-2 text-right">${item.unit_cost?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
-                                    <td className="py-2 text-right font-medium text-zinc-900">${item.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
+                                    <td className="py-3 pr-4">
+                                        <div className="font-bold text-zinc-900 text-sm">{item.title || 'Sans titre'}</div>
+                                        {item.description && (
+                                            <div className="text-zinc-500 text-xs mt-1 whitespace-pre-wrap">{item.description}</div>
+                                        )}
+                                    </td>
+                                    <td className="py-3 text-center">{item.quantity}</td>
+                                    <td className="py-3 text-center">{item.unit || '-'}</td>
+                                    <td className="py-3 text-right">${item.unit_cost?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
+                                    <td className="py-3 text-right font-medium text-zinc-900">${item.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -557,6 +735,20 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                                 <div key={img.id} className="border border-zinc-200 rounded-md overflow-hidden bg-zinc-50">
                                     <img src={img.image_url} alt="Photo" className="w-full h-48 object-cover object-center" crossOrigin="anonymous" />
                                     {img.caption && <div className="p-3 text-sm text-zinc-700 font-medium bg-white">{img.caption}</div>}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {itemPhotos.length > 0 && (
+                    <div className="mt-12 pt-8 border-t-2 border-zinc-200">
+                        <h3 className="font-semibold text-zinc-900 mb-4">Annexe : Photos de référence</h3>
+                        <div className="grid grid-cols-2 gap-6">
+                            {itemPhotos.map((photo: any, index: number) => (
+                                <div key={index} className="border border-zinc-200 rounded-md overflow-hidden bg-zinc-50">
+                                    <img src={photo.url} alt={photo.itemTitle} className="w-full h-48 object-cover object-center" crossOrigin="anonymous" />
+                                    <div className="p-3 text-sm text-zinc-700 font-medium bg-white">{photo.itemTitle}</div>
                                 </div>
                             ))}
                         </div>

@@ -17,6 +17,7 @@ export async function getSettings() {
             qst_rate: 0.09975,
             monthly_goal_enabled: false,
             monthly_goal_amount: 0,
+            work_types_options: ["Peinture", "Plâtre", "Maçonnerie", "Menuiserie", "Électricité", "Plomberie"],
         }
     }
     return data
@@ -39,6 +40,10 @@ export async function updateSettingsAction(formData: FormData, hasId: string | n
         qst_rate: parseFloat(formData.get('qst_rate') as string || '0.09975'),
         monthly_goal_enabled: formData.get('monthly_goal_enabled') === 'on',
         monthly_goal_amount: parseFloat(formData.get('monthly_goal_amount') as string || '0'),
+        work_types_options: (formData.get('work_types_options') as string || '')
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean),
         updated_at: new Date().toISOString()
     }
 
@@ -48,6 +53,7 @@ export async function updateSettingsAction(formData: FormData, hasId: string | n
         default_profit_percentage: payload.default_profit_percentage,
         gst_rate: payload.gst_rate,
         qst_rate: payload.qst_rate,
+        work_types_options: payload.work_types_options,
         updated_at: payload.updated_at,
     }
 
