@@ -688,61 +688,6 @@ export async function downloadQuotePDF(quote: any, settings: any) {
             y += 8
         }
 
-        // --- 5. SUMMARY CARD ---
-        const summaryHeight = 40 + (quote.admin_amount > 0 ? 5 : 0) + (quote.profit_amount > 0 ? 5 : 0)
-        checkNewPage(summaryHeight)
-
-        const summaryX = margin + 105
-        const summaryWidth = 75
-
-        doc.setFont('Helvetica', 'normal')
-        doc.setFontSize(9)
-        doc.setTextColor(71, 85, 105)
-
-        let curY = y
-        
-        // Subtotal
-        doc.text('Sous-total:', summaryX, curY)
-        doc.text(`$${Number(quote.subtotal || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
-        curY += 5
-
-        // Admin
-        if (quote.admin_amount > 0) {
-            doc.text(`Administration (${quote.admin_percentage}%):`, summaryX, curY)
-            doc.text(`$${Number(quote.admin_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
-            curY += 5
-        }
-
-        // Profit
-        if (quote.profit_amount > 0) {
-            doc.text(`Profit (${quote.profit_percentage}%):`, summaryX, curY)
-            doc.text(`$${Number(quote.profit_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
-            curY += 5
-        }
-
-        // TPS
-        doc.text('TPS (5%):', summaryX, curY)
-        doc.text(`$${Number(quote.gst_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
-        curY += 5
-
-        // TVQ
-        doc.text('TVQ (9.975%):', summaryX, curY)
-        doc.text(`$${Number(quote.qst_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
-        curY += 6
-
-        // Grand Total
-        doc.setFillColor(248, 250, 252)
-        doc.setDrawColor(226, 232, 240)
-        doc.roundedRect(summaryX - 2, curY - 4.5, summaryWidth + 2, 8.5, 1.5, 1.5, 'FD')
-
-        doc.setFont('Helvetica', 'bold')
-        doc.setFontSize(11)
-        doc.setTextColor(15, 23, 42)
-        doc.text('Total:', summaryX, curY + 1)
-        doc.text(`$${Number(quote.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY + 1, { align: 'right' })
-
-        y = curY + 12
-
         // --- 5.5 ANNEXE PHOTOS ---
         const allAnnexPhotos: { url: string, caption: string }[] = []
         if (quote.quote_images && quote.quote_images.length > 0) {
@@ -1054,6 +999,61 @@ export async function downloadQuotePDF(quote: any, settings: any) {
                 y += 6
             }
         }
+
+        // --- 5. SUMMARY CARD ---
+        const summaryHeight = 40 + (quote.admin_amount > 0 ? 5 : 0) + (quote.profit_amount > 0 ? 5 : 0)
+        checkNewPage(summaryHeight)
+
+        const summaryX = margin + 105
+        const summaryWidth = 75
+
+        doc.setFont('Helvetica', 'normal')
+        doc.setFontSize(9)
+        doc.setTextColor(71, 85, 105)
+
+        let curY = y
+        
+        // Subtotal
+        doc.text('Sous-total:', summaryX, curY)
+        doc.text(`$${Number(quote.subtotal || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
+        curY += 5
+
+        // Admin
+        if (quote.admin_amount > 0) {
+            doc.text(`Administration (${quote.admin_percentage}%):`, summaryX, curY)
+            doc.text(`$${Number(quote.admin_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
+            curY += 5
+        }
+
+        // Profit
+        if (quote.profit_amount > 0) {
+            doc.text(`Profit (${quote.profit_percentage}%):`, summaryX, curY)
+            doc.text(`$${Number(quote.profit_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
+            curY += 5
+        }
+
+        // TPS
+        doc.text('TPS (5%):', summaryX, curY)
+        doc.text(`$${Number(quote.gst_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
+        curY += 5
+
+        // TVQ
+        doc.text('TVQ (9.975%):', summaryX, curY)
+        doc.text(`$${Number(quote.qst_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
+        curY += 6
+
+        // Grand Total
+        doc.setFillColor(248, 250, 252)
+        doc.setDrawColor(226, 232, 240)
+        doc.roundedRect(summaryX - 2, curY - 4.5, summaryWidth + 2, 8.5, 1.5, 1.5, 'FD')
+
+        doc.setFont('Helvetica', 'bold')
+        doc.setFontSize(11)
+        doc.setTextColor(15, 23, 42)
+        doc.text('Total:', summaryX, curY + 1)
+        doc.text(`$${Number(quote.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY + 1, { align: 'right' })
+
+        y = curY + 12
 
         // --- 6. FOOTER note ---
         checkNewPage(15)
