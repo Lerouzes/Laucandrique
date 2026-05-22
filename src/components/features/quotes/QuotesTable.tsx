@@ -155,8 +155,8 @@ function QuoteRow({
                 />
             </TableCell>
             <TableCell className="text-cyan-400 font-mono font-medium hover:text-cyan-300 hover:underline transition-colors">#{quote.quote_number}</TableCell>
-            <TableCell className="font-medium text-zinc-100">{quote.title}</TableCell>
-            <TableCell className="text-zinc-300">
+            <TableCell className="font-medium text-zinc-100 whitespace-normal break-words max-w-[250px]">{quote.title}</TableCell>
+            <TableCell className="text-zinc-300 whitespace-normal break-words max-w-[200px]">
                 {quote.clients?.full_name}
                 {quote.clients?.company_name && <span className="text-zinc-300 text-xs block">{quote.clients.company_name}</span>}
             </TableCell>
@@ -323,11 +323,11 @@ export function QuotesTable({ data }: { data: any[] }) {
         }
     })
 
-    const renderHeader = (label: string, field: string) => {
+    const renderHeader = (label: string, field: string, className?: string) => {
         const isSorted = sortField === field
         return (
             <TableHead 
-                className="text-zinc-300 font-medium cursor-pointer select-none hover:text-cyan-400 transition-colors"
+                className={`text-zinc-300 font-medium cursor-pointer select-none hover:text-cyan-400 transition-colors ${className || ''}`}
                 onClick={() => handleSort(field)}
             >
                 <div className="flex items-center gap-1">
@@ -495,8 +495,8 @@ export function QuotesTable({ data }: { data: any[] }) {
                                 />
                             </TableHead>
                             {renderHeader('#', 'quote_number')}
-                            {renderHeader('Titre', 'title')}
-                            {renderHeader('Client', 'client')}
+                            {renderHeader('Titre', 'title', 'whitespace-normal min-w-[150px] max-w-[250px]')}
+                            {renderHeader('Client', 'client', 'whitespace-normal min-w-[150px] max-w-[200px]')}
                             {renderHeader('Statut', 'status')}
                             {renderHeader('Montant Total', 'total')}
                             {renderHeader('Créée le', 'created_at')}
