@@ -12,6 +12,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CalendarX, ExternalLink, CalendarClock, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog'
 
 type StatusFilter = 'unscheduled' | 'scheduled' | 'completed' | 'all'
 
@@ -51,6 +57,9 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     const externalEventsRef = useRef<HTMLDivElement>(null)
     const [isPending, startTransition] = useTransition()
     const [filter, setFilter] = useState<StatusFilter>('unscheduled')
+    const [isMoreEventsOpen, setIsMoreEventsOpen] = useState(false)
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+    const [selectedEvents, setSelectedEvents] = useState<any[]>([])
     const normalizedQuery = query.trim().toLowerCase()
     const getDurationDays = (project: any) => Number(project?.estimated_duration_days || 1)
     const getDurationMinutes = (project: any) => Math.max(15, Math.round(getDurationDays(project) * 24 * 60))
@@ -295,6 +304,18 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         }
     }
 
+    const formattedModalDate = selectedDate
+        ? selectedDate.toLocaleDateString('fr-FR', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+          })
+        : ''
+    const capitalizedDate = formattedModalDate
+        ? formattedModalDate.charAt(0).toUpperCase() + formattedModalDate.slice(1)
+        : ''
+
     return (
         <div className="flex gap-6 h-full">
             {/* Sidebar */}
@@ -401,7 +422,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             </Card>
 
             {/* Calendar */}
-            <Card className="flex-1 h-full border-zinc-800 bg-transparent p-4 relative overflow-visible">
+            <Card className="flex-1 h-full border-zinc-800 bg-transparent p-4 relative overflow-hidden">
                 <div className="fc-dark-theme-wrapper h-full">
                     <FullCalendar
                         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -419,6 +440,13 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                         eventResize={handleEventResize}
                         eventClick={handleEventClick}
                         dayMaxEvents={true}
+                        moreLinkClick={(info) => {
+                            info.jsEvent.preventDefault()
+                            setSelectedDate(info.date)
+                            const evts = info.allSegs.map((seg: any) => seg.event)
+                            setSelectedEvents(evts)
+                            setIsMoreEventsOpen(true)
+                        }}
                         eventDisplay="block"
                         eventDidMount={(info) => {
                             const color = info.event.extendedProps.eventColor
@@ -457,6 +485,125 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                     />
                 </div>
             </Card>
+
+            <Dialog open={isMoreEventsOpen} onOpenChange={setIsMoreEventsOpen}>
+                <DialogContent className="sm:max-w-md bg-[#103f75] border border-white/20 text-white max-h-[80vh] flex flex-col p-6 rounded-xl">
+                    <DialogHeader className="pb-3 border-b border-white/10">
+                        <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
+                            <CalendarClock className="h-5 w-5 text-yellow-300" />
+                            <span>Projets du {capitalizedDate}</span>
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="flex-1 overflow-y-auto py-4 space-y-3 pr-1">
+                        {selectedEvents.map((event) => {
+                            const props = event.extendedProps || {}
+                            const projectId = props.projectId
+                            const quoteId = props.quoteId
+                            const quoteNumber = props.quoteNumber
+                            const client = props.client
+                            const status = props.status
+                            const projectType = props.projectType || 'interior'
+
+                            return (
+                                <div 
+                                    key={event.id}
+                                    className="p-3 bg-white/5 border border-white/10 rounded-lg hover:border-white/20 transition-colors flex items-start justify-between gap-3"
+                                >
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                            <span 
+                                                className="inline-block h-2.5 w-2.5 rounded-full shrink-0" 
+                                                style={{ backgroundColor: TYPE_DOT[projectType] }} 
+                                            />
+                                            <span className="font-semibold text-white text-sm truncate">
+                                                {event.title}
+                                            </span>
+                                            {quoteNumber && (
+                                                <span className="text-xs text-white/60 font-mono">
+                                                    #{quoteNumber}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="text-xs text-white/70 mb-2 truncate">
+                                            {client}
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <Badge 
+                                                variant="secondary" 
+                                                className={`text-[10px] py-0 px-1.5 pointer-events-none ${
+                                                    status === 'completed' 
+                                                        ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-800' 
+                                                        : status === 'in_progress' 
+                                                            ? 'bg-blue-900/60 text-blue-300 border border-blue-800' 
+                                                            : 'bg-yellow-900/60 text-yellow-300 border border-yellow-800'
+                                                }`}
+                                            >
+                                                {status === 'completed' ? 'Complété' : status === 'in_progress' ? 'En cours' : 'Planifié'}
+                                            </Badge>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        {quoteId && (
+                                            <button
+                                                onClick={() => {
+                                                    setIsMoreEventsOpen(false)
+                                                    router.push(`/quotes/${quoteId}`)
+                                                }}
+                                                className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded transition-colors"
+                                                title="Voir la soumission"
+                                            >
+                                                <ExternalLink className="h-4 w-4" />
+                                            </button>
+                                        )}
+                                        {status !== 'completed' && (
+                                            <button
+                                                onClick={() => {
+                                                    handleMarkCompleted(projectId)
+                                                    setSelectedEvents(prev => prev.map(e => e.id === event.id ? {
+                                                        ...e,
+                                                        extendedProps: { ...e.extendedProps, status: 'completed' }
+                                                    } : e))
+                                                }}
+                                                className="p-1.5 text-white/60 hover:text-emerald-400 hover:bg-white/10 rounded transition-colors"
+                                                title="Marquer comme complété"
+                                            >
+                                                <CheckCircle2 className="h-4 w-4" />
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => {
+                                                handleUnschedule(projectId)
+                                                setSelectedEvents(prev => prev.filter(e => e.id !== event.id))
+                                            }}
+                                            className="p-1.5 text-white/60 hover:text-red-400 hover:bg-white/10 rounded transition-colors"
+                                            title="Retirer du calendrier"
+                                        >
+                                            <CalendarX className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                        {selectedEvents.length === 0 && (
+                            <div className="text-white/40 text-center py-6 text-sm">
+                                Aucun projet planifié pour cette journée.
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="pt-3 border-t border-white/10 flex justify-end">
+                        <Button 
+                            variant="secondary" 
+                            onClick={() => setIsMoreEventsOpen(false)}
+                            className="bg-white/10 hover:bg-white/15 text-white border-white/10"
+                        >
+                            Fermer
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             <style dangerouslySetInnerHTML={{
                 __html: `
