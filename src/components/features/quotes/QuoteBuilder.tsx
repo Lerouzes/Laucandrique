@@ -6,7 +6,7 @@ import { useState, useEffect, useRef, useTransition } from 'react'
 import { useForm, useFieldArray, useWatch, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { Plus, Trash2, Image as ImageIcon, ChevronsUpDown, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, Image as ImageIcon, ChevronsUpDown, ChevronDown, Download, CheckCircle, XCircle, Send, CalendarCheck2, Eye } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -16,13 +16,16 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { createQuoteAction, updateQuoteAction } from '@/actions/quotes'
+import { createQuoteAction, updateQuoteAction, updateQuoteStatus, revertQuoteToPending, markQuoteAsSent } from '@/actions/quotes'
 import { createClient } from '@/utils/supabase/client'
 import { getClients } from '@/actions/clients'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import Link from 'next/link'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { markProjectCompletedByQuote } from '@/actions/projects'
+import { downloadQuotePDF } from '@/utils/pdf'
 
 const quoteItemSchema = z.object({
     title: z.string().min(1, 'Titre requis'),
@@ -65,6 +68,73 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
     const [isSearchingClients, setIsSearchingClients] = useState(false)
     const [clientPopoverOpen, setClientPopoverOpen] = useState(false)
     const [showAdditionalInfo, setShowAdditionalInfo] = useState(initialQuote?.work_types && initialQuote.work_types.length > 0)
+    const [isGenerating, setIsGenerating] = useState(false)
+
+    const handleStatusChange = (status: 'approved' | 'denied') => {
+        if (!initialQuote) return
+        startTransition(async () => {
+            try {
+                await updateQuoteStatus(initialQuote.id, status, initialQuote.client_id, initialQuote.title, initialQuote.estimated_duration_days)
+                toast.success(`Soumission ${status === 'approved' ? 'approuvée' : 'refusée'}.`)
+                router.refresh()
+            } catch (err: any) {
+                toast.error("Erreur de mise à jour", { description: err.message })
+            }
+        })
+    }
+
+    const handleMarkAsSent = () => {
+        if (!initialQuote) return
+        startTransition(async () => {
+            try {
+                await markQuoteAsSent(initialQuote.id)
+                toast.success('Soumission marquée comme envoyée.')
+                router.refresh()
+            } catch (err: any) {
+                toast.error('Erreur', { description: err.message })
+            }
+        })
+    }
+
+    const handleMarkProjectCompleted = () => {
+        if (!initialQuote) return
+        startTransition(async () => {
+            try {
+                await markProjectCompletedByQuote(initialQuote.id)
+                toast.success('Projet marqué comme complété.')
+                router.refresh()
+            } catch (err: any) {
+                toast.error('Erreur', { description: err.message })
+            }
+        })
+    }
+
+    const handleRevertToDraft = () => {
+        if (!initialQuote) return
+        startTransition(async () => {
+            try {
+                await revertQuoteToPending(initialQuote.id)
+                toast.success("Soumission repassée en brouillon. Le projet associé a été supprimé.")
+                router.refresh()
+            } catch (err: any) {
+                toast.error("Erreur", { description: err.message })
+            }
+        })
+    }
+
+    const generatePDF = async () => {
+        if (!initialQuote) return
+        try {
+            setIsGenerating(true)
+            await downloadQuotePDF(initialQuote, settings)
+        } finally {
+            setIsGenerating(false)
+        }
+    }
+
+    const linkedProject = initialQuote?.projects && Array.isArray(initialQuote.projects) ? initialQuote.projects[0] : null
+    const isProjectCompleted = linkedProject?.status === 'completed'
+    const displayStatus = isProjectCompleted && initialQuote?.status === 'approved' ? 'completed' : initialQuote?.status
 
     const initialDurationDays = Number(initialQuote?.estimated_duration_days || 1)
     const initialDurationUnit: 'days' | 'hours' = initialDurationDays > 0 && initialDurationDays < 1 ? 'hours' : 'days'
@@ -251,12 +321,11 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                     // In edit mode: keep existing images, add new uploads on top
                     await updateQuoteAction(initialQuote.id, finalQuoteData, itemsWithTotals, uploadedImagesData, true)
                     toast.success("Soumission mise à jour avec succès")
-                    router.push(`/quotes/${initialQuote.id}`)
                     router.refresh()
                 } else {
                     const result = await createQuoteAction(finalQuoteData, itemsWithTotals, uploadedImagesData)
                     toast.success("Soumission créée avec succès")
-                    router.push(`/quotes/${result.id}`)
+                    router.push(`/quotes/${result.id}/edit`)
                     router.refresh()
                 }
             } catch (error: any) {
@@ -268,6 +337,113 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 pb-12">
+                {initialQuote && (
+                    <div className="flex flex-col gap-4 border border-zinc-800 bg-zinc-900/50 p-4 rounded-xl mb-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm font-medium text-zinc-400">Statut actuel :</span>
+                                <div className="flex gap-2 text-sm text-zinc-400">
+                                    {displayStatus === 'draft' && <Badge className="bg-zinc-850 text-zinc-300 border border-zinc-700">Brouillon</Badge>}
+                                    {displayStatus === 'sent' && <Badge className="bg-blue-900/40 text-blue-300 border-blue-800 border">Envoyée</Badge>}
+                                    {displayStatus === 'approved' && <Badge className="bg-green-900/40 text-green-300 border-green-800 border">Approuvée</Badge>}
+                                    {displayStatus === 'completed' && <Badge className="bg-emerald-900/50 text-emerald-300 border-emerald-800 border">Complétée</Badge>}
+                                    {displayStatus === 'denied' && <Badge className="bg-red-900/40 text-red-300 border-red-800 border">Refusée</Badge>}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 pt-1">
+                            <Button 
+                                type="button"
+                                onClick={generatePDF} 
+                                disabled={isGenerating} 
+                                className="bg-zinc-100 text-zinc-900 hover:bg-zinc-200 h-9"
+                            >
+                                <Download className="mr-2 h-4 w-4" />
+                                {isGenerating ? 'Génération...' : 'Télécharger PDF'}
+                            </Button>
+
+                            <Link href={`/quotes/${initialQuote.id}`} className="group/button inline-flex h-9 items-center justify-center rounded-lg px-3 text-sm font-medium border border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 hover:text-zinc-100">
+                                <Eye className="mr-2 h-4 w-4" />
+                                Voir la soumission
+                            </Link>
+
+                            {initialQuote.status === 'draft' && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={handleMarkAsSent}
+                                    disabled={isPending}
+                                    className="border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 h-9"
+                                >
+                                    <Send className="mr-2 h-4 w-4" />
+                                    Marquer envoyée
+                                </Button>
+                            )}
+
+                            {(initialQuote.status === 'sent' || initialQuote.status === 'denied') && (
+                                <>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => handleStatusChange('approved')}
+                                        disabled={isPending}
+                                        className="border-green-300 bg-green-50 text-green-700 hover:bg-green-100 h-9"
+                                    >
+                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                        Approuver le projet
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => handleStatusChange('denied')}
+                                        disabled={isPending}
+                                        className="border-red-300 bg-red-50 text-red-700 hover:bg-red-100 h-9"
+                                    >
+                                        <XCircle className="mr-2 h-4 w-4" />
+                                        Refuser
+                                    </Button>
+                                </>
+                            )}
+
+                            {(initialQuote.status === 'approved' || initialQuote.status === 'sent' || initialQuote.status === 'denied' || initialQuote.status === 'completed') && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={handleRevertToDraft}
+                                    disabled={isPending}
+                                    className="border-yellow-800 bg-yellow-950/20 text-yellow-400 hover:bg-yellow-900/50 hover:text-yellow-300 h-9"
+                                >
+                                    <XCircle className="mr-2 h-4 w-4" />
+                                    Repasser en brouillon
+                                </Button>
+                            )}
+
+                            {initialQuote.status === 'approved' && !isProjectCompleted && (
+                                <>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => router.push(`/planification?query=${encodeURIComponent(String(initialQuote.quote_number || ''))}`)}
+                                        className="border-cyan-800 bg-cyan-950/20 text-cyan-300 hover:bg-cyan-900/50 hover:text-cyan-200 h-9"
+                                    >
+                                        Planifier la date
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={handleMarkProjectCompleted}
+                                        disabled={isPending}
+                                        className="border-emerald-800 bg-emerald-950/20 text-emerald-300 hover:bg-emerald-900/50 hover:text-emerald-200 h-9"
+                                    >
+                                        <CalendarCheck2 className="mr-2 h-4 w-4" />
+                                        Marquer job complété
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="md:col-span-2 space-y-6">
                         <Card className="border-zinc-800 bg-zinc-900">
