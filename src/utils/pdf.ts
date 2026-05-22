@@ -82,7 +82,31 @@ function calculateWallSurface(points: any, height: number | null, scale: number 
     return perimeter * h
 }
 
-function renderRoomToDataURL(points: any, roomName: string, scale: number = 20): string | null {
+function formatFeetInches(feetDecimal: number): string {
+    const totalInches = Math.round(feetDecimal * 12)
+    const feet = Math.floor(totalInches / 12)
+    const inches = totalInches % 12
+    if (inches === 0) {
+        return `${feet}'`
+    }
+    return `${feet}' ${inches}"`
+}
+
+function isClockwise(points: { x: number; y: number }[]): boolean {
+    let sum = 0
+    for (let i = 0; i < points.length; i++) {
+        const p1 = points[i]
+        const p2 = points[(i + 1) % points.length]
+        sum += (p2.x - p1.x) * (p2.y + p1.y)
+    }
+    return sum < 0
+}
+
+function renderRoomToDataURL(
+    points: any,
+    roomName: string,
+    scale: number = 20
+): { dataUrl: string; width: number; height: number } | null {
     console.log(`renderRoomToDataURL debug: Room "${roomName}", points:`, points);
     if (typeof window === 'undefined') {
         console.log("renderRoomToDataURL debug: window is undefined (SSR)");
@@ -108,7 +132,7 @@ function renderRoomToDataURL(points: any, roomName: string, scale: number = 20):
         return null
     }
 
-    const padding = 30
+    const padding = 35
     const rawWidth = (maxX - minX) + 2 * padding
     const rawHeight = (maxY - minY) + 2 * padding
 
@@ -117,62 +141,44 @@ function renderRoomToDataURL(points: any, roomName: string, scale: number = 20):
         return null
     }
 
+    const resolutionScale = 4
     const canvas = document.createElement('canvas')
-    canvas.width = rawWidth
-    canvas.height = rawHeight
+    canvas.width = rawWidth * resolutionScale
+    canvas.height = rawHeight * resolutionScale
 
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
 
+    ctx.scale(resolutionScale, resolutionScale)
+
+    // Clear background to white
     ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillRect(0, 0, rawWidth, rawHeight)
 
     const tx = -minX + padding
     const ty = -minY + padding
 
-    // Draw grid lines
-    ctx.strokeStyle = '#f1f5f9'
-    ctx.lineWidth = 0.5
-    for (let x = 0; x < canvas.width; x += scale) {
-        ctx.beginPath()
-        ctx.moveTo(x, 0)
-        ctx.lineTo(x, canvas.height)
-        ctx.stroke()
-    }
-    for (let y = 0; y < canvas.height; y += scale) {
-        ctx.beginPath()
-        ctx.moveTo(0, y)
-        ctx.lineTo(canvas.width, y)
-        ctx.stroke()
-    }
-
-    // Draw filled polygon
-    ctx.fillStyle = 'rgba(6, 182, 212, 0.05)'
+    // Draw walls: Double line CAD effect
     ctx.beginPath()
     ctx.moveTo(parsedPoints[0].x + tx, parsedPoints[0].y + ty)
     for (let i = 1; i < parsedPoints.length; i++) {
         ctx.lineTo(parsedPoints[i].x + tx, parsedPoints[i].y + ty)
     }
     ctx.closePath()
-    ctx.fill()
 
-    // Draw lines
-    ctx.strokeStyle = '#475569'
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.moveTo(parsedPoints[0].x + tx, parsedPoints[0].y + ty)
-    for (let i = 1; i < parsedPoints.length; i++) {
-        ctx.lineTo(parsedPoints[i].x + tx, parsedPoints[i].y + ty)
-    }
-    ctx.closePath()
+    // Outer stroke (black/slate-800, thick)
+    ctx.strokeStyle = '#1e293b'
+    ctx.lineWidth = 5
+    ctx.lineJoin = 'miter'
     ctx.stroke()
 
-    // Draw dimension labels
-    ctx.font = 'bold 9px Helvetica'
-    ctx.fillStyle = '#0e7490'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
+    // Inner stroke (white, thin)
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 1.5
+    ctx.lineJoin = 'miter'
+    ctx.stroke()
 
+    // Draw dimension lines and ticks
     const n = parsedPoints.length
     for (let i = 0; i < n; i++) {
         const p1 = parsedPoints[i]
@@ -181,28 +187,84 @@ function renderRoomToDataURL(points: any, roomName: string, scale: number = 20):
         const dx = p2.x - p1.x
         const dy = p2.y - p1.y
         const pixelLen = Math.sqrt(dx * dx + dy * dy)
-        if (pixelLen < 12) continue
+        if (pixelLen < 10) continue
 
         const feetLen = pixelLen / scale
 
-        const midX = (p1.x + p2.x) / 2 + tx
-        const midY = (p1.y + p2.y) / 2 + ty
+        // Outward normal vector
+        const cw = isClockwise(parsedPoints)
+        const nx = cw ? dy / pixelLen : -dy / pixelLen
+        const ny = cw ? -dx / pixelLen : dx / pixelLen
 
+        // Dimension lines offsets
+        const offset = 18
+        const extGap = 2
+        const extExtend = 3
+
+        const d1x = p1.x + tx + nx * offset
+        const d1y = p1.y + ty + ny * offset
+        const d2x = p2.x + tx + nx * offset
+        const d2y = p2.y + ty + ny * offset
+
+        const e1ex = p1.x + tx + nx * (offset + extExtend)
+        const e1ey = p1.y + ty + ny * (offset + extExtend)
+        const e2ex = p2.x + tx + nx * (offset + extExtend)
+        const e2ey = p2.y + ty + ny * (offset + extExtend)
+
+        // Draw extension lines (thin gray)
+        ctx.strokeStyle = '#64748b'
+        ctx.lineWidth = 0.5
+        ctx.beginPath()
+        ctx.moveTo(p1.x + tx + nx * extGap, p1.y + ty + ny * extGap)
+        ctx.lineTo(e1ex, e1ey)
+        ctx.moveTo(p2.x + tx + nx * extGap, p2.y + ty + ny * extGap)
+        ctx.lineTo(e2ex, e2ey)
+        ctx.stroke()
+
+        // Draw the dimension line
+        ctx.beginPath()
+        ctx.moveTo(d1x, d1y)
+        ctx.lineTo(d2x, d2y)
+        ctx.stroke()
+
+        // Draw 45-degree architectural ticks at d1 and d2
+        const tickSize = 3
+        ctx.strokeStyle = '#000000'
+        ctx.lineWidth = 1.0
+        ctx.beginPath()
+        ctx.moveTo(d1x - tickSize, d1y + tickSize)
+        ctx.lineTo(d1x + tickSize, d1y - tickSize)
+        ctx.moveTo(d2x - tickSize, d2y + tickSize)
+        ctx.lineTo(d2x + tickSize, d2y - tickSize)
+        ctx.stroke()
+
+        // Draw the dimension label text
+        const midX = (d1x + d2x) / 2
+        const midY = (d1y + d2y) / 2
         const angle = Math.atan2(dy, dx)
-        const offset = 10
-        const textX = midX + Math.sin(angle) * offset
-        const textY = midY - Math.cos(angle) * offset
+        
+        let textAngle = angle
+        if (textAngle < -Math.PI / 2) textAngle += Math.PI
+        if (textAngle > Math.PI / 2) textAngle -= Math.PI
+
+        ctx.save()
+        ctx.translate(midX, midY)
+        ctx.rotate(textAngle)
+
+        ctx.font = 'bold 7.5px Helvetica'
+        const label = formatFeetInches(feetLen)
+        const textWidth = ctx.measureText(label).width + 3
+        const textHeight = 7
 
         ctx.fillStyle = '#ffffff'
-        const label = `M${i + 1}: ${feetLen.toFixed(1)}'`
-        const textWidth = ctx.measureText(label).width + 6
-        ctx.fillRect(textX - textWidth / 2, textY - 6, textWidth, 12)
-        ctx.strokeStyle = '#cbd5e1'
-        ctx.lineWidth = 0.5
-        ctx.strokeRect(textX - textWidth / 2, textY - 6, textWidth, 12)
+        ctx.fillRect(-textWidth / 2, -textHeight / 2, textWidth, textHeight)
 
-        ctx.fillStyle = '#0f172a'
-        ctx.fillText(label, textX, textY + 0.5)
+        ctx.fillStyle = '#000000'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(label, 0, 0)
+
+        ctx.restore()
     }
 
     // Centroid room name
@@ -214,18 +276,25 @@ function renderRoomToDataURL(points: any, roomName: string, scale: number = 20):
     const centroidX = sumX / parsedPoints.length + tx
     const centroidY = sumY / parsedPoints.length + ty
 
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)'
-    const textWidth = ctx.measureText(roomName).width + 12
-    ctx.fillRect(centroidX - textWidth / 2, centroidY - 8, textWidth, 16)
-    ctx.strokeStyle = '#475569'
-    ctx.lineWidth = 0.5
-    ctx.strokeRect(centroidX - textWidth / 2, centroidY - 8, textWidth, 16)
+    ctx.font = 'bold 8.5px Helvetica'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
 
-    ctx.font = 'bold 9px Helvetica'
-    ctx.fillStyle = '#ffffff'
-    ctx.fillText(roomName, centroidX, centroidY + 0.5)
+    // White halo outline
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 2.5
+    ctx.lineJoin = 'round'
+    ctx.strokeText(roomName, centroidX, centroidY)
 
-    return canvas.toDataURL('image/jpeg', 0.95)
+    // Black text fill
+    ctx.fillStyle = '#000000'
+    ctx.fillText(roomName, centroidX, centroidY)
+
+    return {
+        dataUrl: canvas.toDataURL('image/png'),
+        width: rawWidth,
+        height: rawHeight
+    }
 }
 
 export async function downloadQuotePDF(quote: any, settings: any) {
@@ -727,13 +796,22 @@ export async function downloadQuotePDF(quote: any, settings: any) {
 
             for (const room of allRooms) {
                 const hasDrawing = room.points && room.points.length >= 3
-                checkNewPage(hasDrawing ? 75 : 30)
+                checkNewPage(hasDrawing ? 72 : 30)
 
                 doc.setFont('Helvetica', 'bold')
                 doc.setFontSize(11)
-                doc.setTextColor(14, 116, 144) // cyan-700
-                doc.text(`${room.sectionName} - ${room.name}`, margin, y)
-                y += 5
+                doc.setTextColor(15, 23, 42) // slate-900
+                const titleStr = room.sectionName ? `${room.sectionName} - ${room.name}` : room.name
+                doc.text(titleStr, margin, y)
+
+                const heightVal = room.height || 8.0
+                doc.text(`Hauteur du plafond: ${heightVal}'`, pageWidth - margin, y, { align: 'right' })
+
+                y += 2
+                doc.setDrawColor(0, 0, 0)
+                doc.setLineWidth(0.5)
+                doc.line(margin, y, pageWidth - margin, y)
+                y += 6
 
                 if (room.description) {
                     doc.setFont('Helvetica', 'italic')
@@ -743,47 +821,112 @@ export async function downloadQuotePDF(quote: any, settings: any) {
                     y += 5
                 }
 
-                const perimeter = calculatePerimeter(room.points)
-                const area = calculateFloorArea(room.points)
-                const wallSurface = calculateWallSurface(room.points, room.height)
-                const heightVal = room.height || 8.0
-
-                doc.setFont('Helvetica', 'normal')
-                doc.setFontSize(9)
-                doc.setTextColor(51, 65, 85)
-
-                let metricsText = `Périmètre: ${perimeter.toFixed(1)} pi  |  Aire au sol: ${area.toFixed(1)} pi²  |  Hauteur: ${heightVal.toFixed(1)} pi  |  Surface des murs: ${wallSurface.toFixed(1)} pi²`
-                doc.text(metricsText, margin, y)
-                y += 6
-
                 if (hasDrawing) {
-                    const dataUrl = renderRoomToDataURL(room.points, room.name)
-                    if (dataUrl) {
+                    const rendered = renderRoomToDataURL(room.points, room.name)
+                    if (rendered) {
                         try {
-                            const boxW = 100
-                            const boxH = 50
-                            
-                            doc.setFillColor(248, 250, 252)
-                            doc.rect(margin, y, boxW, boxH, 'F')
-                            doc.setDrawColor(226, 232, 240)
-                            doc.setLineWidth(0.3)
-                            doc.rect(margin, y, boxW, boxH)
+                            const { dataUrl, width, height } = rendered
+                            const ratio = width / height
 
-                            doc.addImage(dataUrl, 'JPEG', margin + 1, y + 1, boxW - 2, boxH - 2)
+                            const boxW = 55
+                            const boxH = 55
 
+                            let drawW = boxW
+                            let drawH = boxH
+                            if (ratio > 1) {
+                                drawH = boxW / ratio
+                            } else {
+                                drawW = boxH * ratio
+                            }
+
+                            const xOffset = (boxW - drawW) / 2
+                            const yOffset = (boxH - drawH) / 2
+
+                            doc.addImage(dataUrl, 'PNG', margin + xOffset, y + yOffset, drawW, drawH)
+
+                            // Render metrics in two columns next to the drawing
+                            const perimeter = calculatePerimeter(room.points)
+                            const area = calculateFloorArea(room.points)
+                            const wallSurface = calculateWallSurface(room.points, room.height)
+
+                            const plancherVal = area
+                            const plafondVal = area
+                            const mursVal = wallSurface
+                            const mursEtPlafondVal = wallSurface + area
+                            const solVgVal = area / 9
+                            const perimPlancherVal = perimeter
+                            const perimPlafondVal = perimeter
+
+                            const formatNum = (val: number) => val.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+                            const metricsList = [
+                                {
+                                    col1Num: formatNum(mursVal),
+                                    col1Label: 'pi² murs',
+                                    col2Num: formatNum(plafondVal),
+                                    col2Label: 'pi² plafond'
+                                },
+                                {
+                                    col1Num: formatNum(mursEtPlafondVal),
+                                    col1Label: 'pi² murs et plafond',
+                                    col2Num: formatNum(plancherVal),
+                                    col2Label: 'pi² plancher'
+                                },
+                                {
+                                    col1Num: formatNum(solVgVal),
+                                    col1Label: 'vg² revêtement de sol',
+                                    col2Num: formatNum(perimPlancherVal),
+                                    col2Label: 'pi lin. périmètre du plancher'
+                                },
+                                {
+                                    col1Num: formatNum(perimPlafondVal),
+                                    col1Label: 'pi lin. périmètre du plafond',
+                                    col2Num: '',
+                                    col2Label: ''
+                                }
+                            ]
+
+                            doc.setFont('Helvetica', 'normal')
+                            doc.setFontSize(8.5)
+                            doc.setTextColor(0, 0, 0)
+
+                            const col1NumX = 95
+                            const col1LabelX = 97
+                            const col2NumX = 150
+                            const col2LabelX = 152
+
+                            let metricsY = y + 8
+                            metricsList.forEach(row => {
+                                // Draw column 1
+                                doc.text(row.col1Num, col1NumX, metricsY, { align: 'right' })
+                                doc.text(row.col1Label, col1LabelX, metricsY)
+
+                                // Draw column 2
+                                if (row.col2Num) {
+                                    doc.text(row.col2Num, col2NumX, metricsY, { align: 'right' })
+                                    doc.text(row.col2Label, col2LabelX, metricsY)
+                                }
+                                metricsY += 6
+                            })
+
+                            // Move y down past the drawing/metrics block
+                            y += boxH + 4
+
+                            // List linked items below
                             const linkedItems = (quote.quote_items || []).filter((item: any) => item.planning_room_id === room.id)
                             if (linkedItems.length > 0) {
-                                const listX = margin + boxW + 8
+                                checkNewPage(15)
                                 doc.setFont('Helvetica', 'bold')
                                 doc.setFontSize(9)
                                 doc.setTextColor(15, 23, 42)
-                                doc.text('Items liés à cette pièce:', listX, y + 4)
+                                doc.text('Items liés à cette pièce :', margin, y)
+                                y += 5
 
                                 doc.setFont('Helvetica', 'normal')
                                 doc.setFontSize(8.5)
                                 doc.setTextColor(71, 85, 105)
-                                let itemY = y + 9
-                                linkedItems.forEach((item: any) => {
+
+                                for (const item of linkedItems) {
                                     let sourceLabel = ''
                                     if (item.planning_measurement_source === 'perimeter') {
                                         sourceLabel = 'Périmètre'
@@ -800,18 +943,18 @@ export async function downloadQuotePDF(quote: any, settings: any) {
                                         const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
                                         sourceLabel = `Murs spéc. (surface: ${wallList})`
                                     }
-                                    const itemText = `- ${item.title} (${item.quantity} ${item.unit || ''} - via ${sourceLabel})`
-                                    const lines = doc.splitTextToSize(itemText, contentWidth - boxW - 10)
-                                    lines.forEach((line: string) => {
-                                        if (itemY < y + boxH) {
-                                            doc.text(line, listX, itemY)
-                                            itemY += 4
-                                        }
-                                    })
-                                })
-                            }
 
-                            y += boxH + 8
+                                    const formattedQty = Number(item.quantity || 0).toLocaleString('fr-CA', { maximumFractionDigits: 2 })
+                                    const itemText = `- ${item.title} (${formattedQty} ${item.unit || ''} - via ${sourceLabel})`
+                                    const lines = doc.splitTextToSize(itemText, contentWidth - 4)
+
+                                    checkNewPage(lines.length * 4)
+                                    lines.forEach((line: string) => {
+                                        doc.text(line, margin + 2, y)
+                                        y += 4
+                                    })
+                                }
+                            }
                         } catch (err) {
                             console.error('Error drawing room in PDF:', err)
                             y += 5
@@ -820,10 +963,65 @@ export async function downloadQuotePDF(quote: any, settings: any) {
                         y += 5
                     }
                 } else {
-                    y += 5
+                    // No drawing: just list metrics and linked items flatly
+                    const perimeter = calculatePerimeter(room.points)
+                    const area = calculateFloorArea(room.points)
+                    const wallSurface = calculateWallSurface(room.points, room.height)
+                    const heightVal = room.height || 8.0
+
+                    doc.setFont('Helvetica', 'normal')
+                    doc.setFontSize(9)
+                    doc.setTextColor(51, 65, 85)
+
+                    let metricsText = `Périmètre: ${perimeter.toFixed(1)} pi  |  Aire au sol: ${area.toFixed(1)} pi²  |  Hauteur: ${heightVal.toFixed(1)} pi  |  Surface des murs: ${wallSurface.toFixed(1)} pi²`
+                    doc.text(metricsText, margin, y)
+                    y += 6
+
+                    const linkedItems = (quote.quote_items || []).filter((item: any) => item.planning_room_id === room.id)
+                    if (linkedItems.length > 0) {
+                        checkNewPage(15)
+                        doc.setFont('Helvetica', 'bold')
+                        doc.setFontSize(9)
+                        doc.setTextColor(15, 23, 42)
+                        doc.text('Items liés à cette pièce :', margin, y)
+                        y += 5
+
+                        doc.setFont('Helvetica', 'normal')
+                        doc.setFontSize(8.5)
+                        doc.setTextColor(71, 85, 105)
+
+                        for (const item of linkedItems) {
+                            let sourceLabel = ''
+                            if (item.planning_measurement_source === 'perimeter') {
+                                sourceLabel = 'Périmètre'
+                            } else if (item.planning_measurement_source === 'area') {
+                                sourceLabel = 'Aire au sol'
+                            } else if (item.planning_measurement_source === 'wall_surface') {
+                                sourceLabel = 'Surface murs'
+                            } else if (item.planning_measurement_source === 'selected_walls_linear') {
+                                const segments = item.planning_selected_segments || []
+                                const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
+                                sourceLabel = `Murs spéc. (linéaire: ${wallList})`
+                            } else if (item.planning_measurement_source === 'selected_walls_surface') {
+                                const segments = item.planning_selected_segments || []
+                                const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
+                                sourceLabel = `Murs spéc. (surface: ${wallList})`
+                            }
+
+                            const formattedQty = Number(item.quantity || 0).toLocaleString('fr-CA', { maximumFractionDigits: 2 })
+                            const itemText = `- ${item.title} (${formattedQty} ${item.unit || ''} - via ${sourceLabel})`
+                            const lines = doc.splitTextToSize(itemText, contentWidth - 4)
+
+                            checkNewPage(lines.length * 4)
+                            lines.forEach((line: string) => {
+                                doc.text(line, margin + 2, y)
+                                y += 4
+                            })
+                        }
+                    }
                 }
                 
-                y += 4
+                y += 6
             }
         }
 
