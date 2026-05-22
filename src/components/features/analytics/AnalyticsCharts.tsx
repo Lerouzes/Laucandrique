@@ -1,15 +1,13 @@
 'use client'
 
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Cell } from 'recharts'
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Cell, Legend } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-
-const BAR_COLORS = ['#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e']
 
 export function AnalyticsCharts({ monthlyRevenue }: { monthlyRevenue: any[] }) {
     return (
         <Card className="bg-zinc-950/40 border-zinc-850 p-6 rounded-2xl shadow-xl">
             <CardHeader className="px-0 pt-0">
-                <CardTitle className="text-zinc-100 text-base font-semibold">Revenus Mensuels</CardTitle>
+                <CardTitle className="text-zinc-100 text-base font-semibold">Répartition Mensuelle du Pipeline</CardTitle>
             </CardHeader>
             <CardContent className="px-0 pb-0">
                 <div className="h-[300px] w-full mt-4">
@@ -44,14 +42,15 @@ export function AnalyticsCharts({ monthlyRevenue }: { monthlyRevenue: any[] }) {
                                         boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)'
                                     }} 
                                     itemStyle={{ color: '#f4f4f5' }}
-                                    formatter={(value: number) => [`$${value.toLocaleString('fr-CA')}`, 'Revenus Projetés']}
+                                    formatter={(value: number, name: string) => [
+                                        `$${value.toLocaleString('fr-CA')}`, 
+                                        name === 'approved' ? 'Signé (Approuvé)' : 'En attente (Envoyé)'
+                                    ]}
                                     labelStyle={{ color: '#a1a1aa', fontWeight: 'bold' }}
                                 />
-                                <Bar dataKey="total" radius={[4, 4, 0, 0]} maxBarSize={45}>
-                                    {monthlyRevenue.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={BAR_COLORS[index % BAR_COLORS.length]} />
-                                    ))}
-                                </Bar>
+                                <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }} />
+                                <Bar dataKey="approved" stackId="a" fill="#06b6d4" name="Signé (Approuvé)" />
+                                <Bar dataKey="sent" stackId="a" fill="#f59e0b" name="En attente (Envoyé)" radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     )}

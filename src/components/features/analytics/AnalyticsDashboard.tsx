@@ -72,6 +72,9 @@ export function AnalyticsDashboard({
     // 3. Tab State for active visualization view
     const [activeTab, setActiveTab] = useState<'revenues' | 'managers' | 'teams' | 'contractors'>('revenues')
 
+    // 4. Pipeline mode (approved vs all pending+approved)
+    const [pipelineMode, setPipelineMode] = useState<'approved' | 'all'>('approved')
+
     // List of all unique managers, teams, and contractors in the system for filter dropdowns
     const availableManagers = useMemo(() => {
         if (allManagers && allManagers.length > 0) {
@@ -198,9 +201,17 @@ export function AnalyticsDashboard({
     const deniedQuotes = useMemo(() => filteredQuotes.filter((q: any) => q.status === 'denied'), [filteredQuotes])
     const sentQuotes = useMemo(() => filteredQuotes.filter((q: any) => q.status === 'sent'), [filteredQuotes])
 
+    const totalSentRevenue = useMemo(() => {
+        return sentQuotes.reduce((acc, q) => acc + (q.total || 0), 0)
+    }, [sentQuotes])
+
     const totalProjectedRevenue = useMemo(() => {
-        return approvedQuotes.reduce((acc, q) => acc + (q.total || 0), 0)
-    }, [approvedQuotes])
+        const approvedSum = approvedQuotes.reduce((acc, q) => acc + (q.total || 0), 0)
+        if (pipelineMode === 'all') {
+            return approvedSum + totalSentRevenue
+        }
+        return approvedSum
+    }, [approvedQuotes, totalSentRevenue, pipelineMode])
 
     const totalRealizedRevenue = useMemo(() => {
         return completedProjects.reduce((acc, p) => acc + Number(p.quotes?.total || 0), 0)
@@ -216,8 +227,9 @@ export function AnalyticsDashboard({
     }, [approvedQuotes, deniedQuotes])
 
     const averageDealSize = useMemo(() => {
-        return approvedQuotes.length > 0 ? totalProjectedRevenue / approvedQuotes.length : 0
-    }, [approvedQuotes, totalProjectedRevenue])
+        const count = pipelineMode === 'all' ? (approvedQuotes.length + sentQuotes.length) : approvedQuotes.length
+        return count > 0 ? totalProjectedRevenue / count : 0
+    }, [approvedQuotes, sentQuotes, totalProjectedRevenue, pipelineMode])
 
     // --- CHART DATA GENERATION ---
 
@@ -245,8 +257,9 @@ export function AnalyticsDashboard({
             }
         }
 
-        // Add projected from approved quotes
-        approvedQuotes.forEach((q) => {
+        // Add projected from approved quotes (and sent quotes if pipelineMode is 'all')
+        const targetQuotes = pipelineMode === 'all' ? [...approvedQuotes, ...sentQuotes] : approvedQuotes
+        targetQuotes.forEach((q) => {
             const d = getQuoteTargetDate(q)
             const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
             if (trendMap[key]) {
@@ -266,7 +279,7 @@ export function AnalyticsDashboard({
         })
 
         return Object.values(trendMap).sort((a, b) => a.sortKey.localeCompare(b.sortKey))
-    }, [dateRange, approvedQuotes, completedProjects])
+    }, [dateRange, approvedQuotes, sentQuotes, completedProjects, pipelineMode])
 
     // 2. Status breakdown (Pie Chart)
     const statusData = useMemo(() => {
@@ -289,22 +302,30 @@ export function AnalyticsDashboard({
                 stats[name] = { name, total: 0, approved: 0, denied: 0, revenue: 0 }
             }
             stats[name].total += 1
-            if (q.status === 'approved') {
+            const isApproved = q.status === 'approved'
+            const isSent = q.status === 'sent'
+            const countsAsRevenue = isApproved || (pipelineMode === 'all' && isSent)
+
+            if (isApproved) {
                 stats[name].approved += 1
-                stats[name].revenue += q.total || 0
             } else if (q.status === 'denied') {
                 stats[name].denied += 1
+            }
+
+            if (countsAsRevenue) {
+                stats[name].revenue += q.total || 0
             }
         })
 
         return Object.values(stats).sort((a, b) => b.revenue - a.revenue)
-    }, [filteredQuotes])
+    }, [filteredQuotes, pipelineMode])
 
     // 4. Team Revenue Segmentation
     const teamSegmentation = useMemo(() => {
         const stats: Record<string, { team: string, value: number }> = {}
 
-        approvedQuotes.forEach((q: any) => {
+        const targetQuotes = pipelineMode === 'all' ? [...approvedQuotes, ...sentQuotes] : approvedQuotes
+        targetQuotes.forEach((q: any) => {
             const teamName = q.managers?.manager_teams?.name || 'Sans équipe'
             if (!stats[teamName]) {
                 stats[teamName] = { team: teamName, value: 0 }
@@ -313,7 +334,7 @@ export function AnalyticsDashboard({
         })
 
         return Object.values(stats).sort((a, b) => b.value - a.value)
-    }, [approvedQuotes])
+    }, [approvedQuotes, sentQuotes, pipelineMode])
 
     // 5. Contractor Segmentation
     const contractorSegmentation = useMemo(() => {
@@ -339,6 +360,7 @@ export function AnalyticsDashboard({
         setSelectedManagers([])
         setSelectedTeams([])
         setSelectedContractors([])
+        setPipelineMode('approved')
     }
 
     const toggleManager = (id: string) => {
@@ -365,7 +387,7 @@ export function AnalyticsDashboard({
                                 Période & Segmentations
                             </h3>
                             <p className="text-xs text-zinc-400">
-                                Affinez vos analyses en filtrant par date, gestionnaire, équipe et contracteur.
+                                Affinez vos analyses en filtrant par date, visualisation, gestionnaire, équipe et contracteur.
                             </p>
                         </div>
                         <Button
@@ -378,7 +400,7 @@ export function AnalyticsDashboard({
                         </Button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-2 border-t border-zinc-900">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6 pt-2 border-t border-zinc-900">
                         {/* Time Presets */}
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Période</label>
@@ -410,6 +432,19 @@ export function AnalyticsDashboard({
                                     />
                                 </div>
                             )}
+                        </div>
+
+                        {/* Visualisation Mode (Pipeline Mode) */}
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Visualisation</label>
+                            <select
+                                value={pipelineMode}
+                                onChange={(e: any) => setPipelineMode(e.target.value as 'approved' | 'all')}
+                                className="w-full h-9 rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                            >
+                                <option value="approved">Signé uniquement</option>
+                                <option value="all">Pipeline complet (Signé + Envoyé)</option>
+                            </select>
                         </div>
 
                         {/* Managers */}
@@ -503,13 +538,18 @@ export function AnalyticsDashboard({
                     <div className="absolute top-4 right-4 rounded-xl bg-cyan-950/50 p-2 border border-cyan-800/30 group-hover:scale-110 transition-transform">
                         <DollarSign className="h-5 w-5 text-cyan-400" />
                     </div>
-                    <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Revenu Projeté</p>
+                    <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                        {pipelineMode === 'all' ? 'Pipeline Total (Signé + Envoyé)' : 'Revenu Projeté (Signé)'}
+                    </p>
                     <h3 className="mt-3 text-3xl font-extrabold text-zinc-100 tracking-tight">
                         ${Math.round(totalProjectedRevenue).toLocaleString('fr-CA')}
                     </h3>
                     <p className="mt-2 text-xxs text-zinc-500 flex items-center gap-1">
                         <CheckCircle2 className="h-3 w-3 text-cyan-500" />
-                        Sur {approvedQuotes.length} soumissions approuvées
+                        {pipelineMode === 'all'
+                            ? `Sur ${approvedQuotes.length} approuvées & ${sentQuotes.length} envoyées`
+                            : `Sur ${approvedQuotes.length} soumissions approuvées`
+                        }
                     </p>
                 </div>
 
@@ -553,7 +593,10 @@ export function AnalyticsDashboard({
                         ${Math.round(averageDealSize).toLocaleString('fr-CA')}
                     </h3>
                     <p className="mt-2 text-xxs text-zinc-500 flex items-center gap-1">
-                        Valeur moyenne par projet signé
+                        {pipelineMode === 'all'
+                            ? "Valeur moyenne par soumission (signée ou envoyée)"
+                            : "Valeur moyenne par soumission signée"
+                        }
                     </p>
                 </div>
             </div>
@@ -611,7 +654,10 @@ export function AnalyticsDashboard({
                             <CardHeader className="px-0 pt-0">
                                 <CardTitle className="text-zinc-100 text-base">Évolution des Revenus Mensuels</CardTitle>
                                 <CardDescription className="text-zinc-400 text-xs">
-                                    Visualisez le chiffre d'affaires projeté (soumissions approuvées) par rapport au chiffre d'affaires réel (projets complétés).
+                                    {pipelineMode === 'all'
+                                        ? "Visualisez le pipeline total (soumissions approuvées + envoyées) par rapport au chiffre d'affaires réel (projets complétés)."
+                                        : "Visualisez le chiffre d'affaires projeté (soumissions approuvées) par rapport au chiffre d'affaires réel (projets complétés)."
+                                    }
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="px-0 pb-0">
@@ -644,15 +690,15 @@ export function AnalyticsDashboard({
                                                         backdropFilter: 'blur(8px)',
                                                         boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5)'
                                                     }}
-                                                    formatter={(v: number, name) => [
+                                                    formatter={(v: number, name: string) => [
                                                         `$${v.toLocaleString('fr-CA')}`,
-                                                        name === 'projected' ? 'Projeté (Signé)' : 'Réel (Complété)'
+                                                        name
                                                     ]}
                                                     labelStyle={{ color: '#a1a1aa', fontWeight: 'bold', fontSize: '12px' }}
                                                 />
                                                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }} />
-                                                <Area type="monotone" name="projected" dataKey="projected" stroke={COLORS.cyan} strokeWidth={2.5} fillOpacity={1} fill="url(#colorProjected)" />
-                                                <Area type="monotone" name="realized" dataKey="realized" stroke={COLORS.emerald} strokeWidth={2.5} fillOpacity={1} fill="url(#colorRealized)" />
+                                                <Area type="monotone" name={pipelineMode === 'all' ? 'Pipeline (Signé + Envoyé)' : 'Projeté (Signé)'} dataKey="projected" stroke={COLORS.cyan} strokeWidth={2.5} fillOpacity={1} fill="url(#colorProjected)" />
+                                                <Area type="monotone" name="Réel (Complété)" dataKey="realized" stroke={COLORS.emerald} strokeWidth={2.5} fillOpacity={1} fill="url(#colorRealized)" />
                                             </AreaChart>
                                         </ResponsiveContainer>
                                     )}
@@ -666,7 +712,10 @@ export function AnalyticsDashboard({
                             <CardHeader className="px-0 pt-0">
                                 <CardTitle className="text-zinc-100 text-base">Performance par Gestionnaire</CardTitle>
                                 <CardDescription className="text-zinc-400 text-xs">
-                                    Comparatif du volume d'affaires signé par chaque gestionnaire sur la période.
+                                    {pipelineMode === 'all'
+                                        ? "Comparatif du pipeline (soumissions signées + envoyées) par chaque gestionnaire sur la période."
+                                        : "Comparatif du volume d'affaires signé par chaque gestionnaire sur la période."
+                                    }
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="px-0 pb-0">
@@ -691,12 +740,14 @@ export function AnalyticsDashboard({
                                                     }}
                                                     formatter={(v: number, name) => [
                                                         name === 'revenue' ? `$${v.toLocaleString('fr-CA')}` : v,
-                                                        name === 'revenue' ? 'Revenu Signé' : name === 'approved' ? 'Approuvées' : 'Total Soumissions'
+                                                        name === 'revenue' 
+                                                            ? (pipelineMode === 'all' ? 'Pipeline (Signé + Envoyé)' : 'Revenu Signé') 
+                                                            : name === 'approved' ? 'Approuvées' : 'Total Soumissions'
                                                     ]}
                                                 />
                                                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }} />
-                                                <Bar name="revenue" dataKey="revenue" fill={COLORS.indigo} radius={[4, 4, 0, 0]} maxBarSize={45} />
-                                                <Bar name="approved" dataKey="approved" fill={COLORS.cyan} radius={[4, 4, 0, 0]} maxBarSize={45} />
+                                                <Bar name={pipelineMode === 'all' ? 'Pipeline (Signé + Envoyé)' : 'Revenu Signé'} dataKey="revenue" fill={COLORS.indigo} radius={[4, 4, 0, 0]} maxBarSize={45} />
+                                                <Bar name="Approuvées" dataKey="approved" fill={COLORS.cyan} radius={[4, 4, 0, 0]} maxBarSize={45} />
                                             </BarChart>
                                         </ResponsiveContainer>
                                     )}
@@ -710,7 +761,10 @@ export function AnalyticsDashboard({
                             <CardHeader className="px-0 pt-0">
                                 <CardTitle className="text-zinc-100 text-base">Répartition par Équipe</CardTitle>
                                 <CardDescription className="text-zinc-400 text-xs">
-                                    Répartition en volume de chiffre d'affaires approuvé par équipe de gestion.
+                                    {pipelineMode === 'all'
+                                        ? "Répartition en volume du pipeline (approuvé + envoyé) par équipe de gestion."
+                                        : "Répartition en volume de chiffre d'affaires approuvé par équipe de gestion."
+                                    }
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="px-0 pb-0">
@@ -868,7 +922,9 @@ export function AnalyticsDashboard({
                             <div className="space-y-3.5">
                                 {activeTab === 'revenues' && (
                                     <>
-                                        <span className="text-xxs font-bold text-zinc-500 uppercase tracking-wider block">Revenus par Gestionnaire</span>
+                                        <span className="text-xxs font-bold text-zinc-500 uppercase tracking-wider block">
+                                            {pipelineMode === 'all' ? 'Pipeline par Gestionnaire' : 'Revenus par Gestionnaire'}
+                                        </span>
                                         {managerSegmentation.slice(0, 4).map((mgr) => {
                                             const conversion = mgr.total ? Math.round((mgr.approved / mgr.total) * 100) : 0
                                             return (
@@ -907,7 +963,9 @@ export function AnalyticsDashboard({
 
                                 {activeTab === 'teams' && (
                                     <>
-                                        <span className="text-xxs font-bold text-zinc-500 uppercase tracking-wider block">Revenus par Équipe</span>
+                                        <span className="text-xxs font-bold text-zinc-500 uppercase tracking-wider block">
+                                            {pipelineMode === 'all' ? 'Pipeline par Équipe' : 'Revenus par Équipe'}
+                                        </span>
                                         {teamSegmentation.map((item) => (
                                             <div key={item.team} className="flex items-center justify-between border-b border-zinc-900 pb-2 text-xs">
                                                 <span className="font-semibold text-zinc-200">{item.team}</span>

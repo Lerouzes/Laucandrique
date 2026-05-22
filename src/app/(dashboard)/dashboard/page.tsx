@@ -84,14 +84,16 @@ export default async function DashboardPage({
         const d = new Date(project?.start_date || q.approved_at || q.created_at)
         return d >= range.start && d <= range.end
     })
-    const totalApprovedValue = rangeApprovedQuotes.reduce((acc: number, q: any) => acc + (q.total || 0), 0)
-
+        const totalApprovedValue = rangeApprovedQuotes.reduce((acc: number, q: any) => acc + (q.total || 0), 0)
+ 
     // Filter sent quotes by date range
     const rangeSentQuotes = sentQuotes.filter((q: any) => {
         const d = new Date(q.created_at)
         return d >= range.start && d <= range.end
     })
-
+    const totalSentValue = rangeSentQuotes.reduce((acc: number, q: any) => acc + (q.total || 0), 0)
+    const totalPipelineValue = totalApprovedValue + totalSentValue
+ 
     const activeProjects = projects.filter((p: any) => {
         if (!(p.status === 'in_progress' || p.status === 'planned')) return false
         const managerId = p.quotes?.manager_id || 'none'
@@ -100,12 +102,12 @@ export default async function DashboardPage({
         const teamMatch = selectedTeams.length === 0 || selectedTeams.includes(teamName)
         return managerMatch && teamMatch
     })
-
+ 
     const rangeActiveProjects = activeProjects.filter((p: any) => {
         const d = new Date(p.start_date || p.created_at)
         return d >= range.start && d <= range.end
     })
-
+ 
     // Unplanned projects (approved quotes with no calendar date yet)
     const unplannedProjects = projects.filter((p: any) => {
         if (p.status !== 'unplanned') return false
@@ -115,28 +117,44 @@ export default async function DashboardPage({
         const teamMatch = selectedTeams.length === 0 || selectedTeams.includes(teamName)
         return managerMatch && teamMatch
     })
-
+ 
     const rangeUnplannedProjects = unplannedProjects.filter((p: any) => {
         const d = new Date(p.start_date || p.created_at)
         return d >= range.start && d <= range.end
     })
-
+ 
     // Monthly aggregation
-    const monthlyMap: Record<string, number> = {}
+    const monthlyMap: Record<string, { approved: number, sent: number }> = {}
     filteredQuotes
-        .filter((q: any) => q.status === 'approved')
         .forEach((q: any) => {
+            if (q.status !== 'approved' && q.status !== 'sent') return
             const project = q.projects?.[0]
             const dateStr = project?.start_date || q.approved_at || q.created_at
             const d = new Date(dateStr)
             if (d >= range.start && d <= range.end) {
                 const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-                monthlyMap[key] = (monthlyMap[key] || 0) + (q.total || 0)
+                if (!monthlyMap[key]) {
+                    monthlyMap[key] = { approved: 0, sent: 0 }
+                }
+                if (q.status === 'approved') {
+                    monthlyMap[key].approved += (q.total || 0)
+                } else {
+                    monthlyMap[key].sent += (q.total || 0)
+                }
             }
         })
     const monthlyRevenue = Object.entries(monthlyMap)
         .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([month, total]) => ({ month, total }))
+        .map(([month, val]) => {
+            const [y, m] = month.split('-')
+            const date = new Date(parseInt(y), parseInt(m) - 1, 1)
+            const label = date.toLocaleDateString('fr-CA', { month: 'short', year: '2-digit' })
+            return {
+                month: label,
+                approved: Math.round(val.approved),
+                sent: Math.round(val.sent)
+            }
+        })
 
     const availableManagers = Array.from(new Set(quotes.map((q: any) => q.manager_id).filter(Boolean)))
     const availableTeams = Array.from(new Set(quotes.map((q: any) => q.managers?.manager_teams?.name).filter(Boolean)))
@@ -257,12 +275,12 @@ export default async function DashboardPage({
                     <div className="absolute top-4 right-4 rounded-xl bg-cyan-950/50 p-2 border border-cyan-800/30 group-hover:scale-110 transition-transform">
                         <Banknote className="h-5 w-5 text-cyan-400" />
                     </div>
-                    <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Revenus Projetés</p>
+                    <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Revenus Signés (Approuvés)</p>
                     <h3 className="mt-3 text-2xl sm:text-3xl font-extrabold text-zinc-100 tracking-tight">
                         ${Math.round(totalApprovedValue).toLocaleString('fr-CA')}
                     </h3>
-                    <p className="mt-2 text-xxs text-zinc-500 flex items-center gap-1">
-                        Sur {rangeApprovedQuotes.length} soumissions approuvées
+                    <p className="mt-2 text-xxs text-zinc-400 flex items-center gap-1">
+                        Pipeline total : <strong className="text-cyan-400">${Math.round(totalPipelineValue).toLocaleString('fr-CA')}</strong>
                     </p>
                 </div>
 
@@ -285,12 +303,12 @@ export default async function DashboardPage({
                     <div className="absolute top-4 right-4 rounded-xl bg-amber-950/50 p-2 border border-amber-800/30 group-hover:scale-110 transition-transform">
                         <Send className="h-5 w-5 text-amber-400" />
                     </div>
-                    <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Envoyées en attente</p>
+                    <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Pipeline en attente (Envoyées)</p>
                     <h3 className="mt-3 text-2xl sm:text-3xl font-extrabold text-zinc-100 tracking-tight">
-                        {rangeSentQuotes.length}
+                        ${Math.round(totalSentValue).toLocaleString('fr-CA')}
                     </h3>
                     <p className="mt-2 text-xxs text-zinc-500">
-                        En attente d'une décision client
+                        Sur {rangeSentQuotes.length} soumissions en attente
                     </p>
                 </div>
 
