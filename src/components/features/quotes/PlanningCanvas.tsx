@@ -21,6 +21,7 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
     const [mode, setMode] = useState<'draw' | 'edit'>('edit')
     const [mousePos, setMousePos] = useState<Point>({ x: 0, y: 0 })
     const [draggedPointIndex, setDraggedPointIndex] = useState<number | null>(null)
+    const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null)
     const [editingSegmentIndex, setEditingSegmentIndex] = useState<number | null>(null)
     const [manualLengthValue, setManualLengthValue] = useState<string>('')
     
@@ -442,17 +443,20 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                     {points.map((p, idx) => {
                         const isFirst = idx === 0
                         const isCloseTarget = mode === 'draw' && points.length >= 3 && isFirst
+                        const isHovered = hoveredPointIndex === idx
 
                         return (
                             <g key={`pt-${idx}`}>
                                 <circle
                                     cx={p.x}
                                     cy={p.y}
-                                    r={isCloseTarget ? 8 : 6}
-                                    fill={isCloseTarget ? '#22c55e' : draggedPointIndex === idx ? '#06b6d4' : '#1e1b4b'}
+                                    r={isHovered ? (isCloseTarget ? 10 : 8) : (isCloseTarget ? 8 : 6)}
+                                    fill={isCloseTarget ? '#22c55e' : (draggedPointIndex === idx || isHovered) ? '#06b6d4' : '#1e1b4b'}
                                     stroke={isCloseTarget ? '#4ade80' : '#0891b2'}
-                                    strokeWidth="1.5"
-                                    className={`cursor-move transition-transform hover:scale-125 ${isCloseTarget ? 'animate-pulse' : ''}`}
+                                    strokeWidth={isHovered ? "2.5" : "1.5"}
+                                    className={`cursor-move transition-all duration-150 ${isCloseTarget ? 'animate-pulse' : ''}`}
+                                    onMouseEnter={() => setHoveredPointIndex(idx)}
+                                    onMouseLeave={() => setHoveredPointIndex(null)}
                                     onMouseDown={(e) => handleMouseDown(e, idx)}
                                     onClick={(e) => {
                                         e.stopPropagation()

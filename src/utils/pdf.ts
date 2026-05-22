@@ -19,7 +19,11 @@ const loadImage = (url: string): Promise<HTMLImageElement> => {
 }
 
 function getDistance(p1: { x: number; y: number }, p2: { x: number; y: number }): number {
-    return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2))
+    const x1 = Number(p1.x)
+    const y1 = Number(p1.y)
+    const x2 = Number(p2.x)
+    const y2 = Number(p2.y)
+    return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2))
 }
 
 function calculatePerimeter(points: { x: number; y: number }[], scale: number = 20): number {
@@ -39,7 +43,7 @@ function calculateFloorArea(points: { x: number; y: number }[], scale: number = 
     for (let i = 0; i < n; i++) {
         const p1 = points[i]
         const p2 = points[(i + 1) % n]
-        area += (p1.x * p2.y) - (p2.x * p1.y)
+        area += (Number(p1.x) * Number(p2.y)) - (Number(p2.x) * Number(p1.y))
     }
     return Math.abs(area) / 2 / (scale * scale)
 }
@@ -54,9 +58,14 @@ function renderRoomToDataURL(points: { x: number; y: number }[], roomName: strin
     if (typeof window === 'undefined') return null
     if (!points || points.length < 3) return null
 
+    const parsedPoints = points.map(p => ({
+        x: Number(p.x),
+        y: Number(p.y)
+    }))
+
     let minX = Infinity, maxX = -Infinity
     let minY = Infinity, maxY = -Infinity
-    points.forEach(p => {
+    parsedPoints.forEach(p => {
         if (p.x < minX) minX = p.x
         if (p.x > maxX) maxX = p.x
         if (p.y < minY) minY = p.y
@@ -99,9 +108,9 @@ function renderRoomToDataURL(points: { x: number; y: number }[], roomName: strin
     // Draw filled polygon
     ctx.fillStyle = 'rgba(6, 182, 212, 0.05)'
     ctx.beginPath()
-    ctx.moveTo(points[0].x + tx, points[0].y + ty)
-    for (let i = 1; i < points.length; i++) {
-        ctx.lineTo(points[i].x + tx, points[i].y + ty)
+    ctx.moveTo(parsedPoints[0].x + tx, parsedPoints[0].y + ty)
+    for (let i = 1; i < parsedPoints.length; i++) {
+        ctx.lineTo(parsedPoints[i].x + tx, parsedPoints[i].y + ty)
     }
     ctx.closePath()
     ctx.fill()
@@ -110,9 +119,9 @@ function renderRoomToDataURL(points: { x: number; y: number }[], roomName: strin
     ctx.strokeStyle = '#475569'
     ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.moveTo(points[0].x + tx, points[0].y + ty)
-    for (let i = 1; i < points.length; i++) {
-        ctx.lineTo(points[i].x + tx, points[i].y + ty)
+    ctx.moveTo(parsedPoints[0].x + tx, parsedPoints[0].y + ty)
+    for (let i = 1; i < parsedPoints.length; i++) {
+        ctx.lineTo(parsedPoints[i].x + tx, parsedPoints[i].y + ty)
     }
     ctx.closePath()
     ctx.stroke()
@@ -123,10 +132,10 @@ function renderRoomToDataURL(points: { x: number; y: number }[], roomName: strin
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
 
-    const n = points.length
+    const n = parsedPoints.length
     for (let i = 0; i < n; i++) {
-        const p1 = points[i]
-        const p2 = points[(i + 1) % n]
+        const p1 = parsedPoints[i]
+        const p2 = parsedPoints[(i + 1) % n]
         
         const dx = p2.x - p1.x
         const dy = p2.y - p1.y
@@ -157,12 +166,12 @@ function renderRoomToDataURL(points: { x: number; y: number }[], roomName: strin
 
     // Centroid room name
     let sumX = 0, sumY = 0
-    points.forEach(p => {
+    parsedPoints.forEach(p => {
         sumX += p.x
         sumY += p.y
     })
-    const centroidX = sumX / points.length + tx
-    const centroidY = sumY / points.length + ty
+    const centroidX = sumX / parsedPoints.length + tx
+    const centroidY = sumY / parsedPoints.length + ty
 
     ctx.fillStyle = 'rgba(15, 23, 42, 0.9)'
     const textWidth = ctx.measureText(roomName).width + 12
@@ -652,9 +661,14 @@ export async function downloadQuotePDF(quote: any, settings: any) {
         planningSections.forEach((sec: any) => {
             const rooms = sec.quote_planning_rooms || []
             rooms.forEach((room: any) => {
+                const parsedPoints = (room.points || []).map((p: any) => ({
+                    x: Number(p.x),
+                    y: Number(p.y)
+                }))
                 allRooms.push({
+                    ...room,
                     sectionName: sec.name,
-                    ...room
+                    points: parsedPoints
                 })
             })
         })
