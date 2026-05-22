@@ -325,6 +325,8 @@ export async function downloadQuotePDF(quote: any, settings: any) {
             ? `${Math.round(quote.estimated_duration_days * 24 * 100) / 100} heures`
             : `${quote.estimated_duration_days} jours`
 
+        const planningSections = quote.quote_planning_sections || []
+
         // Map item photos globally
         const itemPhotos: { itemTitle: string, url: string, refNum: number }[] = []
         const itemPhotoRefMap: Record<string, number> = {}
@@ -617,7 +619,6 @@ export async function downloadQuotePDF(quote: any, settings: any) {
 
             // Table Rows
             const roomMap: Record<string, { name: string; sectionName: string }> = {}
-            const planningSections = quote.quote_planning_sections || []
             planningSections.forEach((sec: any) => {
                 const rooms = sec.quote_planning_rooms || []
                 rooms.forEach((room: any) => {

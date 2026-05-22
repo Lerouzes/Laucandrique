@@ -460,7 +460,9 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                     onMouseDown={(e) => handleMouseDown(e, idx)}
                                     onClick={(e) => {
                                         e.stopPropagation()
-                                        // Delete points on click if in edit mode and click is secondary
+                                        if (isCloseTarget) {
+                                            setMode('edit')
+                                        }
                                     }}
                                 />
                                 {/* Small label or point index */}
