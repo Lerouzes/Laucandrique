@@ -227,6 +227,8 @@ export interface Database {
           total: number
           image_urls: string[]
           notes: string | null
+          planning_room_id: string | null
+          planning_measurement_source: string | null
           created_at: string
         }
         Insert: {
@@ -240,6 +242,8 @@ export interface Database {
           total?: number
           image_urls?: string[]
           notes?: string | null
+          planning_room_id?: string | null
+          planning_measurement_source?: string | null
           created_at?: string
         }
         Update: {
@@ -253,6 +257,8 @@ export interface Database {
           total?: number
           image_urls?: string[]
           notes?: string | null
+          planning_room_id?: string | null
+          planning_measurement_source?: string | null
           created_at?: string
         }
         Relationships: [
@@ -261,6 +267,13 @@ export interface Database {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_planning_room_id_fkey"
+            columns: ["planning_room_id"]
+            isOneToOne: false
+            referencedRelation: "quote_planning_rooms"
             referencedColumns: ["id"]
           }
         ]
@@ -349,6 +362,86 @@ export interface Database {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      quote_planning_sections: {
+        Row: {
+          id: string
+          quote_id: string
+          name: string
+          description: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          quote_id: string
+          name: string
+          description?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          quote_id?: string
+          name?: string
+          description?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_planning_sections_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      quote_planning_rooms: {
+        Row: {
+          id: string
+          quote_id: string
+          section_id: string | null
+          name: string
+          description: string | null
+          height: number | null
+          points: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          quote_id: string
+          section_id?: string | null
+          name: string
+          description?: string | null
+          height?: number | null
+          points?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          quote_id?: string
+          section_id?: string | null
+          name?: string
+          description?: string | null
+          height?: number | null
+          points?: Json
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_planning_rooms_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_planning_rooms_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "quote_planning_sections"
             referencedColumns: ["id"]
           }
         ]

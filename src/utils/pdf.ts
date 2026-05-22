@@ -18,6 +18,166 @@ const loadImage = (url: string): Promise<HTMLImageElement> => {
     })
 }
 
+function getDistance(p1: { x: number; y: number }, p2: { x: number; y: number }): number {
+    return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2))
+}
+
+function calculatePerimeter(points: { x: number; y: number }[], scale: number = 20): number {
+    if (!points || points.length < 2) return 0
+    let totalDist = 0
+    const n = points.length
+    for (let i = 0; i < n; i++) {
+        totalDist += getDistance(points[i], points[(i + 1) % n])
+    }
+    return totalDist / scale
+}
+
+function calculateFloorArea(points: { x: number; y: number }[], scale: number = 20): number {
+    if (!points || points.length < 3) return 0
+    let area = 0
+    const n = points.length
+    for (let i = 0; i < n; i++) {
+        const p1 = points[i]
+        const p2 = points[(i + 1) % n]
+        area += (p1.x * p2.y) - (p2.x * p1.y)
+    }
+    return Math.abs(area) / 2 / (scale * scale)
+}
+
+function calculateWallSurface(points: { x: number; y: number }[], height: number | null, scale: number = 20): number {
+    const h = height || 8.0
+    const perimeter = calculatePerimeter(points, scale)
+    return perimeter * h
+}
+
+function renderRoomToDataURL(points: { x: number; y: number }[], roomName: string, scale: number = 20): string | null {
+    if (typeof window === 'undefined') return null
+    if (!points || points.length < 3) return null
+
+    let minX = Infinity, maxX = -Infinity
+    let minY = Infinity, maxY = -Infinity
+    points.forEach(p => {
+        if (p.x < minX) minX = p.x
+        if (p.x > maxX) maxX = p.x
+        if (p.y < minY) minY = p.y
+        if (p.y > maxY) maxY = p.y
+    })
+
+    const padding = 30
+    const rawWidth = (maxX - minX) + 2 * padding
+    const rawHeight = (maxY - minY) + 2 * padding
+
+    const canvas = document.createElement('canvas')
+    canvas.width = rawWidth
+    canvas.height = rawHeight
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    const tx = -minX + padding
+    const ty = -minY + padding
+
+    // Draw grid lines
+    ctx.strokeStyle = '#f1f5f9'
+    ctx.lineWidth = 0.5
+    for (let x = 0; x < canvas.width; x += scale) {
+        ctx.beginPath()
+        ctx.moveTo(x, 0)
+        ctx.lineTo(x, canvas.height)
+        ctx.stroke()
+    }
+    for (let y = 0; y < canvas.height; y += scale) {
+        ctx.beginPath()
+        ctx.moveTo(0, y)
+        ctx.lineTo(canvas.width, y)
+        ctx.stroke()
+    }
+
+    // Draw filled polygon
+    ctx.fillStyle = 'rgba(6, 182, 212, 0.05)'
+    ctx.beginPath()
+    ctx.moveTo(points[0].x + tx, points[0].y + ty)
+    for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x + tx, points[i].y + ty)
+    }
+    ctx.closePath()
+    ctx.fill()
+
+    // Draw lines
+    ctx.strokeStyle = '#475569'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(points[0].x + tx, points[0].y + ty)
+    for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x + tx, points[i].y + ty)
+    }
+    ctx.closePath()
+    ctx.stroke()
+
+    // Draw dimension labels
+    ctx.font = 'bold 9px Helvetica'
+    ctx.fillStyle = '#0e7490'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+
+    const n = points.length
+    for (let i = 0; i < n; i++) {
+        const p1 = points[i]
+        const p2 = points[(i + 1) % n]
+        
+        const dx = p2.x - p1.x
+        const dy = p2.y - p1.y
+        const pixelLen = Math.sqrt(dx * dx + dy * dy)
+        if (pixelLen < 12) continue
+
+        const feetLen = pixelLen / scale
+
+        const midX = (p1.x + p2.x) / 2 + tx
+        const midY = (p1.y + p2.y) / 2 + ty
+
+        const angle = Math.atan2(dy, dx)
+        const offset = 10
+        const textX = midX + Math.sin(angle) * offset
+        const textY = midY - Math.cos(angle) * offset
+
+        ctx.fillStyle = '#ffffff'
+        const label = `${feetLen.toFixed(1)}'`
+        const textWidth = ctx.measureText(label).width + 6
+        ctx.fillRect(textX - textWidth / 2, textY - 6, textWidth, 12)
+        ctx.strokeStyle = '#cbd5e1'
+        ctx.lineWidth = 0.5
+        ctx.strokeRect(textX - textWidth / 2, textY - 6, textWidth, 12)
+
+        ctx.fillStyle = '#0f172a'
+        ctx.fillText(label, textX, textY + 0.5)
+    }
+
+    // Centroid room name
+    let sumX = 0, sumY = 0
+    points.forEach(p => {
+        sumX += p.x
+        sumY += p.y
+    })
+    const centroidX = sumX / points.length + tx
+    const centroidY = sumY / points.length + ty
+
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)'
+    const textWidth = ctx.measureText(roomName).width + 12
+    ctx.fillRect(centroidX - textWidth / 2, centroidY - 8, textWidth, 16)
+    ctx.strokeStyle = '#475569'
+    ctx.lineWidth = 0.5
+    ctx.strokeRect(centroidX - textWidth / 2, centroidY - 8, textWidth, 16)
+
+    ctx.font = 'bold 9px Helvetica'
+    ctx.fillStyle = '#ffffff'
+    ctx.fillText(roomName, centroidX, centroidY + 0.5)
+
+    return canvas.toDataURL('image/png')
+}
+
 export async function downloadQuotePDF(quote: any, settings: any) {
     try {
         const doc = new jsPDF({
@@ -443,6 +603,118 @@ export async function downloadQuotePDF(quote: any, settings: any) {
             }
             
             y = rowStartY + blockHeight
+        }
+
+        // --- 5.6 PLANS & MEASUREMENTS ---
+        const planningSections = quote.quote_planning_sections || []
+        const allRooms: any[] = []
+        planningSections.forEach((sec: any) => {
+            const rooms = sec.quote_planning_rooms || []
+            rooms.forEach((room: any) => {
+                allRooms.push({
+                    sectionName: sec.name,
+                    ...room
+                })
+            })
+        })
+
+        if (allRooms.length > 0) {
+            doc.addPage()
+            y = 20
+
+            doc.setFont('Helvetica', 'bold')
+            doc.setFontSize(14)
+            doc.setTextColor(15, 23, 42)
+            doc.text('ANNEXE : PLANS & MESURES', margin, y)
+            y += 10
+
+            for (const room of allRooms) {
+                const hasDrawing = room.points && room.points.length >= 3
+                checkNewPage(hasDrawing ? 75 : 30)
+
+                doc.setFont('Helvetica', 'bold')
+                doc.setFontSize(11)
+                doc.setTextColor(14, 116, 144) // cyan-700
+                doc.text(`${room.sectionName} - ${room.name}`, margin, y)
+                y += 5
+
+                if (room.description) {
+                    doc.setFont('Helvetica', 'italic')
+                    doc.setFontSize(9)
+                    doc.setTextColor(100, 116, 139)
+                    doc.text(room.description, margin, y)
+                    y += 5
+                }
+
+                const perimeter = calculatePerimeter(room.points)
+                const area = calculateFloorArea(room.points)
+                const wallSurface = calculateWallSurface(room.points, room.height)
+                const heightVal = room.height || 8.0
+
+                doc.setFont('Helvetica', 'normal')
+                doc.setFontSize(9)
+                doc.setTextColor(51, 65, 85)
+
+                let metricsText = `Périmètre: ${perimeter.toFixed(1)} pi  |  Aire au sol: ${area.toFixed(1)} pi²  |  Hauteur: ${heightVal.toFixed(1)} pi  |  Surface des murs: ${wallSurface.toFixed(1)} pi²`
+                doc.text(metricsText, margin, y)
+                y += 6
+
+                if (hasDrawing) {
+                    const dataUrl = renderRoomToDataURL(room.points, room.name)
+                    if (dataUrl) {
+                        try {
+                            const boxW = 100
+                            const boxH = 50
+                            
+                            doc.setFillColor(248, 250, 252)
+                            doc.rect(margin, y, boxW, boxH, 'F')
+                            doc.setDrawColor(226, 232, 240)
+                            doc.setLineWidth(0.3)
+                            doc.rect(margin, y, boxW, boxH)
+
+                            doc.addImage(dataUrl, 'PNG', margin + 1, y + 1, boxW - 2, boxH - 2)
+
+                            const linkedItems = (quote.quote_items || []).filter((item: any) => item.planning_room_id === room.id)
+                            if (linkedItems.length > 0) {
+                                const listX = margin + boxW + 8
+                                doc.setFont('Helvetica', 'bold')
+                                doc.setFontSize(9)
+                                doc.setTextColor(15, 23, 42)
+                                doc.text('Items liés à cette pièce:', listX, y + 4)
+
+                                doc.setFont('Helvetica', 'normal')
+                                doc.setFontSize(8.5)
+                                doc.setTextColor(71, 85, 105)
+                                let itemY = y + 9
+                                linkedItems.forEach((item: any) => {
+                                    const sourceLabel = item.planning_measurement_source === 'perimeter' ? 'Périmètre'
+                                        : item.planning_measurement_source === 'area' ? 'Aire'
+                                        : 'Surface murs'
+                                    const itemText = `- ${item.title} (${item.quantity} ${item.unit || ''} - via ${sourceLabel})`
+                                    const lines = doc.splitTextToSize(itemText, contentWidth - boxW - 10)
+                                    lines.forEach((line: string) => {
+                                        if (itemY < y + boxH) {
+                                            doc.text(line, listX, itemY)
+                                            itemY += 4
+                                        }
+                                    })
+                                })
+                            }
+
+                            y += boxH + 8
+                        } catch (err) {
+                            console.error('Error drawing room in PDF:', err)
+                            y += 5
+                        }
+                    } else {
+                        y += 5
+                    }
+                } else {
+                    y += 5
+                }
+                
+                y += 4
+            }
         }
 
         // --- 6. FOOTER note ---

@@ -6,14 +6,14 @@ import { useState, useEffect, useRef, useTransition } from 'react'
 import { useForm, useFieldArray, useWatch, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { Plus, Trash2, Image as ImageIcon, ChevronsUpDown, ChevronDown, Download, CheckCircle, XCircle, Send, CalendarCheck2, Eye } from 'lucide-react'
+import { Plus, Trash2, Image as ImageIcon, ChevronsUpDown, ChevronDown, Download, CheckCircle, XCircle, Send, CalendarCheck2, Eye, Ruler } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { createQuoteAction, updateQuoteAction, updateQuoteStatus, revertQuoteToPending, markQuoteAsSent } from '@/actions/quotes'
@@ -23,6 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area'
 import Link from 'next/link'
 import { Label } from '@/components/ui/label'
+import { PlanningPanel, Section, Room, calculatePerimeter, calculateFloorArea, calculateWallSurface } from './PlanningPanel'
 import { Badge } from '@/components/ui/badge'
 import { markProjectCompletedByQuote } from '@/actions/projects'
 import { downloadQuotePDF } from '@/utils/pdf'
@@ -34,6 +35,8 @@ const quoteItemSchema = z.object({
     unit: z.string().optional(),
     unit_cost: z.coerce.number().min(0),
     image_urls: z.array(z.string()).default([]),
+    planning_room_id: z.string().nullable().optional(),
+    planning_measurement_source: z.string().nullable().optional(),
 })
 
 const quoteSchema = z.object({
@@ -165,12 +168,14 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                     unit: i.unit || '',
                     unit_cost: i.unit_cost,
                     image_urls: i.image_urls || [],
+                    planning_room_id: i.planning_room_id || null,
+                    planning_measurement_source: i.planning_measurement_source || null,
                 }))
                 : (initialQuote?.subtotal && initialQuote.subtotal > 0)
-                    ? [{ title: 'Montant forfaitaire importé', description: '', quantity: 1, unit: 'u', unit_cost: initialQuote.subtotal, image_urls: [] }]
+                    ? [{ title: 'Montant forfaitaire importé', description: '', quantity: 1, unit: 'u', unit_cost: initialQuote.subtotal, image_urls: [], planning_room_id: null, planning_measurement_source: null }]
                     : (initialQuote?.total && initialQuote.total > 0)
-                        ? [{ title: 'Montant forfaitaire importé', description: '', quantity: 1, unit: 'u', unit_cost: initialQuote.total, image_urls: [] }]
-                        : [{ title: '', description: '', quantity: 1, unit: 'h', unit_cost: 0, image_urls: [] }],
+                        ? [{ title: 'Montant forfaitaire importé', description: '', quantity: 1, unit: 'u', unit_cost: initialQuote.total, image_urls: [], planning_room_id: null, planning_measurement_source: null }]
+                        : [{ title: '', description: '', quantity: 1, unit: 'h', unit_cost: 0, image_urls: [], planning_room_id: null, planning_measurement_source: null }],
         },
     })
 
@@ -182,6 +187,70 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
 
     // useWatch gives per-field subscriptions that reliably trigger re-renders
     const watchItems = useWatch({ control: form.control, name: 'items' }) || []
+
+    const [enablePlanning, setEnablePlanning] = useState(
+        !!(initialQuote?.quote_planning_sections && initialQuote.quote_planning_sections.length > 0)
+    )
+
+    const [sections, setSections] = useState<Section[]>(() => {
+        if (initialQuote?.quote_planning_sections) {
+            return initialQuote.quote_planning_sections.map((sec: any) => ({
+                id: sec.id,
+                name: sec.name,
+                description: sec.description,
+                rooms: (sec.quote_planning_rooms || []).map((room: any) => ({
+                    id: room.id,
+                    name: room.name,
+                    description: room.description,
+                    height: room.height,
+                    points: room.points || []
+                }))
+            }))
+        }
+        return []
+    })
+
+    const findRoom = (roomId: string) => {
+        for (const sec of sections) {
+            const r = sec.rooms.find(rm => rm.id === roomId)
+            if (r) return r
+        }
+        return null
+    }
+
+    const getMetricValue = (room: Room, source: string): { quantity: number; unit: string } => {
+        switch (source) {
+            case 'perimeter':
+                return { quantity: calculatePerimeter(room.points), unit: 'pi' }
+            case 'area':
+                return { quantity: calculateFloorArea(room.points), unit: 'pi²' }
+            case 'wall_surface':
+                return { quantity: calculateWallSurface(room.points, room.height), unit: 'pi²' }
+            default:
+                return { quantity: 0, unit: 'pi' }
+        }
+    }
+
+    useEffect(() => {
+        if (!enablePlanning) return
+        watchItems.forEach((item, index) => {
+            if (item?.planning_room_id && item?.planning_measurement_source) {
+                const room = findRoom(item.planning_room_id)
+                if (room) {
+                    const { quantity, unit } = getMetricValue(room, item.planning_measurement_source)
+                    const roundedQty = Math.round(quantity * 100) / 100
+                    const currentQty = form.getValues(`items.${index}.quantity`)
+                    const currentUnit = form.getValues(`items.${index}.unit`)
+                    if (currentQty !== roundedQty) {
+                        form.setValue(`items.${index}.quantity`, roundedQty, { shouldValidate: true })
+                    }
+                    if (currentUnit !== unit) {
+                        form.setValue(`items.${index}.unit`, unit, { shouldValidate: true })
+                    }
+                }
+            }
+        })
+    }, [sections, enablePlanning, watchItems])
     const adminPerc = useWatch({ control: form.control, name: 'admin_percentage' }) || 0
     const profitPerc = useWatch({ control: form.control, name: 'profit_percentage' }) || 0
 
@@ -319,11 +388,11 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
 
                 if (isEditing) {
                     // In edit mode: keep existing images, add new uploads on top
-                    await updateQuoteAction(initialQuote.id, finalQuoteData, itemsWithTotals, uploadedImagesData, true)
+                    await updateQuoteAction(initialQuote.id, finalQuoteData, itemsWithTotals, uploadedImagesData, true, enablePlanning ? { sections } : null)
                     toast.success("Soumission mise à jour avec succès")
                     router.refresh()
                 } else {
-                    const result = await createQuoteAction(finalQuoteData, itemsWithTotals, uploadedImagesData)
+                    const result = await createQuoteAction(finalQuoteData, itemsWithTotals, uploadedImagesData, enablePlanning ? { sections } : null)
                     toast.success("Soumission créée avec succès")
                     router.push(`/quotes/${result.id}/edit`)
                     router.refresh()
@@ -693,10 +762,38 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                             )}
                         </Card>
 
+                        {/* Planning & Measurement Module */}
+                        <Card className="border-zinc-800 bg-zinc-900">
+                            <CardHeader className="flex flex-row items-center justify-between pb-3">
+                                <div className="space-y-0.5">
+                                    <CardTitle className="text-lg text-zinc-100 flex items-center gap-2">
+                                        <Ruler className="h-5 w-5 text-cyan-400" />
+                                        Planification & Mesures
+                                    </CardTitle>
+                                    <p className="text-xs text-zinc-400">Cartographier visuellement les pièces pour calculer les dimensions</p>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <label className="text-xs text-zinc-400 cursor-pointer select-none" htmlFor="toggle-planning">Activer le mode planification</label>
+                                    <input
+                                        type="checkbox"
+                                        id="toggle-planning"
+                                        checked={enablePlanning}
+                                        onChange={(e) => setEnablePlanning(e.target.checked)}
+                                        className="h-4 w-4 rounded border-zinc-800 bg-zinc-900 text-cyan-600 focus:ring-cyan-600 focus:ring-offset-zinc-900 cursor-pointer"
+                                    />
+                                </div>
+                            </CardHeader>
+                            {enablePlanning && (
+                                <CardContent className="pt-4 border-t border-zinc-800/50">
+                                    <PlanningPanel sections={sections} onChange={setSections} />
+                                </CardContent>
+                            )}
+                        </Card>
+
                         <Card className="border-zinc-800 bg-zinc-900">
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle className="text-lg text-zinc-100">Items de la soumission</CardTitle>
-                                <Button type="button" variant="outline" size="sm" onClick={() => append({ title: '', description: '', quantity: 1, unit: '', unit_cost: 0, image_urls: [] })} className="h-8 border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100">
+                                <Button type="button" variant="outline" size="sm" onClick={() => append({ title: '', description: '', quantity: 1, unit: '', unit_cost: 0, image_urls: [], planning_room_id: null, planning_measurement_source: null })} className="h-8 border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100">
                                     <Plus className="mr-2 h-4 w-4" />
                                     Ajouter Ligne
                                 </Button>
@@ -738,16 +835,20 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                                         <Controller
                                                             control={form.control}
                                                             name={`items.${index}.quantity` as const}
-                                                            render={({ field }) => (
-                                                                <Input
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    placeholder="Qté"
-                                                                    value={field.value ?? ''}
-                                                                    onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
-                                                                    className="bg-zinc-900 border-zinc-800 focus-visible:ring-zinc-700 h-9 text-zinc-100"
-                                                                />
-                                                            )}
+                                                            render={({ field }) => {
+                                                                const isLocked = enablePlanning && !!watchItems[index]?.planning_room_id
+                                                                return (
+                                                                    <Input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        placeholder="Qté"
+                                                                        disabled={isLocked}
+                                                                        value={field.value ?? ''}
+                                                                        onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                                                                        className={`bg-zinc-900 border-zinc-800 focus-visible:ring-zinc-700 h-9 text-zinc-100 ${isLocked ? 'bg-zinc-950 text-cyan-400 border-cyan-900/30' : ''}`}
+                                                                    />
+                                                                )
+                                                            }}
                                                         />
                                                     </div>
                                                     
@@ -755,8 +856,9 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                                         <Label className="text-zinc-400 text-xs mb-1.5 block">Unité</Label>
                                                         <Input 
                                                             placeholder="Ex: h, u, m2" 
+                                                            disabled={enablePlanning && !!watchItems[index]?.planning_room_id}
                                                             {...form.register(`items.${index}.unit` as const)} 
-                                                            className="bg-zinc-900 border-zinc-800 focus-visible:ring-zinc-700 h-9 text-zinc-100" 
+                                                            className={`bg-zinc-900 border-zinc-800 focus-visible:ring-zinc-700 h-9 text-zinc-100 ${enablePlanning && !!watchItems[index]?.planning_room_id ? 'bg-zinc-950 text-cyan-400 border-cyan-900/30' : ''}`} 
                                                         />
                                                     </div>
                                                     
@@ -782,6 +884,79 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                                         ${(qty * cost).toFixed(2)}
                                                     </div>
                                                 </div>
+
+                                                {/* Planning room binding dropdown */}
+                                                {enablePlanning && (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-zinc-900/50 p-2.5 rounded-lg border border-zinc-800/80 mb-3">
+                                                        <div>
+                                                            <Label className="text-zinc-400 text-[11px] mb-1.5 block">Lier à une pièce</Label>
+                                                            <Controller
+                                                                control={form.control}
+                                                                name={`items.${index}.planning_room_id` as const}
+                                                                render={({ field }) => (
+                                                                    <Select
+                                                                        onValueChange={(val) => {
+                                                                            const actualVal = val === 'none' ? null : val
+                                                                            field.onChange(actualVal)
+                                                                            if (!actualVal) {
+                                                                                form.setValue(`items.${index}.planning_measurement_source`, null)
+                                                                            } else {
+                                                                                // Default to wall_surface if not set
+                                                                                const currentSrc = form.getValues(`items.${index}.planning_measurement_source`)
+                                                                                if (!currentSrc) {
+                                                                                    form.setValue(`items.${index}.planning_measurement_source`, 'wall_surface')
+                                                                                }
+                                                                            }
+                                                                        }}
+                                                                        value={field.value || 'none'}
+                                                                    >
+                                                                        <SelectTrigger className="bg-zinc-950 border-zinc-800 text-zinc-200 focus-visible:ring-zinc-700 h-9 text-xs">
+                                                                            <SelectValue placeholder="Choisir une pièce" />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent className="bg-zinc-900 border-zinc-800">
+                                                                            <SelectItem value="none">Aucune (saisie manuelle)</SelectItem>
+                                                                            {sections.map(sec => (
+                                                                                <SelectGroup key={sec.id}>
+                                                                                    <SelectLabel className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider px-2 py-1">{sec.name}</SelectLabel>
+                                                                                    {sec.rooms.map(rm => (
+                                                                                        <SelectItem key={rm.id} value={rm.id} className="pl-6 text-xs">
+                                                                                            {rm.name}
+                                                                                        </SelectItem>
+                                                                                    ))}
+                                                                                </SelectGroup>
+                                                                            ))}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                )}
+                                                            />
+                                                        </div>
+
+                                                        {watchItems[index]?.planning_room_id && (
+                                                            <div>
+                                                                <Label className="text-zinc-400 text-[11px] mb-1.5 block">Mesure à utiliser</Label>
+                                                                <Controller
+                                                                    control={form.control}
+                                                                    name={`items.${index}.planning_measurement_source` as const}
+                                                                    render={({ field }) => (
+                                                                        <Select
+                                                                            onValueChange={field.onChange}
+                                                                            value={field.value || 'wall_surface'}
+                                                                        >
+                                                                            <SelectTrigger className="bg-zinc-950 border-zinc-800 text-zinc-200 focus-visible:ring-zinc-700 h-9 text-xs">
+                                                                                <SelectValue placeholder="Choisir une mesure" />
+                                                                            </SelectTrigger>
+                                                                            <SelectContent className="bg-zinc-900 border-zinc-800">
+                                                                                <SelectItem value="perimeter" className="text-xs">Périmètre (pi)</SelectItem>
+                                                                                <SelectItem value="area" className="text-xs">Aire au sol (pi²)</SelectItem>
+                                                                                <SelectItem value="wall_surface" className="text-xs">Surface des murs (pi²)</SelectItem>
+                                                                            </SelectContent>
+                                                                        </Select>
+                                                                    )}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
 
                                                 {/* ROW 2: Description Textarea */}
                                                 <div className="space-y-1.5">

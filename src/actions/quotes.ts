@@ -59,7 +59,7 @@ export async function getQuotes(query?: string, statusFilter?: string) {
     })
 }
 
-export async function createQuoteAction(quoteData: any, itemsData: any[], imagesData: any[]) {
+export async function createQuoteAction(quoteData: any, itemsData: any[], imagesData: any[], planningData?: any) {
     const supabase = await createClient()
 
     const { data: clientData } = await supabase.from('clients').select('manager_id').eq('id', quoteData.client_id).single()
@@ -81,8 +81,62 @@ export async function createQuoteAction(quoteData: any, itemsData: any[], images
         throw new Error(quoteInsert.error?.message || 'Erreur lors de la création de la soumission')
     }
 
+    // Save planning sections and rooms
+    const tempToRealRoomId: Record<string, string> = {}
+    if (planningData && planningData.sections && planningData.sections.length > 0) {
+        for (const section of planningData.sections) {
+            const sectionPayload = {
+                quote_id: quote.id,
+                name: section.name,
+                description: section.description || null
+            }
+            const { data: insertedSection, error: secErr } = await supabase
+                .from('quote_planning_sections')
+                .insert(sectionPayload)
+                .select()
+                .single()
+
+            if (secErr) throw new Error(secErr.message)
+
+            if (section.rooms && section.rooms.length > 0) {
+                for (const room of section.rooms) {
+                    const roomPayload = {
+                        quote_id: quote.id,
+                        section_id: insertedSection.id,
+                        name: room.name,
+                        description: room.description || null,
+                        height: room.height ? Number(room.height) : null,
+                        points: room.points || []
+                    }
+                    const { data: insertedRoom, error: roomErr } = await supabase
+                        .from('quote_planning_rooms')
+                        .insert(roomPayload)
+                        .select()
+                        .single()
+
+                    if (roomErr) throw new Error(roomErr.message)
+
+                    if (room.id) {
+                        tempToRealRoomId[room.id] = insertedRoom.id
+                    }
+                }
+            }
+        }
+    }
+
     if (itemsData && itemsData.length > 0) {
-        const itemsToInsert = itemsData.map(item => ({ ...item, quote_id: quote.id }))
+        const itemsToInsert = itemsData.map(item => {
+            let planning_room_id = item.planning_room_id || null
+            if (planning_room_id && tempToRealRoomId[planning_room_id]) {
+                planning_room_id = tempToRealRoomId[planning_room_id]
+            }
+            return {
+                ...item,
+                quote_id: quote.id,
+                planning_room_id,
+                planning_measurement_source: item.planning_measurement_source || null
+            }
+        })
         const { error: itemsError } = await supabase.from('quote_items').insert(itemsToInsert)
         if (itemsError) throw new Error(itemsError.message)
     }
@@ -97,7 +151,7 @@ export async function createQuoteAction(quoteData: any, itemsData: any[], images
     return { success: true, id: quote.id }
 }
 
-export async function updateQuoteAction(quoteId: string, quoteData: any, itemsData: any[], imagesData: any[], keepExistingImages: boolean = false) {
+export async function updateQuoteAction(quoteId: string, quoteData: any, itemsData: any[], imagesData: any[], keepExistingImages: boolean = false, planningData?: any) {
     const supabase = await createClient()
 
     const { data: clientData } = await supabase.from('clients').select('manager_id').eq('id', quoteData.client_id).single()
@@ -113,10 +167,68 @@ export async function updateQuoteAction(quoteId: string, quoteData: any, itemsDa
     }
     if (quoteUpdate.error) throw new Error(quoteUpdate.error.message)
 
+    // Delete old sections and rooms (rooms cascade delete)
+    const { error: deleteSecErr } = await supabase.from('quote_planning_sections').delete().eq('quote_id', quoteId)
+    if (deleteSecErr) throw new Error(deleteSecErr.message)
+
+    // Save planning sections and rooms
+    const tempToRealRoomId: Record<string, string> = {}
+    if (planningData && planningData.sections && planningData.sections.length > 0) {
+        for (const section of planningData.sections) {
+            const sectionPayload = {
+                quote_id: quoteId,
+                name: section.name,
+                description: section.description || null
+            }
+            const { data: insertedSection, error: secErr } = await supabase
+                .from('quote_planning_sections')
+                .insert(sectionPayload)
+                .select()
+                .single()
+
+            if (secErr) throw new Error(secErr.message)
+
+            if (section.rooms && section.rooms.length > 0) {
+                for (const room of section.rooms) {
+                    const roomPayload = {
+                        quote_id: quoteId,
+                        section_id: insertedSection.id,
+                        name: room.name,
+                        description: room.description || null,
+                        height: room.height ? Number(room.height) : null,
+                        points: room.points || []
+                    }
+                    const { data: insertedRoom, error: roomErr } = await supabase
+                        .from('quote_planning_rooms')
+                        .insert(roomPayload)
+                        .select()
+                        .single()
+
+                    if (roomErr) throw new Error(roomErr.message)
+
+                    if (room.id) {
+                        tempToRealRoomId[room.id] = insertedRoom.id
+                    }
+                }
+            }
+        }
+    }
+
     // Replace all items
     await supabase.from('quote_items').delete().eq('quote_id', quoteId)
     if (itemsData && itemsData.length > 0) {
-        const itemsToInsert = itemsData.map(item => ({ ...item, quote_id: quoteId }))
+        const itemsToInsert = itemsData.map(item => {
+            let planning_room_id = item.planning_room_id || null
+            if (planning_room_id && tempToRealRoomId[planning_room_id]) {
+                planning_room_id = tempToRealRoomId[planning_room_id]
+            }
+            return {
+                ...item,
+                quote_id: quoteId,
+                planning_room_id,
+                planning_measurement_source: item.planning_measurement_source || null
+            }
+        })
         const { error: itemsError } = await supabase.from('quote_items').insert(itemsToInsert)
         if (itemsError) throw new Error(itemsError.message)
     }
@@ -198,7 +310,7 @@ export async function getQuote(id: string) {
     const supabase = await createClient()
     const { data, error } = await supabase
         .from('quotes')
-        .select('*, clients(*), contractors(*), quote_items(*), quote_images(*), projects(status, completed_at)')
+        .select('*, clients(*), contractors(*), quote_items(*), quote_images(*), projects(status, completed_at), quote_planning_sections(*, quote_planning_rooms(*))')
         .eq('id', id)
         .single()
 
