@@ -688,139 +688,6 @@ export async function downloadQuotePDF(quote: any, settings: any) {
             y += 8
         }
 
-        // --- 5.5 ANNEXE PHOTOS ---
-        const allAnnexPhotos: { url: string, caption: string }[] = []
-        if (quote.quote_images && quote.quote_images.length > 0) {
-            quote.quote_images.forEach((img: any) => {
-                allAnnexPhotos.push({
-                    url: img.image_url,
-                    caption: img.caption || 'Photo du projet'
-                })
-            })
-        }
-        if (itemPhotos.length > 0) {
-            itemPhotos.forEach((photo) => {
-                allAnnexPhotos.push({
-                    url: photo.url,
-                    caption: `Photo Réf. #${photo.refNum} - ${photo.itemTitle}`
-                })
-            })
-        }
-
-        if (allAnnexPhotos.length > 0) {
-            // Load all images first
-            const loadedImages = await Promise.all(
-                allAnnexPhotos.map(async (photo) => {
-                    try {
-                        const imgEl = await loadImage(photo.url)
-                        return { imgEl, caption: photo.caption }
-                    } catch (err) {
-                        console.error(`Failed to load image ${photo.url}:`, err)
-                        return { imgEl: null, caption: photo.caption }
-                    }
-                })
-            )
-
-            doc.addPage()
-            y = 20
-
-            doc.setFont('Helvetica', 'bold')
-            doc.setFontSize(14)
-            doc.setTextColor(15, 23, 42)
-            doc.text('ANNEXE : PHOTOS', margin, y)
-            y += 8
-
-            const colWidth = 85
-            const imageHeight = 55
-            const captionHeight = 10
-            const blockHeight = imageHeight + captionHeight + 5 // 70mm total per row block
-            let rowStartY = y
-
-            for (let idx = 0; idx < loadedImages.length; idx++) {
-                const item = loadedImages[idx]
-
-                // If we are at the start of a new row (col == 0) and it's not the very start
-                if (idx > 0 && idx % 2 === 0) {
-                    y += blockHeight
-                    rowStartY = y
-                }
-
-                // Check if we need a new page for the current row
-                if (idx % 2 === 0) {
-                    if (y + blockHeight > pageHeight - 15) {
-                        doc.addPage()
-                        y = 20
-                        rowStartY = y
-                    }
-                }
-
-                const col = idx % 2
-                const x = margin + col * (colWidth + 10) // 10mm gap
-
-                if (item.imgEl) {
-                    try {
-                        doc.setFillColor(248, 250, 252) // slate-50 background inside frame
-                        doc.rect(x, rowStartY, colWidth, imageHeight, 'F')
-                        
-                        let drawW = colWidth
-                        let drawH = imageHeight
-                        let xOffset = 0
-                        let yOffset = 0
-
-                        const imgRatio = item.imgEl.width / item.imgEl.height
-                        const boxRatio = colWidth / imageHeight
-
-                        if (imgRatio > boxRatio) {
-                            drawH = colWidth / imgRatio
-                            yOffset = (imageHeight - drawH) / 2
-                        } else {
-                            drawW = imageHeight * imgRatio
-                            xOffset = (colWidth - drawW) / 2
-                        }
-
-                        doc.addImage(item.imgEl, 'JPEG', x + xOffset, rowStartY + yOffset, drawW, drawH)
-
-                        doc.setDrawColor(226, 232, 240) // slate-200
-                        doc.setLineWidth(0.3)
-                        doc.rect(x, rowStartY, colWidth, imageHeight)
-                    } catch (err) {
-                        console.error('Error adding image to PDF:', err)
-                        doc.setFillColor(241, 245, 249)
-                        doc.rect(x, rowStartY, colWidth, imageHeight, 'F')
-                        doc.setFont('Helvetica', 'normal')
-                        doc.setFontSize(8)
-                        doc.setTextColor(148, 163, 184)
-                        doc.text('Image non disponible', x + colWidth/2, rowStartY + imageHeight/2, { align: 'center' })
-                    }
-                } else {
-                    doc.setFillColor(241, 245, 249)
-                    doc.rect(x, rowStartY, colWidth, imageHeight, 'F')
-                    doc.setDrawColor(226, 232, 240)
-                    doc.setLineWidth(0.3)
-                    doc.rect(x, rowStartY, colWidth, imageHeight)
-
-                    doc.setFont('Helvetica', 'normal')
-                    doc.setFontSize(8)
-                    doc.setTextColor(148, 163, 184)
-                    doc.text('Image non disponible', x + colWidth/2, rowStartY + imageHeight/2, { align: 'center' })
-                }
-
-                // Print caption
-                doc.setFont('Helvetica', 'bold')
-                doc.setFontSize(9)
-                doc.setTextColor(51, 65, 85)
-
-                const captionLines = doc.splitTextToSize(item.caption, colWidth - 4)
-                let capY = rowStartY + imageHeight + 4
-                captionLines.slice(0, 2).forEach((line: string) => {
-                    doc.text(line, x + 2, capY)
-                    capY += 4
-                })
-            }
-            
-            y = rowStartY + blockHeight
-        }
-
         // --- 5.6 PLANS & MEASUREMENTS ---
         console.log("downloadQuotePDF debug: planningSections raw:", planningSections);
         const allRooms: any[] = []
@@ -998,6 +865,139 @@ export async function downloadQuotePDF(quote: any, settings: any) {
                 
                 y += 6
             }
+        }
+
+        // --- 5.5 ANNEXE PHOTOS ---
+        const allAnnexPhotos: { url: string, caption: string }[] = []
+        if (quote.quote_images && quote.quote_images.length > 0) {
+            quote.quote_images.forEach((img: any) => {
+                allAnnexPhotos.push({
+                    url: img.image_url,
+                    caption: img.caption || 'Photo du projet'
+                })
+            })
+        }
+        if (itemPhotos.length > 0) {
+            itemPhotos.forEach((photo) => {
+                allAnnexPhotos.push({
+                    url: photo.url,
+                    caption: `Photo Réf. #${photo.refNum} - ${photo.itemTitle}`
+                })
+            })
+        }
+
+        if (allAnnexPhotos.length > 0) {
+            // Load all images first
+            const loadedImages = await Promise.all(
+                allAnnexPhotos.map(async (photo) => {
+                    try {
+                        const imgEl = await loadImage(photo.url)
+                        return { imgEl, caption: photo.caption }
+                    } catch (err) {
+                        console.error(`Failed to load image ${photo.url}:`, err)
+                        return { imgEl: null, caption: photo.caption }
+                    }
+                })
+            )
+
+            doc.addPage()
+            y = 20
+
+            doc.setFont('Helvetica', 'bold')
+            doc.setFontSize(14)
+            doc.setTextColor(15, 23, 42)
+            doc.text('ANNEXE : PHOTOS', margin, y)
+            y += 8
+
+            const colWidth = 85
+            const imageHeight = 55
+            const captionHeight = 10
+            const blockHeight = imageHeight + captionHeight + 5 // 70mm total per row block
+            let rowStartY = y
+
+            for (let idx = 0; idx < loadedImages.length; idx++) {
+                const item = loadedImages[idx]
+
+                // If we are at the start of a new row (col == 0) and it's not the very start
+                if (idx > 0 && idx % 2 === 0) {
+                    y += blockHeight
+                    rowStartY = y
+                }
+
+                // Check if we need a new page for the current row
+                if (idx % 2 === 0) {
+                    if (y + blockHeight > pageHeight - 15) {
+                        doc.addPage()
+                        y = 20
+                        rowStartY = y
+                    }
+                }
+
+                const col = idx % 2
+                const x = margin + col * (colWidth + 10) // 10mm gap
+
+                if (item.imgEl) {
+                    try {
+                        doc.setFillColor(248, 250, 252) // slate-50 background inside frame
+                        doc.rect(x, rowStartY, colWidth, imageHeight, 'F')
+                        
+                        let drawW = colWidth
+                        let drawH = imageHeight
+                        let xOffset = 0
+                        let yOffset = 0
+
+                        const imgRatio = item.imgEl.width / item.imgEl.height
+                        const boxRatio = colWidth / imageHeight
+
+                        if (imgRatio > boxRatio) {
+                            drawH = colWidth / imgRatio
+                            yOffset = (imageHeight - drawH) / 2
+                        } else {
+                            drawW = imageHeight * imgRatio
+                            xOffset = (colWidth - drawW) / 2
+                        }
+
+                        doc.addImage(item.imgEl, 'JPEG', x + xOffset, rowStartY + yOffset, drawW, drawH)
+
+                        doc.setDrawColor(226, 232, 240) // slate-200
+                        doc.setLineWidth(0.3)
+                        doc.rect(x, rowStartY, colWidth, imageHeight)
+                    } catch (err) {
+                        console.error('Error adding image to PDF:', err)
+                        doc.setFillColor(241, 245, 249)
+                        doc.rect(x, rowStartY, colWidth, imageHeight, 'F')
+                        doc.setFont('Helvetica', 'normal')
+                        doc.setFontSize(8)
+                        doc.setTextColor(148, 163, 184)
+                        doc.text('Image non disponible', x + colWidth/2, rowStartY + imageHeight/2, { align: 'center' })
+                    }
+                } else {
+                    doc.setFillColor(241, 245, 249)
+                    doc.rect(x, rowStartY, colWidth, imageHeight, 'F')
+                    doc.setDrawColor(226, 232, 240)
+                    doc.setLineWidth(0.3)
+                    doc.rect(x, rowStartY, colWidth, imageHeight)
+
+                    doc.setFont('Helvetica', 'normal')
+                    doc.setFontSize(8)
+                    doc.setTextColor(148, 163, 184)
+                    doc.text('Image non disponible', x + colWidth/2, rowStartY + imageHeight/2, { align: 'center' })
+                }
+
+                // Print caption
+                doc.setFont('Helvetica', 'bold')
+                doc.setFontSize(9)
+                doc.setTextColor(51, 65, 85)
+
+                const captionLines = doc.splitTextToSize(item.caption, colWidth - 4)
+                let capY = rowStartY + imageHeight + 4
+                captionLines.slice(0, 2).forEach((line: string) => {
+                    doc.text(line, x + 2, capY)
+                    capY += 4
+                })
+            }
+            
+            y = rowStartY + blockHeight
         }
 
         // --- 5. SUMMARY CARD ---
