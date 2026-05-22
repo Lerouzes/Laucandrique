@@ -59,6 +59,7 @@ interface ImportQuoteRow {
     temp_id: string
     id?: string // Match existing quote id if update
     quote_number: number // No soumission
+    quote_number_raw: string // raw string representation for edits
     sdc_num: string // SDC #
     client_name?: string | null // Client Name / Nom complet
     manager_name_ref: string // Typed manager name
@@ -226,7 +227,9 @@ export function QuoteExcelImport({
 
                 // Format & Map data to rows
                 const parsed: ImportQuoteRow[] = rawData.map((row: any, index) => {
-                    const quoteNumber = Number(row['No soumission'] || row['no_soumission'] || row['Soumission #'] || row['Numéro'] || 0)
+                    const rawQuoteNum = row['No soumission'] || row['no_soumission'] || row['Soumission #'] || row['Numéro']
+                    const quoteNumberRaw = rawQuoteNum !== undefined && rawQuoteNum !== null ? String(rawQuoteNum).trim() : ''
+                    const quoteNumber = Number(quoteNumberRaw) || 0
                     const sdcNum = String(row['SDC #'] || row['sdc_#'] || row['SDC'] || '').trim()
                     
                     // Match Manager fuzzy/exact by name
@@ -264,6 +267,7 @@ export function QuoteExcelImport({
                         temp_id: `quote-row-${index}-${Date.now()}`,
                         id: duplicateMatch?.id,
                         quote_number: quoteNumber,
+                        quote_number_raw: quoteNumberRaw,
                         sdc_num: sdcNum,
                         client_name: duplicateMatch?.clients?.company_name || null,
                         manager_name_ref: managerNameRef,
@@ -298,10 +302,13 @@ export function QuoteExcelImport({
             const warnings: string[] = []
             
             // Required: No soumission
-            if (!row.quote_number) {
+            if (!row.quote_number_raw || row.quote_number_raw.trim() === '') {
                 errors.push("Le numéro de soumission est obligatoire.")
-            } else if (isNaN(row.quote_number) || row.quote_number <= 0) {
-                errors.push("Le numéro de soumission doit être un nombre positif.")
+            } else {
+                const parsedNum = Number(row.quote_number_raw)
+                if (isNaN(parsedNum) || parsedNum <= 0) {
+                    errors.push("Le numéro de soumission doit être un nombre positif.")
+                }
             }
 
             // Required: SDC #
@@ -368,11 +375,11 @@ export function QuoteExcelImport({
     }, [rows, existingQuotes])
 
     const totalErrorsCount = useMemo(() => {
-        return validatedRows.reduce((acc, row) => acc + row.errors.length, 0)
+        return validatedRows.reduce((acc, row) => row.import_action === 'skip' ? acc : acc + row.errors.length, 0)
     }, [validatedRows])
 
     const totalWarningsCount = useMemo(() => {
-        return validatedRows.reduce((acc, row) => acc + row.warnings.length, 0)
+        return validatedRows.reduce((acc, row) => row.import_action === 'skip' ? acc : acc + row.warnings.length, 0)
     }, [validatedRows])
 
     // 4. INLINE EDIT HANDLERS
@@ -394,10 +401,11 @@ export function QuoteExcelImport({
                 updated.contractor_name_ref = match ? match.full_name : ''
             }
 
-            // Recalculate duplicate on quote_number update
-            if (field === 'quote_number') {
+            // Recalculate duplicate on quote_number_raw update
+            if (field === 'quote_number_raw') {
                 const qNum = Number(value)
-                const dup = existingQuotes.find(eq => Number(eq.quote_number) === qNum)
+                updated.quote_number = isNaN(qNum) ? 0 : qNum
+                const dup = existingQuotes.find(eq => Number(eq.quote_number) === updated.quote_number)
                 updated.id = dup?.id
                 updated.import_action = dup ? 'update' : 'create'
             }
@@ -631,11 +639,11 @@ export function QuoteExcelImport({
                                                             {/* Quote Number */}
                                                             <td className="p-2">
                                                                 <Input 
-                                                                    type="number"
-                                                                    value={row.quote_number || ''} 
-                                                                    onChange={(e) => handleUpdateRowField(row.temp_id, 'quote_number', Number(e.target.value))}
+                                                                    type="text"
+                                                                    value={row.quote_number_raw || ''} 
+                                                                    onChange={(e) => handleUpdateRowField(row.temp_id, 'quote_number_raw', e.target.value)}
                                                                     className={`bg-zinc-950/60 h-8 text-xs focus-visible:ring-zinc-800 ${
-                                                                        !row.quote_number || isNaN(row.quote_number) ? 'border-rose-700 focus-visible:ring-rose-800' : 'border-zinc-850'
+                                                                        !row.quote_number_raw || isNaN(Number(row.quote_number_raw)) || Number(row.quote_number_raw) <= 0 ? 'border-rose-700 focus-visible:ring-rose-800' : 'border-zinc-850'
                                                                     }`}
                                                                 />
                                                                 {row.is_db_duplicate && (
