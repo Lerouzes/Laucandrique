@@ -254,9 +254,10 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                     router.push(`/quotes/${initialQuote.id}`)
                     router.refresh()
                 } else {
-                    await createQuoteAction(finalQuoteData, itemsWithTotals, uploadedImagesData)
+                    const result = await createQuoteAction(finalQuoteData, itemsWithTotals, uploadedImagesData)
                     toast.success("Soumission créée avec succès")
-                    router.push('/quotes')
+                    router.push(`/quotes/${result.id}`)
+                    router.refresh()
                 }
             } catch (error: any) {
                 toast.error(isEditing ? "Erreur lors de la mise à jour" : "Erreur lors de la création", { description: error.message })

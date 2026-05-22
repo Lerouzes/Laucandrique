@@ -38,6 +38,23 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
     const [isPending, startTransition] = useTransition()
     const [templateUrl, setTemplateUrl] = useState<string>('')
 
+    const itemPhotos: { itemTitle: string, url: string, refNum: number }[] = []
+    const itemPhotoRefMap: Record<string, number> = {}
+    let photoCounter = 0
+    for (const item of quote.quote_items || []) {
+        if (item.image_urls && item.image_urls.length > 0) {
+            for (const url of item.image_urls) {
+                photoCounter++
+                itemPhotoRefMap[url] = photoCounter
+                itemPhotos.push({
+                    itemTitle: item.title || 'Sans titre',
+                    url: url,
+                    refNum: photoCounter
+                })
+            }
+        }
+    }
+
     useEffect(() => {
         const localTemplate = typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') || '' : ''
         setTemplateUrl(settings?.pdf_template_url || localTemplate)
@@ -211,8 +228,11 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
             doc.setFontSize(9)
 
             for (const item of items) {
+                const refNums = item.image_urls?.map((url: string) => itemPhotoRefMap[url]).filter(Boolean) || []
+                const refText = refNums.length > 0 ? ` (Photos Réf. ${refNums.map((n: number) => `#${n}`).join(', ')})` : ''
+
                 doc.setFont('Helvetica', 'bold')
-                const titleLines = doc.splitTextToSize(item.title || 'Sans titre', 88)
+                const titleLines = doc.splitTextToSize((item.title || 'Sans titre') + refText, 88)
                 
                 doc.setFont('Helvetica', 'normal')
                 const descLines = item.description ? doc.splitTextToSize(item.description, 88) : []
@@ -328,7 +348,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                 itemPhotos.forEach((photo) => {
                     allAnnexPhotos.push({
                         url: photo.url,
-                        caption: photo.itemTitle
+                        caption: `Photo Réf. #${photo.refNum} - ${photo.itemTitle}`
                     })
                 })
             }
@@ -506,17 +526,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
         ? `${Math.round(quote.estimated_duration_days * 24 * 100) / 100} heures`
         : `${quote.estimated_duration_days} jours`
 
-    const itemPhotos: { itemTitle: string, url: string }[] = []
-    for (const item of quote.quote_items || []) {
-        if (item.image_urls && item.image_urls.length > 0) {
-            for (const url of item.image_urls) {
-                itemPhotos.push({
-                    itemTitle: item.title || 'Sans titre',
-                    url: url
-                })
-            }
-        }
-    }
+    // itemPhotos defined at top
     const linkedProject = Array.isArray(quote.projects) ? quote.projects[0] : null
     const isProjectCompleted = linkedProject?.status === 'completed'
     const displayStatus = isProjectCompleted && quote.status === 'approved' ? 'completed' : quote.status
@@ -676,20 +686,30 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                             </tr>
                         </thead>
                         <tbody className="text-zinc-700">
-                            {quote.quote_items?.map((item: any) => (
-                                <tr key={item.id} className="border-b border-zinc-200">
-                                    <td className="py-3 pr-4">
-                                        <div className="font-bold text-zinc-900 text-sm">{item.title || 'Sans titre'}</div>
-                                        {item.description && (
-                                            <div className="text-zinc-500 text-xs mt-1 whitespace-pre-wrap">{item.description}</div>
-                                        )}
-                                    </td>
-                                    <td className="py-3 text-center">{item.quantity}</td>
-                                    <td className="py-3 text-center">{item.unit || '-'}</td>
-                                    <td className="py-3 text-right">${item.unit_cost?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
-                                    <td className="py-3 text-right font-medium text-zinc-900">${item.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
-                                </tr>
-                            ))}
+                            {quote.quote_items?.map((item: any) => {
+                                const refNums = item.image_urls?.map((url: string) => itemPhotoRefMap[url]).filter(Boolean) || []
+                                return (
+                                    <tr key={item.id} className="border-b border-zinc-200">
+                                        <td className="py-3 pr-4">
+                                            <div className="font-bold text-zinc-900 text-sm flex items-center gap-2 flex-wrap">
+                                                <span>{item.title || 'Sans titre'}</span>
+                                                {refNums.length > 0 && (
+                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                                        Photos Réf. {refNums.map((n: number) => `#${n}`).join(', ')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {item.description && (
+                                                <div className="text-zinc-500 text-xs mt-1 whitespace-pre-wrap">{item.description}</div>
+                                            )}
+                                        </td>
+                                        <td className="py-3 text-center">{item.quantity}</td>
+                                        <td className="py-3 text-center">{item.unit || '-'}</td>
+                                        <td className="py-3 text-right">${item.unit_cost?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
+                                        <td className="py-3 text-right font-medium text-zinc-900">${item.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
+                                    </tr>
+                                )
+                            })}
                         </tbody>
                     </table>
                 </div>
@@ -748,7 +768,10 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                             {itemPhotos.map((photo: any, index: number) => (
                                 <div key={index} className="border border-zinc-200 rounded-md overflow-hidden bg-zinc-50">
                                     <img src={photo.url} alt={photo.itemTitle} className="w-full h-48 object-cover object-center" crossOrigin="anonymous" />
-                                    <div className="p-3 text-sm text-zinc-700 font-medium bg-white">{photo.itemTitle}</div>
+                                    <div className="p-3 text-sm text-zinc-700 font-medium bg-white flex items-center justify-between">
+                                        <span>{photo.itemTitle}</span>
+                                        <span className="text-xs font-semibold text-blue-600">Photo Réf. #{photo.refNum}</span>
+                                    </div>
                                 </div>
                             ))}
                         </div>
