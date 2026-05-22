@@ -40,6 +40,18 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
         }
     }
 
+    const roomMap: Record<string, { name: string; sectionName: string }> = {}
+    const planningSections = quote.quote_planning_sections || []
+    planningSections.forEach((sec: any) => {
+        const rooms = sec.quote_planning_rooms || []
+        rooms.forEach((room: any) => {
+            roomMap[room.id] = {
+                name: room.name,
+                sectionName: sec.name
+            }
+        })
+    })
+
     useEffect(() => {
         const localTemplate = typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') || '' : ''
         setTemplateUrl(settings?.pdf_template_url || localTemplate)
@@ -279,6 +291,29 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                                                 {refNums.length > 0 && (
                                                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                                                         Photos Réf. {refNums.map((n: number) => `#${n}`).join(', ')}
+                                                    </span>
+                                                )}
+                                                {item.planning_room_id && roomMap[item.planning_room_id] && (
+                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-cyan-50 text-cyan-700 border border-cyan-200">
+                                                        {(() => {
+                                                            const r = roomMap[item.planning_room_id]
+                                                            if (item.planning_measurement_source === 'perimeter') {
+                                                                return `Périmètre (${r.name})`
+                                                            } else if (item.planning_measurement_source === 'area') {
+                                                                return `Aire (${r.name})`
+                                                            } else if (item.planning_measurement_source === 'wall_surface') {
+                                                                return `Surf. Murs (${r.name})`
+                                                            } else if (item.planning_measurement_source === 'selected_walls_linear') {
+                                                                const segments = item.planning_selected_segments || []
+                                                                const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
+                                                                return `Murs spéc. (M${wallList} - ${r.name})`
+                                                            } else if (item.planning_measurement_source === 'selected_walls_surface') {
+                                                                const segments = item.planning_selected_segments || []
+                                                                const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
+                                                                return `Murs spéc. (M${wallList} - ${r.name})`
+                                                            }
+                                                            return r.name
+                                                        })()}
                                                     </span>
                                                 )}
                                             </div>

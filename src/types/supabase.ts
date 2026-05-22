@@ -229,6 +229,7 @@ export interface Database {
           notes: string | null
           planning_room_id: string | null
           planning_measurement_source: string | null
+          planning_selected_segments: number[] | null
           created_at: string
         }
         Insert: {
@@ -244,6 +245,7 @@ export interface Database {
           notes?: string | null
           planning_room_id?: string | null
           planning_measurement_source?: string | null
+          planning_selected_segments?: number[] | null
           created_at?: string
         }
         Update: {
@@ -259,6 +261,7 @@ export interface Database {
           notes?: string | null
           planning_room_id?: string | null
           planning_measurement_source?: string | null
+          planning_selected_segments?: number[] | null
           created_at?: string
         }
         Relationships: [

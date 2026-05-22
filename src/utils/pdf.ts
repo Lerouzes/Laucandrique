@@ -144,7 +144,7 @@ function renderRoomToDataURL(points: { x: number; y: number }[], roomName: strin
         const textY = midY - Math.cos(angle) * offset
 
         ctx.fillStyle = '#ffffff'
-        const label = `${feetLen.toFixed(1)}'`
+        const label = `M${i + 1}: ${feetLen.toFixed(1)}'`
         const textWidth = ctx.measureText(label).width + 6
         ctx.fillRect(textX - textWidth / 2, textY - 6, textWidth, 12)
         ctx.strokeStyle = '#cbd5e1'
@@ -361,6 +361,18 @@ export async function downloadQuotePDF(quote: any, settings: any) {
         y += 8
 
         // Table Rows
+        const roomMap: Record<string, { name: string; sectionName: string }> = {}
+        const planningSections = quote.quote_planning_sections || []
+        planningSections.forEach((sec: any) => {
+            const rooms = sec.quote_planning_rooms || []
+            rooms.forEach((room: any) => {
+                roomMap[room.id] = {
+                    name: room.name,
+                    sectionName: sec.name
+                }
+            })
+        })
+
         const items = quote.quote_items || []
         doc.setFont('Helvetica', 'normal')
         doc.setFontSize(9)
@@ -372,8 +384,38 @@ export async function downloadQuotePDF(quote: any, settings: any) {
             doc.setFont('Helvetica', 'bold')
             const titleLines = doc.splitTextToSize((item.title || 'Sans titre') + refText, 88)
             
+            const descText = item.description || ''
+            let fullDesc = descText
+            if (item.planning_room_id && roomMap[item.planning_room_id]) {
+                const roomInfo = roomMap[item.planning_room_id]
+                let sourceLabel = ''
+                if (item.planning_measurement_source === 'perimeter') {
+                    sourceLabel = `Périmètre (${roomInfo.name})`
+                } else if (item.planning_measurement_source === 'area') {
+                    sourceLabel = `Aire (${roomInfo.name})`
+                } else if (item.planning_measurement_source === 'wall_surface') {
+                    sourceLabel = `Surf. Murs (${roomInfo.name})`
+                } else if (item.planning_measurement_source === 'selected_walls_linear') {
+                    const segments = item.planning_selected_segments || []
+                    const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
+                    sourceLabel = `Murs spéc. (M${wallList}) (${roomInfo.name})`
+                } else if (item.planning_measurement_source === 'selected_walls_surface') {
+                    const segments = item.planning_selected_segments || []
+                    const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
+                    sourceLabel = `Murs spéc. (M${wallList}) (${roomInfo.name})`
+                }
+                
+                if (sourceLabel) {
+                    if (fullDesc) {
+                        fullDesc += `\n[Plan] ${sourceLabel}`
+                    } else {
+                        fullDesc = `[Plan] ${sourceLabel}`
+                    }
+                }
+            }
+
             doc.setFont('Helvetica', 'normal')
-            const descLines = item.description ? doc.splitTextToSize(item.description, 88) : []
+            const descLines = fullDesc ? doc.splitTextToSize(fullDesc, 88) : []
             
             const rowHeight = Math.max(8, titleLines.length * 4 + (descLines.length > 0 ? descLines.length * 4 + 2 : 0) + 4)
             
@@ -606,7 +648,6 @@ export async function downloadQuotePDF(quote: any, settings: any) {
         }
 
         // --- 5.6 PLANS & MEASUREMENTS ---
-        const planningSections = quote.quote_planning_sections || []
         const allRooms: any[] = []
         planningSections.forEach((sec: any) => {
             const rooms = sec.quote_planning_rooms || []
@@ -687,9 +728,22 @@ export async function downloadQuotePDF(quote: any, settings: any) {
                                 doc.setTextColor(71, 85, 105)
                                 let itemY = y + 9
                                 linkedItems.forEach((item: any) => {
-                                    const sourceLabel = item.planning_measurement_source === 'perimeter' ? 'Périmètre'
-                                        : item.planning_measurement_source === 'area' ? 'Aire'
-                                        : 'Surface murs'
+                                    let sourceLabel = ''
+                                    if (item.planning_measurement_source === 'perimeter') {
+                                        sourceLabel = 'Périmètre'
+                                    } else if (item.planning_measurement_source === 'area') {
+                                        sourceLabel = 'Aire au sol'
+                                    } else if (item.planning_measurement_source === 'wall_surface') {
+                                        sourceLabel = 'Surface murs'
+                                    } else if (item.planning_measurement_source === 'selected_walls_linear') {
+                                        const segments = item.planning_selected_segments || []
+                                        const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
+                                        sourceLabel = `Murs spéc. (linéaire: ${wallList})`
+                                    } else if (item.planning_measurement_source === 'selected_walls_surface') {
+                                        const segments = item.planning_selected_segments || []
+                                        const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
+                                        sourceLabel = `Murs spéc. (surface: ${wallList})`
+                                    }
                                     const itemText = `- ${item.title} (${item.quantity} ${item.unit || ''} - via ${sourceLabel})`
                                     const lines = doc.splitTextToSize(itemText, contentWidth - boxW - 10)
                                     lines.forEach((line: string) => {

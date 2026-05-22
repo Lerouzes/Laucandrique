@@ -353,9 +353,9 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                         }}
                                     >
                                         <rect
-                                            x={textX - 22}
+                                            x={textX - 28}
                                             y={textY - 8}
-                                            width="44"
+                                            width="56"
                                             height="16"
                                             rx="3"
                                             fill="#18181b"
@@ -371,7 +371,7 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                             textAnchor="middle"
                                             alignmentBaseline="middle"
                                         >
-                                            {feetLen.toFixed(1)}'
+                                            M{idx + 1}: {feetLen.toFixed(1)}'
                                         </text>
                                     </g>
                                 )}
@@ -380,18 +380,63 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                     })}
 
                     {/* Dashed dynamic line in drawing mode */}
-                    {mode === 'draw' && points.length > 0 && (
-                        <line
-                            x1={points[points.length - 1].x}
-                            y1={points[points.length - 1].y}
-                            x2={mousePos.x}
-                            y2={mousePos.y}
-                            stroke="#06b6d4"
-                            strokeWidth="1.5"
-                            strokeDasharray="4 4"
-                            pointerEvents="none"
-                        />
-                    )}
+                    {mode === 'draw' && points.length > 0 && (() => {
+                        const lastPt = points[points.length - 1]
+                        const dx = mousePos.x - lastPt.x
+                        const dy = mousePos.y - lastPt.y
+                        const pixelLen = Math.sqrt(dx * dx + dy * dy)
+                        const feetLen = pixelLen / scale
+
+                        // Midpoint for dimension label
+                        const midX = (lastPt.x + mousePos.x) / 2
+                        const midY = (lastPt.y + mousePos.y) / 2
+
+                        // Perpendicular offset for text to not collide with lines
+                        const angle = Math.atan2(dy, dx)
+                        const offset = 14
+                        const textX = midX + Math.sin(angle) * offset
+                        const textY = midY - Math.cos(angle) * offset
+
+                        return (
+                            <g pointerEvents="none">
+                                <line
+                                    x1={lastPt.x}
+                                    y1={lastPt.y}
+                                    x2={mousePos.x}
+                                    y2={mousePos.y}
+                                    stroke="#06b6d4"
+                                    strokeWidth="1.5"
+                                    strokeDasharray="4 4"
+                                />
+                                {pixelLen > 10 && (
+                                    <g>
+                                        <rect
+                                            x={textX - 28}
+                                            y={textY - 8}
+                                            width="56"
+                                            height="16"
+                                            rx="3"
+                                            fill="#18181b"
+                                            stroke="#06b6d4"
+                                            strokeWidth="1"
+                                            opacity="0.85"
+                                        />
+                                        <text
+                                            x={textX}
+                                            y={textY + 1}
+                                            fill="#22d3ee"
+                                            fontSize="9"
+                                            fontWeight="bold"
+                                            textAnchor="middle"
+                                            alignmentBaseline="middle"
+                                        >
+                                            M{points.length + 1}: {feetLen.toFixed(1)}'
+                                        </text>
+                                    </g>
+                                )}
+                            </g>
+                        )
+                    })()}
 
                     {/* Interactive drag points */}
                     {points.map((p, idx) => {

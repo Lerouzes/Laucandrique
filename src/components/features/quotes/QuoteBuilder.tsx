@@ -23,7 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area'
 import Link from 'next/link'
 import { Label } from '@/components/ui/label'
-import { PlanningPanel, Section, Room, calculatePerimeter, calculateFloorArea, calculateWallSurface } from './PlanningPanel'
+import { PlanningPanel, Section, Room, calculatePerimeter, calculateFloorArea, calculateWallSurface, getDistance } from './PlanningPanel'
 import { Badge } from '@/components/ui/badge'
 import { markProjectCompletedByQuote } from '@/actions/projects'
 import { downloadQuotePDF } from '@/utils/pdf'
@@ -37,6 +37,7 @@ const quoteItemSchema = z.object({
     image_urls: z.array(z.string()).default([]),
     planning_room_id: z.string().nullable().optional(),
     planning_measurement_source: z.string().nullable().optional(),
+    planning_selected_segments: z.array(z.number()).nullable().optional(),
 })
 
 const quoteSchema = z.object({
@@ -170,12 +171,13 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                     image_urls: i.image_urls || [],
                     planning_room_id: i.planning_room_id || null,
                     planning_measurement_source: i.planning_measurement_source || null,
+                    planning_selected_segments: i.planning_selected_segments || null,
                 }))
                 : (initialQuote?.subtotal && initialQuote.subtotal > 0)
-                    ? [{ title: 'Montant forfaitaire importé', description: '', quantity: 1, unit: 'u', unit_cost: initialQuote.subtotal, image_urls: [], planning_room_id: null, planning_measurement_source: null }]
+                    ? [{ title: 'Montant forfaitaire importé', description: '', quantity: 1, unit: 'u', unit_cost: initialQuote.subtotal, image_urls: [], planning_room_id: null, planning_measurement_source: null, planning_selected_segments: null }]
                     : (initialQuote?.total && initialQuote.total > 0)
-                        ? [{ title: 'Montant forfaitaire importé', description: '', quantity: 1, unit: 'u', unit_cost: initialQuote.total, image_urls: [], planning_room_id: null, planning_measurement_source: null }]
-                        : [{ title: '', description: '', quantity: 1, unit: 'h', unit_cost: 0, image_urls: [], planning_room_id: null, planning_measurement_source: null }],
+                        ? [{ title: 'Montant forfaitaire importé', description: '', quantity: 1, unit: 'u', unit_cost: initialQuote.total, image_urls: [], planning_room_id: null, planning_measurement_source: null, planning_selected_segments: null }]
+                        : [{ title: '', description: '', quantity: 1, unit: 'h', unit_cost: 0, image_urls: [], planning_room_id: null, planning_measurement_source: null, planning_selected_segments: null }],
         },
     })
 
@@ -218,7 +220,17 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
         return null
     }
 
-    const getMetricValue = (room: Room, source: string): { quantity: number; unit: string } => {
+    const getWallLengths = (room: Room, scale: number = 20): number[] => {
+        if (!room.points || room.points.length < 2) return []
+        const n = room.points.length
+        const lengths: number[] = []
+        for (let i = 0; i < n; i++) {
+            lengths.push(getDistance(room.points[i], room.points[(i + 1) % n]) / scale)
+        }
+        return lengths
+    }
+
+    const getMetricValue = (room: Room, source: string, selectedSegments?: number[] | null): { quantity: number; unit: string } => {
         switch (source) {
             case 'perimeter':
                 return { quantity: calculatePerimeter(room.points), unit: 'pi' }
@@ -226,6 +238,33 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                 return { quantity: calculateFloorArea(room.points), unit: 'pi²' }
             case 'wall_surface':
                 return { quantity: calculateWallSurface(room.points, room.height), unit: 'pi²' }
+            case 'selected_walls_linear': {
+                if (!selectedSegments || selectedSegments.length === 0) {
+                    return { quantity: 0, unit: 'pi' }
+                }
+                const lengths = getWallLengths(room)
+                const qty = selectedSegments.reduce((sum, idx) => {
+                    if (idx >= 0 && idx < lengths.length) {
+                        return sum + lengths[idx]
+                    }
+                    return sum
+                }, 0)
+                return { quantity: qty, unit: 'pi' }
+            }
+            case 'selected_walls_surface': {
+                if (!selectedSegments || selectedSegments.length === 0) {
+                    return { quantity: 0, unit: 'pi²' }
+                }
+                const lengths = getWallLengths(room)
+                const sumLength = selectedSegments.reduce((sum, idx) => {
+                    if (idx >= 0 && idx < lengths.length) {
+                        return sum + lengths[idx]
+                    }
+                    return sum
+                }, 0)
+                const height = room.height || 8.0
+                return { quantity: sumLength * height, unit: 'pi²' }
+            }
             default:
                 return { quantity: 0, unit: 'pi' }
         }
@@ -237,7 +276,7 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
             if (item?.planning_room_id && item?.planning_measurement_source) {
                 const room = findRoom(item.planning_room_id)
                 if (room) {
-                    const { quantity, unit } = getMetricValue(room, item.planning_measurement_source)
+                    const { quantity, unit } = getMetricValue(room, item.planning_measurement_source, item.planning_selected_segments)
                     const roundedQty = Math.round(quantity * 100) / 100
                     const currentQty = form.getValues(`items.${index}.quantity`)
                     const currentUnit = form.getValues(`items.${index}.unit`)
@@ -793,7 +832,7 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                         <Card className="border-zinc-800 bg-zinc-900">
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle className="text-lg text-zinc-100">Items de la soumission</CardTitle>
-                                <Button type="button" variant="outline" size="sm" onClick={() => append({ title: '', description: '', quantity: 1, unit: '', unit_cost: 0, image_urls: [], planning_room_id: null, planning_measurement_source: null })} className="h-8 border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100">
+                                <Button type="button" variant="outline" size="sm" onClick={() => append({ title: '', description: '', quantity: 1, unit: '', unit_cost: 0, image_urls: [], planning_room_id: null, planning_measurement_source: null, planning_selected_segments: null })} className="h-8 border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100">
                                     <Plus className="mr-2 h-4 w-4" />
                                     Ajouter Ligne
                                 </Button>
@@ -939,7 +978,17 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                                                     name={`items.${index}.planning_measurement_source` as const}
                                                                     render={({ field }) => (
                                                                         <Select
-                                                                            onValueChange={field.onChange}
+                                                                            onValueChange={(val) => {
+                                                                                field.onChange(val)
+                                                                                if (val !== 'selected_walls_linear' && val !== 'selected_walls_surface') {
+                                                                                    form.setValue(`items.${index}.planning_selected_segments`, null)
+                                                                                } else {
+                                                                                    const current = form.getValues(`items.${index}.planning_selected_segments`)
+                                                                                    if (!current) {
+                                                                                        form.setValue(`items.${index}.planning_selected_segments`, [])
+                                                                                    }
+                                                                                }
+                                                                            }}
                                                                             value={field.value || 'wall_surface'}
                                                                         >
                                                                             <SelectTrigger className="bg-zinc-950 border-zinc-800 text-zinc-200 focus-visible:ring-zinc-700 h-9 text-xs">
@@ -949,9 +998,58 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                                                                 <SelectItem value="perimeter" className="text-xs">Périmètre (pi)</SelectItem>
                                                                                 <SelectItem value="area" className="text-xs">Aire au sol (pi²)</SelectItem>
                                                                                 <SelectItem value="wall_surface" className="text-xs">Surface des murs (pi²)</SelectItem>
+                                                                                <SelectItem value="selected_walls_linear" className="text-xs">Murs spécifiques (linéaire - pi)</SelectItem>
+                                                                                <SelectItem value="selected_walls_surface" className="text-xs">Murs spécifiques (surface - pi²)</SelectItem>
                                                                             </SelectContent>
                                                                         </Select>
                                                                     )}
+                                                                />
+                                                            </div>
+                                                        )}
+
+                                                        {watchItems[index]?.planning_room_id && (watchItems[index]?.planning_measurement_source === 'selected_walls_linear' || watchItems[index]?.planning_measurement_source === 'selected_walls_surface') && (
+                                                            <div className="col-span-1 md:col-span-2 border-t border-zinc-800/80 pt-2.5 mt-1 animate-in fade-in duration-200">
+                                                                <Label className="text-zinc-400 text-[11px] mb-1.5 block">Sélectionner les murs à inclure :</Label>
+                                                                <Controller
+                                                                    control={form.control}
+                                                                    name={`items.${index}.planning_selected_segments` as const}
+                                                                    render={({ field }) => {
+                                                                        const room = findRoom(watchItems[index].planning_room_id!)
+                                                                        if (!room || !room.points || room.points.length < 2) {
+                                                                            return <span className="text-xs text-zinc-500 font-medium">Tracez au moins un mur sur le plan pour cette pièce.</span>
+                                                                        }
+                                                                        const lengths = getWallLengths(room)
+                                                                        const selected = field.value || []
+
+                                                                        const handleToggle = (wallIdx: number) => {
+                                                                            let newSel = [...selected]
+                                                                            if (newSel.includes(wallIdx)) {
+                                                                                newSel = newSel.filter(x => x !== wallIdx)
+                                                                            } else {
+                                                                                newSel.push(wallIdx)
+                                                                            }
+                                                                            field.onChange(newSel)
+                                                                        }
+
+                                                                        return (
+                                                                            <div className="flex flex-wrap gap-x-4 gap-y-2">
+                                                                                {lengths.map((len, wallIdx) => {
+                                                                                    const isChecked = selected.includes(wallIdx)
+                                                                                    return (
+                                                                                        <label key={`wall-${wallIdx}`} className="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer select-none hover:text-zinc-100">
+                                                                                            <input
+                                                                                                type="checkbox"
+                                                                                                checked={isChecked}
+                                                                                                onChange={() => handleToggle(wallIdx)}
+                                                                                                className="rounded border-zinc-800 bg-zinc-950 text-cyan-500 focus:ring-cyan-600 focus:ring-offset-zinc-900 h-3.5 w-3.5"
+                                                                                            />
+                                                                                            <span>Mur {wallIdx + 1} ({len.toFixed(1)} pi)</span>
+                                                                                        </label>
+                                                                                    )
+                                                                                })}
+                                                                            </div>
+                                                                        )
+                                                                    }}
                                                                 />
                                                             </div>
                                                         )}
