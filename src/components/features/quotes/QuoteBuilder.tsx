@@ -28,6 +28,32 @@ import { Badge } from '@/components/ui/badge'
 import { markProjectCompletedByQuote } from '@/actions/projects'
 import { downloadQuotePDF } from '@/utils/pdf'
 
+function parsePoints(points: any): { x: number; y: number }[] {
+    if (!points) return []
+    if (Array.isArray(points)) {
+        return points.map((p: any) => {
+            if (typeof p === 'string') {
+                try {
+                    const parsed = JSON.parse(p)
+                    return { x: Number(parsed.x || 0), y: Number(parsed.y || 0) }
+                } catch {
+                    return { x: 0, y: 0 }
+                }
+            }
+            return { x: Number(p.x || 0), y: Number(p.y || 0) }
+        })
+    }
+    if (typeof points === 'string') {
+        try {
+            const parsed = JSON.parse(points)
+            return parsePoints(parsed)
+        } catch {
+            return []
+        }
+    }
+    return []
+}
+
 const quoteItemSchema = z.object({
     title: z.string().min(1, 'Titre requis'),
     description: z.string().optional(),
@@ -130,7 +156,62 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
         if (!initialQuote) return
         try {
             setIsGenerating(true)
-            await downloadQuotePDF(initialQuote, settings)
+            
+            const formValues = form.getValues()
+            
+            const itemsWithTotals = (formValues.items || []).map(item => ({
+                ...item,
+                total: Number(item.quantity || 0) * Number(item.unit_cost || 0)
+            }))
+
+            const clientInfo = clients.find(c => c.id === formValues.client_id)
+
+            const subtotal = itemsWithTotals.reduce((sum, item) => sum + item.total, 0)
+            const adminPercentage = Number(formValues.admin_percentage || 0)
+            const adminAmount = subtotal * (adminPercentage / 100)
+            const profitPercentage = Number(formValues.profit_percentage || 0)
+            const profitAmount = subtotal * (profitPercentage / 100)
+            const beforeTax = subtotal + adminAmount + profitAmount
+            const gstAmount = beforeTax * 0.05
+            const qstAmount = beforeTax * 0.09975
+            const total = beforeTax + gstAmount + qstAmount
+
+            const mappedSections = enablePlanning ? sections.map(sec => ({
+                id: sec.id,
+                name: sec.name,
+                description: sec.description,
+                quote_planning_rooms: (sec.rooms || []).map(room => ({
+                    id: room.id,
+                    name: room.name,
+                    description: room.description,
+                    height: room.height ? Number(room.height) : null,
+                    points: parsePoints(room.points)
+                }))
+            })) : []
+
+            const quoteForPdf = {
+                ...initialQuote,
+                title: formValues.title,
+                description: formValues.description,
+                estimated_duration_days: formValues.duration_unit === 'hours'
+                    ? Number(formValues.duration_value) / 24
+                    : Number(formValues.duration_value),
+                hide_duration: formValues.hide_duration,
+                work_types: formValues.work_types,
+                clients: clientInfo,
+                quote_items: itemsWithTotals,
+                subtotal,
+                admin_percentage: adminPercentage,
+                admin_amount: adminAmount,
+                profit_percentage: profitPercentage,
+                profit_amount: profitAmount,
+                gst_amount: gstAmount,
+                qst_amount: qstAmount,
+                total,
+                quote_planning_sections: mappedSections
+            }
+
+            await downloadQuotePDF(quoteForPdf, settings)
         } finally {
             setIsGenerating(false)
         }
@@ -205,7 +286,7 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                     name: room.name,
                     description: room.description,
                     height: room.height,
-                    points: room.points || []
+                    points: parsePoints(room.points)
                 }))
             }))
         }

@@ -18,6 +18,32 @@ const loadImage = (url: string): Promise<HTMLImageElement> => {
     })
 }
 
+function parsePoints(points: any): { x: number; y: number }[] {
+    if (!points) return []
+    if (Array.isArray(points)) {
+        return points.map((p: any) => {
+            if (typeof p === 'string') {
+                try {
+                    const parsed = JSON.parse(p)
+                    return { x: Number(parsed.x || 0), y: Number(parsed.y || 0) }
+                } catch {
+                    return { x: 0, y: 0 }
+                }
+            }
+            return { x: Number(p.x || 0), y: Number(p.y || 0) }
+        })
+    }
+    if (typeof points === 'string') {
+        try {
+            const parsed = JSON.parse(points)
+            return parsePoints(parsed)
+        } catch {
+            return []
+        }
+    }
+    return []
+}
+
 function getDistance(p1: { x: number; y: number }, p2: { x: number; y: number }): number {
     const x1 = Number(p1.x)
     const y1 = Number(p1.y)
@@ -26,42 +52,47 @@ function getDistance(p1: { x: number; y: number }, p2: { x: number; y: number })
     return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2))
 }
 
-function calculatePerimeter(points: { x: number; y: number }[], scale: number = 20): number {
-    if (!points || points.length < 2) return 0
+function calculatePerimeter(points: any, scale: number = 20): number {
+    const parsedPoints = parsePoints(points)
+    if (!parsedPoints || parsedPoints.length < 2) return 0
     let totalDist = 0
-    const n = points.length
+    const n = parsedPoints.length
     for (let i = 0; i < n; i++) {
-        totalDist += getDistance(points[i], points[(i + 1) % n])
+        totalDist += getDistance(parsedPoints[i], parsedPoints[(i + 1) % n])
     }
     return totalDist / scale
 }
 
-function calculateFloorArea(points: { x: number; y: number }[], scale: number = 20): number {
-    if (!points || points.length < 3) return 0
+function calculateFloorArea(points: any, scale: number = 20): number {
+    const parsedPoints = parsePoints(points)
+    if (!parsedPoints || parsedPoints.length < 3) return 0
     let area = 0
-    const n = points.length
+    const n = parsedPoints.length
     for (let i = 0; i < n; i++) {
-        const p1 = points[i]
-        const p2 = points[(i + 1) % n]
+        const p1 = parsedPoints[i]
+        const p2 = parsedPoints[(i + 1) % n]
         area += (Number(p1.x) * Number(p2.y)) - (Number(p2.x) * Number(p1.y))
     }
     return Math.abs(area) / 2 / (scale * scale)
 }
 
-function calculateWallSurface(points: { x: number; y: number }[], height: number | null, scale: number = 20): number {
+function calculateWallSurface(points: any, height: number | null, scale: number = 20): number {
     const h = height || 8.0
     const perimeter = calculatePerimeter(points, scale)
     return perimeter * h
 }
 
-function renderRoomToDataURL(points: { x: number; y: number }[], roomName: string, scale: number = 20): string | null {
-    if (typeof window === 'undefined') return null
-    if (!points || points.length < 3) return null
-
-    const parsedPoints = points.map(p => ({
-        x: Number(p.x),
-        y: Number(p.y)
-    }))
+function renderRoomToDataURL(points: any, roomName: string, scale: number = 20): string | null {
+    console.log(`renderRoomToDataURL debug: Room "${roomName}", points:`, points);
+    if (typeof window === 'undefined') {
+        console.log("renderRoomToDataURL debug: window is undefined (SSR)");
+        return null
+    }
+    const parsedPoints = parsePoints(points)
+    if (!parsedPoints || parsedPoints.length < 3) {
+        console.log(`renderRoomToDataURL debug: parsedPoints length is ${parsedPoints ? parsedPoints.length : 'null/undefined'} (< 3)`);
+        return null
+    }
 
     let minX = Infinity, maxX = -Infinity
     let minY = Infinity, maxY = -Infinity
@@ -72,9 +103,19 @@ function renderRoomToDataURL(points: { x: number; y: number }[], roomName: strin
         if (p.y > maxY) maxY = p.y
     })
 
+    if (!isFinite(minX) || !isFinite(maxX) || !isFinite(minY) || !isFinite(maxY)) {
+        console.log("renderRoomToDataURL debug: dimensions are not finite");
+        return null
+    }
+
     const padding = 30
     const rawWidth = (maxX - minX) + 2 * padding
     const rawHeight = (maxY - minY) + 2 * padding
+
+    if (rawWidth <= 0 || rawHeight <= 0 || rawWidth > 10000 || rawHeight > 10000) {
+        console.log(`renderRoomToDataURL debug: invalid rawWidth (${rawWidth}) or rawHeight (${rawHeight})`);
+        return null
+    }
 
     const canvas = document.createElement('canvas')
     canvas.width = rawWidth
@@ -184,7 +225,7 @@ function renderRoomToDataURL(points: { x: number; y: number }[], roomName: strin
     ctx.fillStyle = '#ffffff'
     ctx.fillText(roomName, centroidX, centroidY + 0.5)
 
-    return canvas.toDataURL('image/png')
+    return canvas.toDataURL('image/jpeg', 0.95)
 }
 
 export async function downloadQuotePDF(quote: any, settings: any) {
@@ -657,14 +698,14 @@ export async function downloadQuotePDF(quote: any, settings: any) {
         }
 
         // --- 5.6 PLANS & MEASUREMENTS ---
+        console.log("downloadQuotePDF debug: planningSections raw:", planningSections);
         const allRooms: any[] = []
         planningSections.forEach((sec: any) => {
             const rooms = sec.quote_planning_rooms || []
+            console.log(`downloadQuotePDF debug: Section "${sec.name}" has rooms:`, rooms);
             rooms.forEach((room: any) => {
-                const parsedPoints = (room.points || []).map((p: any) => ({
-                    x: Number(p.x),
-                    y: Number(p.y)
-                }))
+                const parsedPoints = parsePoints(room.points)
+                console.log(`downloadQuotePDF debug: Room "${room.name}", parsedPoints:`, parsedPoints);
                 allRooms.push({
                     ...room,
                     sectionName: sec.name,
@@ -672,6 +713,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
                 })
             })
         })
+        console.log("downloadQuotePDF debug: Compiled allRooms:", allRooms);
 
         if (allRooms.length > 0) {
             doc.addPage()
@@ -727,7 +769,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
                             doc.setLineWidth(0.3)
                             doc.rect(margin, y, boxW, boxH)
 
-                            doc.addImage(dataUrl, 'PNG', margin + 1, y + 1, boxW - 2, boxH - 2)
+                            doc.addImage(dataUrl, 'JPEG', margin + 1, y + 1, boxW - 2, boxH - 2)
 
                             const linkedItems = (quote.quote_items || []).filter((item: any) => item.planning_room_id === room.id)
                             if (linkedItems.length > 0) {

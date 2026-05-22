@@ -314,6 +314,7 @@ export async function getQuote(id: string) {
         .eq('id', id)
         .single()
 
+
     if (error) return null
     return data
 }
