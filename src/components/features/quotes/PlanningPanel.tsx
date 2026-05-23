@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Plus, Trash2, FolderPlus, HelpCircle, Layers, Home, Info, Height } from 'lucide-react'
+import { Plus, Trash2, Layers, Home } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PlanningCanvas } from './PlanningCanvas'
@@ -9,6 +9,9 @@ import { PlanningCanvas } from './PlanningCanvas'
 export interface Point {
     x: number
     y: number
+    disconnect?: boolean
+    features?: any[]
+    isClosed?: boolean
 }
 
 export interface Room {
@@ -38,24 +41,68 @@ export function getDistance(p1: Point, p2: Point): number {
 
 export function calculatePerimeter(points: Point[], scale: number = 20): number {
     if (!points || points.length < 2) return 0
-    let totalDist = 0
-    const n = points.length
-    for (let i = 0; i < n; i++) {
-        totalDist += getDistance(points[i], points[(i + 1) % n])
+    const isClosed = points[0]?.isClosed !== false
+
+    const paths: Point[][] = []
+    let currentPath: Point[] = []
+    points.forEach((p) => {
+        if (p.disconnect && currentPath.length > 0) {
+            paths.push(currentPath)
+            currentPath = []
+        }
+        currentPath.push(p)
+    })
+    if (currentPath.length > 0) {
+        paths.push(currentPath)
     }
+
+    let totalDist = 0
+    paths.forEach(path => {
+        for (let i = 0; i < path.length; i++) {
+            const isLast = i === path.length - 1
+            if (isLast) {
+                if (isClosed && path.length >= 3) {
+                    totalDist += getDistance(path[i], path[0])
+                }
+            } else {
+                totalDist += getDistance(path[i], path[i + 1])
+            }
+        }
+    })
     return totalDist / scale
 }
 
 export function calculateFloorArea(points: Point[], scale: number = 20): number {
     if (!points || points.length < 3) return 0
-    let area = 0
-    const n = points.length
-    for (let i = 0; i < n; i++) {
-        const p1 = points[i]
-        const p2 = points[(i + 1) % n]
-        area += (p1.x * p2.y) - (p2.x * p1.y)
+    const isClosed = points[0]?.isClosed !== false
+    if (!isClosed) return 0
+
+    const paths: Point[][] = []
+    let currentPath: Point[] = []
+    points.forEach((p) => {
+        if (p.disconnect && currentPath.length > 0) {
+            paths.push(currentPath)
+            currentPath = []
+        }
+        currentPath.push(p)
+    })
+    if (currentPath.length > 0) {
+        paths.push(currentPath)
     }
-    return Math.abs(area) / 2 / (scale * scale)
+
+    let totalArea = 0
+    paths.forEach(path => {
+        if (path.length < 3) return
+        let area = 0
+        const n = path.length
+        for (let i = 0; i < n; i++) {
+            const p1 = path[i]
+            const p2 = path[(i + 1) % n]
+            area += (p1.x * p2.y) - (p2.x * p1.y)
+        }
+        totalArea += Math.abs(area) / 2
+    })
+    return totalArea / (scale * scale)
 }
 
 export function calculateWallSurface(points: Point[], height: number | null, scale: number = 20): number {

@@ -28,19 +28,29 @@ import { Badge } from '@/components/ui/badge'
 import { markProjectCompletedByQuote } from '@/actions/projects'
 import { downloadQuotePDF } from '@/utils/pdf'
 
-function parsePoints(points: any): { x: number; y: number }[] {
+function parsePoints(points: any): any[] {
     if (!points) return []
     if (Array.isArray(points)) {
         return points.map((p: any) => {
             if (typeof p === 'string') {
                 try {
                     const parsed = JSON.parse(p)
-                    return { x: Number(parsed.x || 0), y: Number(parsed.y || 0) }
+                    return { 
+                        x: Number(parsed.x || 0), 
+                        y: Number(parsed.y || 0),
+                        disconnect: parsed.disconnect,
+                        features: parsed.features,
+                        isClosed: parsed.isClosed
+                    }
                 } catch {
                     return { x: 0, y: 0 }
                 }
             }
-            return { x: Number(p.x || 0), y: Number(p.y || 0) }
+            return { 
+                ...p,
+                x: Number(p.x || 0), 
+                y: Number(p.y || 0)
+            }
         })
     }
     if (typeof points === 'string') {
