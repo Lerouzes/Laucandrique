@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useTransition } from 'react'
+import { useState, useMemo, useTransition, useEffect } from 'react'
 import { 
     Receipt, 
     Search, 
@@ -54,6 +54,17 @@ export function BillsTable({ initialBills }: BillsTableProps) {
     const [sortBy, setSortBy] = useState<'date' | 'total'>('date')
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
     const [isPending, startTransition] = useTransition()
+
+    useEffect(() => {
+        const savedSortBy = localStorage.getItem('bills_sort_by')
+        const savedSortOrder = localStorage.getItem('bills_sort_order')
+        if (savedSortBy === 'date' || savedSortBy === 'total') {
+            setSortBy(savedSortBy)
+        }
+        if (savedSortOrder === 'asc' || savedSortOrder === 'desc') {
+            setSortOrder(savedSortOrder)
+        }
+    }, [])
 
     // 1. Metric Calculations
     const metrics = useMemo(() => {
@@ -132,12 +143,19 @@ export function BillsTable({ initialBills }: BillsTableProps) {
     }
 
     const toggleSort = (type: 'date' | 'total') => {
+        let nextSortBy = sortBy
+        let nextSortOrder = sortOrder
         if (sortBy === type) {
-            setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+            nextSortOrder = sortOrder === 'asc' ? 'desc' : 'asc'
+            setSortOrder(nextSortOrder)
         } else {
+            nextSortBy = type
+            nextSortOrder = 'desc'
             setSortBy(type)
-            setSortOrder('desc')
+            setSortOrder(nextSortOrder)
         }
+        localStorage.setItem('bills_sort_by', nextSortBy)
+        localStorage.setItem('bills_sort_order', nextSortOrder)
     }
 
     return (

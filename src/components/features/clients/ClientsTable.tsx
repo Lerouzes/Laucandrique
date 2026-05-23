@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 
@@ -15,13 +15,31 @@ export function ClientsTable({ data }: { data: Client[] }) {
     const [sortField, setSortField] = useState<string | null>(null)
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
-    const handleSort = (field: string) => {
-        if (sortField === field) {
-            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
-        } else {
-            setSortField(field)
-            setSortDirection('asc')
+    useEffect(() => {
+        const savedField = localStorage.getItem('clients_sort_field')
+        const savedDirection = localStorage.getItem('clients_sort_direction')
+        if (savedField !== null) {
+            setSortField(savedField === 'null' ? null : savedField)
         }
+        if (savedDirection === 'asc' || savedDirection === 'desc') {
+            setSortDirection(savedDirection)
+        }
+    }, [])
+
+    const handleSort = (field: string) => {
+        let nextField = sortField
+        let nextDirection = sortDirection
+        if (sortField === field) {
+            nextDirection = sortDirection === 'asc' ? 'desc' : 'asc'
+            setSortDirection(nextDirection)
+        } else {
+            nextField = field
+            nextDirection = 'asc'
+            setSortField(field)
+            setSortDirection(nextDirection)
+        }
+        localStorage.setItem('clients_sort_field', String(nextField))
+        localStorage.setItem('clients_sort_direction', nextDirection)
     }
 
     const sortedData = [...data].sort((a, b) => {

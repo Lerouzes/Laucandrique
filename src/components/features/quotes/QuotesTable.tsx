@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -291,13 +291,31 @@ export function QuotesTable({ data }: { data: any[] }) {
     const [sortField, setSortField] = useState<string | null>('created_at')
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
-    const handleSort = (field: string) => {
-        if (sortField === field) {
-            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
-        } else {
-            setSortField(field)
-            setSortDirection('asc')
+    useEffect(() => {
+        const savedField = localStorage.getItem('quotes_sort_field')
+        const savedDirection = localStorage.getItem('quotes_sort_direction')
+        if (savedField !== null) {
+            setSortField(savedField === 'null' ? null : savedField)
         }
+        if (savedDirection === 'asc' || savedDirection === 'desc') {
+            setSortDirection(savedDirection)
+        }
+    }, [])
+
+    const handleSort = (field: string) => {
+        let nextField = sortField
+        let nextDirection = sortDirection
+        if (sortField === field) {
+            nextDirection = sortDirection === 'asc' ? 'desc' : 'asc'
+            setSortDirection(nextDirection)
+        } else {
+            nextField = field
+            nextDirection = 'asc'
+            setSortField(field)
+            setSortDirection(nextDirection)
+        }
+        localStorage.setItem('quotes_sort_field', String(nextField))
+        localStorage.setItem('quotes_sort_direction', nextDirection)
     }
 
     const sortedData = [...data].sort((a, b) => {
