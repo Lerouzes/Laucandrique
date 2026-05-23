@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { frCA } from 'date-fns/locale'
-import { CalendarDays, CheckCircle, Pencil, XCircle, Trash2, ShieldAlert, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { CalendarDays, CheckCircle, Pencil, XCircle, Trash2, ShieldAlert, ArrowUp, ArrowDown, ArrowUpDown, Receipt } from 'lucide-react'
 import { toast } from 'sonner'
 import { updateQuoteStatus, deleteQuoteAction, deleteQuotesAction, updateQuotesStatusAction } from '@/actions/quotes'
 import { scheduleProjectStartByQuote } from '@/actions/projects'
@@ -147,7 +147,13 @@ function QuoteRow({
         <TableRow
             key={quote.id}
             className={`border-b border-zinc-800 hover:bg-zinc-800/50 cursor-pointer ${isSelected ? 'bg-zinc-800/20' : ''}`}
-            onClick={() => router.push(`/quotes/${quote.id}/edit`)}
+            onClick={() => {
+                if (quote.status === 'completed' || quote.status === 'billed') {
+                    router.push(`/quotes/${quote.id}`)
+                } else {
+                    router.push(`/quotes/${quote.id}/edit`)
+                }
+            }}
         >
             <TableCell className="w-12" onClick={e => e.stopPropagation()}>
                 <Checkbox 
@@ -249,16 +255,27 @@ function QuoteRow({
                             </Button>
                         </>
                     )}
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={!canEditQuote}
-                        onClick={() => router.push(`/quotes/${quote.id}/edit`)}
-                        className="h-7 px-2 text-amber-400 hover:text-amber-300 hover:bg-amber-950/50 disabled:text-zinc-600 disabled:hover:bg-transparent"
-                        title={canEditQuote ? 'Modifier' : 'Modification désactivée (complétée)'}
-                    >
-                        <Pencil className="h-4 w-4" />
-                    </Button>
+                    {quote.status === 'completed' ? (
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => router.push(`/bills/new?quoteId=${quote.id}`)}
+                            className="h-7 px-2 text-purple-400 hover:text-purple-300 hover:bg-purple-950/50 animate-pulse"
+                            title="Créer la facture"
+                        >
+                            <Receipt className="h-4 w-4" />
+                        </Button>
+                    ) : quote.status !== 'billed' ? (
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => router.push(`/quotes/${quote.id}/edit`)}
+                            className="h-7 px-2 text-amber-400 hover:text-amber-300 hover:bg-amber-950/50"
+                            title="Modifier"
+                        >
+                            <Pencil className="h-4 w-4" />
+                        </Button>
+                    ) : null}
                     <Button
                         size="sm"
                         variant="ghost"

@@ -4,7 +4,7 @@ import { useState, useTransition, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Plus, Trash2, Calendar, User, Save, ArrowLeft, AlertCircle, FileText } from 'lucide-react'
+import { Plus, Trash2, Calendar, User, Save, ArrowLeft, AlertCircle, FileText, MapPin, Mail, Phone } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,6 +58,18 @@ export function BillForm({ quote, contractors, settings }: BillFormProps) {
     // Initialize items from quote items
     const [items, setItems] = useState<BillItemState[]>(() => {
         if (!quote.quote_items || quote.quote_items.length === 0) {
+            if (quote.subtotal && Number(quote.subtotal) > 0) {
+                return [{
+                    id: Math.random().toString(),
+                    title: quote.title || 'Montant global de la soumission',
+                    description: quote.description || '',
+                    quantity: 1,
+                    unit: 'global',
+                    unit_cost: Number(quote.subtotal),
+                    total: Number(quote.subtotal),
+                    notes: ''
+                }]
+            }
             return [{
                 id: Math.random().toString(),
                 title: '',
@@ -292,10 +304,12 @@ export function BillForm({ quote, contractors, settings }: BillFormProps) {
                                     </Label>
                                     <Select 
                                         value={contractorId} 
-                                        onValueChange={setContractorId}
+                                        onValueChange={(val) => setContractorId(val || '')}
                                     >
                                         <SelectTrigger className="bg-zinc-950 border-zinc-800 text-zinc-100 focus:border-purple-600">
-                                            <SelectValue placeholder="Sélectionner un contracteur..." />
+                                            <SelectValue placeholder="Sélectionner un contracteur...">
+                                                {contractors.find(c => c.id === contractorId)?.full_name || ''}
+                                            </SelectValue>
                                         </SelectTrigger>
                                         <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-100">
                                             {contractors.map(c => (
@@ -411,6 +425,44 @@ export function BillForm({ quote, contractors, settings }: BillFormProps) {
 
                 {/* Totals Summary */}
                 <div className="space-y-6">
+                    {/* Client Details Card */}
+                    <Card className="bg-zinc-900 border-zinc-800">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-zinc-100 text-sm font-semibold flex items-center gap-2">
+                                <User className="h-4 w-4 text-purple-400" />
+                                Informations Client
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-xs space-y-3 text-zinc-300">
+                            <div className="flex flex-col gap-1">
+                                <span className="font-bold text-zinc-100 text-sm">{quote.clients?.full_name || 'N/A'}</span>
+                                {quote.clients?.company_name && (
+                                    <span className="text-purple-400 font-medium">{quote.clients.company_name}</span>
+                                )}
+                            </div>
+                            <div className="border-t border-zinc-800/80 my-2 pt-2.5 space-y-2 text-zinc-400">
+                                {quote.clients?.address && (
+                                    <p className="flex items-center gap-2">
+                                        <MapPin className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+                                        <span>{quote.clients.address} {quote.clients.city || ''}</span>
+                                    </p>
+                                )}
+                                {quote.clients?.email && (
+                                    <p className="flex items-center gap-2">
+                                        <Mail className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+                                        <span className="truncate">{quote.clients.email}</span>
+                                    </p>
+                                )}
+                                {quote.clients?.phone && (
+                                    <p className="flex items-center gap-2">
+                                        <Phone className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+                                        <span>{quote.clients.phone}</span>
+                                    </p>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     <Card className="bg-zinc-900 border-zinc-800 sticky top-6">
                         <CardHeader>
                             <CardTitle className="text-zinc-100 text-base">Récapitulatif Financier</CardTitle>
