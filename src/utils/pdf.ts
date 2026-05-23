@@ -9,12 +9,35 @@ const sanitizePdfFileName = (value: string) => {
     return normalized || 'soumission'
 }
 
+function checkIsPdfTemplate(url: string | null | undefined): boolean {
+    if (!url) return false
+    const normalized = url.trim()
+    return (
+        normalized.startsWith('data:application/pdf') || 
+        normalized.startsWith('data:application/octet-stream') ||
+        normalized.toLowerCase().includes('.pdf') ||
+        (normalized.includes(',') && normalized.split(',')[1]?.replace(/\s/g, '').startsWith('JVBERi'))
+    )
+}
+
 async function overlayPdfTemplate(quotePdfBytes: ArrayBuffer, templateDataUrl: string): Promise<Uint8Array> {
     const quoteDoc = await PDFDocument.load(quotePdfBytes)
     
-    const base64Data = templateDataUrl.split(',')[1]
-    const templateBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
-    const templateDoc = await PDFDocument.load(templateBytes)
+    let templateBytes: Uint8Array
+    try {
+        const response = await fetch(templateDataUrl)
+        const arrayBuffer = await response.arrayBuffer()
+        templateBytes = new Uint8Array(arrayBuffer)
+    } catch (e: any) {
+        throw new Error(`Failed to load PDF template bytes: ${e.message}`)
+    }
+    
+    let templateDoc
+    try {
+        templateDoc = await PDFDocument.load(templateBytes)
+    } catch (e: any) {
+        throw new Error(`Failed to parse PDF template: ${e.message}`)
+    }
     
     const mergedDoc = await PDFDocument.create()
     
@@ -358,11 +381,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
 
         const drawBackgroundTemplate = () => {
             const templateUrl = settings?.pdf_template_url || (typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') : null)
-            const isPdfTemplate = templateUrl && (
-                templateUrl.startsWith('data:application/pdf') || 
-                templateUrl.startsWith('data:application/octet-stream') ||
-                templateUrl.split(',')[1]?.startsWith('JVBERi')
-            )
+            const isPdfTemplate = checkIsPdfTemplate(templateUrl)
             if (templateUrl && !isPdfTemplate) {
                 try {
                     let format = 'JPEG'
@@ -1169,11 +1188,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
         const pdfBytes = doc.output('arraybuffer')
         
         const templateUrl = settings?.pdf_template_url || (typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') : null)
-        const isPdfTemplate = templateUrl && (
-            templateUrl.startsWith('data:application/pdf') || 
-            templateUrl.startsWith('data:application/octet-stream') ||
-            templateUrl.split(',')[1]?.startsWith('JVBERi')
-        )
+        const isPdfTemplate = checkIsPdfTemplate(templateUrl)
         
         let finalPdfBytes: Uint8Array
         if (isPdfTemplate) {
@@ -1194,8 +1209,10 @@ export async function downloadQuotePDF(quote: any, settings: any) {
         URL.revokeObjectURL(downloadUrl)
         
         toast.success('PDF généré avec succès')
-    } catch (error) {
-        toast.error('Erreur lors de la génération du PDF')
+    } catch (error: any) {
+        toast.error('Erreur lors de la génération du PDF', {
+            description: error?.message || String(error)
+        })
         console.error(error)
     }
 }

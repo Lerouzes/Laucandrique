@@ -18,6 +18,7 @@ export async function getSettings() {
             monthly_goal_enabled: false,
             monthly_goal_amount: 0,
             work_types_options: ["Peinture", "Plâtre", "Maçonnerie", "Menuiserie", "Électricité", "Plomberie"],
+            pdf_template_url: '',
         }
     }
     return data
@@ -32,6 +33,8 @@ export async function updateSettingsAction(formData: FormData, hasId: string | n
         throw new Error("Le nom de l'entreprise est requis")
     }
 
+    const pdfTemplateUrl = formData.get('pdf_template_url')
+
     const payload = {
         company_name: companyName.trim(),
         default_admin_percentage: parseFloat(formData.get('default_admin_percentage') as string || '0'),
@@ -44,6 +47,7 @@ export async function updateSettingsAction(formData: FormData, hasId: string | n
             .split(',')
             .map(s => s.trim())
             .filter(Boolean),
+        pdf_template_url: typeof pdfTemplateUrl === 'string' ? pdfTemplateUrl.trim() : null,
         updated_at: new Date().toISOString()
     }
 
@@ -54,6 +58,7 @@ export async function updateSettingsAction(formData: FormData, hasId: string | n
         gst_rate: payload.gst_rate,
         qst_rate: payload.qst_rate,
         work_types_options: payload.work_types_options,
+        pdf_template_url: payload.pdf_template_url,
         updated_at: payload.updated_at,
     }
 

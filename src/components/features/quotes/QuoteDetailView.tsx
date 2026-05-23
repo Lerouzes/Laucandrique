@@ -16,6 +16,32 @@ import { updateQuoteStatus, revertQuoteToPending, markQuoteAsSent } from '@/acti
 import { markProjectCompletedByQuote } from '@/actions/projects'
 import { downloadQuotePDF, calculatePerimeter, calculateFloorArea, calculateWallSurface, renderRoomToDataURL } from '@/utils/pdf'
 
+async function loadTemplateAsBlobUrl(url: string): Promise<string> {
+    if (!url) return ''
+    try {
+        if (url.startsWith('data:')) {
+            const parts = url.split(',')
+            const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/pdf'
+            const base64Data = parts[1]
+            const binaryString = atob(base64Data)
+            const len = binaryString.length
+            const bytes = new Uint8Array(len)
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i)
+            }
+            const blob = new Blob([bytes], { type: mime })
+            return URL.createObjectURL(blob)
+        } else {
+            const response = await fetch(url)
+            const blob = await response.blob()
+            return URL.createObjectURL(blob)
+        }
+    } catch (e) {
+        console.error('Error converting url to blobUrl:', e)
+        return url
+    }
+}
+
 export function QuoteDetailView({ quote, settings }: { quote: any, settings: any }) {
     const router = useRouter()
     const pdfRef = useRef<HTMLDivElement>(null)
@@ -66,32 +92,24 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
         const isPdf = tUrl && (
             tUrl.startsWith('data:application/pdf') || 
             tUrl.startsWith('data:application/octet-stream') || 
+            tUrl.toLowerCase().includes('.pdf') ||
             tUrl.split(',')[1]?.startsWith('JVBERi')
         )
 
+        let activeBlobUrl = ''
         if (isPdf) {
-            try {
-                const parts = tUrl.split(',')
-                const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/pdf'
-                const base64Data = parts[1]
-                const binaryString = atob(base64Data)
-                const len = binaryString.length
-                const bytes = new Uint8Array(len)
-                for (let i = 0; i < len; i++) {
-                    bytes[i] = binaryString.charCodeAt(i)
-                }
-                const blob = new Blob([bytes], { type: mime })
-                const blobUrl = URL.createObjectURL(blob)
+            loadTemplateAsBlobUrl(tUrl).then(blobUrl => {
                 setTemplateBlobUrl(blobUrl)
-                
-                return () => {
-                    URL.revokeObjectURL(blobUrl)
-                }
-            } catch (e) {
-                console.error('Failed to convert PDF template dataUrl to blobUrl:', e)
-            }
+                activeBlobUrl = blobUrl
+            })
         } else {
             setTemplateBlobUrl('')
+        }
+
+        return () => {
+            if (activeBlobUrl) {
+                URL.revokeObjectURL(activeBlobUrl)
+            }
         }
     }, [settings?.pdf_template_url])
 
@@ -265,6 +283,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                 {templateUrl && (
                     (templateUrl.startsWith('data:application/pdf') || 
                      templateUrl.startsWith('data:application/octet-stream') || 
+                     templateUrl.toLowerCase().includes('.pdf') ||
                      templateUrl.split(',')[1]?.startsWith('JVBERi')) ? (
                         templateBlobUrl && (
                             <iframe 

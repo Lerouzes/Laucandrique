@@ -13,28 +13,36 @@ import { getSettings, updateSettingsAction } from '@/actions/settings'
 import Link from 'next/link'
 import { getManagers, createManagerAction, getManagerTeams, createManagerTeamAction } from '@/actions/managers'
 import { fixExistingImportedQuotesAction } from '@/actions/quotes'
+import { createClient } from '@/utils/supabase/client'
 
-function dataUrlToBlobUrl(dataUrl: string): string {
-    if (!dataUrl) return ''
+async function loadTemplateAsBlobUrl(url: string): Promise<string> {
+    if (!url) return ''
     try {
-        const parts = dataUrl.split(',')
-        const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/pdf'
-        const base64Data = parts[1]
-        const binaryString = atob(base64Data)
-        const len = binaryString.length
-        const bytes = new Uint8Array(len)
-        for (let i = 0; i < len; i++) {
-            bytes[i] = binaryString.charCodeAt(i)
+        if (url.startsWith('data:')) {
+            const parts = url.split(',')
+            const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/pdf'
+            const base64Data = parts[1]
+            const binaryString = atob(base64Data)
+            const len = binaryString.length
+            const bytes = new Uint8Array(len)
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i)
+            }
+            const blob = new Blob([bytes], { type: mime })
+            return URL.createObjectURL(blob)
+        } else {
+            const response = await fetch(url)
+            const blob = await response.blob()
+            return URL.createObjectURL(blob)
         }
-        const blob = new Blob([bytes], { type: mime })
-        return URL.createObjectURL(blob)
     } catch (e) {
-        console.error('Error converting dataUrl to blobUrl:', e)
-        return dataUrl
+        console.error('Error converting url to blobUrl:', e)
+        return url
     }
 }
 
 export default function SettingsPage() {
+    const supabase = createClient()
     const [isPending, startTransition] = useTransition()
     const [settingsId, setSettingsId] = useState<string | null>(null)
     const [managers, setManagers] = useState<any[]>([])
@@ -52,12 +60,18 @@ export default function SettingsPage() {
             monthly_goal_enabled: false,
             monthly_goal_amount: 0,
             work_types_options: '',
+            pdf_template_url: '',
         }
     })
 
     useEffect(() => {
         getSettings().then(data => {
             if (data.id) setSettingsId(data.id)
+            
+            const localTemplate = typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') || '' : ''
+            const dbTemplateUrl = data.pdf_template_url || ''
+            const activeTemplate = dbTemplateUrl || localTemplate
+
             form.reset({
                 company_name: data.company_name || 'Gustav Inc.',
                 default_admin_percentage: data.default_admin_percentage || 10,
@@ -67,27 +81,25 @@ export default function SettingsPage() {
                 monthly_goal_enabled: data.monthly_goal_enabled || false,
                 monthly_goal_amount: data.monthly_goal_amount || 0,
                 work_types_options: Array.isArray(data.work_types_options) ? data.work_types_options.join(', ') : '',
+                pdf_template_url: activeTemplate,
             })
+
+            if (activeTemplate) {
+                setTemplatePreview(activeTemplate)
+                const isPdf = activeTemplate.startsWith('data:application/pdf') || 
+                              activeTemplate.startsWith('data:application/octet-stream') ||
+                              activeTemplate.toLowerCase().includes('.pdf') ||
+                              activeTemplate.split(',')[1]?.startsWith('JVBERi')
+                if (isPdf) {
+                    loadTemplateAsBlobUrl(activeTemplate).then(setTemplateBlobUrl)
+                }
+            }
         })
     }, [form])
 
     useEffect(() => {
         getManagers().then(setManagers)
         getManagerTeams().then(setManagerTeams)
-    }, [])
-
-    useEffect(() => {
-        const localTemplate = localStorage.getItem('pdf_template_url') || ''
-        if (localTemplate) {
-            setTemplatePreview(localTemplate)
-            const isPdf = localTemplate.startsWith('data:application/pdf') || 
-                          localTemplate.startsWith('data:application/octet-stream') ||
-                          localTemplate.split(',')[1]?.startsWith('JVBERi')
-            if (isPdf) {
-                const blobUrl = dataUrlToBlobUrl(localTemplate)
-                setTemplateBlobUrl(blobUrl)
-            }
-        }
     }, [])
 
     const handleTemplateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,37 +117,33 @@ export default function SettingsPage() {
             return
         }
 
-        // Limit size to 4MB for localStorage data URL
-        if (file.size > 4 * 1024 * 1024) {
-            toast.error("Fichier trop volumineux", {
-                description: "Le fichier ne doit pas dépasser 4 Mo pour être sauvegardé localement."
-            })
-            return
-        }
+        const fileExt = file.name.split('.').pop()
+        const fileName = `template-${Date.now()}.${fileExt}`
 
-        const reader = new FileReader()
-        reader.onload = () => {
-            const dataUrl = String(reader.result || '')
-            try {
-                localStorage.setItem('pdf_template_url', dataUrl)
-                setTemplatePreview(dataUrl)
-                const isPdfUploaded = dataUrl.startsWith('data:application/pdf') || 
-                                     dataUrl.startsWith('data:application/octet-stream') ||
-                                     dataUrl.split(',')[1]?.startsWith('JVBERi')
-                if (isPdfUploaded) {
-                    const blobUrl = dataUrlToBlobUrl(dataUrl)
+        toast.promise(
+            (async () => {
+                const { error: uploadError } = await supabase.storage.from('quote-images').upload(fileName, file)
+                if (uploadError) throw uploadError
+                
+                const { data: publicUrlData } = supabase.storage.from('quote-images').getPublicUrl(fileName)
+                const publicUrl = publicUrlData.publicUrl
+                
+                form.setValue('pdf_template_url', publicUrl, { shouldDirty: true })
+                setTemplatePreview(publicUrl)
+                
+                if (isPdf) {
+                    const blobUrl = await loadTemplateAsBlobUrl(publicUrl)
                     setTemplateBlobUrl(blobUrl)
                 } else {
                     setTemplateBlobUrl('')
                 }
-                toast.success('Gabarit de template sauvegardé avec succès.')
-            } catch (err) {
-                toast.error("Erreur de stockage", {
-                    description: "Le fichier est trop volumineux pour être stocké dans le navigateur."
-                })
+            })(),
+            {
+                loading: 'Téléchargement du gabarit...',
+                success: 'Gabarit de template téléchargé avec succès!',
+                error: 'Erreur lors du téléchargement'
             }
-        }
-        reader.readAsDataURL(file)
+        )
     }
 
     const onSubmit = (values: any) => {
@@ -144,6 +152,11 @@ export default function SettingsPage() {
                 const formData = new FormData()
                 Object.entries(values).forEach(([key, value]) => formData.append(key, String(value)))
                 await updateSettingsAction(formData, settingsId)
+                
+                // Fetch settings again to update the id state in case of insert
+                const freshSettings = await getSettings()
+                if (freshSettings.id) setSettingsId(freshSettings.id)
+                
                 toast.success("Paramètres mis à jour.")
             } catch (e: any) {
                 toast.error("Erreur", { description: e.message })
@@ -203,6 +216,7 @@ export default function SettingsPage() {
 
             <div className="space-y-6">
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <input type="hidden" {...form.register('pdf_template_url')} />
                 <Card className="bg-zinc-900 border-zinc-800">
                     <CardHeader>
                         <CardTitle className="text-zinc-100">Entreprise</CardTitle>
@@ -242,6 +256,7 @@ export default function SettingsPage() {
                         {templatePreview && (
                             (templatePreview.startsWith('data:application/pdf') || 
                              templatePreview.startsWith('data:application/octet-stream') ||
+                             templatePreview.toLowerCase().includes('.pdf') ||
                              templatePreview.split(',')[1]?.startsWith('JVBERi')) ? (
                                 <div className="w-full h-96 rounded border border-zinc-800 overflow-hidden bg-zinc-950">
                                     {templateBlobUrl && <iframe src={`${templateBlobUrl}#toolbar=0`} className="w-full h-full border-0" />}
