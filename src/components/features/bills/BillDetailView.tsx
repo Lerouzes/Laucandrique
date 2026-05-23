@@ -3,9 +3,8 @@
 import { useState, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Download, ChevronLeft, Pencil, Trash2, CheckCircle, XCircle, User, HardHat, FileText, Image as ImageIcon, MapPin, Mail, Phone } from 'lucide-react'
-import { jsPDF } from 'jspdf'
-import html2canvas from 'html2canvas'
+import { Download, ChevronLeft, Pencil, Trash2, CheckCircle, XCircle, User, FileText, Image as ImageIcon, MapPin, Mail, Phone } from 'lucide-react'
+import { downloadBillPDF } from '@/utils/pdf'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { frCA } from 'date-fns/locale'
@@ -90,32 +89,7 @@ export function BillDetailView({ bill, settings }: BillDetailViewProps) {
     const generatePDF = async () => {
         try {
             setIsGenerating(true)
-            const element = pdfRef.current
-            if (!element) return
-
-            const canvas = await html2canvas(element, {
-                scale: 2,
-                useCORS: true
-            })
-            const imgData = canvas.toDataURL('image/png')
-            const pdf = new jsPDF('p', 'mm', 'a4')
-            const imgWidth = 210
-            const pageHeight = 295
-            const imgHeight = (canvas.height * imgWidth) / canvas.width
-            let heightLeft = imgHeight
-            let position = 0
-
-            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-            heightLeft -= pageHeight
-
-            while (heightLeft >= 0) {
-                position = heightLeft - imgHeight
-                pdf.addPage()
-                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-                heightLeft -= pageHeight
-            }
-            pdf.save(`facture-${bill.bill_number}.pdf`)
-            toast.success("Facture exportée en PDF.")
+            await downloadBillPDF(bill, settings)
         } catch (err) {
             console.error("PDF generation failed:", err)
             toast.error("Erreur lors de la génération du PDF.")
@@ -232,15 +206,6 @@ export function BillDetailView({ bill, settings }: BillDetailViewProps) {
                                 <span className="text-zinc-400 block text-xxs uppercase font-bold">Projet / Titre</span>
                                 <span className="font-semibold text-zinc-900">{bill.title}</span>
                             </div>
-                            {bill.contractors?.full_name && (
-                                <div className="flex items-center gap-1.5">
-                                    <HardHat className="h-4 w-4 text-emerald-600 shrink-0" />
-                                    <div>
-                                        <span className="text-zinc-400 block text-xxs uppercase font-bold">Contracteur</span>
-                                        <span className="text-zinc-900 font-medium">{bill.contractors.full_name}</span>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>

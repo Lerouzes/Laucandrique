@@ -1216,3 +1216,416 @@ export async function downloadQuotePDF(quote: any, settings: any) {
         console.error(error)
     }
 }
+
+export async function downloadBillPDF(bill: any, settings: any) {
+    try {
+        const doc = new jsPDF({
+            orientation: 'p',
+            unit: 'mm',
+            format: 'a4',
+        })
+
+        const pageHeight = doc.internal.pageSize.getHeight() // 297
+        const pageWidth = doc.internal.pageSize.getWidth() // 210
+        const margin = 15
+        const contentWidth = pageWidth - 2 * margin // 180
+        let y = 20
+
+        // Calculate totals
+        const subtotal = Number(bill.subtotal || 0)
+        const adminAmount = Number(bill.admin_amount || 0)
+        const profitAmount = Number(bill.profit_amount || 0)
+        const gstAmount = Number(bill.gst_amount || 0)
+        const qstAmount = Number(bill.qst_amount || 0)
+        const total = Number(bill.total || 0)
+
+        const drawBackgroundTemplate = () => {
+            const templateUrl = settings?.pdf_template_url || (typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') : null)
+            const isPdfTemplate = checkIsPdfTemplate(templateUrl)
+            if (templateUrl && !isPdfTemplate) {
+                try {
+                    let format = 'JPEG'
+                    if (templateUrl.startsWith('data:image/png') || templateUrl.includes('image/png')) {
+                        format = 'PNG'
+                    }
+                    doc.addImage(templateUrl, format, 0, 0, pageWidth, pageHeight)
+                } catch (e) {
+                    console.error('Error drawing PDF background template:', e)
+                }
+            }
+        }
+
+        // Draw template for the first page
+        drawBackgroundTemplate()
+
+        const checkNewPage = (heightNeeded: number) => {
+            if (y + heightNeeded > pageHeight - 20) {
+                doc.addPage()
+                drawBackgroundTemplate()
+                y = 20
+                return true
+            }
+            return false
+        }
+
+        // 1. Header Information
+        doc.setFont('Helvetica', 'bold')
+        doc.setFontSize(20)
+        doc.setTextColor(15, 23, 42)
+        doc.text(settings.company_name || 'Gustav Inc.', margin, y)
+        
+        doc.setFont('Helvetica', 'normal')
+        doc.setFontSize(8.5)
+        doc.setTextColor(100, 116, 139)
+        doc.text('Facture Officielle', margin, y + 5)
+
+        // Metadata Right Aligned
+        doc.setFont('Helvetica', 'bold')
+        doc.setFontSize(14)
+        doc.setTextColor(15, 23, 42)
+        doc.text(`FACTURE #${bill.bill_number}`, pageWidth - margin, y, { align: 'right' })
+
+        doc.setFont('Helvetica', 'normal')
+        doc.setFontSize(8.5)
+        doc.setTextColor(71, 85, 105)
+        const dateStr = format(new Date(bill.bill_date), 'dd MMMM yyyy', { locale: frCA })
+        doc.text(`Date d'émission: ${dateStr}`, pageWidth - margin, y + 5, { align: 'right' })
+        doc.text(`Soumission: #${bill.quotes?.quote_number || 'N/A'}`, pageWidth - margin, y + 9, { align: 'right' })
+
+        y += 22
+
+        // 2. Client & Project Information
+        checkNewPage(45)
+        doc.setDrawColor(226, 232, 240)
+        doc.setLineWidth(0.3)
+        doc.line(margin, y, margin + contentWidth, y)
+        y += 6
+
+        // Bill to details (Left)
+        doc.setFont('Helvetica', 'bold')
+        doc.setFontSize(9.5)
+        doc.setTextColor(15, 23, 42)
+        doc.text('Facturé à', margin, y)
+        y += 5
+
+        doc.setFontSize(9)
+        doc.text(bill.clients?.full_name || 'Client', margin, y)
+        y += 4.5
+        doc.setFont('Helvetica', 'normal')
+        doc.setTextColor(71, 85, 105)
+
+        if (bill.clients?.company_name) {
+            doc.setFont('Helvetica', 'bold')
+            doc.setTextColor(109, 40, 217) // purple-700
+            doc.text(bill.clients.company_name, margin, y)
+            y += 4.5
+            doc.setFont('Helvetica', 'normal')
+            doc.setTextColor(71, 85, 105)
+        }
+
+        const address = `${bill.clients?.address || ''} ${bill.clients?.city || ''}`.trim()
+        if (address) {
+            doc.text(address, margin, y)
+            y += 4.5
+        }
+        if (bill.clients?.email) {
+            doc.text(bill.clients.email, margin, y)
+            y += 4.5
+        }
+        if (bill.clients?.phone) {
+            doc.text(bill.clients.phone, margin, y)
+            y += 4.5
+        }
+
+        // Project details (Right) - y reset to before client details text
+        let rightY = y - (bill.clients?.company_name ? 22.5 : 18) - 5
+        doc.setFont('Helvetica', 'bold')
+        doc.setFontSize(9.5)
+        doc.setTextColor(15, 23, 42)
+        doc.text('Détails Projet', margin + 95, rightY)
+        rightY += 5
+
+        doc.setFontSize(8.5)
+        doc.setTextColor(100, 116, 139)
+        doc.text('Projet / Titre:', margin + 95, rightY)
+        doc.setFont('Helvetica', 'bold')
+        doc.setTextColor(15, 23, 42)
+        const titleLines = doc.splitTextToSize(bill.title, 80)
+        titleLines.forEach((line: string) => {
+            doc.text(line, margin + 95, rightY + 3.5)
+            rightY += 3.5
+        })
+        rightY += 2
+
+        y = Math.max(y, rightY) + 6
+
+        // 3. Table Header
+        checkNewPage(15)
+        doc.setFillColor(109, 40, 217) // purple-700
+        doc.rect(margin, y, contentWidth, 7, 'F')
+
+        doc.setFont('Helvetica', 'bold')
+        doc.setFontSize(8.5)
+        doc.setTextColor(255, 255, 255)
+        doc.text('Description', margin + 3, y + 4.8)
+        doc.text('Qté', margin + 95, y + 4.8, { align: 'center' })
+        doc.text('Unité', margin + 112, y + 4.8, { align: 'center' })
+        doc.text('Prix Unit.', margin + 145, y + 4.8, { align: 'right' })
+        doc.text('Total', margin + 177, y + 4.8, { align: 'right' })
+
+        y += 7
+
+        // Table Rows
+        for (const item of bill.bill_items || []) {
+            const titleText = item.title || 'Sans titre'
+            const descText = item.description || ''
+
+            doc.setFont('Helvetica', 'bold')
+            doc.setFontSize(8.5)
+            const itemTitleLines = doc.splitTextToSize(titleText, 88)
+
+            doc.setFont('Helvetica', 'normal')
+            doc.setFontSize(8)
+            const itemDescLines = descText ? doc.splitTextToSize(descText, 88) : []
+
+            const rowHeight = Math.max(7,
+                itemTitleLines.length * 3.5 +
+                (itemDescLines.length > 0 ? itemDescLines.length * 3.5 + 1.5 : 0) +
+                3
+            )
+
+            checkNewPage(rowHeight)
+
+            doc.setFillColor(255, 255, 255)
+            doc.rect(margin, y, contentWidth, rowHeight, 'F')
+            doc.setDrawColor(241, 245, 249)
+            doc.line(margin, y + rowHeight, margin + contentWidth, y + rowHeight)
+
+            doc.setFont('Helvetica', 'bold')
+            doc.setFontSize(8.5)
+            doc.setTextColor(15, 23, 42)
+            let textY = y + 3.5
+            itemTitleLines.forEach((line: string) => {
+                doc.text(line, margin + 3, textY)
+                textY += 3.5
+            })
+
+            if (itemDescLines.length > 0) {
+                doc.setFont('Helvetica', 'normal')
+                doc.setFontSize(8)
+                doc.setTextColor(100, 116, 139)
+                textY += 1
+                itemDescLines.forEach((line: string) => {
+                    doc.text(line, margin + 3, textY)
+                    textY += 3.5
+                })
+            }
+
+            // Numeric values
+            doc.setFont('Helvetica', 'normal')
+            doc.setFontSize(8.5)
+            doc.setTextColor(15, 23, 42)
+            const middleY = y + (rowHeight / 2) + 1.5
+            doc.text(String(item.quantity), margin + 95, middleY, { align: 'center' })
+            doc.text(item.unit || '-', margin + 112, middleY, { align: 'center' })
+            doc.text(`$${item.unit_cost?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 145, middleY, { align: 'right' })
+            doc.setFont('Helvetica', 'bold')
+            doc.text(`$${item.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 177, middleY, { align: 'right' })
+
+            y += rowHeight
+        }
+
+        y += 8
+
+        // 4. Totals Summary and Notes
+        checkNewPage(50)
+
+        // Draw internal notes if present
+        let notesHeight = 0
+        if (bill.notes) {
+            doc.setFont('Helvetica', 'bold')
+            doc.setFontSize(8)
+            doc.setTextColor(71, 85, 105)
+            const notesLines = doc.splitTextToSize(bill.notes, 85)
+            notesHeight = notesLines.length * 3.5 + 8
+
+            doc.setFillColor(248, 250, 252) // slate-50 background
+            doc.rect(margin, y, 90, notesHeight, 'F')
+            doc.setDrawColor(226, 232, 240)
+            doc.rect(margin, y, 90, notesHeight)
+
+            doc.text('Notes et Conditions de Paiement', margin + 3, y + 4.5)
+            doc.setFont('Helvetica', 'normal')
+            doc.setFontSize(7.5)
+            doc.setTextColor(100, 116, 139)
+            let noteY = y + 8
+            notesLines.forEach((line: string) => {
+                doc.text(line, margin + 3, noteY)
+                noteY += 3.5
+            })
+        }
+
+        // Draw totals on the right
+        doc.setFont('Helvetica', 'normal')
+        doc.setFontSize(8.5)
+        doc.setTextColor(71, 85, 105)
+
+        const totalWidth = 75
+        const rightLabelX = pageWidth - margin - totalWidth
+        const rightValX = pageWidth - margin
+
+        let totalY = y
+
+        doc.text('Sous-total Chantier:', rightLabelX, totalY + 4)
+        doc.text(`$${subtotal.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, rightValX, totalY + 4, { align: 'right' })
+        totalY += 5
+
+        if (adminAmount > 0) {
+            doc.text(`Administration (${bill.admin_percentage}%):`, rightLabelX, totalY + 4)
+            doc.text(`$${adminAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, rightValX, totalY + 4, { align: 'right' })
+            totalY += 5
+        }
+        if (profitAmount > 0) {
+            doc.text(`Profit (${bill.profit_percentage}%):`, rightLabelX, totalY + 4)
+            doc.text(`$${profitAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, rightValX, totalY + 4, { align: 'right' })
+            totalY += 5
+        }
+
+        doc.text('TPS (5%):', rightLabelX, totalY + 4)
+        doc.text(`$${gstAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, rightValX, totalY + 4, { align: 'right' })
+        totalY += 5
+
+        doc.text('TVQ (9.975%):', rightLabelX, totalY + 4)
+        doc.text(`$${qstAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, rightValX, totalY + 4, { align: 'right' })
+        totalY += 7
+
+        // Final Total Box
+        doc.setFillColor(243, 244, 246)
+        doc.rect(rightLabelX - 2, totalY, totalWidth + 2, 8, 'F')
+        doc.setFont('Helvetica', 'bold')
+        doc.setFontSize(10.5)
+        doc.setTextColor(15, 23, 42)
+        doc.text('Total:', rightLabelX, totalY + 5.5)
+        doc.text(`$${total.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, rightValX, totalY + 5.5, { align: 'right' })
+
+        y = Math.max(y + notesHeight, totalY + 12) + 12
+
+        // Footer note on page 1
+        doc.setFont('Helvetica', 'normal')
+        doc.setFontSize(8)
+        doc.setTextColor(148, 163, 184)
+        doc.text(
+            `Ce document est généré par ${settings.company_name || 'Gustav'}. Merci de votre confiance.`,
+            pageWidth / 2,
+            pageHeight - 12,
+            { align: 'center' }
+        )
+
+        // 5. Bill Images Appendix (One image per page)
+        if (bill.bill_images && bill.bill_images.length > 0) {
+            for (const imgData of bill.bill_images) {
+                doc.addPage()
+                drawBackgroundTemplate()
+
+                // Title
+                doc.setFont('Helvetica', 'bold')
+                doc.setFontSize(12)
+                doc.setTextColor(15, 23, 42)
+                doc.text('Annexe : Photos et Justificatifs', margin, 20)
+
+                // Load and draw image
+                try {
+                    const imgEl = await loadImage(imgData.image_url)
+                    const drawAreaW = contentWidth
+                    const drawAreaH = pageHeight - 65 // height minus headers/footers
+                    
+                    let drawW = drawAreaW
+                    let drawH = drawAreaH
+                    let xOffset = 0
+                    let yOffset = 0
+
+                    const imgRatio = imgEl.width / imgEl.height
+                    const boxRatio = drawAreaW / drawAreaH
+
+                    if (imgRatio > boxRatio) {
+                        drawH = drawAreaW / imgRatio
+                        yOffset = (drawAreaH - drawH) / 2
+                    } else {
+                        drawW = drawAreaH * imgRatio
+                        xOffset = (drawAreaW - drawW) / 2
+                    }
+
+                    // Draw a subtle border frame
+                    doc.setDrawColor(241, 245, 249)
+                    doc.rect(margin, 28, drawAreaW, drawAreaH)
+
+                    // Draw image
+                    doc.addImage(imgEl, 'JPEG', margin + xOffset, 28 + yOffset, drawW, drawH)
+
+                    // Draw caption at the bottom of page
+                    if (imgData.caption) {
+                        doc.setFont('Helvetica', 'bold')
+                        doc.setFontSize(9)
+                        doc.setTextColor(71, 85, 105)
+                        const captionLines = doc.splitTextToSize(imgData.caption, contentWidth)
+                        let capY = 28 + drawAreaH + 6
+                        captionLines.forEach((line: string) => {
+                            doc.text(line, margin, capY)
+                            capY += 4
+                        })
+                    }
+                } catch (imgErr) {
+                    console.error('Failed to load/render image in bill PDF:', imgErr)
+                    doc.setFillColor(241, 245, 249)
+                    doc.rect(margin, 28, contentWidth, pageHeight - 65, 'F')
+                    doc.setFont('Helvetica', 'normal')
+                    doc.setFontSize(10)
+                    doc.setTextColor(148, 163, 184)
+                    doc.text('Image non disponible (problème de chargement)', pageWidth/2, pageHeight/2, { align: 'center' })
+                }
+
+                // Footer note on subsequent pages
+                doc.setFont('Helvetica', 'normal')
+                doc.setFontSize(8)
+                doc.setTextColor(148, 163, 184)
+                doc.text(
+                    `Ce document est généré par ${settings.company_name || 'Gustav'}. Merci de votre confiance.`,
+                    pageWidth / 2,
+                    pageHeight - 12,
+                    { align: 'center' }
+                )
+            }
+        }
+
+        // Save PDF and Trigger download
+        const safeFileName = sanitizePdfFileName(bill.title)
+        const pdfBytes = doc.output('arraybuffer')
+
+        const templateUrl = settings?.pdf_template_url || (typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') : null)
+        const isPdfTemplate = checkIsPdfTemplate(templateUrl)
+
+        let finalPdfBytes: Uint8Array
+        if (isPdfTemplate) {
+            finalPdfBytes = await overlayPdfTemplate(pdfBytes, templateUrl)
+        } else {
+            finalPdfBytes = new Uint8Array(pdfBytes)
+        }
+
+        const blob = new Blob([finalPdfBytes as any], { type: 'application/pdf' })
+        const downloadUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = downloadUrl
+        a.download = `Facture-${safeFileName}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(downloadUrl)
+
+        toast.success('Facture PDF générée avec succès')
+    } catch (error: any) {
+        toast.error('Erreur lors de la génération du PDF', {
+            description: error?.message || String(error)
+        })
+        console.error(error)
+    }
+}
