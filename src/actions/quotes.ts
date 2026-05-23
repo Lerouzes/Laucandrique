@@ -310,7 +310,7 @@ export async function getQuote(id: string) {
     const supabase = await createClient()
     const { data, error } = await supabase
         .from('quotes')
-        .select('*, clients(*), contractors(*), quote_items(*), quote_images(*), projects(status, completed_at), quote_planning_sections(*, quote_planning_rooms(*))')
+        .select('*, clients(*), contractors(*), quote_items(*), quote_images(*), projects(status, completed_at), bills(id, bill_number, status), quote_planning_sections(*, quote_planning_rooms(*))')
         .eq('id', id)
         .single()
 

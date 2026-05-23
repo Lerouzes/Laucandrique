@@ -83,6 +83,45 @@ export interface Database {
         Update: { id?: string; first_name?: string; last_name?: string; email?: string | null; created_at?: string }
         Relationships: []
       }
+      contractors: {
+        Row: {
+          id: string
+          full_name: string
+          color: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          full_name: string
+          color?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          full_name?: string
+          color?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      manager_teams: {
+        Row: {
+          id: string
+          name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           id: string
@@ -368,7 +407,7 @@ export interface Database {
           }
         ]
       }
-      bills: {
+       bills: {
         Row: {
           id: string
           quote_id: string | null
@@ -388,6 +427,7 @@ export interface Database {
           qst_amount: number
           total: number
           created_at: string
+          status: string
         }
         Insert: {
           id?: string
@@ -408,6 +448,7 @@ export interface Database {
           qst_amount?: number
           total?: number
           created_at?: string
+          status?: string
         }
         Update: {
           id?: string
@@ -428,6 +469,7 @@ export interface Database {
           qst_amount?: number
           total?: number
           created_at?: string
+          status?: string
         }
         Relationships: [
           {
@@ -493,6 +535,38 @@ export interface Database {
         Relationships: [
           {
             foreignKeyName: "bill_items_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      bill_images: {
+        Row: {
+          id: string
+          bill_id: string
+          image_url: string
+          caption: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          bill_id: string
+          image_url: string
+          caption?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          bill_id?: string
+          image_url?: string
+          caption?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_images_bill_id_fkey"
             columns: ["bill_id"]
             isOneToOne: false
             referencedRelation: "bills"

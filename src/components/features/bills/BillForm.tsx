@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useTransition, useMemo } from 'react'
+import { useState, useTransition, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Plus, Trash2, Calendar, User, Save, ArrowLeft, AlertCircle, FileText, MapPin, Mail, Phone } from 'lucide-react'
+import { Plus, Trash2, Calendar, User, Save, ArrowLeft, AlertCircle, FileText, MapPin, Mail, Phone, Image as ImageIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,12 +13,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { createBillAction } from '@/actions/bills'
+import { createBillAction, updateBillAction } from '@/actions/bills'
+import { createClient } from '@/utils/supabase/client'
 
 interface BillFormProps {
     quote: any
     contractors: any[]
     settings: any
+    initialBill?: any
+    initialBillItems?: any[]
+    initialBillImages?: any[]
 }
 
 interface BillItemState {
@@ -32,31 +36,56 @@ interface BillItemState {
     notes: string
 }
 
-export function BillForm({ quote, contractors, settings }: BillFormProps) {
+export function BillForm({ 
+    quote, 
+    contractors, 
+    settings,
+    initialBill,
+    initialBillItems,
+    initialBillImages
+}: BillFormProps) {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
     const [submitError, setSubmitError] = useState<string | null>(null)
+    const [saveAsDraft, setSaveAsDraft] = useState(initialBill ? initialBill.status === 'draft' : false)
+    const submitBtnRef = useRef<HTMLButtonElement>(null)
 
     // Form fields
-    const [title, setTitle] = useState(quote.title || `Facture pour ${quote.clients?.full_name || 'Projet'}`)
-    const [description, setDescription] = useState(quote.description || '')
+    const [title, setTitle] = useState(initialBill ? initialBill.title : (quote.title || `Facture pour ${quote.clients?.full_name || 'Projet'}`))
+    const [description, setDescription] = useState(initialBill ? (initialBill.description || '') : (quote.description || ''))
     const [billDate, setBillDate] = useState(() => {
+        if (initialBill) {
+            return initialBill.bill_date
+        }
         const today = new Date()
         const yyyy = today.getFullYear()
         const mm = String(today.getMonth() + 1).padStart(2, '0')
         const dd = String(today.getDate()).padStart(2, '0')
         return `${yyyy}-${mm}-${dd}`
     })
-    const [contractorId, setContractorId] = useState<string>(quote.contractor_id || '')
-    const [notes, setNotes] = useState('')
+    const [contractorId, setContractorId] = useState<string>(initialBill ? (initialBill.contractor_id || '') : (quote.contractor_id || ''))
+    const [notes, setNotes] = useState(initialBill ? (initialBill.notes || '') : '')
 
-    const adminPercentage = quote.admin_percentage ?? settings.default_admin_percentage ?? 10
-    const profitPercentage = quote.profit_percentage ?? settings.default_profit_percentage ?? 15
+    const adminPercentage = initialBill ? initialBill.admin_percentage : (quote.admin_percentage ?? settings.default_admin_percentage ?? 10)
+    const profitPercentage = initialBill ? initialBill.profit_percentage : (quote.profit_percentage ?? settings.default_profit_percentage ?? 15)
     const gstRate = settings.gst_rate ?? 0.05
     const qstRate = settings.qst_rate ?? 0.09975
 
-    // Initialize items from quote items
+    // Initialize items from quote items or initial bill items
     const [items, setItems] = useState<BillItemState[]>(() => {
+        if (initialBillItems && initialBillItems.length > 0) {
+            return initialBillItems.map(item => ({
+                id: item.id || Math.random().toString(),
+                title: item.title || '',
+                description: item.description || '',
+                quantity: Number(item.quantity || 1),
+                unit: item.unit || '',
+                unit_cost: Number(item.unit_cost || 0),
+                total: Number(item.total || 0),
+                notes: item.notes || ''
+            }))
+        }
+
         if (!quote.quote_items || quote.quote_items.length === 0) {
             if (quote.subtotal && Number(quote.subtotal) > 0) {
                 return [{
@@ -91,6 +120,19 @@ export function BillForm({ quote, contractors, settings }: BillFormProps) {
             total: Number(item.total || 0),
             notes: item.notes || ''
         }))
+    })
+
+    // Initialize images
+    const [images, setImages] = useState<{ id?: string, file?: File, image_url?: string, caption: string, previewUrl?: string }[]>(() => {
+        if (initialBillImages && initialBillImages.length > 0) {
+            return initialBillImages.map(img => ({
+                id: img.id,
+                image_url: img.image_url,
+                caption: img.caption || '',
+                previewUrl: img.image_url
+            }))
+        }
+        return []
     })
 
     // Dynamic Calculations
@@ -147,6 +189,30 @@ export function BillForm({ quote, contractors, settings }: BillFormProps) {
         }))
     }
 
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0]
+            const previewUrl = URL.createObjectURL(file)
+            setImages(prev => [...prev, { file, caption: '', previewUrl }])
+        }
+        e.target.value = ''
+    }
+
+    const removeImage = (index: number) => {
+        setImages(prev => {
+            const updated = [...prev]
+            if (updated[index].previewUrl && !updated[index].image_url) {
+                URL.revokeObjectURL(updated[index].previewUrl!)
+            }
+            updated.splice(index, 1)
+            return updated
+        })
+    }
+
+    const updateImageCaption = (index: number, caption: string) => {
+        setImages(prev => prev.map((img, i) => i === index ? { ...img, caption } : img))
+    }
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         setSubmitError(null)
@@ -178,6 +244,34 @@ export function BillForm({ quote, contractors, settings }: BillFormProps) {
 
         startTransition(async () => {
             try {
+                const supabase = createClient()
+                
+                // Upload new images to Supabase storage
+                const uploadedImagesData = []
+                for (const img of images) {
+                    if (img.file) {
+                        const fileExt = img.file.name.split('.').pop()
+                        const fileName = `${Math.random()}.${fileExt}`
+                        const { error: uploadError } = await supabase.storage.from('quote-images').upload(fileName, img.file)
+
+                        if (uploadError) {
+                            console.error("Storage upload error:", uploadError)
+                            throw uploadError
+                        }
+
+                        const { data: publicUrlData } = supabase.storage.from('quote-images').getPublicUrl(fileName)
+                        uploadedImagesData.push({
+                            image_url: publicUrlData.publicUrl,
+                            caption: img.caption,
+                        })
+                    } else if (img.image_url) {
+                        uploadedImagesData.push({
+                            image_url: img.image_url,
+                            caption: img.caption
+                        })
+                    }
+                }
+
                 const billPayload = {
                     quote_id: quote.id,
                     client_id: quote.client_id,
@@ -193,17 +287,24 @@ export function BillForm({ quote, contractors, settings }: BillFormProps) {
                     profit_amount: Number(profitAmount.toFixed(2)),
                     gst_amount: Number(gstAmount.toFixed(2)),
                     qst_amount: Number(qstAmount.toFixed(2)),
-                    total: Number(total.toFixed(2))
+                    total: Number(total.toFixed(2)),
+                    status: saveAsDraft ? 'draft' : 'sent'
                 }
 
-                const result = await createBillAction(billPayload, items)
+                let result;
+                if (initialBill) {
+                    result = await updateBillAction(initialBill.id, billPayload, items, uploadedImagesData)
+                } else {
+                    result = await createBillAction(billPayload, items, uploadedImagesData)
+                }
+
                 if (result.success) {
-                    toast.success("Facture créée avec succès et soumission marquée facturée.")
-                    router.push(`/quotes/${quote.id}`)
+                    toast.success(initialBill ? "Facture mise à jour avec succès." : "Facture créée avec succès et soumission mise à jour.")
+                    router.push(`/bills/${initialBill ? initialBill.id : (result as any).billId}`)
                 }
             } catch (err: any) {
                 console.error(err)
-                setSubmitError(err.message || "Une erreur est survenue lors de la création de la facture.")
+                setSubmitError(err.message || "Une erreur est survenue lors de l'enregistrement de la facture.")
                 toast.error("Erreur", { description: err.message })
             }
         })
@@ -212,9 +313,9 @@ export function BillForm({ quote, contractors, settings }: BillFormProps) {
     return (
         <form onSubmit={handleSubmit} className="space-y-6 max-w-5xl mx-auto pb-16">
             <div className="flex items-center justify-between">
-                <Link href={`/quotes/${quote.id}`} className="inline-flex items-center text-zinc-400 hover:text-zinc-100 text-sm transition-colors">
+                <Link href={initialBill ? `/bills/${initialBill.id}` : `/quotes/${quote.id}`} className="inline-flex items-center text-zinc-400 hover:text-zinc-100 text-sm transition-colors">
                     <ArrowLeft className="mr-1 h-4 w-4" />
-                    Retour à la soumission
+                    {initialBill ? "Retour aux détails" : "Retour à la soumission"}
                 </Link>
                 <Badge className="bg-purple-900/60 text-purple-300 border border-purple-800">
                     Soumission #{quote.quote_number}
@@ -223,19 +324,45 @@ export function BillForm({ quote, contractors, settings }: BillFormProps) {
 
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight text-zinc-100">Facturation du Projet</h2>
+                    <h2 className="text-2xl font-bold tracking-tight text-zinc-100">
+                        {initialBill ? "Modifier la Facture" : "Facturation du Projet"}
+                    </h2>
                     <p className="text-sm text-zinc-400">
-                        Confirmez, modifiez ou ajoutez des éléments pour finaliser la facture.
+                        {initialBill ? "Ajustez les détails, articles ou images de cette facture." : "Confirmez, modifiez ou ajoutez des éléments pour finaliser la facture."}
                     </p>
                 </div>
-                <Button 
-                    type="submit" 
-                    disabled={isPending} 
-                    className="bg-purple-600 hover:bg-purple-700 text-white font-semibold flex items-center gap-2"
-                >
-                    <Save className="h-4 w-4" />
-                    {isPending ? 'Enregistrement...' : 'Confirmer et Facturer'}
-                </Button>
+                
+                <div className="flex items-center gap-2">
+                    <Button 
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => {
+                            setSaveAsDraft(true)
+                            setTimeout(() => {
+                                submitBtnRef.current?.click()
+                            }, 50)
+                        }}
+                        className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 font-semibold flex items-center gap-2"
+                    >
+                        <FileText className="h-4 w-4 text-purple-400" />
+                        Sauvegarder en brouillon
+                    </Button>
+                    <Button 
+                        type="button" 
+                        disabled={isPending} 
+                        onClick={() => {
+                            setSaveAsDraft(false)
+                            setTimeout(() => {
+                                submitBtnRef.current?.click()
+                            }, 50)
+                        }}
+                        className="bg-purple-600 hover:bg-purple-700 text-white font-semibold flex items-center gap-2"
+                    >
+                        <Save className="h-4 w-4" />
+                        {initialBill ? 'Mettre à jour & Finaliser' : 'Confirmer et Facturer'}
+                    </Button>
+                    <button type="submit" ref={submitBtnRef} className="hidden" />
+                </div>
             </div>
 
             {submitError && (
@@ -356,7 +483,7 @@ export function BillForm({ quote, contractors, settings }: BillFormProps) {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-zinc-850">
-                                        {items.map((item, index) => (
+                                        {items.map((item) => (
                                             <tr key={item.id} className="group/row">
                                                 <td className="py-3 pr-2 space-y-1">
                                                     <Input
@@ -418,6 +545,75 @@ export function BillForm({ quote, contractors, settings }: BillFormProps) {
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Photos Upload Card */}
+                    <Card className="bg-zinc-900 border-zinc-800">
+                        <CardHeader>
+                            <CardTitle className="text-zinc-100 text-base flex items-center gap-2">
+                                <ImageIcon className="h-5 w-5 text-purple-400" />
+                                Photos de la Facture / Projet
+                            </CardTitle>
+                            <CardDescription className="text-zinc-400 text-xs">
+                                Ajoutez des images de référence ou des justificatifs de travaux pour cette facture.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {/* Grid of uploaded images */}
+                            {images.length > 0 && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {images.map((img, index) => (
+                                        <div key={index} className="border border-zinc-800 rounded-lg overflow-hidden bg-zinc-950 relative group">
+                                            <div className="h-40 w-full relative">
+                                                <img 
+                                                    src={img.previewUrl || img.image_url} 
+                                                    alt="Aperçu" 
+                                                    className="w-full h-full object-cover" 
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    variant="destructive"
+                                                    size="icon"
+                                                    onClick={() => removeImage(index)}
+                                                    className="absolute top-2 right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                            <div className="p-2 bg-zinc-900 border-t border-zinc-800">
+                                                <Input
+                                                    placeholder="Légende de la photo..."
+                                                    value={img.caption}
+                                                    onChange={(e) => updateImageCaption(index, e.target.value)}
+                                                    className="bg-zinc-950 border-zinc-800 text-xs h-8 text-zinc-200"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Drop area / click to upload */}
+                            <div className="flex items-center justify-center w-full">
+                                <label 
+                                    htmlFor="bill-image-upload" 
+                                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-zinc-800 border-dashed rounded-lg cursor-pointer bg-zinc-950 hover:bg-zinc-900/50 hover:border-purple-800/80 transition-colors"
+                                >
+                                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                        <ImageIcon className="w-8 h-8 mb-2 text-zinc-500" />
+                                        <p className="mb-1 text-xs text-zinc-400 font-semibold">Cliquez pour ajouter une photo</p>
+                                        <p className="text-xxs text-zinc-500">PNG, JPG ou WEBP</p>
+                                    </div>
+                                    <input 
+                                        id="bill-image-upload" 
+                                        type="file" 
+                                        className="hidden" 
+                                        accept="image/*" 
+                                        onChange={handleImageChange} 
+                                    />
+                                </label>
                             </div>
                         </CardContent>
                     </Card>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useTransition, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { 
     Receipt, 
     Search, 
@@ -45,6 +46,7 @@ interface BillsTableProps {
 }
 
 export function BillsTable({ initialBills }: BillsTableProps) {
+    const router = useRouter()
     const [bills, setBills] = useState<any[]>(initialBills)
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedBillId, setSelectedBillId] = useState<string | null>(null)
@@ -264,6 +266,7 @@ export function BillsTable({ initialBills }: BillsTableProps) {
                                     <TableHead className="text-zinc-300 font-bold text-xs py-3">Date</TableHead>
                                     <TableHead className="text-zinc-300 font-bold text-xs py-3">Soumission / Projet</TableHead>
                                     <TableHead className="text-zinc-300 font-bold text-xs py-3">Client</TableHead>
+                                    <TableHead className="text-zinc-300 font-bold text-xs py-3">Statut</TableHead>
                                     <TableHead className="text-zinc-300 font-bold text-xs py-3">Contracteur</TableHead>
                                     <TableHead className="text-zinc-300 font-bold text-xs py-3 text-right">Marge Gustav</TableHead>
                                     <TableHead className="text-zinc-300 font-bold text-xs py-3 text-right">Total Facturé</TableHead>
@@ -273,7 +276,7 @@ export function BillsTable({ initialBills }: BillsTableProps) {
                             <TableBody>
                                 {filteredBills.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={8} className="text-center py-8 text-sm text-zinc-500 italic">
+                                        <TableCell colSpan={9} className="text-center py-8 text-sm text-zinc-500 italic">
                                             Aucune facture trouvée correspondant aux critères de recherche.
                                         </TableCell>
                                     </TableRow>
@@ -283,7 +286,8 @@ export function BillsTable({ initialBills }: BillsTableProps) {
                                         return (
                                             <TableRow 
                                                 key={b.id} 
-                                                className="border-b border-zinc-900/80 hover:bg-zinc-900/30 transition-colors duration-150 text-xs"
+                                                className="border-b border-zinc-900/80 hover:bg-zinc-900/30 transition-colors duration-150 text-xs cursor-pointer"
+                                                onClick={() => router.push(`/bills/${b.id}`)}
                                             >
                                                 <TableCell className="font-bold text-purple-400 py-3">
                                                     #{b.bill_number || 'N/A'}
@@ -301,6 +305,17 @@ export function BillsTable({ initialBills }: BillsTableProps) {
                                                         <div className="text-xxs text-zinc-500 truncate max-w-[120px]">{b.clients.company_name}</div>
                                                     )}
                                                 </TableCell>
+                                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                                    {b.status === 'draft' ? (
+                                                        <Badge variant="outline" className="bg-zinc-800 text-zinc-200 border-zinc-700">
+                                                            Brouillon
+                                                        </Badge>
+                                                    ) : (
+                                                        <Badge variant="outline" className="bg-purple-900/50 text-purple-300 border-purple-800">
+                                                            Facturée
+                                                        </Badge>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell className="text-zinc-300">
                                                     <span className="flex items-center gap-1">
                                                         <HardHat className="h-3 w-3 text-emerald-400 shrink-0" />
@@ -313,13 +328,13 @@ export function BillsTable({ initialBills }: BillsTableProps) {
                                                 <TableCell className="text-right font-extrabold text-zinc-100">
                                                     ${Number(b.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </TableCell>
-                                                <TableCell className="text-center py-2">
+                                                <TableCell className="text-center py-2" onClick={(e) => e.stopPropagation()}>
                                                     <Button
                                                         size="xs"
                                                         variant="ghost"
-                                                        onClick={() => handleViewDetails(b.id)}
+                                                        onClick={() => router.push(`/bills/${b.id}`)}
                                                         className="h-7 w-7 p-0 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40 rounded-lg"
-                                                        title="Voir le détail de la facture"
+                                                        title="Voir la facture"
                                                     >
                                                         <Eye className="h-3.5 w-3.5" />
                                                     </Button>

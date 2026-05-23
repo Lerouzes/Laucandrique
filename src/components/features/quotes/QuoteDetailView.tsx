@@ -182,6 +182,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
     const linkedProject = Array.isArray(quote.projects) ? quote.projects[0] : null
     const isProjectCompleted = linkedProject?.status === 'completed'
     const displayStatus = quote.status === 'billed' ? 'billed' : (isProjectCompleted && quote.status === 'approved' ? 'completed' : quote.status)
+    const linkedBill = Array.isArray(quote.bills) ? quote.bills[0] : (quote.bills || null)
 
     return (
         <div className="space-y-6 max-w-4xl mx-auto pb-12 w-full overflow-x-auto">
@@ -281,17 +282,30 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                         </Button>
                     </>
                 )}
-                {(quote.status === 'completed' || displayStatus === 'completed') && (
+                {linkedBill ? (
                     <Link
-                        href={`/bills/new?quoteId=${quote.id}`}
+                        href={`/bills/${linkedBill.id}`}
                         className={cn(
                             buttonVariants({ variant: 'outline' }),
                             "border-purple-800 bg-purple-950/20 text-purple-300 hover:bg-purple-900/50 hover:text-purple-200 font-semibold inline-flex items-center"
                         )}
                     >
                         <Receipt className="mr-2 h-4 w-4" />
-                        Créer la facture
+                        Voir la facture #{linkedBill.bill_number}
                     </Link>
+                ) : (
+                    (quote.status === 'completed' || displayStatus === 'completed') && (
+                        <Link
+                            href={`/bills/new?quoteId=${quote.id}`}
+                            className={cn(
+                                buttonVariants({ variant: 'outline' }),
+                                "border-purple-800 bg-purple-950/20 text-purple-300 hover:bg-purple-900/50 hover:text-purple-200 font-semibold inline-flex items-center"
+                            )}
+                        >
+                            <Receipt className="mr-2 h-4 w-4" />
+                            Créer la facture
+                        </Link>
+                    )
                 )}
             </div>
 
