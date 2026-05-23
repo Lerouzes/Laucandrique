@@ -64,16 +64,21 @@ export default function SettingsPage() {
         const file = e.target.files?.[0]
         if (!file) return
 
-        if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        // Support both images and PDFs
+        const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf')
+        const isImg = file.type.startsWith('image/')
+        
+        if (!isPdf && !isImg) {
             toast.error("Format non supporté", {
-                description: "Veuillez utiliser une image (PNG ou JPEG) au lieu d'un fichier PDF."
+                description: "Veuillez sélectionner un fichier PDF ou une image (PNG/JPEG)."
             })
             return
         }
 
-        if (file.size > 3 * 1024 * 1024) {
+        // Limit size to 4MB for localStorage data URL
+        if (file.size > 4 * 1024 * 1024) {
             toast.error("Fichier trop volumineux", {
-                description: "L'image ne doit pas dépasser 3 Mo pour être sauvegardée localement."
+                description: "Le fichier ne doit pas dépasser 4 Mo pour être sauvegardé localement."
             })
             return
         }
@@ -84,10 +89,10 @@ export default function SettingsPage() {
             try {
                 localStorage.setItem('pdf_template_url', dataUrl)
                 setTemplatePreview(dataUrl)
-                toast.success('Gabarit d\'arrière-plan sauvegardé localement.')
+                toast.success('Gabarit de template sauvegardé avec succès.')
             } catch (err) {
                 toast.error("Erreur de stockage", {
-                    description: "L'image est trop volumineuse pour être stockée dans le navigateur."
+                    description: "Le fichier est trop volumineux pour être stocké dans le navigateur."
                 })
             }
         }
@@ -188,12 +193,22 @@ export default function SettingsPage() {
 
                 <Card className="bg-zinc-900 border-zinc-800">
                     <CardHeader>
-                        <CardTitle className="text-zinc-100">Image de fond (Entête / Arrière-plan)</CardTitle>
-                        <CardDescription className="text-zinc-400">Ajoutez une image modèle (gabarit au format PNG ou JPEG) pour personnaliser le look de vos PDF exportés. Les fichiers PDF ne sont pas acceptés.</CardDescription>
+                        <CardTitle className="text-zinc-100">Gabarit de template PDF / Image</CardTitle>
+                        <CardDescription className="text-zinc-400">
+                            Ajoutez un gabarit (format PDF, PNG ou JPEG) pour personnaliser le look de vos PDF exportés. Si vous téléchargez un PDF, le système l'utilisera comme arrière-plan et écrira la soumission par-dessus.
+                        </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                        <Input type="file" accept="image/*" onChange={handleTemplateUpload} className="bg-zinc-950 border-zinc-800 text-zinc-100" />
-                        {templatePreview && <img src={templatePreview} alt="Template preview" className="max-h-40 rounded border border-zinc-800" />}
+                        <Input type="file" accept="image/*,application/pdf" onChange={handleTemplateUpload} className="bg-zinc-950 border-zinc-800 text-zinc-100" />
+                        {templatePreview && (
+                            templatePreview.startsWith('data:application/pdf') ? (
+                                <div className="w-full h-64 rounded border border-zinc-800 overflow-hidden bg-zinc-950">
+                                    <iframe src={`${templatePreview}#toolbar=0`} className="w-full h-full border-0" />
+                                </div>
+                            ) : (
+                                <img src={templatePreview} alt="Template preview" className="max-h-40 rounded border border-zinc-800" />
+                            )
+                        )}
                     </CardContent>
                 </Card>
 

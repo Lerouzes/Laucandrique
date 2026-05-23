@@ -229,7 +229,16 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
             </div>
 
             <div className="bg-white text-black p-10 rounded-lg shadow-sm w-[800px] shrink-0 relative overflow-hidden" ref={pdfRef}>
-                {templateUrl && <img src={templateUrl} alt="Template" className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none" crossOrigin="anonymous" />}
+                {templateUrl && (
+                    templateUrl.startsWith('data:application/pdf') ? (
+                        <iframe 
+                            src={`${templateUrl}#toolbar=0&navpanes=0&scrollbar=0`} 
+                            className="absolute inset-0 w-full h-full opacity-20 pointer-events-none border-0" 
+                        />
+                    ) : (
+                        <img src={templateUrl} alt="Template" className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none" crossOrigin="anonymous" />
+                    )
+                )}
                 <div className="flex justify-between items-start mb-8">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight text-zinc-900">{settings.company_name || 'Gustav Inc.'}</h1>

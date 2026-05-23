@@ -2,10 +2,55 @@ import { jsPDF } from 'jspdf'
 import { format } from 'date-fns'
 import { frCA } from 'date-fns/locale'
 import { toast } from 'sonner'
+import { PDFDocument } from 'pdf-lib'
 
 const sanitizePdfFileName = (value: string) => {
     const normalized = (value || 'soumission').trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '')
     return normalized || 'soumission'
+}
+
+async function overlayPdfTemplate(quotePdfBytes: ArrayBuffer, templateDataUrl: string): Promise<Uint8Array> {
+    const quoteDoc = await PDFDocument.load(quotePdfBytes)
+    
+    const base64Data = templateDataUrl.split(',')[1]
+    const templateBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
+    const templateDoc = await PDFDocument.load(templateBytes)
+    
+    const mergedDoc = await PDFDocument.create()
+    
+    const quotePages = quoteDoc.getPages()
+    const templatePages = templateDoc.getPages()
+    
+    const embeddedQuotePages = await mergedDoc.embedPages(quotePages)
+    const embeddedTemplatePages = await mergedDoc.embedPages(templatePages)
+    
+    for (let i = 0; i < quotePages.length; i++) {
+        const quotePage = quotePages[i]
+        const { width, height } = quotePage.getSize()
+        
+        const newPage = mergedDoc.addPage([width, height])
+        
+        if (templatePages.length > 0) {
+            const templateIdx = Math.min(i, templatePages.length - 1)
+            const backgroundPage = embeddedTemplatePages[templateIdx]
+            newPage.drawPage(backgroundPage, {
+                x: 0,
+                y: 0,
+                width: width,
+                height: height,
+            })
+        }
+        
+        const foregroundPage = embeddedQuotePages[i]
+        newPage.drawPage(foregroundPage, {
+            x: 0,
+            y: 0,
+            width: width,
+            height: height,
+        })
+    }
+    
+    return await mergedDoc.save()
 }
 
 const loadImage = (url: string): Promise<HTMLImageElement> => {
@@ -313,7 +358,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
 
         const drawBackgroundTemplate = () => {
             const templateUrl = settings?.pdf_template_url || (typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') : null)
-            if (templateUrl) {
+            if (templateUrl && !templateUrl.startsWith('data:application/pdf')) {
                 try {
                     let format = 'JPEG'
                     if (templateUrl.startsWith('data:image/png') || templateUrl.includes('image/png')) {
@@ -1114,9 +1159,30 @@ export async function downloadQuotePDF(quote: any, settings: any) {
             { align: 'center' }
         )
 
-        // Save PDF
+        // Save PDF (with support for PDF template overlay)
         const safeFileName = sanitizePdfFileName(quote.title)
-        doc.save(`Soumission-${safeFileName}.pdf`)
+        const pdfBytes = doc.output('arraybuffer')
+        
+        const templateUrl = settings?.pdf_template_url || (typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') : null)
+        
+        let finalPdfBytes: Uint8Array
+        if (templateUrl && templateUrl.startsWith('data:application/pdf')) {
+            finalPdfBytes = await overlayPdfTemplate(pdfBytes, templateUrl)
+        } else {
+            finalPdfBytes = new Uint8Array(pdfBytes)
+        }
+        
+        // Trigger browser download
+        const blob = new Blob([finalPdfBytes as any], { type: 'application/pdf' })
+        const downloadUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = downloadUrl
+        a.download = `Soumission-${safeFileName}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(downloadUrl)
+        
         toast.success('PDF généré avec succès')
     } catch (error) {
         toast.error('Erreur lors de la génération du PDF')
