@@ -242,6 +242,7 @@ export function AnalyticsDashboard({
     const totalSubtotal = useMemo(() => totalBilledWork + totalAdminAmount + totalProfitAmount, [totalBilledWork, totalAdminAmount, totalProfitAmount])
     const totalGstAmount = useMemo(() => filteredBills.reduce((sum, b) => sum + Number(b.gst_amount || 0), 0), [filteredBills])
     const totalQstAmount = useMemo(() => filteredBills.reduce((sum, b) => sum + Number(b.qst_amount || 0), 0), [filteredBills])
+    const grandTotalBilled = totalRealizedRevenue
 
     const totalDeniedValue = useMemo(() => {
         return deniedQuotes.reduce((acc, q) => acc + (q.total || 0), 0)

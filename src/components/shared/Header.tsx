@@ -27,11 +27,9 @@ export function Header({ user, profile }: { user: User, profile: Profile | null 
         <header className="flex h-16 items-center justify-between border-b border-white/20 bg-[#0f3f74]/70 backdrop-blur-md px-6">
             <div className="flex items-center gap-4 md:hidden">
                 <Sheet>
-                    <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
-                            <Menu className="h-6 w-6" />
-                            <span className="sr-only">Ouvrir le menu</span>
-                        </Button>
+                    <SheetTrigger render={<Button variant="ghost" size="icon" className="text-white hover:bg-white/10" />}>
+                        <Menu className="h-6 w-6" />
+                        <span className="sr-only">Ouvrir le menu</span>
                     </SheetTrigger>
                     <SheetContent side="left" className="w-64 p-0 bg-[#103f75] border-r border-white/20 text-white">
                         <div className="flex h-full flex-col">

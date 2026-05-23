@@ -99,3 +99,19 @@ export async function getBillForQuote(quoteId: string) {
 
     return data
 }
+
+export async function getBillWithItems(billId: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('bills')
+        .select('*, bill_items(*), contractors(*), quotes(quote_number, title, manager_id, managers(first_name, last_name)), clients(full_name, company_name)')
+        .eq('id', billId)
+        .maybeSingle()
+
+    if (error) {
+        console.error('Error fetching bill details:', error)
+        return null
+    }
+
+    return data
+}

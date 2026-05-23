@@ -10,8 +10,9 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { frCA } from 'date-fns/locale'
 
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import { updateQuoteStatus, revertQuoteToPending, markQuoteAsSent } from '@/actions/quotes'
 import { markProjectCompletedByQuote } from '@/actions/projects'
 import { downloadQuotePDF, calculatePerimeter, calculateFloorArea, calculateWallSurface, renderRoomToDataURL } from '@/utils/pdf'
@@ -281,16 +282,16 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                     </>
                 )}
                 {(quote.status === 'completed' || displayStatus === 'completed') && (
-                    <Button
-                        asChild
-                        className="border-purple-800 bg-purple-950/20 text-purple-300 hover:bg-purple-900/50 hover:text-purple-200 font-semibold"
-                        variant="outline"
+                    <Link
+                        href={`/bills/new?quoteId=${quote.id}`}
+                        className={cn(
+                            buttonVariants({ variant: 'outline' }),
+                            "border-purple-800 bg-purple-950/20 text-purple-300 hover:bg-purple-900/50 hover:text-purple-200 font-semibold inline-flex items-center"
+                        )}
                     >
-                        <Link href={`/bills/new?quoteId=${quote.id}`}>
-                            <Receipt className="mr-2 h-4 w-4" />
-                            Créer la facture
-                        </Link>
-                    </Button>
+                        <Receipt className="mr-2 h-4 w-4" />
+                        Créer la facture
+                    </Link>
                 )}
             </div>
 

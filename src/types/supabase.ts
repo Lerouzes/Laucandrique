@@ -111,7 +111,6 @@ export interface Database {
           email?: string | null
           manager?: string | null
           manager_id?: string | null
-          manager_id?: string | null
           notes?: string | null
           created_at?: string
         }

@@ -628,7 +628,7 @@ export async function deleteQuotesAction(quoteIds: string[]) {
 
 export async function updateQuotesStatusAction(
     quoteIds: string[],
-    status: 'draft' | 'sent' | 'approved' | 'denied' | 'completed'
+    status: 'draft' | 'sent' | 'approved' | 'denied' | 'completed' | 'billed'
 ) {
     const supabase = await createClient()
 

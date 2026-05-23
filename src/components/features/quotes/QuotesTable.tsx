@@ -174,18 +174,20 @@ function QuoteRow({
                 <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
                     {isSchedulable ? (
                         <Popover open={isScheduleOpen} onOpenChange={handleOpenChange}>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50"
-                                    title={scheduledDate ? 'Voir / modifier la date' : 'Planifier ce projet'}
-                                >
-                                    <CalendarDays className="h-4 w-4" />
-                                    <span className="ml-1 hidden md:inline">
-                                        {scheduledDate ? formatSafeDateTime(scheduledDate) : 'Planifier'}
-                                    </span>
-                                </Button>
+                            <PopoverTrigger
+                                render={
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-7 px-2 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50"
+                                        title={scheduledDate ? 'Voir / modifier la date' : 'Planifier ce projet'}
+                                    />
+                                }
+                            >
+                                <CalendarDays className="h-4 w-4" />
+                                <span className="ml-1 hidden md:inline">
+                                    {scheduledDate ? formatSafeDateTime(scheduledDate) : 'Planifier'}
+                                </span>
                             </PopoverTrigger>
                             <PopoverContent className="w-80 p-4 bg-zinc-950 border-zinc-800 space-y-4" align="end">
                                 <div className="space-y-1">
@@ -197,7 +199,6 @@ function QuoteRow({
                                     selected={tempDate}
                                     onSelect={setTempDate}
                                     disabled={quote.status === 'completed' || isPending}
-                                    initialFocus
                                     className="rounded-md border border-zinc-800 bg-zinc-950 p-1 mx-auto"
                                 />
                                 <div className="flex items-center justify-between gap-4 pt-2 border-t border-zinc-900">
@@ -441,15 +442,17 @@ export function QuotesTable({ data }: { data: any[] }) {
                     </div>
                     <div className="flex items-center gap-2">
                         <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    disabled={isPending}
-                                    className="h-8 border-zinc-800 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
-                                >
-                                    Changer le statut
-                                </Button>
+                            <DropdownMenuTrigger
+                                render={
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        disabled={isPending}
+                                        className="h-8 border-zinc-800 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
+                                    />
+                                }
+                            >
+                                Changer le statut
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="bg-zinc-950 border border-zinc-800 text-zinc-200" align="end">
                                 <DropdownMenuItem onClick={() => { setStatusToApply('draft'); setBulkStatusChangeOpen(true) }}>
@@ -493,7 +496,7 @@ export function QuotesTable({ data }: { data: any[] }) {
                         <TableRow className="border-b border-zinc-800 hover:bg-transparent">
                             <TableHead className="w-12 text-zinc-300 font-medium">
                                 <Checkbox 
-                                    checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                                    checked={(allSelected ? true : someSelected ? 'mixed' : false) as any}
                                     onCheckedChange={(checked) => handleSelectAll(checked)}
                                     aria-label="Sélectionner tout"
                                 />
@@ -546,10 +549,12 @@ export function QuotesTable({ data }: { data: any[] }) {
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="bg-zinc-950 border-t border-zinc-900 mt-2">
-                        <DialogClose asChild>
-                            <Button variant="outline" size="sm" className="border-zinc-800 text-zinc-300 bg-transparent hover:bg-zinc-900">
-                                Annuler
-                            </Button>
+                        <DialogClose
+                            render={
+                                <Button variant="outline" size="sm" className="border-zinc-800 text-zinc-300 bg-transparent hover:bg-zinc-900" />
+                            }
+                        >
+                            Annuler
                         </DialogClose>
                         <Button 
                             variant="destructive" 
@@ -581,10 +586,12 @@ export function QuotesTable({ data }: { data: any[] }) {
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="bg-zinc-950 border-t border-zinc-900 mt-2">
-                        <DialogClose asChild>
-                            <Button variant="outline" size="sm" className="border-zinc-800 text-zinc-300 bg-transparent hover:bg-zinc-900">
-                                Annuler
-                            </Button>
+                        <DialogClose
+                            render={
+                                <Button variant="outline" size="sm" className="border-zinc-800 text-zinc-300 bg-transparent hover:bg-zinc-900" />
+                            }
+                        >
+                            Annuler
                         </DialogClose>
                         <Button 
                             variant="destructive" 
@@ -632,10 +639,12 @@ export function QuotesTable({ data }: { data: any[] }) {
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="bg-zinc-950 border-t border-zinc-900 mt-2">
-                        <DialogClose asChild>
-                            <Button variant="outline" size="sm" className="border-zinc-800 text-zinc-300 bg-transparent hover:bg-zinc-900">
-                                Annuler
-                            </Button>
+                        <DialogClose
+                            render={
+                                <Button variant="outline" size="sm" className="border-zinc-800 text-zinc-300 bg-transparent hover:bg-zinc-900" />
+                            }
+                        >
+                            Annuler
                         </DialogClose>
                         <Button 
                             size="sm"

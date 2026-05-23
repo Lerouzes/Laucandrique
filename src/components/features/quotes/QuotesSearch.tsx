@@ -45,7 +45,7 @@ export function QuotesSearch({ initialQuery, initialStatus }: { initialQuery: st
                     onChange={(e) => setVal(e.target.value)}
                 />
             </div>
-            <Select value={status} onValueChange={(next) => { setStatus(next); }}>
+            <Select value={status} onValueChange={(next) => { setStatus(next || 'all'); }}>
                 <SelectTrigger className="w-[180px] bg-white border-zinc-200 text-zinc-900">
                     <SelectValue placeholder="Statut" />
                 </SelectTrigger>
