@@ -487,7 +487,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                                                 {room.sectionName ? `${room.sectionName} - ${room.name}` : room.name}
                                             </h4>
                                             <span className="text-sm text-zinc-500 font-medium">
-                                                Hauteur du plafond : {room.height || 8.0}'
+                                                Hauteur du plafond : {room.height || 8.0} pi
                                             </span>
                                         </div>
                                         

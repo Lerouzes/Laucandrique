@@ -106,9 +106,25 @@ export function calculateFloorArea(points: Point[], scale: number = 20): number 
 }
 
 export function calculateWallSurface(points: Point[], height: number | null, scale: number = 20): number {
-    const h = height || 8.0 // default height
+    const h = height || 8.0 // default ceiling height in feet
     const perimeter = calculatePerimeter(points, scale)
-    return perimeter * h
+    let grossSurface = perimeter * h
+
+    // Subtract opening areas (doors and windows)
+    // Features are stored on the start point (p1) of each segment
+    points.forEach(p => {
+        if (!p.features || p.features.length === 0) return
+        p.features.forEach((feat: any) => {
+            const featWidth: number = feat.width || 0
+            const featHeight: number = feat.height || (feat.type === 'door' ? 7.0 : 4.0)
+            // For doors: remove from floor up to door height (strip above door remains wall if door is shorter than ceiling)
+            // For windows: remove the window rectangle (strips above & below remain wall)
+            const openingArea = featWidth * Math.min(featHeight, h)
+            grossSurface -= openingArea
+        })
+    })
+
+    return Math.max(0, grossSurface)
 }
 
 export function PlanningPanel({ sections, onChange }: PlanningPanelProps) {

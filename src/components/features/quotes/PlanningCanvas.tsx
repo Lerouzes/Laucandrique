@@ -289,12 +289,14 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
         if (!activeSeg) return
 
         const width = type === 'door' ? 3.0 : 4.0
+        const height = type === 'door' ? 7.0 : 4.0
         const offset = Math.max(0, (activeSeg.feetLen - width) / 2)
 
         const newFeature = {
             id: `feat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             type,
             width,
+            height,
             offset
         }
 
@@ -698,7 +700,7 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                             textAnchor="middle"
                                             alignmentBaseline="middle"
                                         >
-                                            M{idx + 1}: {feetLen.toFixed(1)}'
+                                            M{idx + 1}: {feetLen.toFixed(1)} pi
                                         </text>
                                     </g>
                                 )}
@@ -757,7 +759,7 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                             textAnchor="middle"
                                             alignmentBaseline="middle"
                                         >
-                                            M{getSegments(points, isClosed, scale).length + 1}: {feetLen.toFixed(1)}'
+                                            M{getSegments(points, isClosed, scale).length + 1}: {feetLen.toFixed(1)} pi
                                         </text>
                                     </g>
                                 )}
@@ -944,36 +946,51 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                                         <span>{feat.type === 'door' ? '🚪 Porte' : '🖼️ Fenêtre'}</span>
                                                     </div>
                                                     
-                                                    <div className="flex items-center gap-3">
+                                                    <div className="flex flex-wrap items-center gap-2 mt-1 w-full">
                                                         {/* Width Input */}
                                                         <div className="flex items-center gap-1">
-                                                            <span className="text-[10px] text-zinc-500">Larg:</span>
+                                                            <span className="text-[10px] text-zinc-500">Largeur:</span>
                                                             <Input
                                                                 type="number"
                                                                 step="0.1"
                                                                 value={feat.width}
                                                                 onChange={(e) => updateFeature(p1Index, feat.id, 'width', parseFloat(e.target.value) || 0)}
-                                                                className="h-6 w-12 bg-zinc-950 border-zinc-850 text-zinc-200 text-xxs text-center p-0"
+                                                                className="h-6 w-14 bg-zinc-950 border-zinc-850 text-zinc-200 text-xxs text-center p-0"
                                                             />
+                                                            <span className="text-[9px] text-zinc-600">pi</span>
+                                                        </div>
+
+                                                        {/* Height Input */}
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="text-[10px] text-zinc-500">Hauteur:</span>
+                                                            <Input
+                                                                type="number"
+                                                                step="0.1"
+                                                                value={feat.height ?? (feat.type === 'door' ? 7.0 : 4.0)}
+                                                                onChange={(e) => updateFeature(p1Index, feat.id, 'height', parseFloat(e.target.value) || 0)}
+                                                                className="h-6 w-14 bg-zinc-950 border-zinc-850 text-zinc-200 text-xxs text-center p-0"
+                                                            />
+                                                            <span className="text-[9px] text-zinc-600">pi</span>
                                                         </div>
 
                                                         {/* Offset Input */}
                                                         <div className="flex items-center gap-1">
-                                                            <span className="text-[10px] text-zinc-500">Pos:</span>
+                                                            <span className="text-[10px] text-zinc-500">Position:</span>
                                                             <Input
                                                                 type="number"
                                                                 step="0.1"
                                                                 value={feat.offset}
                                                                 onChange={(e) => updateFeature(p1Index, feat.id, 'offset', parseFloat(e.target.value) || 0)}
-                                                                className="h-6 w-12 bg-zinc-950 border-zinc-850 text-zinc-200 text-xxs text-center p-0"
+                                                                className="h-6 w-14 bg-zinc-950 border-zinc-850 text-zinc-200 text-xxs text-center p-0"
                                                             />
+                                                            <span className="text-[9px] text-zinc-600">pi</span>
                                                         </div>
 
                                                         {/* Delete button */}
                                                         <button
                                                             type="button"
                                                             onClick={() => deleteFeature(p1Index, feat.id)}
-                                                            className="text-zinc-500 hover:text-red-400 transition-colors focus:outline-none ml-1"
+                                                            className="text-zinc-500 hover:text-red-400 transition-colors focus:outline-none ml-auto"
                                                         >
                                                             &times;
                                                         </button>
@@ -995,7 +1012,7 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                     <span className="text-[11px] font-medium text-zinc-400 px-2">Angles ({points.length}) :</span>
                     {points.map((p, idx) => (
                         <div key={`badge-${idx}`} className="inline-flex items-center gap-1.5 bg-zinc-950 px-2 py-1 rounded text-xs text-zinc-300 border border-zinc-800">
-                            <span>P{idx+1} ({Math.round(p.x/scale)}', {Math.round(p.y/scale)}')</span>
+                            <span>P{idx+1} ({Math.round(p.x/scale)} pi, {Math.round(p.y/scale)} pi)</span>
                             <button
                                 type="button"
                                 onClick={() => deletePoint(idx)}

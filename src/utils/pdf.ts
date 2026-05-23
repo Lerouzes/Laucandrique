@@ -155,9 +155,9 @@ function formatFeetInches(feetDecimal: number): string {
     const feet = Math.floor(totalInches / 12)
     const inches = totalInches % 12
     if (inches === 0) {
-        return `${feet}'`
+        return `${feet} pi`
     }
-    return `${feet}' ${inches}"`
+    return `${feet} pi ${inches} po`
 }
 
 function isClockwise(points: { x: number; y: number }[]): boolean {
