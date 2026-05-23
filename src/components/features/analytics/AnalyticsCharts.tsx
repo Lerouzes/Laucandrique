@@ -44,7 +44,7 @@ export function AnalyticsCharts({ monthlyRevenue }: { monthlyRevenue: any[] }) {
                                     itemStyle={{ color: '#f4f4f5' }}
                                     formatter={(value: number, name: string) => [
                                         `$${value.toLocaleString('fr-CA')}`, 
-                                        name === 'approved' ? 'Signé (Approuvé)' : 'En attente (Envoyé)'
+                                        name
                                     ]}
                                     labelStyle={{ color: '#a1a1aa', fontWeight: 'bold' }}
                                 />

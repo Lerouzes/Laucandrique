@@ -743,12 +743,13 @@ export function AnalyticsDashboard({
                                                         backdropFilter: 'blur(8px)',
                                                         boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5)'
                                                     }}
-                                                    formatter={(v: number, name) => [
-                                                        name === 'revenue' ? `$${v.toLocaleString('fr-CA')}` : v,
-                                                        name === 'revenue' 
-                                                            ? (pipelineMode === 'all' ? 'Pipeline (Signé + Envoyé)' : 'Revenu Signé') 
-                                                            : name === 'approved' ? 'Approuvées' : 'Total Soumissions'
-                                                    ]}
+                                                    formatter={(v: number, name: string) => {
+                                                        const isRevenue = name === 'Revenu Signé' || name === 'Pipeline (Signé + Envoyé)' || name === 'revenue';
+                                                        return [
+                                                            isRevenue ? `$${v.toLocaleString('fr-CA')}` : v,
+                                                            name
+                                                        ];
+                                                    }}
                                                 />
                                                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }} />
                                                 <Bar name={pipelineMode === 'all' ? 'Pipeline (Signé + Envoyé)' : 'Revenu Signé'} dataKey="revenue" fill={COLORS.indigo} radius={[4, 4, 0, 0]} maxBarSize={45} />
@@ -850,13 +851,13 @@ export function AnalyticsDashboard({
                                                         borderColor: '#27272a',
                                                         borderRadius: '12px',
                                                     }}
-                                                    formatter={(v: number, name) => [
-                                                        name === 'revenue' ? `$${v.toLocaleString('fr-CA')}` : v,
-                                                        name === 'revenue' ? 'Revenu Réalisé' : 'Projets Assignés'
+                                                    formatter={(v: number, name: string) => [
+                                                        `$${v.toLocaleString('fr-CA')}`,
+                                                        name
                                                     ]}
                                                 />
                                                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }} />
-                                                <Bar name="revenue" dataKey="revenue" fill={COLORS.amber} radius={[0, 4, 4, 0]} maxBarSize={30} />
+                                                <Bar name="Revenu Réalisé" dataKey="revenue" fill={COLORS.amber} radius={[0, 4, 4, 0]} maxBarSize={30} />
                                             </BarChart>
                                         </ResponsiveContainer>
                                     )}
