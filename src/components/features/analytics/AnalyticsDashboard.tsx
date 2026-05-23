@@ -51,13 +51,15 @@ export function AnalyticsDashboard({
     initialProjects,
     settings,
     allTeams = [],
-    allManagers = []
+    allManagers = [],
+    initialBills = []
 }: {
     initialQuotes: any[]
     initialProjects: any[]
     settings: any
     allTeams?: any[]
     allManagers?: any[]
+    initialBills?: any[]
 }) {
     // 1. Time Period presets and custom state
     const [period, setPeriod] = useState<'all' | 'this_year' | 'last_90_days' | 'next_90_days' | 'custom'>('this_year')
@@ -196,10 +198,27 @@ export function AnalyticsDashboard({
     }, [initialProjects, dateRange, selectedManagers, selectedTeams, selectedContractors])
 
     // --- METRIC CALCULATIONS ---
-    const approvedQuotes = useMemo(() => filteredQuotes.filter((q: any) => q.status === 'approved' || q.status === 'completed'), [filteredQuotes])
+    const approvedQuotes = useMemo(() => filteredQuotes.filter((q: any) => q.status === 'approved' || q.status === 'completed' || q.status === 'billed'), [filteredQuotes])
     const completedProjects = useMemo(() => filteredProjects.filter((p: any) => p.status === 'completed'), [filteredProjects])
     const deniedQuotes = useMemo(() => filteredQuotes.filter((q: any) => q.status === 'denied'), [filteredQuotes])
     const sentQuotes = useMemo(() => filteredQuotes.filter((q: any) => q.status === 'sent'), [filteredQuotes])
+
+    const filteredBills = useMemo(() => {
+        return (initialBills || []).filter((b: any) => {
+            const d = new Date(b.bill_date)
+            const dateMatch = d >= dateRange.start && d <= dateRange.end
+
+            const managerId = b.quotes?.manager_id || 'none'
+            const teamName = b.quotes?.managers?.manager_teams?.name || ''
+            const contractorName = b.contractors?.full_name || ''
+
+            const managerMatch = selectedManagers.length === 0 || selectedManagers.includes(managerId)
+            const teamMatch = selectedTeams.length === 0 || selectedTeams.includes(teamName)
+            const contractorMatch = selectedContractors.length === 0 || selectedContractors.includes(contractorName)
+
+            return dateMatch && managerMatch && teamMatch && contractorMatch
+        })
+    }, [initialBills, dateRange, selectedManagers, selectedTeams, selectedContractors])
 
     const totalSentRevenue = useMemo(() => {
         return sentQuotes.reduce((acc, q) => acc + (q.total || 0), 0)
@@ -214,8 +233,15 @@ export function AnalyticsDashboard({
     }, [approvedQuotes, totalSentRevenue, pipelineMode])
 
     const totalRealizedRevenue = useMemo(() => {
-        return completedProjects.reduce((acc, p) => acc + Number(p.quotes?.total || 0), 0)
-    }, [completedProjects])
+        return filteredBills.reduce((acc, b) => acc + Number(b.total || 0), 0)
+    }, [filteredBills])
+
+    const totalBilledWork = useMemo(() => filteredBills.reduce((sum, b) => sum + Number(b.subtotal || 0), 0), [filteredBills])
+    const totalAdminAmount = useMemo(() => filteredBills.reduce((sum, b) => sum + Number(b.admin_amount || 0), 0), [filteredBills])
+    const totalProfitAmount = useMemo(() => filteredBills.reduce((sum, b) => sum + Number(b.profit_amount || 0), 0), [filteredBills])
+    const totalSubtotal = useMemo(() => totalBilledWork + totalAdminAmount + totalProfitAmount, [totalBilledWork, totalAdminAmount, totalProfitAmount])
+    const totalGstAmount = useMemo(() => filteredBills.reduce((sum, b) => sum + Number(b.gst_amount || 0), 0), [filteredBills])
+    const totalQstAmount = useMemo(() => filteredBills.reduce((sum, b) => sum + Number(b.qst_amount || 0), 0), [filteredBills])
 
     const totalDeniedValue = useMemo(() => {
         return deniedQuotes.reduce((acc, q) => acc + (q.total || 0), 0)
@@ -267,14 +293,12 @@ export function AnalyticsDashboard({
             }
         })
 
-        // Add realized from completed projects
-        completedProjects.forEach((p) => {
-            const d = p.completed_at ? new Date(p.completed_at) : (p.start_date ? new Date(p.start_date) : null)
-            if (d) {
-                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-                if (trendMap[key]) {
-                    trendMap[key].realized += Number(p.quotes?.total || 0)
-                }
+        // Add realized from bills
+        filteredBills.forEach((b) => {
+            const d = new Date(b.bill_date)
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+            if (trendMap[key]) {
+                trendMap[key].realized += Number(b.total || 0)
             }
         })
 
@@ -302,7 +326,7 @@ export function AnalyticsDashboard({
                 stats[name] = { name, total: 0, approved: 0, denied: 0, revenue: 0, presented: 0 }
             }
             stats[name].total += 1
-            const isApproved = q.status === 'approved' || q.status === 'completed'
+            const isApproved = q.status === 'approved' || q.status === 'completed' || q.status === 'billed'
             const isSent = q.status === 'sent'
             const isDenied = q.status === 'denied'
             const countsAsRevenue = isApproved || (pipelineMode === 'all' && isSent)
@@ -345,19 +369,17 @@ export function AnalyticsDashboard({
     const contractorSegmentation = useMemo(() => {
         const stats: Record<string, { name: string, jobs: number, revenue: number }> = {}
 
-        filteredProjects.forEach((p: any) => {
-            const name = p.contractors?.full_name || p.quotes?.contractors?.full_name || 'Sans contracteur'
+        filteredBills.forEach((b: any) => {
+            const name = b.contractors?.full_name || 'Sans contracteur'
             if (!stats[name]) {
                 stats[name] = { name, jobs: 0, revenue: 0 }
             }
             stats[name].jobs += 1
-            if (p.status === 'completed') {
-                stats[name].revenue += Number(p.quotes?.total || 0)
-            }
+            stats[name].revenue += Number(b.total || 0)
         })
 
         return Object.values(stats).sort((a, b) => b.revenue - a.revenue)
-    }, [filteredProjects])
+    }, [filteredBills])
 
     // --- RESET FILTERS ---
     const resetFilters = () => {
@@ -569,7 +591,7 @@ export function AnalyticsDashboard({
                     </h3>
                     <p className="mt-2 text-xxs text-zinc-500 flex items-center gap-1">
                         <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                        Sur {completedProjects.length} projets complétés
+                        Sur {filteredBills.length} facture(s) enregistrée(s)
                     </p>
                 </div>
 
@@ -707,6 +729,85 @@ export function AnalyticsDashboard({
                                             </AreaChart>
                                         </ResponsiveContainer>
                                     )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {activeTab === 'revenues' && (
+                        <Card className="bg-zinc-950/40 border-zinc-800 p-6 rounded-2xl shadow-xl">
+                            <CardHeader className="px-0 pt-0">
+                                <CardTitle className="text-zinc-100 text-base flex items-center gap-2">
+                                    <TrendingUp className="h-5 w-5 text-emerald-400" />
+                                    Analyse Détaillée des Gains Réalisés (Facturés)
+                                </CardTitle>
+                                <CardDescription className="text-zinc-400 text-xs">
+                                    Répartition des montants facturés pour les {filteredBills.length} facture(s) de la période sélectionnée.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="px-0 pb-0 space-y-6">
+                                <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
+                                    <div className="bg-zinc-900/40 p-4 border border-zinc-800 rounded-xl">
+                                        <p className="text-xxs font-bold text-zinc-500 uppercase tracking-wider">Montant Chantier (Travail)</p>
+                                        <p className="text-lg font-bold text-zinc-200 mt-1">
+                                            ${totalBilledWork.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                        </p>
+                                    </div>
+                                    <div className="bg-zinc-900/40 p-4 border border-zinc-800 rounded-xl">
+                                        <p className="text-xxs font-bold text-zinc-500 uppercase tracking-wider">Marge Administration</p>
+                                        <p className="text-lg font-bold text-zinc-200 mt-1">
+                                            ${totalAdminAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                        </p>
+                                    </div>
+                                    <div className="bg-zinc-900/40 p-4 border border-zinc-800 rounded-xl">
+                                        <p className="text-xxs font-bold text-zinc-500 uppercase tracking-wider">Marge Profit</p>
+                                        <p className="text-lg font-bold text-zinc-200 mt-1">
+                                            ${totalProfitAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                        </p>
+                                    </div>
+                                    <div className="bg-zinc-900/40 p-4 border border-zinc-800 rounded-xl">
+                                        <p className="text-xxs font-bold text-zinc-500 uppercase tracking-wider">Sous-total (Hors Taxes)</p>
+                                        <p className="text-lg font-bold text-emerald-400 mt-1">
+                                            ${totalSubtotal.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                        </p>
+                                    </div>
+                                    <div className="bg-zinc-900/40 p-4 border border-zinc-800 rounded-xl col-span-2 md:col-span-1">
+                                        <p className="text-xxs font-bold text-zinc-500 uppercase tracking-wider">Taxes (TPS + TVQ)</p>
+                                        <p className="text-sm font-bold text-zinc-200 mt-1">
+                                            ${(totalGstAmount + totalQstAmount).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                        </p>
+                                        <p className="text-xxs text-zinc-500 mt-0.5">
+                                            TPS: ${totalGstAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })} <br /> TVQ: ${totalQstAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                        </p>
+                                    </div>
+                                    <div className="bg-emerald-950/20 p-4 border border-emerald-900/40 rounded-xl col-span-2 md:col-span-1">
+                                        <p className="text-xxs font-bold text-emerald-400 uppercase tracking-wider">Total Facturé</p>
+                                        <p className="text-lg font-extrabold text-zinc-100 mt-1">
+                                            ${grandTotalBilled.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Notes et Commentaires de Facturation</h4>
+                                    <div className="max-h-[200px] overflow-y-auto space-y-2.5 pr-1">
+                                        {filteredBills.filter(b => b.notes || b.description).map((b) => (
+                                            <div key={b.id} className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-xxs">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className="font-bold text-zinc-300">Facture #{b.bill_number} · Soumission #{b.quotes?.quote_number || 'N/A'}</span>
+                                                    <span className="text-zinc-500">{new Date(b.bill_date).toLocaleDateString('fr-CA')}</span>
+                                                </div>
+                                                <p className="text-zinc-200 font-semibold mb-1">{b.title}</p>
+                                                {b.description && <p className="text-zinc-400 italic mb-1">{b.description}</p>}
+                                                {b.notes && <p className="text-zinc-300 bg-zinc-950 p-2 rounded-lg">{b.notes}</p>}
+                                            </div>
+                                        ))}
+                                        {filteredBills.filter(b => b.notes || b.description).length === 0 && (
+                                            <p className="text-xxs text-zinc-500 italic py-2 text-center bg-zinc-900/20 border border-zinc-800 border-dashed rounded-xl">
+                                                Aucune note enregistrée pour les factures de cette période.
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>

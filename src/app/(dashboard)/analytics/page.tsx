@@ -2,6 +2,7 @@ import { getQuotes } from '@/actions/quotes'
 import { getProjects } from '@/actions/projects'
 import { getSettings } from '@/actions/settings'
 import { getManagers, getManagerTeams } from '@/actions/managers'
+import { getBills } from '@/actions/bills'
 import { AnalyticsDashboard } from '@/components/features/analytics/AnalyticsDashboard'
 
 export default async function AnalyticsPage() {
@@ -10,6 +11,7 @@ export default async function AnalyticsPage() {
     const settings = await getSettings()
     const managers = await getManagers()
     const teams = await getManagerTeams()
+    const bills = await getBills()
 
     return (
         <div className="space-y-6 h-full flex flex-col pb-6">
@@ -26,6 +28,7 @@ export default async function AnalyticsPage() {
                 settings={settings} 
                 allManagers={managers}
                 allTeams={teams}
+                initialBills={bills}
             />
         </div>
     )

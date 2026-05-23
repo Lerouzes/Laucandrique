@@ -141,7 +141,7 @@ export interface Database {
           description: string | null
           internal_notes: string | null
           manager_id: string | null
-          status: 'draft' | 'sent' | 'approved' | 'denied' | 'completed'
+          status: 'draft' | 'sent' | 'approved' | 'denied' | 'completed' | 'billed'
           estimated_duration_days: number
           work_types: string[]
           hide_duration: boolean
@@ -165,7 +165,7 @@ export interface Database {
           description?: string | null
           internal_notes?: string | null
           manager_id?: string | null
-          status?: 'draft' | 'sent' | 'approved' | 'denied' | 'completed'
+          status?: 'draft' | 'sent' | 'approved' | 'denied' | 'completed' | 'billed'
           estimated_duration_days?: number
           work_types?: string[]
           hide_duration?: boolean
@@ -189,7 +189,7 @@ export interface Database {
           description?: string | null
           internal_notes?: string | null
           manager_id?: string | null
-          status?: 'draft' | 'sent' | 'approved' | 'denied' | 'completed'
+          status?: 'draft' | 'sent' | 'approved' | 'denied' | 'completed' | 'billed'
           estimated_duration_days?: number
           work_types?: string[]
           hide_duration?: boolean
@@ -369,6 +369,138 @@ export interface Database {
           }
         ]
       }
+      bills: {
+        Row: {
+          id: string
+          quote_id: string | null
+          client_id: string
+          contractor_id: string | null
+          bill_number: number
+          bill_date: string
+          title: string
+          description: string | null
+          notes: string | null
+          subtotal: number
+          admin_percentage: number
+          admin_amount: number
+          profit_percentage: number
+          profit_amount: number
+          gst_amount: number
+          qst_amount: number
+          total: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          quote_id?: string | null
+          client_id: string
+          contractor_id?: string | null
+          bill_number?: number
+          bill_date?: string
+          title: string
+          description?: string | null
+          notes?: string | null
+          subtotal?: number
+          admin_percentage?: number
+          admin_amount?: number
+          profit_percentage?: number
+          profit_amount?: number
+          gst_amount?: number
+          qst_amount?: number
+          total?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          quote_id?: string | null
+          client_id?: string
+          contractor_id?: string | null
+          bill_number?: number
+          bill_date?: string
+          title?: string
+          description?: string | null
+          notes?: string | null
+          subtotal?: number
+          admin_percentage?: number
+          admin_amount?: number
+          profit_percentage?: number
+          profit_amount?: number
+          gst_amount?: number
+          qst_amount?: number
+          total?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bills_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: false
+            referencedRelation: "contractors"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      bill_items: {
+        Row: {
+          id: string
+          bill_id: string
+          title: string | null
+          description: string | null
+          quantity: number
+          unit: string | null
+          unit_cost: number
+          total: number
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          bill_id: string
+          title?: string | null
+          description?: string | null
+          quantity?: number
+          unit?: string | null
+          unit_cost?: number
+          total?: number
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          bill_id?: string
+          title?: string | null
+          description?: string | null
+          quantity?: number
+          unit?: string | null
+          unit_cost?: number
+          total?: number
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_items_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       quote_planning_sections: {
         Row: {
           id: string
@@ -457,7 +589,7 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
-      quote_status: 'draft' | 'sent' | 'approved' | 'denied' | 'completed'
+      quote_status: 'draft' | 'sent' | 'approved' | 'denied' | 'completed' | 'billed'
       project_status: 'unplanned' | 'planned' | 'in_progress' | 'completed'
     }
   }

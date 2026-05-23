@@ -75,7 +75,7 @@ export default async function DashboardPage({
         return managerMatch && teamMatch
     })
 
-    const approvedQuotes = filteredQuotes.filter((q: any) => q.status === 'approved' || q.status === 'completed')
+    const approvedQuotes = filteredQuotes.filter((q: any) => q.status === 'approved' || q.status === 'completed' || q.status === 'billed')
     const sentQuotes = filteredQuotes.filter((q: any) => q.status === 'sent')
 
     // Filter approved quotes by date range
@@ -127,7 +127,7 @@ export default async function DashboardPage({
     const monthlyMap: Record<string, { approved: number, sent: number }> = {}
     filteredQuotes
         .forEach((q: any) => {
-            if (q.status !== 'approved' && q.status !== 'completed' && q.status !== 'sent') return
+            if (q.status !== 'approved' && q.status !== 'completed' && q.status !== 'billed' && q.status !== 'sent') return
             const project = q.projects?.[0]
             const dateStr = project?.start_date || q.approved_at || q.created_at
             const d = new Date(dateStr)
@@ -136,7 +136,7 @@ export default async function DashboardPage({
                 if (!monthlyMap[key]) {
                     monthlyMap[key] = { approved: 0, sent: 0 }
                 }
-                if (q.status === 'approved' || q.status === 'completed') {
+                if (q.status === 'approved' || q.status === 'completed' || q.status === 'billed') {
                     monthlyMap[key].approved += (q.total || 0)
                 } else {
                     monthlyMap[key].sent += (q.total || 0)
@@ -356,12 +356,16 @@ export default async function DashboardPage({
                                     recentQuotes.map((q: any) => {
                                         const badgeStyle = 
                                             q.status === 'approved' ? 'bg-cyan-950/40 text-cyan-300 border-cyan-800' :
+                                            q.status === 'completed' ? 'bg-emerald-950/40 text-emerald-300 border-emerald-850' :
+                                            q.status === 'billed' ? 'bg-purple-950/40 text-purple-300 border-purple-800' :
                                             q.status === 'denied' ? 'bg-rose-950/40 text-rose-300 border-rose-800' :
                                             q.status === 'sent' ? 'bg-amber-950/40 text-amber-300 border-amber-800' :
                                             'bg-zinc-950 text-zinc-400 border-zinc-850'
                                         
                                         const statusLabel = 
                                             q.status === 'approved' ? 'Approuvée' :
+                                            q.status === 'completed' ? 'Complétée' :
+                                            q.status === 'billed' ? 'Facturée' :
                                             q.status === 'denied' ? 'Refusée' :
                                             q.status === 'sent' ? 'Envoyée' : 'Brouillon'
 

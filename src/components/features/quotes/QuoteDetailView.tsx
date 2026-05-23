@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { Download, CheckCircle, XCircle, ChevronLeft, Pencil, Send, CalendarCheck2 } from 'lucide-react'
+import { Download, CheckCircle, XCircle, ChevronLeft, Pencil, Send, CalendarCheck2, Receipt } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { jsPDF } from 'jspdf'
@@ -180,7 +180,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
     // itemPhotos defined at top
     const linkedProject = Array.isArray(quote.projects) ? quote.projects[0] : null
     const isProjectCompleted = linkedProject?.status === 'completed'
-    const displayStatus = isProjectCompleted && quote.status === 'approved' ? 'completed' : quote.status
+    const displayStatus = quote.status === 'billed' ? 'billed' : (isProjectCompleted && quote.status === 'approved' ? 'completed' : quote.status)
 
     return (
         <div className="space-y-6 max-w-4xl mx-auto pb-12 w-full overflow-x-auto">
@@ -194,6 +194,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                     {displayStatus === 'sent' && <Badge className="bg-blue-900/50 text-blue-300 border-blue-800 border">Envoyée</Badge>}
                     {displayStatus === 'approved' && <Badge className="bg-green-900/50 text-green-300 border-green-800 border">Approuvée</Badge>}
                     {displayStatus === 'completed' && <Badge className="bg-emerald-900/60 text-emerald-300 border-emerald-800 border">Complétée</Badge>}
+                    {displayStatus === 'billed' && <Badge className="bg-purple-900/60 text-purple-300 border-purple-800 border">Facturée</Badge>}
                     {displayStatus === 'denied' && <Badge className="bg-red-900/50 text-red-300 border-red-800 border">Refusée</Badge>}
                 </div>
             </div>
@@ -204,10 +205,12 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                     {isGenerating ? 'Génération...' : 'Télécharger PDF'}
                 </Button>
 
-                <Link href={`/quotes/${quote.id}/edit`} className="group/button inline-flex h-8 items-center justify-center rounded-lg px-2.5 text-sm font-medium border border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 hover:text-zinc-100">
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Modifier la soumission
-                </Link>
+                {quote.status !== 'billed' && (
+                    <Link href={`/quotes/${quote.id}/edit`} className="group/button inline-flex h-8 items-center justify-center rounded-lg px-2.5 text-sm font-medium border border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 hover:text-zinc-100">
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Modifier la soumission
+                    </Link>
+                )}
 
                 {quote.status === 'draft' && (
                     <>
@@ -246,7 +249,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                     </>
                 )}
 
-                {(quote.status === 'approved' || quote.status === 'sent' || quote.status === 'denied' || quote.status === 'completed') && (
+                {(quote.status === 'approved' || quote.status === 'sent' || quote.status === 'denied' || quote.status === 'completed') && quote.status !== 'billed' && (
                     <Button
                         variant="outline"
                         onClick={handleRevertToDraft}
@@ -276,6 +279,18 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                             Marquer job complété
                         </Button>
                     </>
+                )}
+                {(quote.status === 'completed' || displayStatus === 'completed') && (
+                    <Button
+                        asChild
+                        className="border-purple-800 bg-purple-950/20 text-purple-300 hover:bg-purple-900/50 hover:text-purple-200 font-semibold"
+                        variant="outline"
+                    >
+                        <Link href={`/bills/new?quoteId=${quote.id}`}>
+                            <Receipt className="mr-2 h-4 w-4" />
+                            Créer la facture
+                        </Link>
+                    </Button>
                 )}
             </div>
 

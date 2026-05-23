@@ -35,6 +35,7 @@ const statusMap: Record<string, { label: string, styles: string }> = {
     sent: { label: 'Envoyée', styles: 'bg-blue-900/50 text-blue-300 border-blue-800' },
     approved: { label: 'Approuvée', styles: 'bg-green-900/50 text-green-300 border-green-800' },
     completed: { label: 'Complétée', styles: 'bg-blue-900/50 text-blue-300 border-blue-800' },
+    billed: { label: 'Facturée', styles: 'bg-purple-900/50 text-purple-300 border-purple-800' },
     denied: { label: 'Refusée', styles: 'bg-red-900/50 text-red-300 border-red-800' },
 }
 
@@ -98,7 +99,7 @@ function QuoteRow({
         })
     }
 
-    const canChangeStatus = quote.status !== 'approved' && quote.status !== 'denied' && quote.status !== 'completed'
+    const canChangeStatus = quote.status !== 'approved' && quote.status !== 'denied' && quote.status !== 'completed' && quote.status !== 'billed'
     const canEditQuote = true
     const isSchedulable = quote.status === 'approved'
     const scheduledDate = quote.projects?.[0]?.start_date
@@ -348,7 +349,7 @@ export function QuotesTable({ data }: { data: any[] }) {
 
     const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false)
     const [bulkStatusChangeOpen, setBulkStatusChangeOpen] = useState(false)
-    const [statusToApply, setStatusToApply] = useState<'draft' | 'sent' | 'approved' | 'denied' | 'completed' | null>(null)
+    const [statusToApply, setStatusToApply] = useState<'draft' | 'sent' | 'approved' | 'denied' | 'completed' | 'billed' | null>(null)
 
     const handleSelectAll = (checked: boolean | 'indeterminate') => {
         if (checked === true) {
@@ -408,7 +409,7 @@ export function QuotesTable({ data }: { data: any[] }) {
         })
     }
 
-    const confirmBulkStatusChange = (status: 'draft' | 'sent' | 'approved' | 'denied' | 'completed') => {
+    const confirmBulkStatusChange = (status: 'draft' | 'sent' | 'approved' | 'denied' | 'completed' | 'billed') => {
         const ids = Array.from(selectedIds)
         if (ids.length === 0) return
         startTransition(async () => {
@@ -462,6 +463,9 @@ export function QuotesTable({ data }: { data: any[] }) {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => { setStatusToApply('completed'); setBulkStatusChangeOpen(true) }}>
                                     Complétée
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setStatusToApply('billed'); setBulkStatusChangeOpen(true) }}>
+                                    Facturée
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => { setStatusToApply('denied'); setBulkStatusChangeOpen(true) }}>
                                     Refusée
@@ -613,6 +617,11 @@ export function QuotesTable({ data }: { data: any[] }) {
                             {statusToApply === 'completed' && (
                                 <span className="text-cyan-400/80 font-medium text-xs mt-1 block">
                                     Les soumissions n'ayant pas de projet lié créeront automatiquement un nouveau projet complété.
+                                </span>
+                            )}
+                            {statusToApply === 'billed' && (
+                                <span className="text-purple-400/80 font-medium text-xs mt-1 block">
+                                    Attention : Facturer des soumissions en lot n'est pas recommandé si les articles doivent être validés individuellement.
                                 </span>
                             )}
                             {(statusToApply === 'draft' || statusToApply === 'sent' || statusToApply === 'denied') && (

@@ -55,6 +55,7 @@ export function QuotesSearch({ initialQuery, initialStatus }: { initialQuery: st
                     <SelectItem value="sent" className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-900">Envoyée</SelectItem>
                     <SelectItem value="approved" className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-900">Approuvée</SelectItem>
                     <SelectItem value="completed" className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-900">Complétée</SelectItem>
+                    <SelectItem value="billed" className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-900">Facturée</SelectItem>
                     <SelectItem value="denied" className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-900">Refusée</SelectItem>
                 </SelectContent>
             </Select>
