@@ -617,9 +617,9 @@ export async function downloadQuotePDF(quote: any, settings: any) {
         y += 8
 
         // --- 4. ITEMS TABLE ---
-        const unlinkedItems = (quote.quote_items || []).filter((item: any) => !item.planning_room_id)
+        const allItems = quote.quote_items || []
 
-        if (unlinkedItems.length > 0) {
+        if (allItems.length > 0) {
             // Table Header
             checkNewPage(15)
             doc.setFillColor(15, 23, 42) // dark background
@@ -651,12 +651,37 @@ export async function downloadQuotePDF(quote: any, settings: any) {
             doc.setFont('Helvetica', 'normal')
             doc.setFontSize(9)
 
-            for (const item of unlinkedItems) {
+            for (const item of allItems) {
                 const refNums = item.image_urls?.map((url: string) => itemPhotoRefMap[url]).filter(Boolean) || []
                 const refText = refNums.length > 0 ? ` (Photos Réf. ${refNums.map((n: number) => `#${n}`).join(', ')})` : ''
 
+                // Format room source label for linked items to match the HTML preview badges
+                let roomLabel = ''
+                if (item.planning_room_id && roomMap[item.planning_room_id]) {
+                    const r = roomMap[item.planning_room_id]
+                    let srcName = ''
+                    if (item.planning_measurement_source === 'perimeter') {
+                        srcName = 'Périmètre'
+                    } else if (item.planning_measurement_source === 'area') {
+                        srcName = 'Aire'
+                    } else if (item.planning_measurement_source === 'wall_surface') {
+                        srcName = 'Surf. Murs'
+                    } else if (item.planning_measurement_source === 'selected_walls_linear') {
+                        const segments = item.planning_selected_segments || []
+                        const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
+                        srcName = `Murs spéc. (M${wallList})`
+                    } else if (item.planning_measurement_source === 'selected_walls_surface') {
+                        const segments = item.planning_selected_segments || []
+                        const wallList = segments.map((idx: number) => `M${idx + 1}`).join(', ')
+                        srcName = `Murs spéc. (M${wallList})`
+                    }
+                    roomLabel = srcName ? ` [${srcName} - ${r.name}]` : ` [${r.name}]`
+                }
+
+                const titleText = (item.title || 'Sans titre') + refText + roomLabel
+
                 doc.setFont('Helvetica', 'bold')
-                const titleLines = doc.splitTextToSize((item.title || 'Sans titre') + refText, 88)
+                const titleLines = doc.splitTextToSize(titleText, 88)
                 
                 const descText = item.description || ''
                 let fullDesc = descText
