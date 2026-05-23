@@ -22,6 +22,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
     const [isGenerating, setIsGenerating] = useState(false)
     const [isPending, startTransition] = useTransition()
     const [templateUrl, setTemplateUrl] = useState<string>('')
+    const [templateBlobUrl, setTemplateBlobUrl] = useState<string>('')
 
     const itemPhotos: { itemTitle: string, url: string, refNum: number }[] = []
     const itemPhotoRefMap: Record<string, number> = {}
@@ -59,7 +60,39 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
 
     useEffect(() => {
         const localTemplate = typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') || '' : ''
-        setTemplateUrl(settings?.pdf_template_url || localTemplate)
+        const tUrl = settings?.pdf_template_url || localTemplate
+        setTemplateUrl(tUrl)
+        
+        const isPdf = tUrl && (
+            tUrl.startsWith('data:application/pdf') || 
+            tUrl.startsWith('data:application/octet-stream') || 
+            tUrl.split(',')[1]?.startsWith('JVBERi')
+        )
+
+        if (isPdf) {
+            try {
+                const parts = tUrl.split(',')
+                const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/pdf'
+                const base64Data = parts[1]
+                const binaryString = atob(base64Data)
+                const len = binaryString.length
+                const bytes = new Uint8Array(len)
+                for (let i = 0; i < len; i++) {
+                    bytes[i] = binaryString.charCodeAt(i)
+                }
+                const blob = new Blob([bytes], { type: mime })
+                const blobUrl = URL.createObjectURL(blob)
+                setTemplateBlobUrl(blobUrl)
+                
+                return () => {
+                    URL.revokeObjectURL(blobUrl)
+                }
+            } catch (e) {
+                console.error('Failed to convert PDF template dataUrl to blobUrl:', e)
+            }
+        } else {
+            setTemplateBlobUrl('')
+        }
     }, [settings?.pdf_template_url])
 
     const generatePDF = async () => {
@@ -230,11 +263,15 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
 
             <div className="bg-white text-black p-10 rounded-lg shadow-sm w-[800px] shrink-0 relative overflow-hidden" ref={pdfRef}>
                 {templateUrl && (
-                    templateUrl.startsWith('data:application/pdf') ? (
-                        <iframe 
-                            src={`${templateUrl}#toolbar=0&navpanes=0&scrollbar=0`} 
-                            className="absolute inset-0 w-full h-full opacity-20 pointer-events-none border-0" 
-                        />
+                    (templateUrl.startsWith('data:application/pdf') || 
+                     templateUrl.startsWith('data:application/octet-stream') || 
+                     templateUrl.split(',')[1]?.startsWith('JVBERi')) ? (
+                        templateBlobUrl && (
+                            <iframe 
+                                src={`${templateBlobUrl}#toolbar=0&navpanes=0&scrollbar=0`} 
+                                className="absolute inset-0 w-full h-full opacity-20 pointer-events-none border-0" 
+                            />
+                        )
                     ) : (
                         <img src={templateUrl} alt="Template" className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none" crossOrigin="anonymous" />
                     )

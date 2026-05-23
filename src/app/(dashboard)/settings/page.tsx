@@ -14,12 +14,33 @@ import Link from 'next/link'
 import { getManagers, createManagerAction, getManagerTeams, createManagerTeamAction } from '@/actions/managers'
 import { fixExistingImportedQuotesAction } from '@/actions/quotes'
 
+function dataUrlToBlobUrl(dataUrl: string): string {
+    if (!dataUrl) return ''
+    try {
+        const parts = dataUrl.split(',')
+        const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/pdf'
+        const base64Data = parts[1]
+        const binaryString = atob(base64Data)
+        const len = binaryString.length
+        const bytes = new Uint8Array(len)
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i)
+        }
+        const blob = new Blob([bytes], { type: mime })
+        return URL.createObjectURL(blob)
+    } catch (e) {
+        console.error('Error converting dataUrl to blobUrl:', e)
+        return dataUrl
+    }
+}
+
 export default function SettingsPage() {
     const [isPending, startTransition] = useTransition()
     const [settingsId, setSettingsId] = useState<string | null>(null)
     const [managers, setManagers] = useState<any[]>([])
     const [managerTeams, setManagerTeams] = useState<any[]>([])
     const [templatePreview, setTemplatePreview] = useState<string>('')
+    const [templateBlobUrl, setTemplateBlobUrl] = useState<string>('')
 
     const form = useForm({
         defaultValues: {
@@ -57,7 +78,16 @@ export default function SettingsPage() {
 
     useEffect(() => {
         const localTemplate = localStorage.getItem('pdf_template_url') || ''
-        if (localTemplate) setTemplatePreview(localTemplate)
+        if (localTemplate) {
+            setTemplatePreview(localTemplate)
+            const isPdf = localTemplate.startsWith('data:application/pdf') || 
+                          localTemplate.startsWith('data:application/octet-stream') ||
+                          localTemplate.split(',')[1]?.startsWith('JVBERi')
+            if (isPdf) {
+                const blobUrl = dataUrlToBlobUrl(localTemplate)
+                setTemplateBlobUrl(blobUrl)
+            }
+        }
     }, [])
 
     const handleTemplateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,6 +119,15 @@ export default function SettingsPage() {
             try {
                 localStorage.setItem('pdf_template_url', dataUrl)
                 setTemplatePreview(dataUrl)
+                const isPdfUploaded = dataUrl.startsWith('data:application/pdf') || 
+                                     dataUrl.startsWith('data:application/octet-stream') ||
+                                     dataUrl.split(',')[1]?.startsWith('JVBERi')
+                if (isPdfUploaded) {
+                    const blobUrl = dataUrlToBlobUrl(dataUrl)
+                    setTemplateBlobUrl(blobUrl)
+                } else {
+                    setTemplateBlobUrl('')
+                }
                 toast.success('Gabarit de template sauvegardé avec succès.')
             } catch (err) {
                 toast.error("Erreur de stockage", {
@@ -201,9 +240,11 @@ export default function SettingsPage() {
                     <CardContent className="space-y-3">
                         <Input type="file" accept="image/*,application/pdf" onChange={handleTemplateUpload} className="bg-zinc-950 border-zinc-800 text-zinc-100" />
                         {templatePreview && (
-                            templatePreview.startsWith('data:application/pdf') ? (
-                                <div className="w-full h-64 rounded border border-zinc-800 overflow-hidden bg-zinc-950">
-                                    <iframe src={`${templatePreview}#toolbar=0`} className="w-full h-full border-0" />
+                            (templatePreview.startsWith('data:application/pdf') || 
+                             templatePreview.startsWith('data:application/octet-stream') ||
+                             templatePreview.split(',')[1]?.startsWith('JVBERi')) ? (
+                                <div className="w-full h-96 rounded border border-zinc-800 overflow-hidden bg-zinc-950">
+                                    {templateBlobUrl && <iframe src={`${templateBlobUrl}#toolbar=0`} className="w-full h-full border-0" />}
                                 </div>
                             ) : (
                                 <img src={templatePreview} alt="Template preview" className="max-h-40 rounded border border-zinc-800" />

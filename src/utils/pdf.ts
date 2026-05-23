@@ -358,7 +358,12 @@ export async function downloadQuotePDF(quote: any, settings: any) {
 
         const drawBackgroundTemplate = () => {
             const templateUrl = settings?.pdf_template_url || (typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') : null)
-            if (templateUrl && !templateUrl.startsWith('data:application/pdf')) {
+            const isPdfTemplate = templateUrl && (
+                templateUrl.startsWith('data:application/pdf') || 
+                templateUrl.startsWith('data:application/octet-stream') ||
+                templateUrl.split(',')[1]?.startsWith('JVBERi')
+            )
+            if (templateUrl && !isPdfTemplate) {
                 try {
                     let format = 'JPEG'
                     if (templateUrl.startsWith('data:image/png') || templateUrl.includes('image/png')) {
@@ -1164,9 +1169,14 @@ export async function downloadQuotePDF(quote: any, settings: any) {
         const pdfBytes = doc.output('arraybuffer')
         
         const templateUrl = settings?.pdf_template_url || (typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') : null)
+        const isPdfTemplate = templateUrl && (
+            templateUrl.startsWith('data:application/pdf') || 
+            templateUrl.startsWith('data:application/octet-stream') ||
+            templateUrl.split(',')[1]?.startsWith('JVBERi')
+        )
         
         let finalPdfBytes: Uint8Array
-        if (templateUrl && templateUrl.startsWith('data:application/pdf')) {
+        if (isPdfTemplate) {
             finalPdfBytes = await overlayPdfTemplate(pdfBytes, templateUrl)
         } else {
             finalPdfBytes = new Uint8Array(pdfBytes)
