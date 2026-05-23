@@ -751,40 +751,40 @@ export function AnalyticsDashboard({
                                     <div className="bg-zinc-900/40 p-4 border border-zinc-800 rounded-xl">
                                         <p className="text-xxs font-bold text-zinc-500 uppercase tracking-wider">Montant Chantier (Travail)</p>
                                         <p className="text-lg font-bold text-zinc-200 mt-1">
-                                            ${totalBilledWork.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                            ${totalBilledWork.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                     <div className="bg-zinc-900/40 p-4 border border-zinc-800 rounded-xl">
                                         <p className="text-xxs font-bold text-zinc-500 uppercase tracking-wider">Marge Administration</p>
                                         <p className="text-lg font-bold text-zinc-200 mt-1">
-                                            ${totalAdminAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                            ${totalAdminAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                     <div className="bg-zinc-900/40 p-4 border border-zinc-800 rounded-xl">
                                         <p className="text-xxs font-bold text-zinc-500 uppercase tracking-wider">Marge Profit</p>
                                         <p className="text-lg font-bold text-zinc-200 mt-1">
-                                            ${totalProfitAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                            ${totalProfitAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                     <div className="bg-zinc-900/40 p-4 border border-zinc-800 rounded-xl">
                                         <p className="text-xxs font-bold text-zinc-500 uppercase tracking-wider">Sous-total (Hors Taxes)</p>
                                         <p className="text-lg font-bold text-emerald-400 mt-1">
-                                            ${totalSubtotal.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                            ${totalSubtotal.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                     <div className="bg-zinc-900/40 p-4 border border-zinc-800 rounded-xl col-span-2 md:col-span-1">
                                         <p className="text-xxs font-bold text-zinc-500 uppercase tracking-wider">Taxes (TPS + TVQ)</p>
                                         <p className="text-sm font-bold text-zinc-200 mt-1">
-                                            ${(totalGstAmount + totalQstAmount).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                            ${(totalGstAmount + totalQstAmount).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                         <p className="text-xxs text-zinc-500 mt-0.5">
-                                            TPS: ${totalGstAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })} <br /> TVQ: ${totalQstAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                            TPS: ${totalGstAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <br /> TVQ: ${totalQstAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                     <div className="bg-emerald-950/20 p-4 border border-emerald-900/40 rounded-xl col-span-2 md:col-span-1">
                                         <p className="text-xxs font-bold text-emerald-400 uppercase tracking-wider">Total Facturé</p>
                                         <p className="text-lg font-extrabold text-zinc-100 mt-1">
-                                            ${grandTotalBilled.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                            ${grandTotalBilled.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                 </div>

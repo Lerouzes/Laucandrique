@@ -98,7 +98,7 @@ export default async function ContractorDetailPage({
               <Link href={`/contractors/${id}?mode=${mode}`} className='inline-flex h-8 items-center rounded-lg border border-zinc-700 px-3 text-xs hover:bg-zinc-800'>Réinitialiser</Link>
             </div>
           </form>
-          <p>Valeur ({mode === 'realized' ? 'réalisée' : 'planifiée'}): <span className='text-zinc-100 font-medium'>${selectedValue.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span></p>
+          <p>Valeur ({mode === 'realized' ? 'réalisée' : 'planifiée'}): <span className='text-zinc-100 font-medium'>${selectedValue.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></p>
           <p className='text-xs text-zinc-400'>Soumissions dans la période: {mode === 'realized' ? filteredRealized.length : filteredScheduled.length}</p>
         </div>
       </div>

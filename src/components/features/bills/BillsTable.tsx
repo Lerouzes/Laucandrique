@@ -456,10 +456,10 @@ export function BillsTable({ initialBills }: BillsTableProps) {
                                                         <TableCell className="text-right text-zinc-300 py-2.5">{item.quantity}</TableCell>
                                                         <TableCell className="text-center text-zinc-400 py-2.5">{item.unit || '-'}</TableCell>
                                                         <TableCell className="text-right text-zinc-300 py-2.5">
-                                                            ${Number(item.unit_cost || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                                            ${Number(item.unit_cost || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                         </TableCell>
                                                         <TableCell className="text-right text-zinc-100 font-semibold py-2.5">
-                                                            ${Number(item.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                                            ${Number(item.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                         </TableCell>
                                                     </TableRow>
                                                 ))
@@ -491,33 +491,33 @@ export function BillsTable({ initialBills }: BillsTableProps) {
                                     <div className="flex justify-between text-zinc-400">
                                         <span>Total Travail Chantier</span>
                                         <span className="font-semibold text-zinc-200">
-                                            ${Number(billDetails.subtotal || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                            ${Number(billDetails.subtotal || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </span>
                                     </div>
                                     <div className="flex justify-between text-zinc-400">
                                         <span>Marge Admin. ({billDetails.admin_percentage ?? 10}%)</span>
                                         <span className="font-semibold text-zinc-200">
-                                            ${Number(billDetails.admin_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                            ${Number(billDetails.admin_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </span>
                                     </div>
                                     <div className="flex justify-between text-zinc-400">
                                         <span>Marge Profit ({billDetails.profit_percentage ?? 15}%)</span>
                                         <span className="font-semibold text-zinc-200">
-                                            ${Number(billDetails.profit_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                            ${Number(billDetails.profit_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </span>
                                     </div>
 
                                     <div className="border-t border-zinc-800 pt-2 flex justify-between font-semibold text-zinc-200 text-sm">
                                         <span>Sous-total (Hors Taxes)</span>
                                         <span>
-                                            ${(Number(billDetails.subtotal || 0) + Number(billDetails.admin_amount || 0) + Number(billDetails.profit_amount || 0)).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                            ${(Number(billDetails.subtotal || 0) + Number(billDetails.admin_amount || 0) + Number(billDetails.profit_amount || 0)).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </span>
                                     </div>
 
                                     <div className="flex justify-between text-zinc-500 text-xxs pt-1">
                                         <span>Taxes (TPS {Number(billDetails.gst_amount || 0) > 0 ? '5%' : '0%'} + TVQ {Number(billDetails.qst_amount || 0) > 0 ? '9.975%' : '0%'})</span>
                                         <span>
-                                            ${(Number(billDetails.gst_amount || 0) + Number(billDetails.qst_amount || 0)).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                            ${(Number(billDetails.gst_amount || 0) + Number(billDetails.qst_amount || 0)).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </span>
                                     </div>
 
@@ -525,7 +525,7 @@ export function BillsTable({ initialBills }: BillsTableProps) {
                                         <div className="bg-purple-950/20 border border-purple-900/40 p-3.5 rounded-xl flex justify-between items-center">
                                             <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Total Facturé</span>
                                             <span className="text-xl font-extrabold text-zinc-100">
-                                                ${Number(billDetails.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                                ${Number(billDetails.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </span>
                                         </div>
                                     </div>

@@ -236,8 +236,8 @@ export function BillDetailView({ bill, settings }: BillDetailViewProps) {
                                     </td>
                                     <td className="py-3 text-center">{item.quantity}</td>
                                     <td className="py-3 text-center">{item.unit || '-'}</td>
-                                    <td className="py-3 text-right">${item.unit_cost?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
-                                    <td className="py-3 text-right font-medium text-zinc-900">${item.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
+                                    <td className="py-3 text-right">${item.unit_cost?.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                    <td className="py-3 text-right font-medium text-zinc-900">${item.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -263,31 +263,31 @@ export function BillDetailView({ bill, settings }: BillDetailViewProps) {
                     <div className="w-64 space-y-2 text-sm text-zinc-700">
                         <div className="flex justify-between">
                             <span>Sous-total Chantier:</span>
-                            <span>${subtotal.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                            <span>${subtotal.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         {adminAmount > 0 && (
                             <div className="flex justify-between">
                                 <span>Administration ({bill.admin_percentage}%):</span>
-                                <span>${adminAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                                <span>${adminAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                         )}
                         {profitAmount > 0 && (
                             <div className="flex justify-between">
                                 <span>Profit ({bill.profit_percentage}%):</span>
-                                <span>${profitAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                                <span>${profitAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                         )}
                         <div className="flex justify-between">
                             <span>TPS (5%):</span>
-                            <span>${gstAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                            <span>${gstAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between">
                             <span>TVQ (9.975%):</span>
-                            <span>${qstAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                            <span>${qstAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between pt-2 border-t-2 border-zinc-300 font-bold text-lg text-black bg-zinc-55 px-2 rounded-sm pb-1">
                             <span>Total:</span>
-                            <span>${total.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                            <span>${total.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                     </div>
                 </div>

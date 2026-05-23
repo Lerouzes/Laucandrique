@@ -549,8 +549,8 @@ export async function downloadQuotePDF(quote: any, settings: any) {
                 doc.setTextColor(51, 65, 85)
                 doc.text(String(item.quantity || 0), margin + 95, y + 4, { align: 'center' })
                 doc.text(item.unit || '-', margin + 112, y + 4, { align: 'center' })
-                doc.text(`$${Number(item.unit_cost || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 145, y + 4, { align: 'right' })
-                doc.text(`$${Number(item.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 177, y + 4, { align: 'right' })
+                doc.text(`$${Number(item.unit_cost || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + 145, y + 4, { align: 'right' })
+                doc.text(`$${Number(item.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + 177, y + 4, { align: 'right' })
 
                 y += rowHeight
             }
@@ -561,7 +561,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
             doc.setFont('Helvetica', 'bold')
             doc.setFontSize(9)
             doc.setTextColor(15, 23, 42)
-            const subtotalText = `Total pour ${room.name} : $${roomSubtotal.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`
+            const subtotalText = `Total pour ${room.name} : $${roomSubtotal.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
             doc.text(subtotalText, margin + contentWidth, y, { align: 'right' })
             y += 6
         }
@@ -792,8 +792,8 @@ export async function downloadQuotePDF(quote: any, settings: any) {
                 doc.setTextColor(51, 65, 85)
                 doc.text(String(item.quantity || 0), margin + 95, y + 5, { align: 'center' })
                 doc.text(item.unit || '-', margin + 112, y + 5, { align: 'center' })
-                doc.text(`$${Number(item.unit_cost || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 145, y + 5, { align: 'right' })
-                doc.text(`$${Number(item.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 177, y + 5, { align: 'right' })
+                doc.text(`$${Number(item.unit_cost || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + 145, y + 5, { align: 'right' })
+                doc.text(`$${Number(item.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + 177, y + 5, { align: 'right' })
 
                 y += rowHeight
             }
@@ -1131,31 +1131,31 @@ export async function downloadQuotePDF(quote: any, settings: any) {
         
         // Subtotal
         doc.text('Sous-total:', summaryX, curY)
-        doc.text(`$${Number(quote.subtotal || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
+        doc.text(`$${Number(quote.subtotal || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
         curY += 5
 
         // Admin
         if (quote.admin_amount > 0) {
             doc.text(`Administration (${quote.admin_percentage}%):`, summaryX, curY)
-            doc.text(`$${Number(quote.admin_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
+            doc.text(`$${Number(quote.admin_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
             curY += 5
         }
 
         // Profit
         if (quote.profit_amount > 0) {
             doc.text(`Profit (${quote.profit_percentage}%):`, summaryX, curY)
-            doc.text(`$${Number(quote.profit_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
+            doc.text(`$${Number(quote.profit_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
             curY += 5
         }
 
         // TPS
         doc.text('TPS (5%):', summaryX, curY)
-        doc.text(`$${Number(quote.gst_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
+        doc.text(`$${Number(quote.gst_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
         curY += 5
 
         // TVQ
         doc.text('TVQ (9.975%):', summaryX, curY)
-        doc.text(`$${Number(quote.qst_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
+        doc.text(`$${Number(quote.qst_amount || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - margin - 2, curY, { align: 'right' })
         curY += 6
 
         // Grand Total
@@ -1167,7 +1167,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
         doc.setFontSize(11)
         doc.setTextColor(15, 23, 42)
         doc.text('Total:', summaryX, curY + 1)
-        doc.text(`$${Number(quote.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, curY + 1, { align: 'right' })
+        doc.text(`$${Number(quote.total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - margin - 2, curY + 1, { align: 'right' })
 
         y = curY + 12
 
@@ -1428,9 +1428,9 @@ export async function downloadBillPDF(bill: any, settings: any) {
             const middleY = y + (rowHeight / 2) + 1.5
             doc.text(String(item.quantity), margin + 95, middleY, { align: 'center' })
             doc.text(item.unit || '-', margin + 112, middleY, { align: 'center' })
-            doc.text(`$${item.unit_cost?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 145, middleY, { align: 'right' })
+            doc.text(`$${item.unit_cost?.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + 145, middleY, { align: 'right' })
             doc.setFont('Helvetica', 'bold')
-            doc.text(`$${item.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, margin + 177, middleY, { align: 'right' })
+            doc.text(`$${item.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + 177, middleY, { align: 'right' })
 
             y += rowHeight
         }
@@ -1477,26 +1477,26 @@ export async function downloadBillPDF(bill: any, settings: any) {
         let totalY = y
 
         doc.text('Sous-total Chantier:', rightLabelX, totalY + 4)
-        doc.text(`$${subtotal.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, rightValX, totalY + 4, { align: 'right' })
+        doc.text(`$${subtotal.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, rightValX, totalY + 4, { align: 'right' })
         totalY += 5
 
         if (adminAmount > 0) {
             doc.text(`Administration (${bill.admin_percentage}%):`, rightLabelX, totalY + 4)
-            doc.text(`$${adminAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, rightValX, totalY + 4, { align: 'right' })
+            doc.text(`$${adminAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, rightValX, totalY + 4, { align: 'right' })
             totalY += 5
         }
         if (profitAmount > 0) {
             doc.text(`Profit (${bill.profit_percentage}%):`, rightLabelX, totalY + 4)
-            doc.text(`$${profitAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, rightValX, totalY + 4, { align: 'right' })
+            doc.text(`$${profitAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, rightValX, totalY + 4, { align: 'right' })
             totalY += 5
         }
 
         doc.text('TPS (5%):', rightLabelX, totalY + 4)
-        doc.text(`$${gstAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, rightValX, totalY + 4, { align: 'right' })
+        doc.text(`$${gstAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, rightValX, totalY + 4, { align: 'right' })
         totalY += 5
 
         doc.text('TVQ (9.975%):', rightLabelX, totalY + 4)
-        doc.text(`$${qstAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, rightValX, totalY + 4, { align: 'right' })
+        doc.text(`$${qstAmount.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, rightValX, totalY + 4, { align: 'right' })
         totalY += 7
 
         // Final Total Box
@@ -1506,7 +1506,7 @@ export async function downloadBillPDF(bill: any, settings: any) {
         doc.setFontSize(10.5)
         doc.setTextColor(15, 23, 42)
         doc.text('Total:', rightLabelX, totalY + 5.5)
-        doc.text(`$${total.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`, rightValX, totalY + 5.5, { align: 'right' })
+        doc.text(`$${total.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, rightValX, totalY + 5.5, { align: 'right' })
 
         y = Math.max(y + notesHeight, totalY + 12) + 12
 

@@ -172,7 +172,7 @@ function QuoteRow({
                     {statusMap[quote.status]?.label || quote.status}
                 </Badge>
             </TableCell>
-            <TableCell className="text-zinc-100">${quote.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</TableCell>
+            <TableCell className="text-zinc-100">${quote.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
             <TableCell className="text-zinc-300">
                 {format(new Date(quote.created_at), 'dd MMM yyyy', { locale: frCA })}
             </TableCell>

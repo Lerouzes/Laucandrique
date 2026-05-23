@@ -423,8 +423,8 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                                         </td>
                                         <td className="py-3 text-center">{item.quantity}</td>
                                         <td className="py-3 text-center">{item.unit || '-'}</td>
-                                        <td className="py-3 text-right">${item.unit_cost?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
-                                        <td className="py-3 text-right font-medium text-zinc-900">${item.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
+                                        <td className="py-3 text-right">${item.unit_cost?.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                        <td className="py-3 text-right font-medium text-zinc-900">${item.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                     </tr>
                                 )
                             })}
@@ -436,31 +436,31 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                     <div className="w-64 space-y-2 text-sm text-zinc-700">
                         <div className="flex justify-between">
                             <span>Sous-total:</span>
-                            <span>${quote.subtotal?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                            <span>${quote.subtotal?.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         {quote.admin_amount > 0 && (
                             <div className="flex justify-between">
                                 <span>Administration ({quote.admin_percentage}%):</span>
-                                <span>${quote.admin_amount?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                                <span>${quote.admin_amount?.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                         )}
                         {quote.profit_amount > 0 && (
                             <div className="flex justify-between">
                                 <span>Profit ({quote.profit_percentage}%):</span>
-                                <span>${quote.profit_amount?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                                <span>${quote.profit_amount?.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                         )}
                         <div className="flex justify-between">
                             <span>TPS:</span>
-                            <span>${quote.gst_amount?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                            <span>${quote.gst_amount?.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between">
                             <span>TVQ:</span>
-                            <span>${quote.qst_amount?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                            <span>${quote.qst_amount?.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between pt-2 border-t-2 border-zinc-300 font-bold text-lg text-black bg-zinc-50 px-2 rounded-sm pb-1">
                             <span>Total:</span>
-                            <span>${quote.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                            <span>${quote.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                     </div>
                 </div>
@@ -550,8 +550,8 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                                                                 <td className="py-2 px-3 text-zinc-900 font-medium">{item.title}</td>
                                                                 <td className="py-2 px-3 text-center text-zinc-700">{item.quantity}</td>
                                                                 <td className="py-2 px-3 text-center text-zinc-700">{item.unit || '-'}</td>
-                                                                <td className="py-2 px-3 text-right text-zinc-700">${item.unit_cost?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
-                                                                <td className="py-2 px-3 text-right text-zinc-900 font-semibold">${item.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
+                                                                <td className="py-2 px-3 text-right text-zinc-700">${item.unit_cost?.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                                                <td className="py-2 px-3 text-right text-zinc-900 font-semibold">${item.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                                             </tr>
                                                         ))}
                                                     </tbody>
