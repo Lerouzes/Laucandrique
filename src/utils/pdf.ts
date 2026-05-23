@@ -377,7 +377,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
         const pageWidth = doc.internal.pageSize.getWidth() // 210
         const margin = 15
         const contentWidth = pageWidth - 2 * margin // 180
-        let y = 20
+        let y = 48
 
         const drawBackgroundTemplate = () => {
             const templateUrl = settings?.pdf_template_url || (typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') : null)
@@ -403,7 +403,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
             if (y + heightNeeded > pageHeight - 20) {
                 doc.addPage()
                 drawBackgroundTemplate()
-                y = 20
+                y = 48
                 return true
             }
             return false
@@ -822,7 +822,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
         if (allRooms.length > 0) {
             doc.addPage()
             drawBackgroundTemplate()
-            y = 20
+            y = 48
 
             doc.setFont('Helvetica', 'bold')
             doc.setFontSize(14)
@@ -841,7 +841,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
                 doc.text(titleStr, margin, y)
 
                 const heightVal = room.height || 8.0
-                doc.text(`Hauteur du plafond: ${heightVal}'`, pageWidth - margin, y, { align: 'right' })
+                doc.text(`Hauteur du plafond: ${heightVal} pi`, pageWidth - margin, y, { align: 'right' })
 
                 y += 2
                 doc.setDrawColor(0, 0, 0)
@@ -1016,7 +1016,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
 
             doc.addPage()
             drawBackgroundTemplate()
-            y = 20
+            y = 48
 
             doc.setFont('Helvetica', 'bold')
             doc.setFontSize(14)
@@ -1044,7 +1044,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
                     if (y + blockHeight > pageHeight - 15) {
                         doc.addPage()
                         drawBackgroundTemplate()
-                        y = 20
+                        y = 48
                         rowStartY = y
                     }
                 }
@@ -1229,7 +1229,7 @@ export async function downloadBillPDF(bill: any, settings: any) {
         const pageWidth = doc.internal.pageSize.getWidth() // 210
         const margin = 15
         const contentWidth = pageWidth - 2 * margin // 180
-        let y = 20
+        let y = 48
 
         // Calculate totals
         const subtotal = Number(bill.subtotal || 0)
@@ -1262,7 +1262,7 @@ export async function downloadBillPDF(bill: any, settings: any) {
             if (y + heightNeeded > pageHeight - 20) {
                 doc.addPage()
                 drawBackgroundTemplate()
-                y = 20
+                y = 48
                 return true
             }
             return false
@@ -1531,7 +1531,7 @@ export async function downloadBillPDF(bill: any, settings: any) {
                 doc.setFont('Helvetica', 'bold')
                 doc.setFontSize(12)
                 doc.setTextColor(15, 23, 42)
-                doc.text('Annexe : Photos et Justificatifs', margin, 20)
+                doc.text('Annexe : Photos et Justificatifs', margin, 48)
 
                 // Load and draw image
                 try {
@@ -1557,10 +1557,10 @@ export async function downloadBillPDF(bill: any, settings: any) {
 
                     // Draw a subtle border frame
                     doc.setDrawColor(241, 245, 249)
-                    doc.rect(margin, 28, drawAreaW, drawAreaH)
+                    doc.rect(margin, 56, drawAreaW, drawAreaH)
 
                     // Draw image
-                    doc.addImage(imgEl, 'JPEG', margin + xOffset, 28 + yOffset, drawW, drawH)
+                    doc.addImage(imgEl, 'JPEG', margin + xOffset, 56 + yOffset, drawW, drawH)
 
                     // Draw caption at the bottom of page
                     if (imgData.caption) {
@@ -1568,7 +1568,7 @@ export async function downloadBillPDF(bill: any, settings: any) {
                         doc.setFontSize(9)
                         doc.setTextColor(71, 85, 105)
                         const captionLines = doc.splitTextToSize(imgData.caption, contentWidth)
-                        let capY = 28 + drawAreaH + 6
+                        let capY = 56 + drawAreaH + 6
                         captionLines.forEach((line: string) => {
                             doc.text(line, margin, capY)
                             capY += 4
@@ -1577,7 +1577,7 @@ export async function downloadBillPDF(bill: any, settings: any) {
                 } catch (imgErr) {
                     console.error('Failed to load/render image in bill PDF:', imgErr)
                     doc.setFillColor(241, 245, 249)
-                    doc.rect(margin, 28, contentWidth, pageHeight - 65, 'F')
+                    doc.rect(margin, 56, contentWidth, pageHeight - 65, 'F')
                     doc.setFont('Helvetica', 'normal')
                     doc.setFontSize(10)
                     doc.setTextColor(148, 163, 184)
