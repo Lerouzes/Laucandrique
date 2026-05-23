@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { updateQuoteStatus, revertQuoteToPending, markQuoteAsSent } from '@/actions/quotes'
 import { markProjectCompletedByQuote } from '@/actions/projects'
-import { downloadQuotePDF } from '@/utils/pdf'
+import { downloadQuotePDF, calculatePerimeter, calculateFloorArea, calculateWallSurface, renderRoomToDataURL } from '@/utils/pdf'
 
 export function QuoteDetailView({ quote, settings }: { quote: any, settings: any }) {
     const router = useRouter()
@@ -41,6 +41,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
     }
 
     const roomMap: Record<string, { name: string; sectionName: string }> = {}
+    const allRooms: any[] = []
     const planningSections = quote.quote_planning_sections || []
     planningSections.forEach((sec: any) => {
         const rooms = sec.quote_planning_rooms || []
@@ -49,6 +50,10 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                 name: room.name,
                 sectionName: sec.name
             }
+            allRooms.push({
+                ...room,
+                sectionName: sec.name
+            })
         })
     })
 
@@ -364,6 +369,106 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                         </div>
                     </div>
                 </div>
+
+                {/* Annexe : Plans & Mesures */}
+                {allRooms.length > 0 && (
+                    <div className="mt-12 pt-8 border-t-2 border-zinc-200">
+                        <h3 className="font-semibold text-zinc-900 mb-4 uppercase tracking-wider text-sm">Annexe : Plans & Mesures</h3>
+                        <div className="space-y-8">
+                            {allRooms.map((room: any) => {
+                                const hasDrawing = room.points && room.points.length >= 3
+                                const rendered = hasDrawing ? renderRoomToDataURL(room.points, room.name) : null
+                                
+                                const perimeter = hasDrawing ? calculatePerimeter(room.points) : 0
+                                const area = hasDrawing ? calculateFloorArea(room.points) : 0
+                                const wallSurface = hasDrawing ? calculateWallSurface(room.points, room.height) : 0
+                                
+                                const linkedItems = (quote.quote_items || []).filter((item: any) => item.planning_room_id === room.id)
+                                
+                                return (
+                                    <div key={room.id} className="border border-zinc-200 rounded-lg p-5 bg-white space-y-4 shadow-sm">
+                                        <div className="flex justify-between items-center border-b border-zinc-150 pb-2">
+                                            <h4 className="font-bold text-zinc-900 text-base">
+                                                {room.sectionName ? `${room.sectionName} - ${room.name}` : room.name}
+                                            </h4>
+                                            <span className="text-sm text-zinc-500 font-medium">
+                                                Hauteur du plafond : {room.height || 8.0}'
+                                            </span>
+                                        </div>
+                                        
+                                        {room.description && (
+                                            <p className="text-sm text-zinc-500 italic whitespace-pre-wrap">{room.description}</p>
+                                        )}
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {hasDrawing && rendered ? (
+                                                <div className="flex items-center justify-center border border-zinc-200 rounded bg-zinc-50/50 p-2 h-[220px]">
+                                                    <img 
+                                                        src={rendered.dataUrl} 
+                                                        alt={`Plan de ${room.name}`} 
+                                                        className="max-w-full max-h-full object-contain" 
+                                                        crossOrigin="anonymous" 
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center justify-center border border-zinc-200 border-dashed rounded bg-zinc-50 h-[220px] text-zinc-400 text-sm">
+                                                    Aucun tracé disponible
+                                                </div>
+                                            )}
+                                            
+                                            <div className="flex flex-col justify-center space-y-2 text-sm text-zinc-800 bg-zinc-50/50 p-4 rounded border border-zinc-200">
+                                                <div className="grid grid-cols-2 gap-y-2">
+                                                    <span className="font-semibold">{perimeter.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pi</span>
+                                                    <span className="text-zinc-500">périmètre (sol / plafond)</span>
+                                                    
+                                                    <span className="font-semibold">{area.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pi²</span>
+                                                    <span className="text-zinc-500">aire au sol (plancher / plafond)</span>
+                                                    
+                                                    <span className="font-semibold">{wallSurface.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pi²</span>
+                                                    <span className="text-zinc-500">surface des murs</span>
+                                                    
+                                                    <span className="font-semibold">{(wallSurface + area).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pi²</span>
+                                                    <span className="text-zinc-500">surface murs et plafond</span>
+                                                    
+                                                    <span className="font-semibold">{(area / 9).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} vg²</span>
+                                                    <span className="text-zinc-500">revêtement de sol</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Room-specific items table */}
+                                        {linkedItems.length > 0 && (
+                                            <div className="mt-4 border border-zinc-200 rounded overflow-hidden">
+                                                <table className="w-full text-xs text-left">
+                                                    <thead>
+                                                        <tr className="bg-zinc-100 border-b border-zinc-200 text-zinc-800">
+                                                            <th className="py-2 px-3 font-semibold">Item relié</th>
+                                                            <th className="py-2 px-3 text-center font-semibold">Qté</th>
+                                                            <th className="py-2 px-3 text-center font-semibold">Unité</th>
+                                                            <th className="py-2 px-3 text-right font-semibold">Prix Unit.</th>
+                                                            <th className="py-2 px-3 text-right font-semibold">Total</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {linkedItems.map((item: any) => (
+                                                            <tr key={item.id} className="border-b border-zinc-150 last:border-0 hover:bg-zinc-50/50">
+                                                                <td className="py-2 px-3 text-zinc-900 font-medium">{item.title}</td>
+                                                                <td className="py-2 px-3 text-center text-zinc-700">{item.quantity}</td>
+                                                                <td className="py-2 px-3 text-center text-zinc-700">{item.unit || '-'}</td>
+                                                                <td className="py-2 px-3 text-right text-zinc-700">${item.unit_cost?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
+                                                                <td className="py-2 px-3 text-right text-zinc-900 font-semibold">${item.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {quote.quote_images?.length > 0 && (
                     <div className="mt-12 pt-8 border-t-2 border-zinc-200">

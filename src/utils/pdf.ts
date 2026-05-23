@@ -18,7 +18,7 @@ const loadImage = (url: string): Promise<HTMLImageElement> => {
     })
 }
 
-function parsePoints(points: any): { x: number; y: number }[] {
+export function parsePoints(points: any): { x: number; y: number }[] {
     if (!points) return []
     if (Array.isArray(points)) {
         return points.map((p: any) => {
@@ -52,7 +52,7 @@ function getDistance(p1: { x: number; y: number }, p2: { x: number; y: number })
     return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2))
 }
 
-function calculatePerimeter(points: any, scale: number = 20): number {
+export function calculatePerimeter(points: any, scale: number = 20): number {
     const parsedPoints = parsePoints(points)
     if (!parsedPoints || parsedPoints.length < 2) return 0
     let totalDist = 0
@@ -63,7 +63,7 @@ function calculatePerimeter(points: any, scale: number = 20): number {
     return totalDist / scale
 }
 
-function calculateFloorArea(points: any, scale: number = 20): number {
+export function calculateFloorArea(points: any, scale: number = 20): number {
     const parsedPoints = parsePoints(points)
     if (!parsedPoints || parsedPoints.length < 3) return 0
     let area = 0
@@ -76,7 +76,7 @@ function calculateFloorArea(points: any, scale: number = 20): number {
     return Math.abs(area) / 2 / (scale * scale)
 }
 
-function calculateWallSurface(points: any, height: number | null, scale: number = 20): number {
+export function calculateWallSurface(points: any, height: number | null, scale: number = 20): number {
     const h = height || 8.0
     const perimeter = calculatePerimeter(points, scale)
     return perimeter * h
@@ -102,7 +102,7 @@ function isClockwise(points: { x: number; y: number }[]): boolean {
     return sum < 0
 }
 
-function renderRoomToDataURL(
+export function renderRoomToDataURL(
     points: any,
     roomName: string,
     scale: number = 20
