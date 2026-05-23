@@ -63,12 +63,33 @@ export default function SettingsPage() {
     const handleTemplateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
+
+        if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+            toast.error("Format non supporté", {
+                description: "Veuillez utiliser une image (PNG ou JPEG) au lieu d'un fichier PDF."
+            })
+            return
+        }
+
+        if (file.size > 3 * 1024 * 1024) {
+            toast.error("Fichier trop volumineux", {
+                description: "L'image ne doit pas dépasser 3 Mo pour être sauvegardée localement."
+            })
+            return
+        }
+
         const reader = new FileReader()
         reader.onload = () => {
             const dataUrl = String(reader.result || '')
-            localStorage.setItem('pdf_template_url', dataUrl)
-            setTemplatePreview(dataUrl)
-            toast.success('Template PDF sauvegardé localement.')
+            try {
+                localStorage.setItem('pdf_template_url', dataUrl)
+                setTemplatePreview(dataUrl)
+                toast.success('Gabarit d\'arrière-plan sauvegardé localement.')
+            } catch (err) {
+                toast.error("Erreur de stockage", {
+                    description: "L'image est trop volumineuse pour être stockée dans le navigateur."
+                })
+            }
         }
         reader.readAsDataURL(file)
     }
@@ -167,8 +188,8 @@ export default function SettingsPage() {
 
                 <Card className="bg-zinc-900 border-zinc-800">
                     <CardHeader>
-                        <CardTitle className="text-zinc-100">Template PDF personnalisé</CardTitle>
-                        <CardDescription className="text-zinc-400">Ajoutez une image modèle (entête/arrière-plan) pour personnaliser le look du PDF.</CardDescription>
+                        <CardTitle className="text-zinc-100">Image de fond (Entête / Arrière-plan)</CardTitle>
+                        <CardDescription className="text-zinc-400">Ajoutez une image modèle (gabarit au format PNG ou JPEG) pour personnaliser le look de vos PDF exportés. Les fichiers PDF ne sont pas acceptés.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
                         <Input type="file" accept="image/*" onChange={handleTemplateUpload} className="bg-zinc-950 border-zinc-800 text-zinc-100" />

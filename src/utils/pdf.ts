@@ -311,10 +311,29 @@ export async function downloadQuotePDF(quote: any, settings: any) {
         const contentWidth = pageWidth - 2 * margin // 180
         let y = 20
 
+        const drawBackgroundTemplate = () => {
+            const templateUrl = settings?.pdf_template_url || (typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') : null)
+            if (templateUrl) {
+                try {
+                    let format = 'JPEG'
+                    if (templateUrl.startsWith('data:image/png') || templateUrl.includes('image/png')) {
+                        format = 'PNG'
+                    }
+                    doc.addImage(templateUrl, format, 0, 0, pageWidth, pageHeight)
+                } catch (e) {
+                    console.error('Error drawing PDF background template:', e)
+                }
+            }
+        }
+
+        // Draw template for the first page
+        drawBackgroundTemplate()
+
         // Helper to add a new page and reset cursor
         const checkNewPage = (heightNeeded: number) => {
             if (y + heightNeeded > pageHeight - 20) {
                 doc.addPage()
+                drawBackgroundTemplate()
                 y = 20
                 return true
             }
@@ -708,6 +727,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
 
         if (allRooms.length > 0) {
             doc.addPage()
+            drawBackgroundTemplate()
             y = 20
 
             doc.setFont('Helvetica', 'bold')
@@ -901,6 +921,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
             )
 
             doc.addPage()
+            drawBackgroundTemplate()
             y = 20
 
             doc.setFont('Helvetica', 'bold')
@@ -928,6 +949,7 @@ export async function downloadQuotePDF(quote: any, settings: any) {
                 if (idx % 2 === 0) {
                     if (y + blockHeight > pageHeight - 15) {
                         doc.addPage()
+                        drawBackgroundTemplate()
                         y = 20
                         rowStartY = y
                     }
