@@ -189,12 +189,16 @@ export async function confirmBulkImportAction(rows: {
 
         // Seed all known package names so FK constraints never block contract inserts
         try {
-            const packageNames = ['Bronze', 'Argent', 'Argent +', 'Or', 'Platine', 'Non spécifié']
-            await supabase.from('packages').upsert(
+            const packageNames = ['Bronze', 'Argent', 'Argent+', 'Argent +', 'Or', 'Platine', 'Platinum', 'Non spécifié']
+            const { error: seedErr } = await supabase.from('packages').upsert(
                 packageNames.map(name => ({ name })),
                 { onConflict: 'name' }
             )
-        } catch (_) {
+            if (seedErr) {
+                console.error('Error seeding packages in confirmBulkImportAction:', seedErr.message)
+            }
+        } catch (seedEx) {
+            console.error('Exception seeding packages in confirmBulkImportAction:', seedEx)
             // packages table may not exist yet — contract inserts will just skip silently
         }
 
@@ -339,13 +343,17 @@ export async function confirmBulkImportAction(rows: {
                     const start_date = parseDateSafe(row.financial_year)
                     const active = row.status !== 'inactive'
 
-                    await supabase
+                    const { error: contractError } = await supabase
                         .from('contracts')
                         .upsert(
                             { client_id: clientId, package_name, monthly_fee, start_date, active },
                             { onConflict: 'client_id' }
                         )
-                } catch (_) {
+                    if (contractError) {
+                        console.error('Database error upserting contract for client:', row.full_name, contractError.message)
+                    }
+                } catch (contractEx) {
+                    console.error('Exception processing contract for client:', row.full_name, contractEx)
                     // contracts table may not be migrated yet — skip silently
                 }
 
@@ -355,22 +363,32 @@ export async function confirmBulkImportAction(rows: {
                     if (isNaN(doorsNum) || doorsNum < 0) doorsNum = 0
 
                     // Delete existing doors first to prevent duplicates on re-import
-                    await supabase.from('doors').delete().eq('client_id', clientId)
+                    const { error: deleteDoorsErr } = await supabase.from('doors').delete().eq('client_id', clientId)
+                    if (deleteDoorsErr) {
+                        console.error('Database error deleting existing doors for client:', row.full_name, deleteDoorsErr.message)
+                    }
 
                     if (doorsNum > 0) {
                         const doorsToInsert = Array.from({ length: doorsNum }, (_, i) => ({
                             client_id: clientId,
                             door_number: `Porte ${i + 1}`,
                         }))
-                        await supabase.from('doors').insert(doorsToInsert)
+                        const { error: insertDoorsErr } = await supabase.from('doors').insert(doorsToInsert)
+                        if (insertDoorsErr) {
+                            console.error('Database error inserting doors for client:', row.full_name, insertDoorsErr.message)
+                        }
                     } else {
                         // Insert a placeholder so we can identify missing door data
-                        await supabase.from('doors').insert({
+                        const { error: insertPlaceholderErr } = await supabase.from('doors').insert({
                             client_id: clientId,
                             door_number: 'Porte non spécifiée',
                         })
+                        if (insertPlaceholderErr) {
+                            console.error('Database error inserting doors placeholder for client:', row.full_name, insertPlaceholderErr.message)
+                        }
                     }
-                } catch (_) {
+                } catch (doorsEx) {
+                    console.error('Exception processing doors for client:', row.full_name, doorsEx)
                     // doors table may not be migrated yet — skip silently
                 }
 
