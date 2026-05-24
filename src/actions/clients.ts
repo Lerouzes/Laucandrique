@@ -2,7 +2,6 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 import fs from 'fs'
 import path from 'path'
 
@@ -122,10 +121,16 @@ export async function getClientById(id: string) {
     return data
 }
 
-export async function updateClientAction(clientId: string, formData: FormData) {
+export async function updateClientAction(_prevState: any, formData: FormData): Promise<{ success: boolean; error?: string }>
+export async function updateClientAction(clientId: string, formData: FormData): Promise<{ success: boolean; error?: string }>
+export async function updateClientAction(clientIdOrPrev: any, formData: FormData): Promise<{ success: boolean; error?: string }> {
+    // When called via useActionState, first arg is prevState (ignore it) — clientId comes from a hidden field
     const supabase = await createClient()
 
-    // Debug logging to the database to inspect what production actually receives
+    const clientId = typeof clientIdOrPrev === 'string' ? clientIdOrPrev : (formData.get('client_id') as string)
+    if (!clientId) return { success: false, error: 'Client ID manquant.' }
+
+    // Debug logging to the database
     try {
         const keys = Array.from(formData.keys())
         await supabase.from('package_change_logs').insert({
@@ -154,7 +159,7 @@ export async function updateClientAction(clientId: string, formData: FormData) {
     }
 
     const { error } = await supabase.from('clients').update(payload).eq('id', clientId)
-    if (error) throw new Error(error.message)
+    if (error) return { success: false, error: 'Erreur clients: ' + error.message }
 
     // Seed all known package names to avoid FK violations
     const knownPackages = ['Bronze', 'Argent', 'Argent+', 'Or', 'Platinum', 'Non spécifié']
@@ -169,8 +174,8 @@ export async function updateClientAction(clientId: string, formData: FormData) {
     const monthly_fee_raw = formData.get('monthly_fee')
     const financial_year_raw = formData.get('financial_year')
 
-    const monthly_fee = monthly_fee_raw != null ? Number(monthly_fee_raw) : 0
-    const start_date = financial_year_raw ? parseDateSafe(financial_year_raw) : '2026-01-01'
+    const monthly_fee = monthly_fee_raw != null && monthly_fee_raw !== '' ? Number(monthly_fee_raw) : 0
+    const start_date = financial_year_raw && financial_year_raw !== '' ? parseDateSafe(financial_year_raw) : null
     const active = payload.status !== 'inactive'
 
     const { error: contractErr } = await supabase
@@ -182,7 +187,7 @@ export async function updateClientAction(clientId: string, formData: FormData) {
     if (contractErr) {
         console.error('Error updating contract on client update:', contractErr.message)
         logImportError('Error updating contract on client update: ' + contractErr.message)
-        throw new Error('Database error updating contract: ' + contractErr.message)
+        return { success: false, error: 'Erreur contrat: ' + contractErr.message }
     }
 
     // Doors count
@@ -194,7 +199,7 @@ export async function updateClientAction(clientId: string, formData: FormData) {
             if (deleteErr) {
                 console.error('Error deleting doors on client update:', deleteErr.message)
                 logImportError('Error deleting doors on client update: ' + deleteErr.message)
-                throw new Error('Database error deleting doors: ' + deleteErr.message)
+                return { success: false, error: 'Erreur portes (suppression): ' + deleteErr.message }
             }
             if (doorsNum > 0) {
                 const doorsToInsert = Array.from({ length: doorsNum }, (_, i) => ({
@@ -205,17 +210,7 @@ export async function updateClientAction(clientId: string, formData: FormData) {
                 if (insertErr) {
                     console.error('Error inserting doors on client update:', insertErr.message)
                     logImportError('Error inserting doors on client update: ' + insertErr.message)
-                    throw new Error('Database error inserting doors: ' + insertErr.message)
-                }
-            } else {
-                const { error: placeholderErr } = await supabase.from('doors').insert({
-                    client_id: clientId,
-                    door_number: 'Porte non spécifiée',
-                })
-                if (placeholderErr) {
-                    console.error('Error inserting placeholder door on client update:', placeholderErr.message)
-                    logImportError('Error inserting placeholder door on client update: ' + placeholderErr.message)
-                    throw new Error('Database error inserting placeholder door: ' + placeholderErr.message)
+                    return { success: false, error: 'Erreur portes (insertion): ' + insertErr.message }
                 }
             }
         }
@@ -225,7 +220,7 @@ export async function updateClientAction(clientId: string, formData: FormData) {
     revalidatePath(`/clients/${clientId}`)
     revalidatePath('/team-management/dashboard')
     revalidatePath('/team-management/syndicates')
-    redirect(`/clients/${clientId}`)
+    return { success: true }
 }
 
 function parseDateSafe(val: any): string {
