@@ -75,6 +75,9 @@ export function ClientExcelImport({
     managers: Manager[]
     existingClients: ExistingClient[]
 }) {
+    const safeManagers = managers || []
+    const safeExistingClients = existingClients || []
+
     const [isPending, startTransition] = useTransition()
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [isOpen, setIsOpen] = useState(false)
@@ -98,7 +101,7 @@ export function ClientExcelImport({
             // Sheet 1: Main template data
             const wsData = [
                 ["SDC #", "Nom complet", "Address", "Email", "Phone", "City", "Province", "Postal Code", "Manager", "Nombre de portes", "Forfait", "Frais mensuels", "Exercice financier", "Statut"],
-                ["SDC-001", "Laucandrique Brossard", "123 Boulevard Taschereau", "brossard@laucandrique.com", "450-123-4567", "Brossard", "QC", "J4Z 2G8", managers[0] ? `${managers[0].first_name} ${managers[0].last_name}` : "", 24, "Or", "350.00", "2026-01-01", "Actif"],
+                ["SDC-001", "Laucandrique Brossard", "123 Boulevard Taschereau", "brossard@laucandrique.com", "450-123-4567", "Brossard", "QC", "J4Z 2G8", safeManagers[0] ? `${safeManagers[0].first_name} ${safeManagers[0].last_name}` : "", 24, "Or", "350.00", "2026-01-01", "Actif"],
                 ["SDC-002", "Laucandrique Longueuil", "456 Chemin de Chambly", "longueuil@laucandrique.com", "450-987-6543", "Longueuil", "QC", "J4H 3M4", "", "", "Argent", "250.00", "", "Inactif"]
             ]
             
@@ -114,7 +117,7 @@ export function ClientExcelImport({
             // Sheet 2: Manager list reference
             const managersSheetData = [
                 ["Nom du Gestionnaire (à copier/coller)", "Courriel"],
-                ...managers.map(m => [`${m.first_name} ${m.last_name}`, m.email || ''])
+                ...safeManagers.map(m => [`${m.first_name} ${m.last_name}`, m.email || ''])
             ]
             const wsManagers = XLSX.utils.aoa_to_sheet(managersSheetData)
             wsManagers['!cols'] = [{ wch: 45 }, { wch: 30 }]
@@ -135,6 +138,7 @@ export function ClientExcelImport({
         if (typeof value === 'number') {
             // Excel serial date to JS Date
             const date = new Date(Math.round((value - 25569) * 86400 * 1000))
+            if (isNaN(date.getTime())) return ''
             const y = date.getUTCFullYear()
             const m = String(date.getUTCMonth() + 1).padStart(2, '0')
             const d = String(date.getUTCDate()).padStart(2, '0')
@@ -150,7 +154,17 @@ export function ClientExcelImport({
         if (ddmmyyyy) {
             return `${ddmmyyyy[3]}-${ddmmyyyy[2].padStart(2, '0')}-${ddmmyyyy[1].padStart(2, '0')}`
         }
-        return str
+        
+        // Try parsing with new Date() as a fallback
+        const parsedDate = new Date(str)
+        if (!isNaN(parsedDate.getTime())) {
+            const y = parsedDate.getFullYear()
+            const m = String(parsedDate.getMonth() + 1).padStart(2, '0')
+            const d = String(parsedDate.getDate()).padStart(2, '0')
+            return `${y}-${m}-${d}`
+        }
+        
+        return ''
     }
 
     // Parse currency values safely
@@ -192,7 +206,7 @@ export function ClientExcelImport({
                     const managerNameRef = String(row['Manager'] || row['manager_name'] || row['Gestionnaire'] || '').trim()
                     let matchedManagerId: string | null = null
                     if (managerNameRef) {
-                        const match = managers.find(
+                        const match = safeManagers.find(
                             m => `${m.first_name} ${m.last_name}`.toLowerCase() === managerNameRef.toLowerCase()
                         )
                         if (match) matchedManagerId = match.id
@@ -200,14 +214,18 @@ export function ClientExcelImport({
 
                     // Check for existing duplicate in client table matching SDC # (column `full_name` or `manager`)
                     const duplicateMatch = sdcNum 
-                        ? existingClients.find(ec => 
+                        ? safeExistingClients.find(ec => 
                             ec.full_name?.toLowerCase() === sdcNum.toLowerCase() || 
                             ec.manager?.toLowerCase() === sdcNum.toLowerCase()
                           )
                         : null
 
                     const rawDoors = row['Nombre de portes'] || row['doors_count'] || row['Portes'] || row['Amount of doors']
-                    const doorsCount = rawDoors !== undefined && rawDoors !== null ? Number(rawDoors) : null
+                    let doorsCount: number | null = null
+                    if (rawDoors !== undefined && rawDoors !== null) {
+                        const parsedDoors = parseInt(String(rawDoors).replace(/\D/g, ''), 10)
+                        doorsCount = isNaN(parsedDoors) ? null : parsedDoors
+                    }
 
                     let rawPackage = String(row['Forfait'] || row['forfait'] || row['package'] || '').trim()
                     if (rawPackage.toLowerCase().includes('platine')) {
@@ -290,11 +308,11 @@ export function ClientExcelImport({
 
             // Warning: SDC # duplicated
             const isDuplicate = row.full_name 
-                ? existingClients.some(ec => (ec.full_name?.toLowerCase() === row.full_name.toLowerCase() || ec.manager?.toLowerCase() === row.full_name.toLowerCase()) && ec.id !== row.id)
+                ? safeExistingClients.some(ec => (ec.full_name?.toLowerCase() === row.full_name.toLowerCase() || ec.manager?.toLowerCase() === row.full_name.toLowerCase()) && ec.id !== row.id)
                 : false
             
             const matchedClient = row.full_name
-                ? existingClients.find(ec => ec.full_name?.toLowerCase() === row.full_name.toLowerCase() || ec.manager?.toLowerCase() === row.full_name.toLowerCase())
+                ? safeExistingClients.find(ec => ec.full_name?.toLowerCase() === row.full_name.toLowerCase() || ec.manager?.toLowerCase() === row.full_name.toLowerCase())
                 : null
 
             return {
@@ -304,7 +322,7 @@ export function ClientExcelImport({
                 duplicate_matched_name: matchedClient?.company_name || matchedClient?.full_name || ''
             }
         })
-    }, [rows, existingClients])
+    }, [rows, safeExistingClients])
 
     const totalErrorsCount = useMemo(() => {
         return validatedRows.reduce((acc, row) => acc + row.errors.length, 0)
@@ -319,7 +337,7 @@ export function ClientExcelImport({
             
             // If manager_id changes, reset name ref
             if (field === 'manager_id') {
-                const match = managers.find(m => m.id === value)
+                const match = safeManagers.find(m => m.id === value)
                 updated.manager_name_ref = match ? `${match.first_name} ${match.last_name}` : ''
             }
 
@@ -327,7 +345,7 @@ export function ClientExcelImport({
             if (field === 'full_name') {
                 const sdcValue = String(value).trim()
                 updated.manager = sdcValue
-                const dup = existingClients.find(ec => 
+                const dup = safeExistingClients.find(ec => 
                     ec.full_name?.toLowerCase() === sdcValue.toLowerCase() ||
                     ec.manager?.toLowerCase() === sdcValue.toLowerCase()
                 )
@@ -349,7 +367,7 @@ export function ClientExcelImport({
         setRows(prev => prev.map(r => {
             // Only update duplicates if trying to set 'update'
             if (action === 'update') {
-                const isDup = r.full_name && existingClients.some(ec => 
+                const isDup = r.full_name && safeExistingClients.some(ec => 
                     ec.full_name?.toLowerCase() === r.full_name.toLowerCase() ||
                     ec.manager?.toLowerCase() === r.full_name.toLowerCase()
                 )
@@ -620,7 +638,7 @@ export function ClientExcelImport({
                                                                     className="w-full h-8 rounded-lg border border-zinc-850 bg-zinc-950 text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-850"
                                                                 >
                                                                     <option value="" className="text-zinc-550 bg-zinc-900">Non assigné</option>
-                                                                    {managers.map((m) => (
+                                                                    {safeManagers.map((m) => (
                                                                         <option key={m.id} value={m.id} className="text-zinc-100 bg-zinc-900">
                                                                             {m.first_name} {m.last_name}
                                                                         </option>

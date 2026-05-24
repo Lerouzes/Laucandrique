@@ -104,6 +104,22 @@ export async function updateClientAction(clientId: string, formData: FormData) {
     return { success: true }
 }
 
+function parseDateSafe(val: any): string {
+    if (!val) return '2000-01-01'
+    const str = String(val).trim()
+    const match = str.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!match) return '2000-01-01'
+    
+    const y = parseInt(match[1], 10)
+    const m = parseInt(match[2], 10) - 1
+    const d = parseInt(match[3], 10)
+    
+    const date = new Date(Date.UTC(y, m, d))
+    if (isNaN(date.getTime())) return '2000-01-01'
+    
+    return str
+}
+
 export async function confirmBulkImportAction(rows: {
     id?: string
     full_name: string
@@ -214,8 +230,11 @@ export async function confirmBulkImportAction(rows: {
 
         // Handle contract upsert
         const package_name = row.package_name || 'Non spécifié'
-        const monthly_fee = row.monthly_fee !== null && row.monthly_fee !== undefined ? row.monthly_fee : 0.00
-        const start_date = row.financial_year || '2000-01-01'
+        let monthly_fee = row.monthly_fee !== null && row.monthly_fee !== undefined ? Number(row.monthly_fee) : 0.00
+        if (isNaN(monthly_fee)) {
+            monthly_fee = 0.00
+        }
+        const start_date = parseDateSafe(row.financial_year)
         const active = row.status !== 'inactive'
 
         const { error: contractErr } = await supabase
@@ -233,7 +252,10 @@ export async function confirmBulkImportAction(rows: {
         }
 
         // Handle doors count
-        const doorsNum = row.doors_count !== null && row.doors_count !== undefined ? row.doors_count : 0
+        let doorsNum = row.doors_count !== null && row.doors_count !== undefined ? Math.floor(Number(row.doors_count)) : 0
+        if (isNaN(doorsNum) || doorsNum < 0) {
+            doorsNum = 0
+        }
         
         // Delete existing doors first to prevent duplicates/incorrect count on update
         const { error: deleteDoorsErr } = await supabase
