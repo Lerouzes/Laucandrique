@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { recordLostSyndicateAction, recordPackageChangeAction, recordNewSyndicateAction } from '@/actions/team-management'
+import { SearchableClientSelect } from '@/components/features/team-management/SearchableClientSelect'
 import Link from 'next/link'
 import { 
     UserCheck, 
@@ -139,9 +140,12 @@ export default async function ManagersControlTowerPage() {
                         <div className="space-y-2 text-xxs">
                             <div>
                                 <Label className="text-zinc-500 mb-0.5 block">Syndicat Perdu</Label>
-                                <select name="client_id" className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-8 text-xs" required>
-                                    {activeClients.map(c => <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>)}
-                                </select>
+                                <SearchableClientSelect 
+                                    clients={activeClients.map(c => ({ id: c.id, name: c.company_name || c.full_name }))}
+                                    name="client_id"
+                                    placeholder="Sélectionner le syndicat..."
+                                    required
+                                />
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
@@ -202,9 +206,12 @@ export default async function ManagersControlTowerPage() {
                         <div className="space-y-2 text-xxs">
                             <div>
                                 <Label className="text-zinc-500 mb-0.5 block">Syndicat / Copropriété</Label>
-                                <select name="client_id" className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-8 text-xs" required>
-                                    {activeClients.map(c => <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>)}
-                                </select>
+                                <SearchableClientSelect 
+                                    clients={activeClients.map(c => ({ id: c.id, name: c.company_name || c.full_name }))}
+                                    name="client_id"
+                                    placeholder="Sélectionner le syndicat..."
+                                    required
+                                />
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>

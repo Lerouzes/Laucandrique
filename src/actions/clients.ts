@@ -117,6 +117,13 @@ export async function confirmBulkImportAction(rows: {
     manager?: string | null
     manager_id?: string | null
     import_action: 'create' | 'update' | 'skip'
+    
+    // New Columns
+    doors_count?: number | null
+    package_name?: string | null
+    monthly_fee?: number | null
+    financial_year?: string | null
+    status?: 'active' | 'inactive' | null
 }[]) {
     const supabase = await createClient()
 
@@ -125,7 +132,8 @@ export async function confirmBulkImportAction(rows: {
     let skipped = 0
     let failed = 0
 
-    const toInsert = []
+    // Ensure 'Non spécifié' package exists in packages table
+    await supabase.from('packages').upsert({ name: 'Non spécifié' }, { onConflict: 'name' })
 
     for (const row of rows) {
         if (row.import_action === 'skip') {
@@ -148,41 +156,125 @@ export async function confirmBulkImportAction(rows: {
             city: row.city || null,
             province: row.province || null,
             postal_code: row.postal_code || null,
-            manager: row.manager || null,
+            manager: row.manager || row.full_name.trim(),
             manager_id: row.manager_id || null,
+            status: row.status || 'active'
         }
 
-        if (row.import_action === 'update' && row.id) {
+        let clientId = row.id
+
+        if (row.import_action === 'update' && clientId) {
             const { error } = await supabase
                 .from('clients')
                 .update(clientPayload)
-                .eq('id', row.id)
+                .eq('id', clientId)
             
             if (error) {
                 console.error('Bulk Import update error:', error)
                 failed++
-            } else {
+                continue
+            }
+            updated++
+        } else {
+            // Check if it already exists to prevent duplicate key violations (fallback)
+            const { data: existing } = await supabase
+                .from('clients')
+                .select('id')
+                .eq('full_name', clientPayload.full_name)
+                .maybeSingle()
+
+            if (existing?.id) {
+                clientId = existing.id
+                const { error } = await supabase
+                    .from('clients')
+                    .update(clientPayload)
+                    .eq('id', clientId)
+                if (error) {
+                    console.error('Bulk Import insert-retry update error:', error)
+                    failed++
+                    continue
+                }
                 updated++
+            } else {
+                const { data: insertedClient, error } = await supabase
+                    .from('clients')
+                    .insert(clientPayload)
+                    .select('id')
+                    .single()
+                
+                if (error || !insertedClient) {
+                    console.error('Bulk Import insert error:', error)
+                    failed++
+                    continue
+                }
+                clientId = insertedClient.id
+                imported++
+            }
+        }
+
+        // Handle contract upsert
+        const package_name = row.package_name || 'Non spécifié'
+        const monthly_fee = row.monthly_fee !== null && row.monthly_fee !== undefined ? row.monthly_fee : 0.00
+        const start_date = row.financial_year || '2000-01-01'
+        const active = row.status !== 'inactive'
+
+        const { error: contractErr } = await supabase
+            .from('contracts')
+            .upsert({
+                client_id: clientId,
+                package_name,
+                monthly_fee,
+                start_date,
+                active
+            }, { onConflict: 'client_id' })
+
+        if (contractErr) {
+            console.error('Error upserting contract for client:', clientId, contractErr)
+        }
+
+        // Handle doors count
+        const doorsNum = row.doors_count !== null && row.doors_count !== undefined ? row.doors_count : 0
+        
+        // Delete existing doors first to prevent duplicates/incorrect count on update
+        const { error: deleteDoorsErr } = await supabase
+            .from('doors')
+            .delete()
+            .eq('client_id', clientId)
+
+        if (deleteDoorsErr) {
+            console.error('Error deleting doors for client:', clientId, deleteDoorsErr)
+        }
+
+        if (doorsNum > 0) {
+            const doorsToInsert = Array.from({ length: doorsNum }).map((_, i) => ({
+                client_id: clientId,
+                door_number: `Porte ${i + 1}`
+            }))
+            const { error: insertDoorsErr } = await supabase
+                .from('doors')
+                .insert(doorsToInsert)
+            if (insertDoorsErr) {
+                console.error('Error inserting doors for client:', clientId, insertDoorsErr)
             }
         } else {
-            toInsert.push(clientPayload)
-        }
-    }
-
-    if (toInsert.length > 0) {
-        const { error } = await supabase
-            .from('clients')
-            .insert(toInsert)
-        
-        if (error) {
-            console.error('Bulk Import insert error:', error)
-            failed += toInsert.length
-        } else {
-            imported += toInsert.length
+            // Missing/Zero doors: Insert a placeholder door to easily identify it
+            const { error: insertPlaceholderErr } = await supabase
+                .from('doors')
+                .insert({
+                    client_id: clientId,
+                    door_number: 'Porte non spécifiée'
+                })
+            if (insertPlaceholderErr) {
+                console.error('Error inserting placeholder door for client:', clientId, insertPlaceholderErr)
+            }
         }
     }
 
     revalidatePath('/clients')
+    revalidatePath('/team-management/dashboard')
+    revalidatePath('/team-management/teams')
+    revalidatePath('/team-management/managers')
+
     return {
         success: true,
         summary: {

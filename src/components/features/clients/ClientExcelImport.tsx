@@ -59,6 +59,13 @@ interface ImportRow {
     manager_name_ref: string // Typed manager name
     manager_id: string | null // Resolved manager UUID
     import_action: 'create' | 'update' | 'skip'
+    
+    // New fields
+    doors_count: number | null
+    package_name: string | null
+    monthly_fee: number | null
+    financial_year: string | null
+    status: 'active' | 'inactive'
 }
 
 export function ClientExcelImport({ 
@@ -90,9 +97,9 @@ export function ClientExcelImport({
             
             // Sheet 1: Main template data
             const wsData = [
-                ["SDC #", "Nom complet", "Address", "Email", "Phone", "City", "Province", "Postal Code", "Manager"],
-                ["SDC-001", "Laucandrique Brossard", "123 Boulevard Taschereau", "brossard@laucandrique.com", "450-123-4567", "Brossard", "QC", "J4Z 2G8", managers[0] ? `${managers[0].first_name} ${managers[0].last_name}` : ""],
-                ["SDC-002", "Laucandrique Longueuil", "456 Chemin de Chambly", "longueuil@laucandrique.com", "450-987-6543", "Longueuil", "QC", "J4H 3M4", ""]
+                ["SDC #", "Nom complet", "Address", "Email", "Phone", "City", "Province", "Postal Code", "Manager", "Nombre de portes", "Forfait", "Frais mensuels", "Exercice financier", "Statut"],
+                ["SDC-001", "Laucandrique Brossard", "123 Boulevard Taschereau", "brossard@laucandrique.com", "450-123-4567", "Brossard", "QC", "J4Z 2G8", managers[0] ? `${managers[0].first_name} ${managers[0].last_name}` : "", 24, "Or", "350.00", "2026-01-01", "Actif"],
+                ["SDC-002", "Laucandrique Longueuil", "456 Chemin de Chambly", "longueuil@laucandrique.com", "450-987-6543", "Longueuil", "QC", "J4H 3M4", "", "", "Argent", "250.00", "", "Inactif"]
             ]
             
             const ws = XLSX.utils.aoa_to_sheet(wsData)
@@ -120,6 +127,41 @@ export function ClientExcelImport({
         } catch (err: any) {
             toast.error("Erreur lors de la génération du modèle", { description: err.message })
         }
+    }
+
+    // Parse Excel Serial Date/Strings safely
+    const parseExcelDate = (value: any): string => {
+        if (!value) return ''
+        if (typeof value === 'number') {
+            // Excel serial date to JS Date
+            const date = new Date(Math.round((value - 25569) * 86400 * 1000))
+            const y = date.getUTCFullYear()
+            const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+            const d = String(date.getUTCDate()).padStart(2, '0')
+            return `${y}-${m}-${d}`
+        }
+        const str = String(value).trim()
+        // Match YYYY-MM-DD or DD/MM/YYYY or DD-MM-YYYY
+        const yyyymmdd = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/)
+        if (yyyymmdd) {
+            return `${yyyymmdd[1]}-${yyyymmdd[2].padStart(2, '0')}-${yyyymmdd[3].padStart(2, '0')}`
+        }
+        const ddmmyyyy = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/)
+        if (ddmmyyyy) {
+            return `${ddmmyyyy[3]}-${ddmmyyyy[2].padStart(2, '0')}-${ddmmyyyy[1].padStart(2, '0')}`
+        }
+        return str
+    }
+
+    // Parse currency values safely
+    const parseAmount = (val: any): number => {
+        if (val === undefined || val === null) return 0
+        const clean = String(val)
+            .replace('$', '')
+            .replace(/\s/g, '') // remove spaces
+            .replace(/,/g, '.') // replace comma with dot
+        const num = parseFloat(clean)
+        return isNaN(num) ? 0 : num
     }
 
     // 2. PARSE EXCEL FILE
@@ -164,6 +206,32 @@ export function ClientExcelImport({
                           )
                         : null
 
+                    const rawDoors = row['Nombre de portes'] || row['doors_count'] || row['Portes'] || row['Amount of doors']
+                    const doorsCount = rawDoors !== undefined && rawDoors !== null ? Number(rawDoors) : null
+
+                    let rawPackage = String(row['Forfait'] || row['forfait'] || row['package'] || '').trim()
+                    if (rawPackage.toLowerCase().includes('platine')) {
+                        rawPackage = 'Platinum'
+                    } else if (rawPackage.toLowerCase() === 'argent +') {
+                        rawPackage = 'Argent+'
+                    }
+                    const validPackages = ['Bronze', 'Argent', 'Argent+', 'Or', 'Platinum']
+                    const packageName = validPackages.find(p => p.toLowerCase() === rawPackage.toLowerCase()) || null
+
+                    const rawFee = row['Frais mensuels'] || row['monthly_fee'] || row['Pricing'] || row['monthly pricing']
+                    const monthlyFee = rawFee !== undefined && rawFee !== null ? parseAmount(rawFee) : null
+
+                    const rawYear = row['Exercice financier'] || row['financial_year'] || row['Financial year'] || row['Date exercice']
+                    const financialYear = rawYear ? parseExcelDate(rawYear) : null
+
+                    const rawStatusStr = String(row['Statut'] || row['status'] || row['status_contract'] || '').trim().toLowerCase()
+                    let status: 'active' | 'inactive' = 'active'
+                    if (rawStatusStr.includes('inactiv') || rawStatusStr === 'inactive' || rawStatusStr === 'inactif') {
+                        status = 'inactive'
+                    } else if (rawStatusStr.includes('activ') || rawStatusStr === 'active' || rawStatusStr === 'actif') {
+                        status = 'active'
+                    }
+
                     return {
                         temp_id: `row-${index}-${Date.now()}`,
                         id: duplicateMatch?.id,
@@ -178,7 +246,13 @@ export function ClientExcelImport({
                         postal_code: String(row['Postal Code'] || row['Code Postal'] || row['postal_code'] || '').trim(),
                         manager_name_ref: managerNameRef,
                         manager_id: matchedManagerId,
-                        import_action: duplicateMatch ? 'update' : 'create' // Default update if duplicate
+                        import_action: duplicateMatch ? 'update' : 'create',
+                        
+                        doors_count: doorsCount,
+                        package_name: packageName,
+                        monthly_fee: monthlyFee,
+                        financial_year: financialYear,
+                        status: status
                     }
                 })
 
@@ -448,15 +522,20 @@ export function ClientExcelImport({
                                 {/* Preview Grid Table */}
                                 <div className="rounded-xl border border-zinc-850 overflow-hidden bg-zinc-950/20">
                                     <div className="overflow-x-auto max-w-full">
-                                        <table className="w-full text-left border-collapse min-w-[1000px]">
+                                        <table className="w-full text-left border-collapse min-w-[1450px]">
                                             <thead>
                                                 <tr className="bg-zinc-900 border-b border-zinc-800 text-zinc-400 text-xxs font-bold uppercase tracking-wider">
-                                                    <th className="p-3 w-[120px]">SDC #</th>
-                                                    <th className="p-3 w-[180px]">Nom SDC *</th>
-                                                    <th className="p-3 w-[220px]">Adresse</th>
-                                                    <th className="p-3 w-[180px]">Courriel</th>
-                                                    <th className="p-3 w-[160px]">Gestionnaire Assigné</th>
-                                                    <th className="p-3 w-[130px]">Action d'Import</th>
+                                                    <th className="p-3 w-[110px]">SDC #</th>
+                                                    <th className="p-3 w-[150px]">Nom SDC *</th>
+                                                    <th className="p-3 w-[180px]">Adresse</th>
+                                                    <th className="p-3 w-[140px]">Courriel</th>
+                                                    <th className="p-3 w-[140px]">Gestionnaire</th>
+                                                    <th className="p-3 w-[80px]">Portes</th>
+                                                    <th className="p-3 w-[110px]">Forfait</th>
+                                                    <th className="p-3 w-[90px]">Frais ($)</th>
+                                                    <th className="p-3 w-[110px]">Ex. Financier</th>
+                                                    <th className="p-3 w-[90px]">Statut</th>
+                                                    <th className="p-3 w-[120px]">Action d'Import</th>
                                                     <th className="p-3 w-[50px] text-center">Suppr.</th>
                                                 </tr>
                                             </thead>
@@ -540,7 +619,7 @@ export function ClientExcelImport({
                                                                     onChange={(e) => handleUpdateRowField(row.temp_id, 'manager_id', e.target.value || null)}
                                                                     className="w-full h-8 rounded-lg border border-zinc-850 bg-zinc-950 text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-850"
                                                                 >
-                                                                    <option value="" className="text-zinc-500 bg-zinc-900">Non assigné</option>
+                                                                    <option value="" className="text-zinc-550 bg-zinc-900">Non assigné</option>
                                                                     {managers.map((m) => (
                                                                         <option key={m.id} value={m.id} className="text-zinc-100 bg-zinc-900">
                                                                             {m.first_name} {m.last_name}
@@ -552,6 +631,67 @@ export function ClientExcelImport({
                                                                         Ref: "{row.manager_name_ref}"
                                                                     </p>
                                                                 )}
+                                                            </td>
+
+                                                            {/* Doors Count */}
+                                                            <td className="p-2">
+                                                                <Input 
+                                                                    type="number"
+                                                                    value={row.doors_count === null ? '' : row.doors_count}
+                                                                    placeholder="N/A"
+                                                                    onChange={(e) => handleUpdateRowField(row.temp_id, 'doors_count', e.target.value === '' ? null : Number(e.target.value))}
+                                                                    className={cn("bg-zinc-950/60 h-8 text-xs focus-visible:ring-zinc-800", row.doors_count === null && "border-amber-700/50 placeholder:text-amber-500/50")}
+                                                                />
+                                                            </td>
+
+                                                            {/* Package / Forfait Dropdown */}
+                                                            <td className="p-2">
+                                                                <select 
+                                                                    value={row.package_name || ''} 
+                                                                    onChange={(e) => handleUpdateRowField(row.temp_id, 'package_name', e.target.value || null)}
+                                                                    className={cn("w-full h-8 rounded-lg border bg-zinc-950 text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-850", row.package_name === null ? "border-amber-700/50" : "border-zinc-850")}
+                                                                >
+                                                                    <option value="" className="text-zinc-550 bg-zinc-900">Non spécifié</option>
+                                                                    <option value="Bronze" className="bg-zinc-900">Bronze</option>
+                                                                    <option value="Argent" className="bg-zinc-900">Argent</option>
+                                                                    <option value="Argent+" className="bg-zinc-900">Argent+</option>
+                                                                    <option value="Or" className="bg-zinc-900">Or</option>
+                                                                    <option value="Platinum" className="bg-zinc-900">Platinum</option>
+                                                                </select>
+                                                            </td>
+
+                                                            {/* Monthly Fee */}
+                                                            <td className="p-2">
+                                                                <Input 
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    value={row.monthly_fee === null ? '' : row.monthly_fee}
+                                                                    placeholder="N/A"
+                                                                    onChange={(e) => handleUpdateRowField(row.temp_id, 'monthly_fee', e.target.value === '' ? null : parseAmount(e.target.value))}
+                                                                    className={cn("bg-zinc-950/60 h-8 text-xs focus-visible:ring-zinc-800", row.monthly_fee === null && "border-amber-700/50")}
+                                                                />
+                                                            </td>
+
+                                                            {/* Financial Year Date */}
+                                                            <td className="p-2">
+                                                                <Input 
+                                                                    type="date"
+                                                                    value={row.financial_year || ''} 
+                                                                    onChange={(e) => handleUpdateRowField(row.temp_id, 'financial_year', e.target.value || null)}
+                                                                    className={cn("bg-zinc-950/60 h-8 text-xs focus-visible:ring-zinc-800", !row.financial_year && "border-amber-700/50")}
+                                                                />
+                                                            </td>
+
+                                                            {/* Status Dropdown */}
+                                                            <td className="p-2">
+                                                                <select 
+                                                                    value={row.status} 
+                                                                    onChange={(e) => handleUpdateRowField(row.temp_id, 'status', e.target.value)}
+                                                                    className="w-full h-8 rounded-lg border border-zinc-850 bg-zinc-950 text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-850"
+                                                                >
+                                                                    <option value="active" className="bg-zinc-900">Actif</option>
+                                                                    <option value="inactive" className="bg-zinc-900">Inactif</option>
+                                                                </select>
                                                             </td>
 
                                                             {/* Action Selector */}
