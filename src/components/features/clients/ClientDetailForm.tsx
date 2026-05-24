@@ -1,6 +1,7 @@
 'use client'
 
-import { useActionState, useEffect, useRef } from 'react'
+import { useActionState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,7 +39,14 @@ export function ClientDetailForm({
   doorsCount,
   saveAction,
 }: ClientDetailFormProps) {
+  const router = useRouter()
   const [state, formAction, isPending] = useActionState(saveAction, null)
+
+  useEffect(() => {
+    if (state?.success) {
+      router.refresh()
+    }
+  }, [state?.success])
 
   return (
     <form action={formAction} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
