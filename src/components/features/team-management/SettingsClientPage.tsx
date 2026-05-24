@@ -26,7 +26,7 @@ import {
     updateAuditQuestionConfigAction 
 } from '@/actions/team-management'
 
-interface Category {
+interface ComplaintCategory {
     id: string
     name: string
     created_at?: string
@@ -38,7 +38,7 @@ interface AuditConfig {
 }
 
 interface SettingsClientPageProps {
-    initialCategories: Category[]
+    initialCategories: ComplaintCategory[]
     initialAuditConfigs: AuditConfig[]
 }
 
@@ -67,7 +67,7 @@ export function SettingsClientPage({
     const [activeTab, setActiveTab] = useState<'categories' | 'audits'>('categories')
     
     // Categories states
-    const [categories, setCategories] = useState<Category[]>(initialCategories)
+    const [categories, setCategories] = useState<ComplaintCategory[]>(initialCategories)
     const [newCategoryName, setNewCategoryName] = useState('')
     const [isAdding, setIsAdding] = useState(false)
     const [editingId, setEditingId] = useState<string | null>(null)
@@ -100,7 +100,7 @@ export function SettingsClientPage({
 
         setIsAdding(true)
         try {
-            const added = await createComplaintCategoryAction(newCategoryName.trim())
+            const added = await createComplaintCategoryAction(newCategoryName.trim()) as ComplaintCategory
             setCategories(prev => [...prev, added].sort((a, b) => a.name.localeCompare(b.name)))
             setNewCategoryName('')
             triggerAlert('Catégorie ajoutée avec succès !')
@@ -117,7 +117,7 @@ export function SettingsClientPage({
 
         setIsUpdating(true)
         try {
-            const updated = await updateComplaintCategoryAction(id, editingName.trim())
+            const updated = await updateComplaintCategoryAction(id, editingName.trim()) as ComplaintCategory
             setCategories(prev => prev.map(c => c.id === id ? updated : c).sort((a, b) => a.name.localeCompare(b.name)))
             setEditingId(null)
             setEditingName('')

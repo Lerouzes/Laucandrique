@@ -51,7 +51,7 @@ export function NewAuditForm({
     }))
 
     // Map custom configs to a lookup record
-    const descriptionsMap = {
+    const descriptionsMap: Record<string, string> = {
         ...DEFAULT_DESCRIPTIONS,
         ...questionConfigs.reduce((acc, c) => ({ ...acc, [c.key]: c.description }), {})
     }
