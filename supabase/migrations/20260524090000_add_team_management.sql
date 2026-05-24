@@ -272,15 +272,22 @@ CREATE POLICY "Allow authenticated full access on assembly_evaluations" ON assem
 CREATE POLICY "Allow authenticated full access on lost_syndicates" ON lost_syndicates FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Allow authenticated full access on package_change_logs" ON package_change_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
--- Update trigger function to default role to 'Operations'
+-- Update trigger function to default role to 'Operations' and promote specific email to 'Master'
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  assigned_role TEXT := 'Operations';
 BEGIN
+  IF new.email = 'elerouzeslaucandrique@gmail.com' THEN
+    assigned_role := 'Master';
+  END IF;
+
   INSERT INTO public.profiles (id, full_name, email, role)
-  VALUES (new.id, COALESCE(new.raw_user_meta_data->>'full_name', new.email), new.email, 'Operations');
+  VALUES (new.id, COALESCE(new.raw_user_meta_data->>'full_name', new.email), new.email, assigned_role);
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Promote specific email to Master role
+-- Also update existing profile in case it was created without the trigger active
 UPDATE public.profiles SET role = 'Master' WHERE email = 'elerouzeslaucandrique@gmail.com';
+
