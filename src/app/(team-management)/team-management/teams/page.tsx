@@ -18,7 +18,23 @@ export default async function TeamsListPage() {
         .from('managers')
         .select('*')
 
-    // 3. Compute stats for each team by aggregating stats of their managers
+    // 3. Compute stats for all managers in parallel
+    const managerStatsMap: Record<string, any> = {}
+    if (managers && managers.length > 0) {
+        const statsList = await Promise.all(
+            managers.map(async (m) => {
+                const stats = await getManagerStats(m.id)
+                return { id: m.id, stats }
+            })
+        )
+        statsList.forEach(item => {
+            if (item.stats) {
+                managerStatsMap[item.id] = item.stats
+            }
+        })
+    }
+
+    // 4. Compute stats for each team by aggregating stats of their managers
     const teamStatsList = []
 
     for (const team of teams || []) {
@@ -35,7 +51,7 @@ export default async function TeamsListPage() {
         const managerDetails = []
 
         for (const m of teamManagers) {
-            const stats = await getManagerStats(m.id)
+            const stats = managerStatsMap[m.id]
             if (stats) {
                 totalSyndicates += stats.syndicatesCount
                 totalDoors += stats.doorsCount

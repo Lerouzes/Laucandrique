@@ -36,17 +36,17 @@ export async function getManagerStats(managerId: string) {
 
     const syndicatesCount = activeSyndicates.length
 
-    // Sum doors count from buildings/doors or cache
+    // Sum doors count from buildings/doors in a single query
+    const activeSyndicateIds = activeSyndicates.map(c => c.id)
     let doorsCount = 0
-    for (const client of activeSyndicates) {
-        // Fetch from doors count
+    if (activeSyndicateIds.length > 0) {
         const { count } = await supabase
             .from('doors')
             .select('id', { count: 'exact', head: true })
-            .eq('client_id', client.id)
-        
-        doorsCount += count || 0
+            .in('client_id', activeSyndicateIds)
+        doorsCount = count || 0
     }
+
 
     // 3. Monthly Recurring Revenue (MRR)
     const mrr = activeSyndicates.reduce((acc, c) => {
@@ -247,15 +247,17 @@ export async function getGlobalTeamStats() {
         return isActiveStatus && notDepartedYet
     })
 
-    // Doors sum
+    // Doors sum (optimized single query)
+    const activeClientIds = activeClients.map(c => c.id)
     let totalDoors = 0
-    for (const client of activeClients) {
+    if (activeClientIds.length > 0) {
         const { count } = await supabase
             .from('doors')
             .select('id', { count: 'exact', head: true })
-            .eq('client_id', client.id)
-        totalDoors += count || 0
+            .in('client_id', activeClientIds)
+        totalDoors = count || 0
     }
+
 
     // Monthly recurring revenue
     const mrr = activeClients.reduce((acc, c) => {

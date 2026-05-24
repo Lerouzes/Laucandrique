@@ -131,7 +131,12 @@ export default async function SyndicatesBoardPage() {
                                     </div>
                                 ) : (
                                     sect.list.map(({ client, audit }) => {
-                                        const managerName = client.managers ? `${client.managers.first_name[0]}.${client.managers.last_name}` : 'N/A'
+                                        const m = client.managers
+                                        const managerName = m
+                                            ? (Array.isArray(m)
+                                                ? (m[0] ? `${m[0].first_name?.[0] || ''}.${m[0].last_name || ''}` : 'N/A')
+                                                : `${m.first_name?.[0] || ''}.${m.last_name || ''}`)
+                                            : (client.manager || 'N/A')
                                         const contract = client.contracts?.[0]
                                         return (
                                             <div 

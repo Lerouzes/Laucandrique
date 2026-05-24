@@ -31,14 +31,10 @@ export default async function ManagersControlTowerPage() {
     // 1. Get managers
     const managersList = await getManagers()
 
-    // 2. Compute stats for each manager
-    const managerStatsList = []
-    for (const m of managersList) {
-        const stats = await getManagerStats(m.id)
-        if (stats) {
-            managerStatsList.push(stats)
-        }
-    }
+    // 2. Compute stats for each manager in parallel
+    const managerStatsList = (await Promise.all(
+        managersList.map(m => getManagerStats(m.id))
+    )).filter((s): s is NonNullable<typeof s> => s !== null)
 
     // 3. Get all active syndicates/clients for loss and package actions
     const { data: clients } = await supabase

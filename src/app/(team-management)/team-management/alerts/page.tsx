@@ -14,28 +14,35 @@ export default async function GlobalAlertsPage() {
         .select('*, manager_teams(name)')
         .order('first_name')
 
-    // 2. Fetch stats and gather active alerts
-    const allAlerts = []
-    let totalRiskPoints = 0
-
-    for (const m of managers || []) {
-        const stats = await getManagerStats(m.id)
-        if (stats && stats.alerts && stats.alerts.length > 0) {
-            stats.alerts.forEach((alertText: string) => {
-                let severity: 'high' | 'critical' | 'medium' = 'medium'
-                if (alertText.includes('critique') || alertText.includes('sévère') || stats.riskLevel === 'Critique') {
-                    severity = 'critical'
-                } else if (stats.riskLevel === 'Élevé') {
-                    severity = 'high'
-                }
-
-                allAlerts.push({
-                    manager: m,
-                    text: alertText,
-                    severity,
-                    managerRisk: stats.riskLevel
-                })
+    // 2. Fetch stats and gather active alerts in parallel
+    const allAlerts: any[] = []
+    
+    if (managers && managers.length > 0) {
+        const statsList = await Promise.all(
+            managers.map(async (m) => {
+                const stats = await getManagerStats(m.id)
+                return { manager: m, stats }
             })
+        )
+
+        for (const { manager: m, stats } of statsList) {
+            if (stats && stats.alerts && stats.alerts.length > 0) {
+                stats.alerts.forEach((alertText: string) => {
+                    let severity: 'high' | 'critical' | 'medium' = 'medium'
+                    if (alertText.includes('critique') || alertText.includes('sévère') || stats.riskLevel === 'Critique') {
+                        severity = 'critical'
+                    } else if (stats.riskLevel === 'Élevé') {
+                        severity = 'high'
+                    }
+
+                    allAlerts.push({
+                        manager: m,
+                        text: alertText,
+                        severity,
+                        managerRisk: stats.riskLevel
+                    })
+                })
+            }
         }
     }
 
