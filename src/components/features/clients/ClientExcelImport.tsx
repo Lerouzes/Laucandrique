@@ -476,9 +476,9 @@ export function ClientExcelImport({
                     </DialogHeader>
 
                     {/* Step Content */}
-                    <div className="flex-1 overflow-y-auto min-h-[250px] p-6">
+                    <div className="flex-1 overflow-y-auto min-h-[250px] p-6 w-full min-w-0">
                         {step === 'preview' && (
-                            <div className="space-y-6">
+                            <div className="space-y-6 w-full min-w-0">
                                 
                                 {/* Info / Bulk actions row */}
                                 <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border border-zinc-800 bg-zinc-950/40">
@@ -539,8 +539,8 @@ export function ClientExcelImport({
                                 </div>
 
                                 {/* Preview Grid Table */}
-                                <div className="rounded-xl border border-zinc-850 overflow-hidden bg-zinc-950/20">
-                                    <div className="overflow-x-auto max-w-full">
+                                <div className="rounded-xl border border-zinc-850 overflow-hidden bg-zinc-950/20 w-full min-w-0">
+                                    <div className="overflow-x-auto w-full">
                                         <table className="w-full text-left border-collapse min-w-[1450px]">
                                             <thead>
                                                 <tr className="bg-zinc-900 border-b border-zinc-800 text-zinc-400 text-xxs font-bold uppercase tracking-wider">
