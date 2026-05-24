@@ -1,6 +1,9 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import fs from 'fs'
+
+export const dynamic = 'force-dynamic'
+
 import { getClientById, updateClientAction } from '@/actions/clients'
 import { getManagers } from '@/actions/managers'
 import { getQuotes } from '@/actions/quotes'

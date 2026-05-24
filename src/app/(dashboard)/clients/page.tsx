@@ -1,4 +1,7 @@
 import { Suspense } from 'react'
+
+export const dynamic = 'force-dynamic'
+
 import { getClients } from '@/actions/clients'
 import { ClientsTable } from '@/components/features/clients/ClientsTable'
 import { ClientFormDialog } from '@/components/features/clients/ClientFormDialog'
