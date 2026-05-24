@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 interface ClientOption {
     id: string
     name: string
+    sdc?: string
 }
 
 interface SearchableClientSelectProps {
@@ -39,9 +40,21 @@ export function SearchableClientSelect({
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
-    const filteredClients = clients.filter(c => 
-        c.name.toLowerCase().includes(search.toLowerCase())
-    )
+    const cleanStr = (str: string) => {
+        return str
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]/g, "")
+    }
+
+    const cleanSearch = cleanStr(search)
+
+    const filteredClients = clients.filter(c => {
+        const nameMatch = c.name.toLowerCase().includes(search.toLowerCase()) || cleanStr(c.name).includes(cleanSearch)
+        const sdcMatch = c.sdc ? (c.sdc.toLowerCase().includes(search.toLowerCase()) || cleanStr(c.sdc).includes(cleanSearch)) : false
+        return nameMatch || sdcMatch
+    })
 
     const handleSelect = (id: string, name: string) => {
         setSelectedId(id)
@@ -61,7 +74,7 @@ export function SearchableClientSelect({
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full bg-[#121318] border border-zinc-800 rounded-lg px-2.5 flex items-center justify-between text-white outline-none focus:border-purple-600 h-8 text-xs text-left"
             >
-                <span className={cn(selectedName ? "text-white" : "text-zinc-500 truncate pr-2")}>
+                <span className={cn(selectedName ? "text-white" : "text-zinc-550 truncate pr-2")}>
                     {selectedName || placeholder}
                 </span>
                 <ChevronsUpDown className="h-3 w-3 text-zinc-500 shrink-0" />
@@ -90,17 +103,21 @@ export function SearchableClientSelect({
                         ) : (
                             filteredClients.map((client) => {
                                 const isSelected = selectedId === client.id
+                                const displayName = client.sdc ? `${client.name} (${client.sdc})` : client.name
                                 return (
                                     <button
                                         key={client.id}
                                         type="button"
-                                        onClick={() => handleSelect(client.id, client.name)}
+                                        onClick={() => handleSelect(client.id, displayName)}
                                         className={cn(
                                             "w-full text-left px-2 py-1.5 rounded-md hover:bg-purple-950/20 hover:text-purple-400 text-xxs flex items-center justify-between text-zinc-300 transition-colors",
                                             isSelected && "bg-purple-950/30 text-purple-400 font-bold"
                                         )}
                                     >
-                                        <span className="truncate pr-1">{client.name}</span>
+                                        <span className="truncate pr-1">
+                                            {client.name}
+                                            {client.sdc && <span className="text-zinc-500 font-mono text-[9px] ml-1.5">[{client.sdc}]</span>}
+                                        </span>
                                         {isSelected && <Check className="h-3 w-3 text-purple-400 shrink-0" />}
                                     </button>
                                 )

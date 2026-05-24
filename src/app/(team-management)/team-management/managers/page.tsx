@@ -141,7 +141,11 @@ export default async function ManagersControlTowerPage() {
                             <div>
                                 <Label className="text-zinc-500 mb-0.5 block">Syndicat Perdu</Label>
                                 <SearchableClientSelect 
-                                    clients={activeClients.map(c => ({ id: c.id, name: c.company_name || c.full_name }))}
+                                    clients={activeClients.map(c => ({ 
+                                        id: c.id, 
+                                        name: c.company_name || c.full_name,
+                                        sdc: c.full_name || undefined
+                                    }))}
                                     name="client_id"
                                     placeholder="Sélectionner le syndicat..."
                                     required
@@ -207,7 +211,11 @@ export default async function ManagersControlTowerPage() {
                             <div>
                                 <Label className="text-zinc-500 mb-0.5 block">Syndicat / Copropriété</Label>
                                 <SearchableClientSelect 
-                                    clients={activeClients.map(c => ({ id: c.id, name: c.company_name || c.full_name }))}
+                                    clients={activeClients.map(c => ({ 
+                                        id: c.id, 
+                                        name: c.company_name || c.full_name,
+                                        sdc: c.full_name || undefined
+                                    }))}
                                     name="client_id"
                                     placeholder="Sélectionner le syndicat..."
                                     required
