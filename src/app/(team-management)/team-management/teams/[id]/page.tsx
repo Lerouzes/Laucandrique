@@ -37,19 +37,32 @@ export default async function TeamDetailPage({
     let sumPerformanceScore = 0
     const allAlerts: string[] = []
 
-    for (const m of managers || []) {
-        const stats = await getManagerStats(m.id)
-        if (stats) {
-            totalSyndicates += stats.syndicatesCount
-            totalDoors += stats.doorsCount
-            totalMrr += stats.mrr
-            sumWorkloadIndex += stats.workloadIndex
-            sumPerformanceScore += stats.performanceScore
-            stats.alerts.forEach(a => allAlerts.push(`${m.first_name} ${m.last_name}: ${a}`))
-            managerStats.push({
-                manager: m,
-                stats
+    if (managers && managers.length > 0) {
+        const statsList = await Promise.all(
+            managers.map(async (m) => {
+                try {
+                    const stats = await getManagerStats(m.id)
+                    return { manager: m, stats }
+                } catch (e) {
+                    console.error('Error fetching stats for manager', m.id, e)
+                    return { manager: m, stats: null }
+                }
             })
+        )
+
+        for (const { manager: m, stats } of statsList) {
+            if (stats) {
+                totalSyndicates += stats.syndicatesCount
+                totalDoors += stats.doorsCount
+                totalMrr += stats.mrr
+                sumWorkloadIndex += stats.workloadIndex
+                sumPerformanceScore += stats.performanceScore
+                stats.alerts?.forEach(a => allAlerts.push(`${m.first_name} ${m.last_name}: ${a}`))
+                managerStats.push({
+                    manager: m,
+                    stats
+                })
+            }
         }
     }
 

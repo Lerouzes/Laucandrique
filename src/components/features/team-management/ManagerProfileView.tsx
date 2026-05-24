@@ -25,13 +25,13 @@ import { cn } from '@/lib/utils'
 export function ManagerProfileView({
     manager,
     stats,
-    syndicates,
-    assemblies,
-    complaints,
-    oneOnOnes,
-    monthlyWorkload,
-    monthlyCalls,
-    audits
+    syndicates = [],
+    assemblies = [],
+    complaints = [],
+    oneOnOnes = [],
+    monthlyWorkload = [],
+    monthlyCalls = [],
+    audits = []
 }: {
     manager: any
     stats: any
@@ -61,7 +61,7 @@ export function ManagerProfileView({
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 bg-[#16171e]/70 border border-zinc-800/80 rounded-2xl shadow-xl gap-4">
                 <div className="flex items-center gap-4">
                     <div className="h-14 w-14 rounded-full bg-purple-900/40 border border-purple-800/40 flex items-center justify-center font-bold text-purple-400 text-xl">
-                        {manager.first_name[0]}{manager.last_name[0]}
+                        {((manager.first_name?.[0] || '') + (manager.last_name?.[0] || '')).toUpperCase()}
                     </div>
                     <div>
                         <h2 className="text-xl font-bold text-white tracking-tight">{manager.first_name} {manager.last_name}</h2>
@@ -137,16 +137,19 @@ export function ManagerProfileView({
                                 </div>
                                 <div className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl">
                                     <span className="text-zinc-500 block uppercase font-bold text-[9px] tracking-wider">Index Charge</span>
-                                    <span className="text-lg font-bold text-zinc-100 mt-1 block">{stats.workloadIndex}</span>
+                                    <span className="text-lg font-bold text-zinc-100 mt-1 block">{stats.workloadIndex || 0}</span>
                                 </div>
                                 <div className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl">
                                     <span className="text-zinc-500 block uppercase font-bold text-[9px] tracking-wider">Changements Forfaits YTD</span>
-                                    <span className="text-lg font-bold text-zinc-100 mt-1 block">{stats.packageChangesCount}</span>
+                                    <span className="text-lg font-bold text-zinc-100 mt-1 block">{stats.packageChangesCount || 0}</span>
                                 </div>
                                 <div className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl">
                                     <span className="text-zinc-500 block uppercase font-bold text-[9px] tracking-wider">Dernier 1-à-1</span>
                                     <span className="text-sm font-bold text-zinc-200 mt-1.5 block font-mono">
-                                        {stats.lastOneOnOneDate ? new Date(stats.lastOneOnOneDate).toLocaleDateString('fr-CA') : 'Aucun'}
+                                        {stats.lastOneOnOneDate ? (() => {
+                                            const d = new Date(stats.lastOneOnOneDate)
+                                            return isNaN(d.getTime()) ? 'Aucun' : d.toLocaleDateString('fr-CA')
+                                        })() : 'Aucun'}
                                     </span>
                                 </div>
                             </div>
@@ -160,7 +163,7 @@ export function ManagerProfileView({
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    {stats.alerts.length === 0 ? (
+                                    {(!stats.alerts || stats.alerts.length === 0) ? (
                                         <div className="p-4 rounded-xl bg-emerald-950/15 border border-emerald-900/30 text-center">
                                             <p className="text-xxs font-bold text-emerald-400">Aucun risque identifié</p>
                                             <p className="text-xxs text-zinc-500 mt-1">Le dossier de ce gestionnaire est conforme à tous les indicateurs.</p>
@@ -221,18 +224,18 @@ export function ManagerProfileView({
                                     <div className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-4">
                                         <h4 className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Taux de réponse téléphonique (Dernier mois)</h4>
                                         <div className="flex items-baseline justify-between">
-                                            <span className="text-2xl font-extrabold text-white">{stats.callsAnsweredPct}%</span>
-                                            <span className="text-xxs text-zinc-500">{stats.answeredCalls} répondus / {stats.totalCalls} reçus</span>
+                                            <span className="text-2xl font-extrabold text-white">{stats.callsAnsweredPct || 0}%</span>
+                                            <span className="text-xxs text-zinc-500">{stats.answeredCalls || 0} répondus / {stats.totalCalls || 0} reçus</span>
                                         </div>
                                         <div className="h-3 w-full bg-zinc-950 rounded-full overflow-hidden">
-                                            <div className="h-full bg-purple-600 rounded-full" style={{ width: `${stats.callsAnsweredPct}%` }} />
+                                            <div className="h-full bg-purple-600 rounded-full" style={{ width: `${stats.callsAnsweredPct || 0}%` }} />
                                         </div>
                                     </div>
 
                                     {/* Task completion rate card */}
                                     <div className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-4">
                                         <h4 className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Taux de fermeture des tâches</h4>
-                                        {stats.openTasks + stats.closedTasks === 0 ? (
+                                        {(stats.openTasks + stats.closedTasks === 0) ? (
                                             <p className="text-xs text-zinc-500 italic">Aucune donnée disponible</p>
                                         ) : (
                                             <>
@@ -393,9 +396,9 @@ export function ManagerProfileView({
                                 ) : (
                                     assemblies.map((a) => {
                                         // Calculate total score
-                                        const opsSum = (a.agenda_sent_on_time + a.quorum_respected + a.voting_controlled + a.duration_reasonable + a.technical_prep_complete)
-                                        const ldrSum = (a.manager_controlled_room + a.discussions_on_track + a.conflict_handled_professionally + a.answers_clear_confident + a.board_confidence_level + a.financial_statement_quality)
-                                        const docSum = (a.pv_drafted_quickly + a.templates_respected + a.resolutions_clear + a.followup_tasks_created)
+                                        const opsSum = (a.agenda_sent_on_time || 0) + (a.quorum_respected || 0) + (a.voting_controlled || 0) + (a.duration_reasonable || 0) + (a.technical_prep_complete || 0)
+                                        const ldrSum = (a.manager_controlled_room || 0) + (a.discussions_on_track || 0) + (a.conflict_handled_professionally || 0) + (a.answers_clear_confident || 0) + (a.board_confidence_level || 0) + (a.financial_statement_quality || 0)
+                                        const docSum = (a.pv_drafted_quickly || 0) + (a.templates_respected || 0) + (a.resolutions_clear || 0) + (a.followup_tasks_created || 0)
                                         
                                         const maxPoints = 15 * 5 // 15 questions * 5 points = 75
                                         const scorePct = Math.round(((opsSum + ldrSum + docSum) / maxPoints) * 100)
@@ -404,7 +407,12 @@ export function ManagerProfileView({
                                             <div key={a.id} className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-3">
                                                 <div className="flex justify-between items-center text-xxs">
                                                     <span className="font-bold text-zinc-200">#{a.clients?.company_name || 'Syndicat'}</span>
-                                                    <span className="text-zinc-500 font-mono">{new Date(a.assembly_date).toLocaleDateString('fr-CA')}</span>
+                                                    <span className="text-zinc-500 font-mono">
+                                                        {a.assembly_date ? (() => {
+                                                            const d = new Date(a.assembly_date)
+                                                            return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('fr-CA')
+                                                        })() : 'N/A'}
+                                                    </span>
                                                 </div>
                                                 <div className="grid grid-cols-3 gap-2 text-xxs pt-1">
                                                     <div>
@@ -474,8 +482,14 @@ export function ManagerProfileView({
                                                 </div>
                                                 {c.description && <p className="text-[10px] text-zinc-400 mt-1">{c.description}</p>}
                                                 <div className="text-[9px] text-zinc-500 pt-2 border-t border-zinc-850 flex justify-between">
-                                                    <span>Signalée le : {new Date(c.received_date).toLocaleDateString('fr-CA')}</span>
-                                                    {c.resolved_date && <span>Résolue le : {new Date(c.resolved_date).toLocaleDateString('fr-CA')}</span>}
+                                                    <span>Signalée le : {c.received_date ? (() => {
+                                                        const d = new Date(c.received_date)
+                                                        return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('fr-CA')
+                                                    })() : 'N/A'}</span>
+                                                    {c.resolved_date && <span>Résolue le : {(() => {
+                                                        const d = new Date(c.resolved_date)
+                                                        return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('fr-CA')
+                                                    })()}</span>}
                                                 </div>
                                             </div>
                                         )
@@ -519,7 +533,12 @@ export function ManagerProfileView({
                                             className="block p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl hover:border-purple-800/40 hover:bg-zinc-950/30 transition-all text-xxs space-y-2.5"
                                         >
                                             <div className="flex justify-between items-center">
-                                                <span className="font-bold text-zinc-200">Rencontre du {new Date(o.meeting_date).toLocaleDateString('fr-CA')}</span>
+                                                <span className="font-bold text-zinc-200">
+                                                    Rencontre du {o.meeting_date ? (() => {
+                                                        const d = new Date(o.meeting_date)
+                                                        return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('fr-CA')
+                                                    })() : 'N/A'}
+                                                </span>
                                                 <Badge variant="outline" className={cn(
                                                     "text-[8px] font-bold px-2 py-0.5",
                                                     o.status === 'completed' ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/40' : 'bg-amber-950/40 text-amber-400 border-amber-800/40'

@@ -136,7 +136,7 @@ export default async function SyndicatesBoardPage() {
                                             ? (Array.isArray(m)
                                                 ? (m[0] ? `${m[0].first_name?.[0] || ''}.${m[0].last_name || ''}` : 'N/A')
                                                 : `${m.first_name?.[0] || ''}.${m.last_name || ''}`)
-                                            : (client.manager || 'N/A')
+                                            : (typeof client.manager === 'string' ? client.manager : 'N/A')
                                         const contract = client.contracts?.[0]
                                         return (
                                             <div 
