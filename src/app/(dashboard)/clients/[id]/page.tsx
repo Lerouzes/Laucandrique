@@ -91,14 +91,14 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="status" className="text-xs text-zinc-400 font-semibold">Statut</Label>
-                <select id="status" name="status" defaultValue={client.status || 'active'} className="w-full h-9 rounded-md border border-zinc-855 bg-zinc-950 px-3 text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-800">
+                <select key={client.status || 'active'} id="status" name="status" defaultValue={client.status || 'active'} className="w-full h-9 rounded-md border border-zinc-855 bg-zinc-950 px-3 text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-800">
                   <option value="active">Actif</option>
                   <option value="inactive">Inactif</option>
                 </select>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="doors_count" className="text-xs text-zinc-400 font-semibold">Nombre de portes</Label>
-                <Input id="doors_count" type="number" name="doors_count" defaultValue={doorsCount} placeholder="ex: 24" className="bg-zinc-950 border-zinc-850 h-9 text-xs focus-visible:ring-zinc-800" />
+                <Input key={doorsCount} id="doors_count" type="number" name="doors_count" defaultValue={doorsCount} placeholder="ex: 24" className="bg-zinc-950 border-zinc-850 h-9 text-xs focus-visible:ring-zinc-800" />
               </div>
             </div>
           </div>
@@ -181,7 +181,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
             <div className="space-y-1.5">
               <Label htmlFor="package_name" className="text-xs text-zinc-400 font-semibold">Forfait / Package</Label>
-              <select id="package_name" name="package_name" defaultValue={contract?.package_name || ''} className="w-full h-9 rounded-md border border-zinc-855 bg-zinc-950 px-3 text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-800">
+              <select key={contract?.package_name || 'empty'} id="package_name" name="package_name" defaultValue={contract?.package_name || ''} className="w-full h-9 rounded-md border border-zinc-855 bg-zinc-950 px-3 text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-800">
                 <option value="">Non spécifié</option>
                 <option value="Bronze">Bronze</option>
                 <option value="Argent">Argent</option>
@@ -195,7 +195,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               <Label htmlFor="monthly_fee" className="text-xs text-zinc-400 font-semibold">Frais Mensuels ($)</Label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
-                <Input id="monthly_fee" type="number" step="0.01" name="monthly_fee" defaultValue={contract?.monthly_fee || ''} placeholder="0.00" className="pl-9 bg-zinc-950 border-zinc-850 h-9 text-xs focus-visible:ring-zinc-800" />
+                <Input key={contract?.monthly_fee || 'empty'} id="monthly_fee" type="number" step="0.01" name="monthly_fee" defaultValue={contract?.monthly_fee || ''} placeholder="0.00" className="pl-9 bg-zinc-950 border-zinc-850 h-9 text-xs focus-visible:ring-zinc-800" />
               </div>
             </div>
 
@@ -203,7 +203,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               <Label htmlFor="financial_year" className="text-xs text-zinc-400 font-semibold">Exercice financier (Date de début)</Label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
-                <Input id="financial_year" type="date" name="financial_year" defaultValue={contract?.start_date || ''} className="pl-9 bg-zinc-950 border-zinc-850 h-9 text-xs focus-visible:ring-zinc-800" />
+                <Input key={contract?.start_date || 'empty'} id="financial_year" type="date" name="financial_year" defaultValue={contract?.start_date || ''} className="pl-9 bg-zinc-950 border-zinc-850 h-9 text-xs focus-visible:ring-zinc-800" />
               </div>
             </div>
           </div>
