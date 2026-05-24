@@ -21,9 +21,14 @@ export default async function DashboardLayout({
         .eq('id', user.id)
         .single()
 
+    // Redirect Managers to Team Management
+    if (profile?.role === 'Managers') {
+        redirect('/team-management/dashboard')
+    }
+
     return (
         <div className="flex h-screen brand-surface text-white">
-            <Sidebar />
+            <Sidebar profile={profile} />
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 <Header user={user} profile={profile} />
                 <main className="flex-1 overflow-y-auto bg-[#1a4a82] p-6">

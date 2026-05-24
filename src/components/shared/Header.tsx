@@ -33,7 +33,7 @@ export function Header({ user, profile }: { user: User, profile: Profile | null 
                     </SheetTrigger>
                     <SheetContent side="left" className="w-64 p-0 bg-[#103f75] border-r border-white/20 text-white">
                         <div className="flex h-full flex-col">
-                            <SidebarContent />
+                            <SidebarContent profile={profile} />
                         </div>
                     </SheetContent>
                 </Sheet>

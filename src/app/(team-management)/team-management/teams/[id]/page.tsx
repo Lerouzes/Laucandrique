@@ -1,0 +1,212 @@
+import { getManagerStats } from '@/actions/team-management'
+import { createClient } from '@/utils/supabase/server'
+import { notFound } from 'next/navigation'
+import Link from 'next/link'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Network, Users, Building2, DoorOpen, DollarSign, Calendar, BarChart3, AlertTriangle, ArrowRight } from 'lucide-react'
+
+export default async function TeamDetailPage({
+    params
+}: {
+    params: Promise<{ id: string }>
+}) {
+    const { id } = await params
+    const supabase = await createClient()
+
+    // 1. Get team details
+    const { data: team } = await supabase
+        .from('manager_teams')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+    if (!team) notFound()
+
+    // 2. Get managers in this team
+    const { data: managers } = await supabase
+        .from('managers')
+        .select('*')
+        .eq('team_id', id)
+
+    const managerStats = []
+    let totalSyndicates = 0
+    let totalDoors = 0
+    let totalMrr = 0
+    let sumWorkloadIndex = 0
+    let sumPerformanceScore = 0
+    const allAlerts: string[] = []
+
+    for (const m of managers || []) {
+        const stats = await getManagerStats(m.id)
+        if (stats) {
+            totalSyndicates += stats.syndicatesCount
+            totalDoors += stats.doorsCount
+            totalMrr += stats.mrr
+            sumWorkloadIndex += stats.workloadIndex
+            sumPerformanceScore += stats.performanceScore
+            stats.alerts.forEach(a => allAlerts.push(`${m.first_name} ${m.last_name}: ${a}`))
+            managerStats.push({
+                manager: m,
+                stats
+            })
+        }
+    }
+
+    const avgWorkload = managerStats.length > 0 ? Math.round(sumWorkloadIndex / managerStats.length) : 0
+    const avgPerformance = managerStats.length > 0 ? Math.round(sumPerformanceScore / managerStats.length) : 0
+
+    return (
+        <div className="space-y-6">
+            {/* Header */}
+            <div>
+                <Link href="/team-management/teams" className="text-xxs text-zinc-400 hover:text-white transition-colors">
+                    ← Retour aux équipes
+                </Link>
+                <h2 className="text-xl font-bold tracking-tight text-white uppercase mt-2 flex items-center gap-2">
+                    <Network className="h-5 w-5 text-purple-400" />
+                    Équipe : {team.name}
+                </h2>
+                <p className="text-xs text-zinc-400">
+                    Aperçu opérationnel et indicateurs de performance de cette équipe de gestion.
+                </p>
+            </div>
+
+            {/* Metrics cards */}
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                    <CardHeader className="pb-2">
+                        <CardDescription className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Syndicats Actifs</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex items-baseline justify-between">
+                        <div className="text-xl font-extrabold text-white">{totalSyndicates}</div>
+                        <Building2 className="h-4 w-4 text-purple-400" />
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                    <CardHeader className="pb-2">
+                        <CardDescription className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Portes Gérées</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex items-baseline justify-between">
+                        <div className="text-xl font-extrabold text-white">{totalDoors}</div>
+                        <DoorOpen className="h-4 w-4 text-purple-400" />
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                    <CardHeader className="pb-2">
+                        <CardDescription className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Honoraires d'Équipe</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex items-baseline justify-between">
+                        <div className="text-xl font-extrabold text-emerald-400">${totalMrr.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</div>
+                        <DollarSign className="h-4 w-4 text-emerald-400" />
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                    <CardHeader className="pb-2">
+                        <CardDescription className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Performance Globale</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex items-baseline justify-between">
+                        <div className="text-xl font-extrabold text-purple-400">{avgPerformance}%</div>
+                        <BarChart3 className="h-4 w-4 text-purple-400" />
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Split Content: Managers and Alerts */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* Managers Detail List (2/3 cols) */}
+                <div className="lg:col-span-2 space-y-4">
+                    <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                        <CardHeader>
+                            <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                                <Users className="h-4 w-4 text-purple-400" />
+                                Membres de l'Équipe ({managerStats.length})
+                            </CardTitle>
+                            <CardDescription className="text-xxs text-zinc-400">
+                                Répartition individuelle de la charge et scores de performance.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-3.5">
+                                {managerStats.length === 0 ? (
+                                    <p className="text-xs text-zinc-500 italic py-6 text-center">Aucun gestionnaire dans cette équipe.</p>
+                                ) : (
+                                    managerStats.map(({ manager, stats }) => {
+                                        const riskColor = 
+                                            stats.riskLevel === 'Faible' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-800/40' :
+                                            stats.riskLevel === 'Modéré' ? 'bg-amber-500/20 text-amber-400 border-amber-800/40' :
+                                            'bg-rose-500/20 text-rose-400 border-rose-800/40'
+
+                                        return (
+                                            <Link
+                                                key={manager.id}
+                                                href={`/team-management/managers/${manager.id}`}
+                                                className="flex flex-col sm:flex-row justify-between sm:items-center p-3.5 rounded-xl border border-zinc-805 bg-zinc-950/20 hover:bg-zinc-950/50 hover:border-zinc-700 transition-all gap-4 text-xxs"
+                                            >
+                                                <div className="space-y-0.5">
+                                                    <p className="text-xs font-bold text-zinc-200">{manager.first_name} {manager.last_name}</p>
+                                                    <p className="text-zinc-500">{manager.email || 'Pas de courriel'}</p>
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-4">
+                                                    <div className="px-2.5 py-1 bg-zinc-900 border border-zinc-850 rounded-lg">
+                                                        <span className="text-zinc-500 block uppercase font-bold text-[8px]">Charge (Index)</span>
+                                                        <span className="text-zinc-300 font-bold mt-0.5 block">{stats.workloadIndex}</span>
+                                                    </div>
+                                                    <div className="px-2.5 py-1 bg-zinc-900 border border-zinc-850 rounded-lg">
+                                                        <span className="text-zinc-500 block uppercase font-bold text-[8px]">Performance</span>
+                                                        <span className="text-purple-400 font-bold mt-0.5 block">{stats.performanceScore}%</span>
+                                                    </div>
+                                                    <Badge variant="outline" className={`h-6 text-[9px] font-bold ${riskColor}`}>
+                                                        Risque: {stats.riskLevel}
+                                                    </Badge>
+                                                    <ArrowRight className="h-4 w-4 text-zinc-600 self-center hidden sm:block" />
+                                                </div>
+                                            </Link>
+                                        )
+                                    })
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Team Alerts Drawer (1/3 col) */}
+                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md border-dashed">
+                    <CardHeader>
+                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-amber-500 animate-pulse" />
+                            Alerte de Risques Actifs
+                        </CardTitle>
+                        <CardDescription className="text-xxs text-zinc-400">
+                            Risques opérationnels détectés automatiquement pour l'équipe.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {allAlerts.length === 0 ? (
+                            <div className="p-4 rounded-xl bg-emerald-950/15 border border-emerald-900/30 text-center">
+                                <p className="text-xxs font-bold text-emerald-400">Aucun Risque Détecté</p>
+                                <p className="text-[10px] text-zinc-500 mt-1">L'équipe respecte tous les standards opérationnels!</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1">
+                                {allAlerts.map((alert, idx) => (
+                                    <div 
+                                        key={idx} 
+                                        className="p-3 rounded-xl border border-zinc-805 bg-zinc-950/30 flex items-start gap-2.5 text-xxs text-zinc-300"
+                                    >
+                                        <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                                        <span className="leading-relaxed">{alert}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
+    )
+}
