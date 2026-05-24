@@ -14,7 +14,13 @@ export default async function ClientsPage({
     const resolvedSearchParams = await searchParams;
     const query = resolvedSearchParams.query || ''
 
-    const [clients, managers] = await Promise.all([getClients(query), getManagers()])
+    let clients: any[] = []
+    let managers: any[] = []
+    try {
+        ;[clients, managers] = await Promise.all([getClients(query), getManagers()])
+    } catch (err) {
+        console.error('ClientsPage data fetch error:', err)
+    }
 
     return (
         <div className="space-y-6">

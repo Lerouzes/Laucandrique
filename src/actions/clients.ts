@@ -4,22 +4,41 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 export async function getClients(query?: string) {
-    const supabase = await createClient()
+    try {
+        const supabase = await createClient()
 
-    let request = supabase.from('clients').select('*, managers(first_name,last_name,email)').order('created_at', { ascending: false })
+        let request = supabase
+            .from('clients')
+            .select('*, managers(first_name,last_name,email)')
+            .order('created_at', { ascending: false })
 
-    if (query) {
-        request = request.or(`full_name.ilike.%${query}%,company_name.ilike.%${query}%`)
-    }
+        if (query) {
+            request = request.or(`full_name.ilike.%${query}%,company_name.ilike.%${query}%`)
+        }
 
-    const { data, error } = await request
+        const { data, error } = await request
 
-    if (error) {
-        console.error('Error fetching clients:', error)
+        if (error) {
+            console.error('Error fetching clients (with join):', error)
+            // Fall back to simple select without managers join
+            const fallback = supabase
+                .from('clients')
+                .select('*')
+                .order('created_at', { ascending: false })
+            if (query) fallback.or(`full_name.ilike.%${query}%,company_name.ilike.%${query}%`)
+            const { data: fallbackData, error: fallbackError } = await fallback
+            if (fallbackError) {
+                console.error('Error fetching clients (fallback):', fallbackError)
+                return []
+            }
+            return fallbackData ?? []
+        }
+
+        return data ?? []
+    } catch (err) {
+        console.error('getClients exception:', err)
         return []
     }
-
-    return data
 }
 
 export async function createClientAction(formData: FormData) {
