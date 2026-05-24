@@ -157,7 +157,12 @@ export default async function SyndicatesBoardPage() {
 
                                                 {audit && (
                                                     <div className="flex justify-between items-center text-[9px] pt-1.5 border-t border-zinc-850">
-                                                        <span className="text-zinc-500 font-mono">{new Date(audit.audit_date).toLocaleDateString('fr-CA')}</span>
+                                                        <span className="text-zinc-500 font-mono">
+                                                            {audit.audit_date ? (() => {
+                                                                const d = new Date(audit.audit_date)
+                                                                return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('fr-CA')
+                                                            })() : 'N/A'}
+                                                        </span>
                                                         <Link 
                                                             href={`/team-management/audits/${audit.id}`}
                                                             className="text-purple-400 hover:text-purple-300 font-bold flex items-center gap-0.5 hover:underline"

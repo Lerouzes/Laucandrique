@@ -23,8 +23,13 @@ export default async function TeamsListPage() {
     if (managers && managers.length > 0) {
         const statsList = await Promise.all(
             managers.map(async (m) => {
-                const stats = await getManagerStats(m.id)
-                return { id: m.id, stats }
+                try {
+                    const stats = await getManagerStats(m.id)
+                    return { id: m.id, stats }
+                } catch (e) {
+                    console.error('Error fetching stats for manager', m.id, e)
+                    return { id: m.id, stats: null }
+                }
             })
         )
         statsList.forEach(item => {
@@ -82,7 +87,7 @@ export default async function TeamsListPage() {
             avgWorkload,
             avgPerformance,
             riskCount,
-            managers: managerDetails
+            teamManagersList: managerDetails
         })
     }
 
@@ -98,7 +103,7 @@ export default async function TeamsListPage() {
 
             {/* Teams Grid */}
             <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-                {teamStatsList.map(({ team, managersCount, totalSyndicates, totalDoors, totalMrr, avgWorkload, avgPerformance, riskCount, managers }) => {
+                {teamStatsList.map(({ team, managersCount, totalSyndicates, totalDoors, totalMrr, avgWorkload, avgPerformance, riskCount, teamManagersList }) => {
                     const workloadColor = 
                         avgWorkload > 120 ? 'text-rose-400' :
                         avgWorkload > 80 ? 'text-amber-400' : 'text-emerald-400'
@@ -167,11 +172,11 @@ export default async function TeamsListPage() {
                                 {/* Managers list summary */}
                                 <div className="space-y-2">
                                     <h4 className="text-xxs font-bold text-zinc-500 uppercase tracking-wider">Gestionnaires</h4>
-                                    {managers.length === 0 ? (
+                                    {teamManagersList.length === 0 ? (
                                         <span className="text-xxs text-zinc-600 italic">Aucun gestionnaire assigné à cette équipe.</span>
                                     ) : (
                                         <div className="grid grid-cols-2 gap-2">
-                                            {managers.map(mgr => (
+                                            {teamManagersList.map(mgr => (
                                                 <Link 
                                                     key={mgr.id} 
                                                     href={`/team-management/managers/${mgr.id}`}
@@ -180,8 +185,8 @@ export default async function TeamsListPage() {
                                                     <span className="text-zinc-300 truncate font-semibold">{mgr.name}</span>
                                                     <span className={cn(
                                                         "h-1.5 w-1.5 rounded-full shrink-0",
-                                                        mgr.stats.riskLevel === 'Critique' ? 'bg-rose-500' :
-                                                        mgr.stats.riskLevel === 'Élevé' ? 'bg-amber-400' : 'bg-emerald-400'
+                                                        mgr.stats?.riskLevel === 'Critique' ? 'bg-rose-500' :
+                                                        mgr.stats?.riskLevel === 'Élevé' ? 'bg-amber-400' : 'bg-emerald-400'
                                                     )}></span>
                                                 </Link>
                                             ))}
