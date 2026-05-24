@@ -123,6 +123,20 @@ export async function getClientById(id: string) {
 
 export async function updateClientAction(clientId: string, formData: FormData) {
     const supabase = await createClient()
+
+    // Debug logging to the database to inspect what production actually receives
+    try {
+        const keys = Array.from(formData.keys())
+        await supabase.from('package_change_logs').insert({
+            client_id: clientId,
+            old_package: 'DEBUG',
+            new_package: String(formData.get('package_name') || 'NULL'),
+            notes: `Keys: ${keys.join(', ')} | fee: ${formData.get('monthly_fee')} | year: ${formData.get('financial_year')} | doors: ${formData.get('doors_count')} | status: ${formData.get('status')}`
+        })
+    } catch (dbgEx) {
+        console.error('Debug log insertion failed:', dbgEx)
+    }
+
     const payload = {
         full_name: String(formData.get('full_name') || '').trim(),
         company_name: String(formData.get('company_name') || '') || null,
