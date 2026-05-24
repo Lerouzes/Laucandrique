@@ -158,6 +158,8 @@ export async function updateClientAction(clientId: string, formData: FormData) {
         )
     if (contractErr) {
         console.error('Error updating contract on client update:', contractErr.message)
+        logImportError('Error updating contract on client update: ' + contractErr.message)
+        throw new Error('Database error updating contract: ' + contractErr.message)
     }
 
     // Doors count
@@ -168,6 +170,8 @@ export async function updateClientAction(clientId: string, formData: FormData) {
             const { error: deleteErr } = await supabase.from('doors').delete().eq('client_id', clientId)
             if (deleteErr) {
                 console.error('Error deleting doors on client update:', deleteErr.message)
+                logImportError('Error deleting doors on client update: ' + deleteErr.message)
+                throw new Error('Database error deleting doors: ' + deleteErr.message)
             }
             if (doorsNum > 0) {
                 const doorsToInsert = Array.from({ length: doorsNum }, (_, i) => ({
@@ -177,6 +181,8 @@ export async function updateClientAction(clientId: string, formData: FormData) {
                 const { error: insertErr } = await supabase.from('doors').insert(doorsToInsert)
                 if (insertErr) {
                     console.error('Error inserting doors on client update:', insertErr.message)
+                    logImportError('Error inserting doors on client update: ' + insertErr.message)
+                    throw new Error('Database error inserting doors: ' + insertErr.message)
                 }
             } else {
                 const { error: placeholderErr } = await supabase.from('doors').insert({
@@ -185,6 +191,8 @@ export async function updateClientAction(clientId: string, formData: FormData) {
                 })
                 if (placeholderErr) {
                     console.error('Error inserting placeholder door on client update:', placeholderErr.message)
+                    logImportError('Error inserting placeholder door on client update: ' + placeholderErr.message)
+                    throw new Error('Database error inserting placeholder door: ' + placeholderErr.message)
                 }
             }
         }
