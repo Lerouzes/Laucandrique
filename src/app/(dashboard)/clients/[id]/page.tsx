@@ -41,6 +41,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       </div>
 
       <ClientDetailForm
+        key={`${contract?.package_name ?? ''}-${contract?.monthly_fee ?? ''}-${contract?.start_date ?? ''}-${doorsCount}`}
         clientId={id}
         client={client}
         managers={managers}
