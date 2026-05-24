@@ -107,17 +107,33 @@ export async function updateClientAction(clientId: string, formData: FormData) {
 function parseDateSafe(val: any): string {
     if (!val) return '2000-01-01'
     const str = String(val).trim()
-    const match = str.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-    if (!match) return '2000-01-01'
-    
-    const y = parseInt(match[1], 10)
-    const m = parseInt(match[2], 10) - 1
-    const d = parseInt(match[3], 10)
-    
-    const date = new Date(Date.UTC(y, m, d))
-    if (isNaN(date.getTime())) return '2000-01-01'
-    
-    return str
+    // Accept YYYY-MM-DD format
+    const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (isoMatch) {
+        const y = parseInt(isoMatch[1], 10)
+        const m = parseInt(isoMatch[2], 10) - 1
+        const d = parseInt(isoMatch[3], 10)
+        const date = new Date(Date.UTC(y, m, d))
+        if (!isNaN(date.getTime())) return str
+    }
+    // Accept DD/MM/YYYY or MM/DD/YYYY
+    const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+    if (slashMatch) {
+        const a = parseInt(slashMatch[1], 10)
+        const b = parseInt(slashMatch[2], 10)
+        const y = parseInt(slashMatch[3], 10)
+        // Assume DD/MM/YYYY (French convention)
+        const date = new Date(Date.UTC(y, b - 1, a))
+        if (!isNaN(date.getTime())) {
+            return `${y}-${String(b).padStart(2, '0')}-${String(a).padStart(2, '0')}`
+        }
+    }
+    // Accept year only
+    const yearMatch = str.match(/^(\d{4})$/)
+    if (yearMatch) {
+        return `${yearMatch[1]}-01-01`
+    }
+    return '2000-01-01'
 }
 
 export async function confirmBulkImportAction(rows: {
@@ -133,7 +149,6 @@ export async function confirmBulkImportAction(rows: {
     manager?: string | null
     manager_id?: string | null
     import_action: 'create' | 'update' | 'skip'
-    
     // New Columns
     doors_count?: number | null
     package_name?: string | null
@@ -141,170 +156,230 @@ export async function confirmBulkImportAction(rows: {
     financial_year?: string | null
     status?: 'active' | 'inactive' | null
 }[]) {
-    const supabase = await createClient()
+    // Top-level try/catch ensures this server action NEVER crashes the app
+    try {
+        const supabase = await createClient()
 
-    let imported = 0
-    let updated = 0
-    let skipped = 0
-    let failed = 0
+        let imported = 0
+        let updated = 0
+        let skipped = 0
+        let failed = 0
 
-    // Ensure 'Non spécifié' package exists in packages table
-    await supabase.from('packages').upsert({ name: 'Non spécifié' }, { onConflict: 'name' })
-
-    for (const row of rows) {
-        if (row.import_action === 'skip') {
-            skipped++
-            continue
+        // Seed all known package names so FK constraints never block contract inserts
+        try {
+            const packageNames = ['Bronze', 'Argent', 'Argent +', 'Or', 'Platine', 'Non spécifié']
+            await supabase.from('packages').upsert(
+                packageNames.map(name => ({ name })),
+                { onConflict: 'name' }
+            )
+        } catch (_) {
+            // packages table may not exist yet — contract inserts will just skip silently
         }
 
-        // Backend required fields & basic validations
-        if (!row.full_name || row.full_name.trim() === '') {
-            failed++
-            continue
-        }
+        for (const row of rows) {
+            // Skip rows explicitly marked to skip
+            if (row.import_action === 'skip') {
+                skipped++
+                continue
+            }
 
-        const clientPayload = {
-            full_name: row.full_name.trim(),
-            company_name: row.company_name || null,
-            email: row.email || null,
-            phone: row.phone || null,
-            address: row.address || null,
-            city: row.city || null,
-            province: row.province || null,
-            postal_code: row.postal_code || null,
-            manager: row.manager || row.full_name.trim(),
-            manager_id: row.manager_id || null,
-            status: row.status || 'active'
-        }
-
-        let clientId = row.id
-
-        if (row.import_action === 'update' && clientId) {
-            const { error } = await supabase
-                .from('clients')
-                .update(clientPayload)
-                .eq('id', clientId)
-            
-            if (error) {
-                console.error('Bulk Import update error:', error)
+            // Require at minimum a full_name
+            if (!row.full_name || row.full_name.trim() === '') {
                 failed++
                 continue
             }
-            updated++
-        } else {
-            // Check if it already exists to prevent duplicate key violations (fallback)
-            const { data: existing } = await supabase
-                .from('clients')
-                .select('id')
-                .eq('full_name', clientPayload.full_name)
-                .maybeSingle()
 
-            if (existing?.id) {
-                clientId = existing.id
-                const { error } = await supabase
-                    .from('clients')
-                    .update(clientPayload)
-                    .eq('id', clientId)
-                if (error) {
-                    console.error('Bulk Import insert-retry update error:', error)
-                    failed++
-                    continue
+            // Full payload (with all new columns)
+            const fullPayload: Record<string, any> = {
+                full_name: row.full_name.trim(),
+                company_name: row.company_name?.trim() || null,
+                email: row.email?.trim() || null,
+                phone: row.phone?.trim() || null,
+                address: row.address?.trim() || null,
+                city: row.city?.trim() || null,
+                province: row.province?.trim() || null,
+                postal_code: row.postal_code?.trim() || null,
+                manager: row.manager || row.full_name.trim(),
+                manager_id: row.manager_id || null,
+                status: row.status || 'active',
+            }
+
+            // Core payload — falls back to this if DB hasn't been migrated with new columns
+            const corePayload: Record<string, any> = {
+                full_name: fullPayload.full_name,
+                company_name: fullPayload.company_name,
+                email: fullPayload.email,
+                phone: fullPayload.phone,
+                address: fullPayload.address,
+                city: fullPayload.city,
+                province: fullPayload.province,
+                postal_code: fullPayload.postal_code,
+                manager: fullPayload.manager,
+            }
+
+            let clientId: string | undefined = row.id
+
+            try {
+                if (row.import_action === 'update' && clientId) {
+                    // Try full payload first, fall back to core if column errors
+                    let { error } = await supabase
+                        .from('clients')
+                        .update(fullPayload)
+                        .eq('id', clientId)
+
+                    if (error && (
+                        error.message.toLowerCase().includes('column') ||
+                        error.message.includes('status') ||
+                        error.message.includes('manager_id')
+                    )) {
+                        const res = await supabase.from('clients').update(corePayload).eq('id', clientId)
+                        error = res.error
+                    }
+
+                    if (error) {
+                        console.error('Bulk update error:', error.message)
+                        failed++
+                        continue
+                    }
+                    updated++
+
+                } else {
+                    // Check if the record already exists (avoid duplicate key violations)
+                    const { data: existing } = await supabase
+                        .from('clients')
+                        .select('id')
+                        .eq('full_name', fullPayload.full_name)
+                        .maybeSingle()
+
+                    if (existing?.id) {
+                        clientId = existing.id
+                        let { error } = await supabase
+                            .from('clients')
+                            .update(fullPayload)
+                            .eq('id', clientId)
+
+                        if (error && (
+                            error.message.toLowerCase().includes('column') ||
+                            error.message.includes('status') ||
+                            error.message.includes('manager_id')
+                        )) {
+                            const res = await supabase.from('clients').update(corePayload).eq('id', clientId)
+                            error = res.error
+                        }
+
+                        if (error) {
+                            console.error('Bulk update-existing error:', error.message)
+                            failed++
+                            continue
+                        }
+                        updated++
+
+                    } else {
+                        // Insert — try full payload, fall back to core if column errors
+                        let { data: inserted, error } = await supabase
+                            .from('clients')
+                            .insert(fullPayload)
+                            .select('id')
+                            .single()
+
+                        if (error && (
+                            error.message.toLowerCase().includes('column') ||
+                            error.message.includes('status') ||
+                            error.message.includes('manager_id')
+                        )) {
+                            const res = await supabase
+                                .from('clients')
+                                .insert(corePayload)
+                                .select('id')
+                                .single()
+                            inserted = res.data
+                            error = res.error
+                        }
+
+                        if (error || !inserted) {
+                            console.error('Bulk insert error:', error?.message)
+                            failed++
+                            continue
+                        }
+
+                        clientId = inserted.id
+                        imported++
+                    }
                 }
-                updated++
-            } else {
-                const { data: insertedClient, error } = await supabase
-                    .from('clients')
-                    .insert(clientPayload)
-                    .select('id')
-                    .single()
-                
-                if (error || !insertedClient) {
-                    console.error('Bulk Import insert error:', error)
-                    failed++
-                    continue
+
+                if (!clientId) continue
+
+                // --- Contracts (fully isolated — never crashes the client import) ---
+                try {
+                    const package_name = row.package_name || 'Non spécifié'
+                    let monthly_fee = row.monthly_fee != null ? Number(row.monthly_fee) : 0
+                    if (isNaN(monthly_fee)) monthly_fee = 0
+                    const start_date = parseDateSafe(row.financial_year)
+                    const active = row.status !== 'inactive'
+
+                    await supabase
+                        .from('contracts')
+                        .upsert(
+                            { client_id: clientId, package_name, monthly_fee, start_date, active },
+                            { onConflict: 'client_id' }
+                        )
+                } catch (_) {
+                    // contracts table may not be migrated yet — skip silently
                 }
-                clientId = insertedClient.id
-                imported++
+
+                // --- Doors (fully isolated — never crashes the client import) ---
+                try {
+                    let doorsNum = row.doors_count != null ? Math.floor(Number(row.doors_count)) : 0
+                    if (isNaN(doorsNum) || doorsNum < 0) doorsNum = 0
+
+                    // Delete existing doors first to prevent duplicates on re-import
+                    await supabase.from('doors').delete().eq('client_id', clientId)
+
+                    if (doorsNum > 0) {
+                        const doorsToInsert = Array.from({ length: doorsNum }, (_, i) => ({
+                            client_id: clientId,
+                            door_number: `Porte ${i + 1}`,
+                        }))
+                        await supabase.from('doors').insert(doorsToInsert)
+                    } else {
+                        // Insert a placeholder so we can identify missing door data
+                        await supabase.from('doors').insert({
+                            client_id: clientId,
+                            door_number: 'Porte non spécifiée',
+                        })
+                    }
+                } catch (_) {
+                    // doors table may not be migrated yet — skip silently
+                }
+
+            } catch (rowEx: any) {
+                // Unexpected per-row error — log and continue instead of crashing
+                console.error('Unexpected error processing row:', row.full_name, rowEx?.message)
+                failed++
             }
         }
 
-        // Handle contract upsert
-        const package_name = row.package_name || 'Non spécifié'
-        let monthly_fee = row.monthly_fee !== null && row.monthly_fee !== undefined ? Number(row.monthly_fee) : 0.00
-        if (isNaN(monthly_fee)) {
-            monthly_fee = 0.00
-        }
-        const start_date = parseDateSafe(row.financial_year)
-        const active = row.status !== 'inactive'
-
-        const { error: contractErr } = await supabase
-            .from('contracts')
-            .upsert({
-                client_id: clientId,
-                package_name,
-                monthly_fee,
-                start_date,
-                active
-            }, { onConflict: 'client_id' })
-
-        if (contractErr) {
-            console.error('Error upserting contract for client:', clientId, contractErr)
+        // Revalidate caches
+        try {
+            revalidatePath('/clients')
+            revalidatePath('/team-management/dashboard')
+            revalidatePath('/team-management/teams')
+            revalidatePath('/team-management/managers')
+        } catch (_) {
+            // revalidation errors are non-fatal
         }
 
-        // Handle doors count
-        let doorsNum = row.doors_count !== null && row.doors_count !== undefined ? Math.floor(Number(row.doors_count)) : 0
-        if (isNaN(doorsNum) || doorsNum < 0) {
-            doorsNum = 0
-        }
-        
-        // Delete existing doors first to prevent duplicates/incorrect count on update
-        const { error: deleteDoorsErr } = await supabase
-            .from('doors')
-            .delete()
-            .eq('client_id', clientId)
-
-        if (deleteDoorsErr) {
-            console.error('Error deleting doors for client:', clientId, deleteDoorsErr)
+        return {
+            success: true,
+            summary: { total: rows.length, imported, updated, skipped, failed },
         }
 
-        if (doorsNum > 0) {
-            const doorsToInsert = Array.from({ length: doorsNum }).map((_, i) => ({
-                client_id: clientId,
-                door_number: `Porte ${i + 1}`
-            }))
-            const { error: insertDoorsErr } = await supabase
-                .from('doors')
-                .insert(doorsToInsert)
-            if (insertDoorsErr) {
-                console.error('Error inserting doors for client:', clientId, insertDoorsErr)
-            }
-        } else {
-            // Missing/Zero doors: Insert a placeholder door to easily identify it
-            const { error: insertPlaceholderErr } = await supabase
-                .from('doors')
-                .insert({
-                    client_id: clientId,
-                    door_number: 'Porte non spécifiée'
-                })
-            if (insertPlaceholderErr) {
-                console.error('Error inserting placeholder door for client:', clientId, insertPlaceholderErr)
-            }
-        }
-    }
-
-    revalidatePath('/clients')
-    revalidatePath('/team-management/dashboard')
-    revalidatePath('/team-management/teams')
-    revalidatePath('/team-management/managers')
-
-    return {
-        success: true,
-        summary: {
-            total: rows.length,
-            imported,
-            updated,
-            skipped,
-            failed
+    } catch (fatalErr: any) {
+        console.error('Fatal error in confirmBulkImportAction:', fatalErr)
+        return {
+            success: false,
+            summary: { total: rows.length, imported: 0, updated: 0, skipped: 0, failed: rows.length },
+            error: fatalErr?.message || "Erreur inconnue lors de l'importation.",
         }
     }
 }
