@@ -53,6 +53,9 @@ export default async function TeamsListPage() {
         let sumPerformanceScore = 0
         let riskCount = 0
         let managersWithStats = 0
+        let totalApprovedQuotes = 0
+        let totalDeniedQuotes = 0
+        let totalSentQuotes = 0
 
         const managerDetails = []
 
@@ -64,6 +67,9 @@ export default async function TeamsListPage() {
                 totalMrr += stats.mrr
                 sumWorkloadIndex += stats.workloadIndex
                 sumPerformanceScore += stats.performanceScore
+                totalApprovedQuotes += stats.approvedQuotesCount || 0
+                totalDeniedQuotes += stats.deniedQuotesCount || 0
+                totalSentQuotes += stats.sentQuotesCount || 0
                 if (stats.riskLevel === 'Critique' || stats.riskLevel === 'Élevé') {
                     riskCount++
                 }
@@ -78,6 +84,8 @@ export default async function TeamsListPage() {
 
         const avgWorkload = managersWithStats > 0 ? Math.round(sumWorkloadIndex / managersWithStats) : 0
         const avgPerformance = managersWithStats > 0 ? Math.round(sumPerformanceScore / managersWithStats) : 0
+        const totalPresentedQuotes = totalApprovedQuotes + totalDeniedQuotes + totalSentQuotes
+        const teamQuoteApprovalRate = totalPresentedQuotes > 0 ? Math.round((totalApprovedQuotes / totalPresentedQuotes) * 100) : 0
 
         teamStatsList.push({
             team,
@@ -88,7 +96,10 @@ export default async function TeamsListPage() {
             avgWorkload,
             avgPerformance,
             riskCount,
-            teamManagersList: managerDetails
+            teamManagersList: managerDetails,
+            quoteApprovalRate: teamQuoteApprovalRate,
+            totalApprovedQuotes,
+            totalPresentedQuotes
         })
     }
 
@@ -158,6 +169,12 @@ export default async function TeamsListPage() {
                                             {avgWorkload}
                                         </span>
                                     </div>
+                                    <div className="p-2.5 bg-zinc-900/40 border border-zinc-850 rounded-xl col-span-2 border-purple-900/20">
+                                        <span className="text-purple-400 block uppercase tracking-wider font-bold">Projets Approuvés Équipe</span>
+                                        <span className="text-xs font-bold text-zinc-200 mt-1 block">
+                                            {quoteApprovalRate}% <span className="text-[10px] font-normal text-zinc-500 ml-1">({totalApprovedQuotes} acceptés / {totalPresentedQuotes} présentés)</span>
+                                        </span>
+                                    </div>
                                 </div>
 
                                 {/* Active alert warnings inside team */}
@@ -183,7 +200,9 @@ export default async function TeamsListPage() {
                                                     href={`/team-management/managers/${mgr.id}`}
                                                     className="p-2 bg-zinc-950/30 border border-zinc-850/80 rounded-lg hover:border-purple-800/40 hover:bg-zinc-950/60 transition-all flex items-center justify-between text-xxs"
                                                 >
-                                                    <span className="text-zinc-300 truncate font-semibold">{mgr.name}</span>
+                                                    <span className="text-zinc-300 truncate font-semibold">
+                                                        {mgr.name} <span className="text-purple-400 ml-1 font-mono">({mgr.stats?.quoteApprovalRate ?? 0}%)</span>
+                                                    </span>
                                                     <span className={cn(
                                                         "h-1.5 w-1.5 rounded-full shrink-0",
                                                         mgr.stats?.riskLevel === 'Critique' ? 'bg-rose-500' :

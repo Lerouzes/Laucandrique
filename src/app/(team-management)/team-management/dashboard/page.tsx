@@ -44,7 +44,7 @@ export default async function TeamManagementDashboard() {
             </div>
 
             {/* Metrics cards */}
-            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                         <CardTitle className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Syndicats Actifs</CardTitle>
@@ -52,7 +52,7 @@ export default async function TeamManagementDashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-xl font-extrabold text-white">{stats.totalSyndicates}</div>
-                        <p className="text-[10px] text-zinc-500 mt-1">Syndicats sous contrat de gestion actif</p>
+                        <p className="text-[10px] text-zinc-500 mt-1">Syndicats sous contrat actif</p>
                     </CardContent>
                 </Card>
 
@@ -63,7 +63,7 @@ export default async function TeamManagementDashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-xl font-extrabold text-white">{stats.totalDoors}</div>
-                        <p className="text-[10px] text-zinc-500 mt-1">Unités physiques administrées</p>
+                        <p className="text-[10px] text-zinc-500 mt-1">Unités administrées</p>
                     </CardContent>
                 </Card>
 
@@ -86,6 +86,17 @@ export default async function TeamManagementDashboard() {
                     <CardContent>
                         <div className="text-xl font-extrabold text-white">{stats.meetingsCount}</div>
                         <p className="text-[10px] text-zinc-500 mt-1">Rencontres 1-à-1 complétées</p>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-[#16171e]/70 border-zinc-800/80 border-purple-900/30 shadow-md">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                        <CardTitle className="text-xxs font-bold text-purple-400 uppercase tracking-wider">Projets Approuvés</CardTitle>
+                        <Award className="h-4 w-4 text-purple-400" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-xl font-extrabold text-white">{stats.quoteApprovalRate}%</div>
+                        <p className="text-[10px] text-zinc-500 mt-1">Taux d'approbation global (Ops)</p>
                     </CardContent>
                 </Card>
             </div>

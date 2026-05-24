@@ -35,6 +35,9 @@ export default async function TeamDetailPage({
     let totalMrr = 0
     let sumWorkloadIndex = 0
     let sumPerformanceScore = 0
+    let totalApprovedQuotes = 0
+    let totalDeniedQuotes = 0
+    let totalSentQuotes = 0
     const allAlerts: string[] = []
 
     if (managers && managers.length > 0) {
@@ -57,6 +60,9 @@ export default async function TeamDetailPage({
                 totalMrr += stats.mrr
                 sumWorkloadIndex += stats.workloadIndex
                 sumPerformanceScore += stats.performanceScore
+                totalApprovedQuotes += stats.approvedQuotesCount || 0
+                totalDeniedQuotes += stats.deniedQuotesCount || 0
+                totalSentQuotes += stats.sentQuotesCount || 0
                 stats.alerts?.forEach(a => allAlerts.push(`${m.first_name} ${m.last_name}: ${a}`))
                 managerStats.push({
                     manager: m,
@@ -68,6 +74,8 @@ export default async function TeamDetailPage({
 
     const avgWorkload = managerStats.length > 0 ? Math.round(sumWorkloadIndex / managerStats.length) : 0
     const avgPerformance = managerStats.length > 0 ? Math.round(sumPerformanceScore / managerStats.length) : 0
+    const totalPresentedQuotes = totalApprovedQuotes + totalDeniedQuotes + totalSentQuotes
+    const teamQuoteApprovalRate = totalPresentedQuotes > 0 ? Math.round((totalApprovedQuotes / totalPresentedQuotes) * 100) : 0
 
     return (
         <div className="space-y-6">
@@ -86,7 +94,7 @@ export default async function TeamDetailPage({
             </div>
 
             {/* Metrics cards */}
-            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardHeader className="pb-2">
                         <CardDescription className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Syndicats Actifs</CardDescription>
@@ -123,6 +131,19 @@ export default async function TeamDetailPage({
                     </CardHeader>
                     <CardContent className="flex items-baseline justify-between">
                         <div className="text-xl font-extrabold text-purple-400">{avgPerformance}%</div>
+                        <BarChart3 className="h-4 w-4 text-purple-400" />
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-[#16171e]/70 border-zinc-800/80 border-purple-900/30 shadow-md">
+                    <CardHeader className="pb-2">
+                        <CardDescription className="text-xxs font-bold text-purple-450 uppercase tracking-wider text-purple-400">Projets Approuvés</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex items-baseline justify-between">
+                        <div>
+                            <div className="text-xl font-extrabold text-white">{teamQuoteApprovalRate}%</div>
+                            <span className="text-[9px] text-zinc-500 font-normal">({totalApprovedQuotes}/{totalPresentedQuotes})</span>
+                        </div>
                         <BarChart3 className="h-4 w-4 text-purple-400" />
                     </CardContent>
                 </Card>
@@ -168,6 +189,10 @@ export default async function TeamDetailPage({
                                                     <div className="px-2.5 py-1 bg-zinc-900 border border-zinc-850 rounded-lg">
                                                         <span className="text-zinc-500 block uppercase font-bold text-[8px]">Charge (Index)</span>
                                                         <span className="text-zinc-300 font-bold mt-0.5 block">{stats.workloadIndex}</span>
+                                                    </div>
+                                                    <div className="px-2.5 py-1 bg-zinc-900 border border-zinc-850 rounded-lg border-purple-900/20">
+                                                        <span className="text-purple-400 block uppercase font-bold text-[8px]">Projets Approuvés</span>
+                                                        <span className="text-zinc-355 font-bold mt-0.5 block">{stats.quoteApprovalRate ?? 0}%</span>
                                                     </div>
                                                     <div className="px-2.5 py-1 bg-zinc-900 border border-zinc-850 rounded-lg">
                                                         <span className="text-zinc-500 block uppercase font-bold text-[8px]">Performance</span>

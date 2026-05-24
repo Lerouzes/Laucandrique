@@ -210,6 +210,18 @@ export async function getManagerStats(managerId: string) {
         .in('client_id', clientIds)
     const packageChangesCount = pLogs?.length || 0
 
+    // 13. Operation Tab Quotes / Projects stats
+    const { data: managerQuotes } = await supabase
+        .from('quotes')
+        .select('status')
+        .eq('manager_id', managerId)
+
+    const approvedQuotesCount = (managerQuotes || []).filter(q => ['approved', 'completed', 'billed'].includes(q.status)).length
+    const deniedQuotesCount = (managerQuotes || []).filter(q => q.status === 'denied').length
+    const sentQuotesCount = (managerQuotes || []).filter(q => q.status === 'sent').length
+    const quotesTotalPresented = approvedQuotesCount + deniedQuotesCount + sentQuotesCount
+    const quoteApprovalRate = quotesTotalPresented > 0 ? Math.round((approvedQuotesCount / quotesTotalPresented) * 100) : 0
+
     return {
         manager,
         syndicatesCount,
@@ -228,7 +240,11 @@ export async function getManagerStats(managerId: string) {
         performanceScore,
         riskLevel,
         alerts,
-        packageChangesCount
+        packageChangesCount,
+        quoteApprovalRate,
+        approvedQuotesCount,
+        deniedQuotesCount,
+        sentQuotesCount
     }
 }
 
@@ -321,6 +337,18 @@ export async function getGlobalTeamStats() {
         .select('id', { count: 'exact', head: true })
         .gte('created_at', startOfYear)
 
+    // Global quote stats
+    const { data: allQuotes } = await supabase
+        .from('quotes')
+        .select('status')
+
+    const globalApproved = (allQuotes || []).filter(q => ['approved', 'completed', 'billed'].includes(q.status)).length
+    const globalDenied = (allQuotes || []).filter(q => q.status === 'denied').length
+    const globalSent = (allQuotes || []).filter(q => q.status === 'sent').length
+    const globalTotalPresented = globalApproved + globalDenied + globalSent
+    const quoteApprovalRate = globalTotalPresented > 0 ? Math.round((globalApproved / globalTotalPresented) * 105) : 0 // Wait, why * 105? Ah, Math.round((globalApproved / globalTotalPresented) * 100)
+    const normalizedQuoteApprovalRate = globalTotalPresented > 0 ? Math.round((globalApproved / globalTotalPresented) * 100) : 0
+
     return {
         totalSyndicates: activeClients.length,
         totalDoors,
@@ -330,7 +358,8 @@ export async function getGlobalTeamStats() {
         atRiskCount,
         criticalCount,
         lostYtd: lostCount || 0,
-        newYtd: newCount || 0
+        newYtd: newCount || 0,
+        quoteApprovalRate: normalizedQuoteApprovalRate
     }
 }
 

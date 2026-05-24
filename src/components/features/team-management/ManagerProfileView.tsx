@@ -152,6 +152,15 @@ export function ManagerProfileView({
                                         })() : 'Aucun'}
                                     </span>
                                 </div>
+                                <div className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl border-purple-900/30">
+                                    <span className="text-purple-400 block uppercase font-bold text-[9px] tracking-wider">Projets Approuvés</span>
+                                    <span className="text-lg font-bold text-zinc-100 mt-1 block">
+                                        {stats.quoteApprovalRate ?? 0}%
+                                        <span className="text-xxs font-normal text-zinc-500 ml-1.5">
+                                            ({stats.approvedQuotesCount ?? 0}/{(stats.approvedQuotesCount ?? 0) + (stats.deniedQuotesCount ?? 0) + (stats.sentQuotesCount ?? 0)})
+                                        </span>
+                                    </span>
+                                </div>
                             </div>
 
                             {/* Active managers alarms card */}
