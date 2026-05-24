@@ -2,6 +2,18 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import fs from 'fs'
+import path from 'path'
+
+function logImportError(message: string) {
+    try {
+        const logPath = '/Users/goon/Desktop/LAUCANDRIQUE/gustav/import_error_log.txt'
+        const timestamp = new Date().toISOString()
+        fs.appendFileSync(logPath, `[${timestamp}] ${message}\n`)
+    } catch (_) {
+        // ignore log write failures
+    }
+}
 
 export async function getClients(query?: string) {
     try {
@@ -255,9 +267,11 @@ export async function confirmBulkImportAction(rows: {
             )
             if (seedErr) {
                 console.error('Error seeding packages in confirmBulkImportAction:', seedErr.message)
+                logImportError('Seeding packages error: ' + seedErr.message)
             }
-        } catch (seedEx) {
+        } catch (seedEx: any) {
             console.error('Exception seeding packages in confirmBulkImportAction:', seedEx)
+            logImportError('Seeding packages exception: ' + (seedEx?.message || String(seedEx)))
             // packages table may not exist yet — contract inserts will just skip silently
         }
 
@@ -323,6 +337,7 @@ export async function confirmBulkImportAction(rows: {
 
                     if (error) {
                         console.error('Bulk update error:', error.message)
+                        logImportError('Client update error for SDC ' + row.full_name + ': ' + error.message)
                         failed++
                         continue
                     }
@@ -354,6 +369,7 @@ export async function confirmBulkImportAction(rows: {
 
                         if (error) {
                             console.error('Bulk update-existing error:', error.message)
+                            logImportError('Client update-existing error for SDC ' + row.full_name + ': ' + error.message)
                             failed++
                             continue
                         }
@@ -383,6 +399,7 @@ export async function confirmBulkImportAction(rows: {
 
                         if (error || !inserted) {
                             console.error('Bulk insert error:', error?.message)
+                            logImportError('Client insert error for SDC ' + row.full_name + ': ' + (error?.message || 'No data inserted'))
                             failed++
                             continue
                         }
@@ -410,9 +427,11 @@ export async function confirmBulkImportAction(rows: {
                         )
                     if (contractError) {
                         console.error('Database error upserting contract for client:', row.full_name, contractError.message)
+                        logImportError('Contract upsert database error for client ' + row.full_name + ': ' + contractError.message)
                     }
-                } catch (contractEx) {
+                } catch (contractEx: any) {
                     console.error('Exception processing contract for client:', row.full_name, contractEx)
+                    logImportError('Contract upsert exception for client ' + row.full_name + ': ' + (contractEx?.message || String(contractEx)))
                     // contracts table may not be migrated yet — skip silently
                 }
 
@@ -425,6 +444,7 @@ export async function confirmBulkImportAction(rows: {
                     const { error: deleteDoorsErr } = await supabase.from('doors').delete().eq('client_id', clientId)
                     if (deleteDoorsErr) {
                         console.error('Database error deleting existing doors for client:', row.full_name, deleteDoorsErr.message)
+                        logImportError('Doors delete database error for client ' + row.full_name + ': ' + deleteDoorsErr.message)
                     }
 
                     if (doorsNum > 0) {
@@ -435,6 +455,7 @@ export async function confirmBulkImportAction(rows: {
                         const { error: insertDoorsErr } = await supabase.from('doors').insert(doorsToInsert)
                         if (insertDoorsErr) {
                             console.error('Database error inserting doors for client:', row.full_name, insertDoorsErr.message)
+                            logImportError('Doors insert database error for client ' + row.full_name + ': ' + insertDoorsErr.message)
                         }
                     } else {
                         // Insert a placeholder so we can identify missing door data
@@ -444,10 +465,12 @@ export async function confirmBulkImportAction(rows: {
                         })
                         if (insertPlaceholderErr) {
                             console.error('Database error inserting doors placeholder for client:', row.full_name, insertPlaceholderErr.message)
+                            logImportError('Doors placeholder insert database error for client ' + row.full_name + ': ' + insertPlaceholderErr.message)
                         }
                     }
-                } catch (doorsEx) {
+                } catch (doorsEx: any) {
                     console.error('Exception processing doors for client:', row.full_name, doorsEx)
+                    logImportError('Doors processing exception for client ' + row.full_name + ': ' + (doorsEx?.message || String(doorsEx)))
                     // doors table may not be migrated yet — skip silently
                 }
 
