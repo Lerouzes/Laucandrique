@@ -24,8 +24,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   if (!client) notFound()
 
   const clientQuotes = quotes.filter((q: any) => q.client_id === id)
-  // Prefer the direct contract fetch over the join result
-  const contract = contractDirect || (client.contracts as any[])?.[0] || null
+  // Prefer the direct contract fetch over the join result (with robust support for array and object shapes)
+  const contractJoined = Array.isArray(client.contracts) ? client.contracts[0] : client.contracts
+  const contract = contractDirect || contractJoined || null
   const doorsCount = (client.doors as any[])?.length || 0
   const isStatusActive = client.status !== 'inactive'
 
@@ -46,10 +47,6 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             </Badge>
           </div>
           <p className="text-xs text-zinc-400 mt-1">SDC #: <span className="font-semibold text-zinc-300">{client.full_name || 'N/A'}</span></p>
-          {/* DB ground-truth debug strip — remove once confirmed working */}
-          <p className="text-[10px] text-zinc-600 mt-1 font-mono">
-            DB contract: {contract ? `${contract.package_name ?? 'null'} | $${contract.monthly_fee ?? 'null'} | ${contract.start_date ?? 'null'}` : 'aucun contrat en base'}
-          </p>
         </div>
       </div>
 

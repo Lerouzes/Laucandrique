@@ -336,7 +336,7 @@ export function ManagerProfileView({
                                             </tr>
                                         ) : (
                                             syndicates.map((s) => {
-                                                const contract = s.contracts?.[0]
+                                                const contract = Array.isArray(s.contracts) ? s.contracts[0] : s.contracts
                                                 const audit = audits.find(a => a.client_id === s.id)
                                                 
                                                 let auditScore = 'N/A'

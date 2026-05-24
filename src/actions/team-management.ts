@@ -50,7 +50,8 @@ export async function getManagerStats(managerId: string) {
 
     // 3. Monthly Recurring Revenue (MRR)
     const mrr = activeSyndicates.reduce((acc, c) => {
-        const fee = Number(c.contracts?.[0]?.monthly_fee || 0)
+        const contract = Array.isArray(c.contracts) ? c.contracts[0] : c.contracts
+        const fee = Number(contract?.monthly_fee || 0)
         return acc + fee
     }, 0)
 
@@ -277,7 +278,8 @@ export async function getGlobalTeamStats() {
 
     // Monthly recurring revenue
     const mrr = activeClients.reduce((acc, c) => {
-        const fee = Number(c.contracts?.[0]?.monthly_fee || 0)
+        const contract = Array.isArray(c.contracts) ? c.contracts[0] : c.contracts
+        const fee = Number(contract?.monthly_fee || 0)
         return acc + fee
     }, 0)
 
@@ -291,7 +293,8 @@ export async function getGlobalTeamStats() {
     }
 
     activeClients.forEach(c => {
-        const pkgName = c.contracts?.[0]?.package_name as keyof typeof packageCounts
+        const contract = Array.isArray(c.contracts) ? c.contracts[0] : c.contracts
+        const pkgName = contract?.package_name as keyof typeof packageCounts
         if (pkgName && pkgName in packageCounts) {
             packageCounts[pkgName]++
         }
