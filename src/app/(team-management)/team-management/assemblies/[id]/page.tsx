@@ -168,12 +168,14 @@ export default async function AssemblyDetailPage({
                     <CardContent className="pt-4 space-y-4 text-xxs">
                         {sect.list.map(c => {
                             const label = CRITERIA_LABELS[c.key] || c.key
+                            const note = evalData.item_notes?.[c.key]
                             return (
-                                <div key={c.key} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center border-b border-zinc-900 pb-4 last:border-b-0 last:pb-0">
+                                <div key={c.key} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border-b border-zinc-900 pb-4 last:border-b-0 last:pb-0">
                                     <div className="md:col-span-8 font-semibold text-zinc-200">
-                                        {label}
+                                        <div>{label}</div>
+                                        {note && <div className="text-[10px] text-zinc-400 italic mt-1 font-normal bg-zinc-950/20 p-1.5 rounded border border-zinc-900/60 max-w-lg">Remarque: {note}</div>}
                                     </div>
-                                    <div className="md:col-span-4 flex items-center gap-2 justify-end md:justify-start">
+                                    <div className="md:col-span-4 flex items-center gap-2 justify-end md:justify-start pt-1">
                                         <div className="flex text-purple-400">
                                             {Array.from({ length: 5 }).map((_, i) => (
                                                 <Star 

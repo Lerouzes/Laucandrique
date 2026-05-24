@@ -60,6 +60,15 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
     const [recentWins, setRecentWins] = useState('')
     const [difficultSituations, setDifficultSituations] = useState('')
 
+    // Complaints states
+    const [managerComplaints, setManagerComplaints] = useState<any[]>([])
+    const [complaintDiscussions, setComplaintDiscussions] = useState<Record<string, {
+        checked: boolean
+        discussion_notes: string
+        resolution_plan: string
+        resolved_in_meeting: boolean
+    }>>({})
+
     // Next Priorities state
     const [priority1, setPriority1] = useState('')
     const [priority2, setPriority2] = useState('')
@@ -100,6 +109,10 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                         carried_forward: true
                     }))
                 )
+
+                // Set manager complaints
+                setManagerComplaints(snapshot.openComplaints || [])
+                setComplaintDiscussions({})
             } catch (err) {
                 console.error('Error fetching one-on-one snapshot:', err)
             }
@@ -146,6 +159,16 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 }))
             ]
 
+            // Format addressed complaints
+            const finalComplaints = Object.entries(complaintDiscussions)
+                .filter(([_, data]) => data.checked)
+                .map(([id, data]) => ({
+                    complaint_id: id,
+                    discussion_notes: data.discussion_notes,
+                    resolution_plan: data.resolution_plan,
+                    resolved_in_meeting: data.resolved_in_meeting
+                }))
+
             await createOneOnOneAction({
                 manager_id: managerId,
                 meeting_date: meetingDate,
@@ -171,7 +194,8 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 escalation_needed: escalationNeeded,
                 operational_blockers: operationalBlockers,
                 conflict_resolution: conflictResolution,
-                commitments: finalCommitments
+                commitments: finalCommitments,
+                complaints: finalComplaints
             })
 
             router.push('/team-management/one-on-ones')
@@ -472,6 +496,140 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                     </CardContent>
                 </Card>
             )}
+
+            {/* Complaints section */}
+            <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                <CardHeader>
+                    <CardTitle className="text-xs font-bold text-white flex items-center gap-2">
+                        <AlertCircle className="h-4.5 w-4.5 text-purple-400" />
+                        Plaintes Actives à aborder ({managerComplaints.length})
+                    </CardTitle>
+                    <CardDescription className="text-xxs text-zinc-400">
+                        Sélectionnez les plaintes du gestionnaire à discuter pendant la rencontre, saisissez les notes de discussion et marquez-les comme résolues au besoin.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 text-xxs">
+                    {managerComplaints.length === 0 ? (
+                        <p className="text-xxs text-zinc-500 italic py-3 text-center">Aucune plainte active pour ce gestionnaire.</p>
+                    ) : (
+                        <div className="space-y-4">
+                            {managerComplaints.map((c) => {
+                                const isChecked = !!complaintDiscussions[c.id]?.checked
+                                const clientName = c.clients ? (c.clients.company_name || c.clients.full_name) : 'Copropriété inconnue'
+                                const sdcNum = c.clients?.full_name || 'Inconnu'
+                                const categoryName = c.complaint_categories?.name || 'Non spécifiée'
+                                
+                                const sevStyle = 
+                                    c.severity === 'critical' ? 'bg-rose-500/20 text-rose-400 border-rose-800/40' :
+                                    c.severity === 'high' ? 'bg-orange-500/20 text-orange-400 border-orange-850/40' :
+                                    c.severity === 'medium' ? 'bg-amber-500/20 text-amber-400 border-amber-800/40' :
+                                    'bg-zinc-900 text-zinc-400 border-zinc-850'
+
+                                return (
+                                    <div key={c.id} className="p-4 bg-zinc-900/20 border border-zinc-850 rounded-xl space-y-3">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex items-start gap-2.5">
+                                                <input 
+                                                    type="checkbox"
+                                                    id={`comp-${c.id}`}
+                                                    checked={isChecked}
+                                                    onChange={(e) => {
+                                                        const checked = e.target.checked
+                                                        setComplaintDiscussions(prev => ({
+                                                            ...prev,
+                                                            [c.id]: {
+                                                                checked,
+                                                                discussion_notes: prev[c.id]?.discussion_notes || '',
+                                                                resolution_plan: prev[c.id]?.resolution_plan || '',
+                                                                resolved_in_meeting: prev[c.id]?.resolved_in_meeting || false
+                                                            }
+                                                        }))
+                                                    }}
+                                                    className="rounded border-zinc-800 text-purple-600 h-4.5 w-4.5 mt-0.5"
+                                                />
+                                                <div className="space-y-1">
+                                                    <label htmlFor={`comp-${c.id}`} className="text-xs font-bold text-zinc-200 cursor-pointer hover:text-white transition-colors">
+                                                        {c.title}
+                                                    </label>
+                                                    <p className="text-zinc-500 text-[10px]">
+                                                        Syndicat: <strong className="text-zinc-400">{clientName} [{sdcNum}]</strong>
+                                                    </p>
+                                                    {c.description && (
+                                                        <p className="text-[10px] text-zinc-400 bg-zinc-950/30 p-2 rounded-lg border border-zinc-900 leading-relaxed mt-1.5 max-w-2xl">
+                                                            {c.description}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-1.5 shrink-0">
+                                                <Badge variant="outline" className="text-[8px] font-bold bg-purple-950/20 text-purple-400 border-purple-800/30">{categoryName}</Badge>
+                                                <Badge variant="outline" className={`text-[8px] font-bold ${sevStyle}`}>{c.severity}</Badge>
+                                            </div>
+                                        </div>
+
+                                        {isChecked && (
+                                            <div className="pl-7 space-y-3 pt-2 border-t border-zinc-850/60 animate-in fade-in duration-200">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div className="space-y-1">
+                                                        <Label className="text-zinc-500">Notes de discussion (lors du 1v1)</Label>
+                                                        <Textarea 
+                                                            value={complaintDiscussions[c.id]?.discussion_notes || ''}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value
+                                                                setComplaintDiscussions(prev => ({
+                                                                    ...prev,
+                                                                    [c.id]: { ...prev[c.id], discussion_notes: val }
+                                                                }))
+                                                            }}
+                                                            placeholder="Qu'est-ce qui a été discuté ?" 
+                                                            rows={2} 
+                                                            className="bg-[#121318] border-zinc-800 text-xxs text-white" 
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <Label className="text-zinc-500">Plan de résolution</Label>
+                                                        <Textarea 
+                                                            value={complaintDiscussions[c.id]?.resolution_plan || ''}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value
+                                                                setComplaintDiscussions(prev => ({
+                                                                    ...prev,
+                                                                    [c.id]: { ...prev[c.id], resolution_plan: val }
+                                                                }))
+                                                            }}
+                                                            placeholder="Plan d'action pour résoudre le problème..." 
+                                                            rows={2} 
+                                                            className="bg-[#121318] border-zinc-800 text-xxs text-white" 
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <input 
+                                                        type="checkbox"
+                                                        id={`resolve-${c.id}`}
+                                                        checked={!!complaintDiscussions[c.id]?.resolved_in_meeting}
+                                                        onChange={(e) => {
+                                                            const resolved_in_meeting = e.target.checked
+                                                            setComplaintDiscussions(prev => ({
+                                                                ...prev,
+                                                                [c.id]: { ...prev[c.id], resolved_in_meeting }
+                                                            }))
+                                                        }}
+                                                        className="rounded border-zinc-800 text-emerald-600 h-4 w-4"
+                                                    />
+                                                    <label htmlFor={`resolve-${c.id}`} className="text-zinc-400 cursor-pointer font-semibold text-[10px] hover:text-zinc-200 select-none">
+                                                        Marquer comme résolue à l'issue de cette rencontre
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
             {/* Notes & Discussions sections */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

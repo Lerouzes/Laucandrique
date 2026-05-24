@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { ClipboardCheck, Calendar, User, ArrowLeft, Star, FileText } from 'lucide-react'
 
 const QUESTION_LABELS: Record<string, string> = {
-    registre_coproprietaires: 'Registre des copropriétaires à jour',
+    registre_coproprietaires: 'Registre des documents complets',
     convocations_assemblee: 'Convocations d\'assemblées conformes',
     reglement_immeuble: 'Règlements de l\'immeuble respectés',
     proces_verbaux: 'Procès-verbaux rédigés et archivés',
@@ -129,7 +129,7 @@ export default async function AuditDetailPage({
                 { key: 'gov', title: 'Gouvernance & Conformité Juridique', list: govAnswers },
                 { key: 'fin', title: 'Santé Financière & Budgets', list: finAnswers },
                 { key: 'op', title: 'Opérations & Maintenance', list: opAnswers }
-            ]).map(cat => (
+            ]).filter(cat => cat.list.length > 0).map(cat => (
                 <Card key={cat.key} className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10">
                         <CardTitle className="text-xs font-bold text-white uppercase tracking-wider text-purple-400">

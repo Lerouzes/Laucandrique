@@ -9,35 +9,54 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { ClipboardCheck, ShieldAlert, CheckCircle, Save } from 'lucide-react'
+import { ClipboardCheck, ShieldAlert, CheckCircle, Save, HelpCircle } from 'lucide-react'
+import { SearchableClientSelect } from './SearchableClientSelect'
 
-// Define the 14 questions
 const QUESTIONS = [
-    { key: 'registre_coproprietaires', category: 'governance', text: 'Registre des copropriétaires à jour' },
+    { key: 'registre_coproprietaires', category: 'governance', text: 'Registre des documents complets' },
     { key: 'convocations_assemblee', category: 'governance', text: 'Convocations d\'assemblées conformes' },
-    { key: 'reglement_immeuble', category: 'governance', text: 'Règlements de l\'immeuble respectés' },
     { key: 'proces_verbaux', category: 'governance', text: 'Procès-verbaux rédigés et archivés' },
     { key: 'contrats_fournisseurs', category: 'governance', text: 'Contrats de fournisseurs signés et classés' },
     
     { key: 'budget_annuel', category: 'financial', text: 'Budget annuel voté et respecté' },
-    { key: 'fonds_prevoyance', category: 'financial', text: 'Fonds de prévoyance (étude + cotisations) conforme' },
-    { key: 'conciliation_bancaire', category: 'financial', text: 'Conciliations bancaires mensuelles complétées' },
-    { key: 'perception_charges', category: 'financial', text: 'Perception des charges et gestion des retards' },
-    { key: 'etats_financiers', category: 'financial', text: 'États financiers de fin d\'année à jour' },
-    
-    { key: 'carnet_entretien', category: 'operations', text: 'Carnet d\'entretien de l\'immeuble à jour' },
-    { key: 'inspections_preventives', category: 'operations', text: 'Inspections préventives complétées et consignées' },
-    { key: 'sinistres_assurance', category: 'operations', text: 'Suivi rigoureux des sinistres et réclamations' },
-    { key: 'appels_offres', category: 'operations', text: 'Appels d\'offres conformes pour grands travaux' }
+    { key: 'fonds_prevoyance', category: 'financial', text: 'Fonds de prévoyance (étude + cotisations) conforme' }
 ]
 
-export function NewAuditForm({ clients }: { clients: any[] }) {
+const DEFAULT_DESCRIPTIONS: Record<string, string> = {
+    registre_coproprietaires: 'Vérifier que les documents juridiques, registres de copropriété, procès-verbaux et règlements sont complets.',
+    convocations_assemblee: 'Vérifier que les avis de convocation et procès-verbaux d\'assemblées sont conformes aux délais légaux.',
+    proces_verbaux: 'S\'assurer que les procès-verbaux des assemblées et réunions de CA sont signés, archivés et à jour.',
+    contrats_fournisseurs: 'Contrôler la signature, l\'archivage et le classement de tous les contrats de fournisseurs.',
+    budget_annuel: 'Valider que le budget de fonctionnement annuel est voté en assemblée générale et respecté.',
+    fonds_prevoyance: 'S\'assurer de la conformité de l\'étude du fonds de prévoyance et du versement régulier des cotisations.'
+}
+
+export function NewAuditForm({ 
+    clients,
+    questionConfigs = []
+}: { 
+    clients: any[] 
+    questionConfigs?: Array<{ key: string; description: string }>
+}) {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [clientId, setClientId] = useState(clients[0]?.id || '')
     const [notes, setNotes] = useState('')
+
+    // Transform clients for SearchableClientSelect
+    const clientOptions = clients.map(c => ({
+        id: c.id,
+        name: c.company_name || c.full_name,
+        sdc: c.full_name
+    }))
+
+    // Map custom configs to a lookup record
+    const descriptionsMap = {
+        ...DEFAULT_DESCRIPTIONS,
+        ...questionConfigs.reduce((acc, c) => ({ ...acc, [c.key]: c.description }), {})
+    }
     
-    // Scores and individual notes for the 14 questions
+    // Scores and individual notes for the 6 questions
     const [scores, setScores] = useState<Record<string, number>>(
         QUESTIONS.reduce((acc, q) => ({ ...acc, [q.key]: 3 }), {})
     )
@@ -55,7 +74,8 @@ export function NewAuditForm({ clients }: { clients: any[] }) {
 
     // Realtime Calculations
     const totalPoints = Object.values(scores).reduce((sum, s) => sum + s, 0)
-    const healthScore = Math.round((totalPoints / 70) * 100)
+    // 6 questions, each scored out of 5 = 30 max points
+    const healthScore = Math.round((totalPoints / 30) * 100)
 
     const getHealthRating = (score: number) => {
         if (score >= 90) return { label: 'Excellent', style: 'bg-emerald-500/20 text-emerald-400 border-emerald-800/40' }
@@ -106,7 +126,7 @@ export function NewAuditForm({ clients }: { clients: any[] }) {
                     </div>
                     <div>
                         <h2 className="text-sm font-bold text-white uppercase">Nouvel Audit de Syndicat</h2>
-                        <p className="text-[10px] text-zinc-400">Évaluez la qualité de gestion de la copropriété sur 14 points critiques.</p>
+                        <p className="text-[10px] text-zinc-400">Évaluez la qualité de gestion de la copropriété sur 6 points critiques.</p>
                     </div>
                 </div>
 
@@ -139,16 +159,14 @@ export function NewAuditForm({ clients }: { clients: any[] }) {
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xxs">
                     <div className="space-y-1">
                         <Label className="text-zinc-500">Syndicat / Copropriété</Label>
-                        <select 
-                            value={clientId} 
-                            onChange={(e) => setClientId(e.target.value)}
-                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9"
+                        <SearchableClientSelect 
+                            clients={clientOptions}
+                            name="client_id"
+                            placeholder="Rechercher un syndicat..."
                             required
-                        >
-                            {clients.map(c => (
-                                <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>
-                            ))}
-                        </select>
+                            defaultValue={clientId}
+                            onChange={(val) => setClientId(val)}
+                        />
                     </div>
                     <div className="space-y-1">
                         <Label className="text-zinc-500">Notes d'Audit Globales</Label>
@@ -163,11 +181,11 @@ export function NewAuditForm({ clients }: { clients: any[] }) {
             </Card>
 
             {/* Questions Categories */}
-            {(['governance', 'financial', 'operations'] as const).map(cat => {
+            {(['governance', 'financial'] as const).map(cat => {
                 const catQuestions = QUESTIONS.filter(q => q.category === cat)
+                if (catQuestions.length === 0) return null
                 const catTitle = 
-                    cat === 'governance' ? 'Gouvernance & Conformité Juridique' :
-                    cat === 'financial' ? 'Santé Financière & Budgets' : 'Opérations & Maintenance'
+                    cat === 'governance' ? 'Gouvernance & Conformité Juridique' : 'Santé Financière & Budgets'
 
                 return (
                     <Card key={cat} className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
@@ -180,8 +198,16 @@ export function NewAuditForm({ clients }: { clients: any[] }) {
                             {catQuestions.map(q => (
                                 <div key={q.key} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center border-b border-zinc-900 pb-4 last:border-b-0 last:pb-0">
                                     {/* Question Text */}
-                                    <div className="md:col-span-5 text-xxs font-semibold text-zinc-200">
-                                        {q.text}
+                                    <div className="md:col-span-5 text-xxs font-semibold text-zinc-200 flex items-center gap-1.5">
+                                        <span>{q.text}</span>
+                                        {descriptionsMap[q.key] && (
+                                            <div className="relative group cursor-pointer inline-flex items-center">
+                                                <HelpCircle className="h-3.5 w-3.5 text-zinc-500 hover:text-purple-400 transition-colors shrink-0" />
+                                                <div className="absolute left-0 bottom-6 hidden group-hover:block z-50 w-64 p-2.5 bg-[#121318] border border-zinc-800 rounded-lg text-[10px] text-zinc-400 shadow-2xl pointer-events-none font-normal leading-relaxed">
+                                                    {descriptionsMap[q.key]}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                     {/* Score Selector */}
                                     <div className="md:col-span-3">

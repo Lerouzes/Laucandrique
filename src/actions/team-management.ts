@@ -626,6 +626,7 @@ export async function createOneOnOneAction(data: {
     operational_blockers: string
     conflict_resolution: string
     commitments: Array<{ commitment_text: string; completed?: boolean; why_not?: string; failure_reason?: string; carried_forward?: boolean }>
+    complaints?: Array<{ complaint_id: string; discussion_notes: string; resolution_plan: string; resolved_in_meeting: boolean }>
 }) {
     const supabase = await createClient()
 
@@ -677,7 +678,34 @@ export async function createOneOnOneAction(data: {
         if (commsErr) throw new Error(commsErr.message)
     }
 
+    // Insert Complaints Discussions
+    if (data.complaints && data.complaints.length > 0) {
+        const compData = data.complaints.map(c => ({
+            one_on_one_id: meeting.id,
+            complaint_id: c.complaint_id,
+            discussion_notes: c.discussion_notes || null,
+            resolution_plan: c.resolution_plan || null,
+            resolved_in_meeting: c.resolved_in_meeting || false
+        }))
+        const { error: compErr } = await supabase.from('one_on_one_complaints').insert(compData)
+        if (compErr) throw new Error(compErr.message)
+
+        // Resolve addressed complaints if marked as resolved
+        for (const c of data.complaints) {
+            if (c.resolved_in_meeting) {
+                await supabase
+                    .from('complaints')
+                    .update({
+                        status: 'resolved',
+                        resolved_date: data.meeting_date
+                    })
+                    .eq('id', c.complaint_id)
+            }
+        }
+    }
+
     revalidatePath('/team-management/one-on-ones')
+    revalidatePath('/team-management/complaints')
     revalidatePath(`/team-management/managers/${data.manager_id}`)
     return meeting
 }
@@ -707,6 +735,7 @@ export async function updateOneOnOneAction(id: string, data: {
     operational_blockers: string
     conflict_resolution: string
     commitments: Array<{ id?: string; commitment_text: string; completed?: boolean; why_not?: string; failure_reason?: string; carried_forward?: boolean }>
+    complaints?: Array<{ complaint_id: string; discussion_notes: string; resolution_plan: string; resolved_in_meeting: boolean }>
 }) {
     const supabase = await createClient()
 
@@ -792,7 +821,48 @@ export async function updateOneOnOneAction(id: string, data: {
         }
     }
 
+    // Sync complaints discussions
+    // 1. Delete old complaints discussions for this meeting
+    await supabase.from('one_on_one_complaints').delete().eq('one_on_one_id', id)
+
+    // 2. Insert updated complaints discussions
+    if (data.complaints && data.complaints.length > 0) {
+        const compData = data.complaints.map(c => ({
+            one_on_one_id: id,
+            complaint_id: c.complaint_id,
+            discussion_notes: c.discussion_notes || null,
+            resolution_plan: c.resolution_plan || null,
+            resolved_in_meeting: c.resolved_in_meeting || false
+        }))
+        const { error: compErr } = await supabase.from('one_on_one_complaints').insert(compData)
+        if (compErr) throw new Error(compErr.message)
+
+        // Update complaint status in the database
+        for (const c of data.complaints) {
+            if (c.resolved_in_meeting) {
+                await supabase
+                    .from('complaints')
+                    .update({
+                        status: 'resolved',
+                        resolved_date: data.meeting_date
+                    })
+                    .eq('id', c.complaint_id)
+            } else {
+                // If it was resolved, reset to open if they unchecked it
+                await supabase
+                    .from('complaints')
+                    .update({
+                        status: 'open',
+                        resolved_date: null
+                    })
+                    .eq('id', c.complaint_id)
+                    .eq('status', 'resolved') // Only reset if currently marked resolved
+            }
+        }
+    }
+
     revalidatePath('/team-management/one-on-ones')
+    revalidatePath('/team-management/complaints')
     revalidatePath(`/team-management/one-on-ones/${id}`)
     if (oldMeeting?.manager_id) {
         revalidatePath(`/team-management/managers/${oldMeeting.manager_id}`)
@@ -810,10 +880,10 @@ export async function createSyndicateAuditAction(data: {
 }) {
     const supabase = await createClient()
 
-    // Calculate overall health score
+    // Calculate overall health score dynamically
     const sum = data.answers.reduce((acc, a) => acc + a.score, 0)
-    // 14 questions, each scored out of 5 = 70 max points
-    const health_score = Math.round((sum / 70) * 100)
+    const maxPoints = data.answers.length > 0 ? data.answers.length * 5 : 1
+    const health_score = Math.round((sum / maxPoints) * 100)
 
     const { data: audit, error: err } = await supabase
         .from('syndicate_audits')
@@ -870,6 +940,7 @@ export async function createAssemblyEvaluationAction(data: {
     followup_tasks_created: number
     notes?: string
     recommendations?: string
+    item_notes?: Record<string, string>
 }) {
     const supabase = await createClient()
 
@@ -895,7 +966,8 @@ export async function createAssemblyEvaluationAction(data: {
             resolutions_clear: data.resolutions_clear,
             followup_tasks_created: data.followup_tasks_created,
             notes: data.notes || null,
-            recommendations: data.recommendations || null
+            recommendations: data.recommendations || null,
+            item_notes: data.item_notes || {}
         })
         .select()
         .single()
@@ -918,6 +990,7 @@ export async function createComplaintAction(formData: FormData) {
     const title = formData.get('title') as string
     const description = formData.get('description') as string
     const severity = formData.get('severity') as string
+    const category_id = formData.get('category_id') as string
 
     const { error } = await supabase
         .from('complaints')
@@ -927,7 +1000,8 @@ export async function createComplaintAction(formData: FormData) {
             title,
             description,
             severity,
-            status: 'open'
+            status: 'open',
+            category_id: category_id || null
         })
 
     if (error) throw new Error(error.message)
@@ -1008,6 +1082,21 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         }
     }
 
+    // Fetch active complaints for the manager
+    const { data: openComplaints } = await supabase
+        .from('complaints')
+        .select(`
+            id,
+            title,
+            description,
+            severity,
+            received_date,
+            clients(company_name, full_name),
+            complaint_categories(name)
+        `)
+        .eq('manager_id', managerId)
+        .eq('status', 'open')
+
     return {
         calls_total: stats?.totalCalls || 0,
         calls_answered: stats?.answeredCalls || 0,
@@ -1023,9 +1112,95 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         emails_received: stats?.communicationsReceived || 0,
         
         pendingCommitments,
+        openComplaints: openComplaints || [],
         lastMeeting: lastMeeting ? {
             ...lastMeeting,
             commitments: lastMeetingCommitments
         } : null
     }
 }
+
+// ==========================================
+// 8. SETTINGS & CONFIGURATION ACTIONS
+// ==========================================
+
+export async function getComplaintCategoriesAction() {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('complaint_categories')
+        .select('*')
+        .order('name')
+
+    if (error) throw new Error(error.message)
+    return data || []
+}
+
+export async function createComplaintCategoryAction(name: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('complaint_categories')
+        .insert({ name })
+        .select()
+        .single()
+
+    if (error) throw new Error(error.message)
+    
+    revalidatePath('/team-management/settings')
+    revalidatePath('/team-management/complaints')
+    return data
+}
+
+export async function updateComplaintCategoryAction(id: string, name: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('complaint_categories')
+        .update({ name })
+        .eq('id', id)
+        .select()
+        .single()
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/team-management/settings')
+    revalidatePath('/team-management/complaints')
+    return data
+}
+
+export async function deleteComplaintCategoryAction(id: string) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('complaint_categories')
+        .delete()
+        .eq('id', id)
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/team-management/settings')
+    revalidatePath('/team-management/complaints')
+}
+
+export async function getAuditQuestionConfigsAction() {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('audit_question_configs')
+        .select('*')
+
+    if (error) throw new Error(error.message)
+    return data || []
+}
+
+export async function updateAuditQuestionConfigAction(key: string, description: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('audit_question_configs')
+        .upsert({ key, description })
+        .select()
+        .single()
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/team-management/settings')
+    revalidatePath('/team-management/audits')
+    return data
+}
+

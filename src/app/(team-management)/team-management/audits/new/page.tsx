@@ -5,11 +5,13 @@ export default async function NewAuditPage() {
     const supabase = await createClient()
 
     // Fetch active syndicates (clients)
-    const { data: clients } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('status', 'active')
-        .order('company_name')
+    const [clientsRes, configsRes] = await Promise.all([
+        supabase.from('clients').select('*').eq('status', 'active').order('company_name'),
+        supabase.from('audit_question_configs').select('*')
+    ])
+
+    const clients = clientsRes.data
+    const configs = configsRes.data
 
     return (
         <div className="space-y-6 pb-12">
@@ -20,7 +22,7 @@ export default async function NewAuditPage() {
                 </p>
             </div>
 
-            <NewAuditForm clients={clients || []} />
+            <NewAuditForm clients={clients || []} questionConfigs={configs || []} />
         </div>
     )
 }

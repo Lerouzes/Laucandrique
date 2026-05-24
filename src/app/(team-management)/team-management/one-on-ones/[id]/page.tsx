@@ -76,6 +76,22 @@ export default async function OneOnOneDetailPage({
         }
     }
 
+    // 5. Fetch discussed complaints in this 1v1
+    const { data: discussedComplaints } = await supabase
+        .from('one_on_one_complaints')
+        .select(`
+            *,
+            complaints(
+                id,
+                title,
+                description,
+                severity,
+                clients(company_name, full_name),
+                complaint_categories(name)
+            )
+        `)
+        .eq('one_on_one_id', id)
+
     return (
         <div className="space-y-6 pb-12">
             <div>
@@ -90,6 +106,7 @@ export default async function OneOnOneDetailPage({
                 commitments={commitments || []} 
                 manager={manager} 
                 lastMeeting={lastMeetingWithComms}
+                discussedComplaints={(discussedComplaints || []) as any}
             />
         </div>
     )

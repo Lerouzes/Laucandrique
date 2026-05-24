@@ -17,7 +17,8 @@ import {
     ChevronDown,
     RefreshCw,
     Layers,
-    UserCheck
+    UserCheck,
+    Settings
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -37,6 +38,7 @@ const navItems = [
     { name: 'Plaintes', href: '/team-management/complaints', icon: AlertTriangle },
     { name: 'Performance', href: '/team-management/performance-reports', icon: BarChart3 },
     { name: 'Alertes', href: '/team-management/alerts', icon: BellRing },
+    { name: 'Configuration', href: '/team-management/settings', icon: Settings },
 ]
 
 export function TeamManagementSidebar({ profile }: { profile: Profile | null }) {

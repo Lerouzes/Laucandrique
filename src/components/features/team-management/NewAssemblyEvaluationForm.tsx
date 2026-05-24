@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import { SearchableClientSelect } from './SearchableClientSelect'
 import { UsersRound, Save, Sparkles, CheckCircle2 } from 'lucide-react'
 
 const OPERATIONAL_CRITERIA = [
@@ -50,6 +51,13 @@ export function NewAssemblyEvaluationForm({
     const [notes, setNotes] = useState('')
     const [recommendations, setRecommendations] = useState('')
 
+    // Transform clients for SearchableClientSelect
+    const clientOptions = clients.map(c => ({
+        id: c.id,
+        name: c.company_name || c.full_name,
+        sdc: c.full_name
+    }))
+
     // Scoring state
     const [scores, setScores] = useState<Record<string, number>>(() => {
         const initialScores: Record<string, number> = {}
@@ -60,8 +68,22 @@ export function NewAssemblyEvaluationForm({
         return initialScores
     })
 
+    // Item notes state
+    const [itemNotes, setItemNotes] = useState<Record<string, string>>(() => {
+        const initialNotes: Record<string, string> = {}
+        const allCriteria = [...OPERATIONAL_CRITERIA, ...LEADERSHIP_CRITERIA, ...DOCUMENTATION_CRITERIA]
+        allCriteria.forEach(c => {
+            initialNotes[c.key] = ''
+        })
+        return initialNotes
+    })
+
     const handleScoreChange = (key: string, val: number) => {
         setScores({ ...scores, [key]: val })
+    }
+
+    const handleItemNoteChange = (key: string, val: string) => {
+        setItemNotes({ ...itemNotes, [key]: val })
     }
 
     // Realtime Score aggregate
@@ -102,7 +124,8 @@ export function NewAssemblyEvaluationForm({
                 resolutions_clear: scores.resolutions_clear,
                 followup_tasks_created: scores.followup_tasks_created,
                 notes,
-                recommendations
+                recommendations,
+                item_notes: itemNotes
             })
 
             router.push('/team-management/assemblies')
@@ -156,16 +179,14 @@ export function NewAssemblyEvaluationForm({
                 <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xxs">
                     <div className="space-y-1">
                         <Label className="text-zinc-500">Syndicat / Copropriété</Label>
-                        <select 
-                            value={clientId} 
-                            onChange={(e) => setClientId(e.target.value)}
-                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9"
+                        <SearchableClientSelect
+                            clients={clientOptions}
+                            name="client_id"
+                            placeholder="Rechercher un syndicat..."
                             required
-                        >
-                            {clients.map(c => (
-                                <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>
-                            ))}
-                        </select>
+                            defaultValue={clientId}
+                            onChange={(val) => setClientId(val)}
+                        />
                     </div>
                     <div className="space-y-1">
                         <Label className="text-zinc-500">Gestionnaire Animateur</Label>
@@ -211,10 +232,10 @@ export function NewAssemblyEvaluationForm({
                     <CardContent className="pt-4 space-y-4">
                         {sect.list.map(c => (
                             <div key={c.key} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center border-b border-zinc-900 pb-4 last:border-b-0 last:pb-0 text-xxs">
-                                <div className="md:col-span-8 font-semibold text-zinc-200">
+                                <div className="md:col-span-5 font-semibold text-zinc-200">
                                     {c.text}
                                 </div>
-                                <div className="md:col-span-4">
+                                <div className="md:col-span-3">
                                     <select 
                                         value={scores[c.key]}
                                         onChange={(e) => handleScoreChange(c.key, Number(e.target.value))}
@@ -227,6 +248,14 @@ export function NewAssemblyEvaluationForm({
                                         <option value="1">1/5 - Insuffisant / Dérives sérieuses</option>
                                         <option value="0">0/5 - Non exécuté / Échec critique</option>
                                     </select>
+                                </div>
+                                <div className="md:col-span-4">
+                                    <Input
+                                        value={itemNotes[c.key]}
+                                        onChange={(e) => handleItemNoteChange(c.key, e.target.value)}
+                                        placeholder="Note ou remarque sur ce point..."
+                                        className="bg-[#121318] border-zinc-800 h-8 text-[10px] text-white"
+                                    />
                                 </div>
                             </div>
                         ))}

@@ -15,18 +15,43 @@ interface SearchableClientSelectProps {
     name: string
     placeholder?: string
     required?: boolean
+    defaultValue?: string
+    onChange?: (value: string) => void
 }
 
 export function SearchableClientSelect({
     clients,
     name,
     placeholder = "Rechercher un syndicat...",
-    required = false
+    required = false,
+    defaultValue,
+    onChange
 }: SearchableClientSelectProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [search, setSearch] = useState('')
-    const [selectedId, setSelectedId] = useState('')
-    const [selectedName, setSelectedName] = useState('')
+    const [selectedId, setSelectedId] = useState(defaultValue || '')
+    const [selectedName, setSelectedName] = useState(() => {
+        if (defaultValue) {
+            const found = clients.find(c => c.id === defaultValue)
+            if (found) return found.sdc ? `${found.name} (${found.sdc})` : found.name
+        }
+        return ''
+    })
+
+    useEffect(() => {
+        if (defaultValue) {
+            setSelectedId(defaultValue)
+            const found = clients.find(c => c.id === defaultValue)
+            if (found) {
+                setSelectedName(found.sdc ? `${found.name} (${found.sdc})` : found.name)
+            } else {
+                setSelectedName('')
+            }
+        } else {
+            setSelectedId('')
+            setSelectedName('')
+        }
+    }, [defaultValue, clients])
     
     const containerRef = useRef<HTMLDivElement>(null)
 
@@ -61,6 +86,7 @@ export function SearchableClientSelect({
         setSelectedName(name)
         setSearch('')
         setIsOpen(false)
+        if (onChange) onChange(id)
     }
 
     return (
