@@ -1,28 +1,45 @@
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Building2, PlusCircle, ArrowRight, ShieldAlert, CheckCircle, HelpCircle, Activity } from 'lucide-react'
+import { Building2, PlusCircle, ArrowRight, ShieldAlert, CheckCircle, HelpCircle } from 'lucide-react'
 
 export default async function SyndicatesBoardPage() {
     const supabase = await createClient()
 
-    // 1. Fetch active syndicates
-    const { data: clients } = await supabase
+    // 1. Fetch active syndicates — use separate queries to avoid join failures
+    //    if the schema cache is stale or manager_id FK is not yet reflected.
+    const { data: clients, error: clientsError } = await supabase
         .from('clients')
-        .select('*, managers(first_name, last_name), contracts(*)')
+        .select('id, full_name, company_name, manager_id, manager, status')
         .eq('status', 'active')
         .order('company_name')
+
+    // 1b. Fetch contracts separately
+    const clientIds = (clients || []).map(c => c.id)
+    const { data: contracts } = clientIds.length > 0
+        ? await supabase.from('contracts').select('client_id, package_name, monthly_fee').in('client_id', clientIds)
+        : { data: [] }
+
+    // 1c. Fetch all managers (flat, no join)
+    const { data: allManagers } = await supabase
+        .from('managers')
+        .select('id, first_name, last_name')
+
+    const managerMap: Record<string, { first_name: string; last_name: string }> = {}
+    ;(allManagers || []).forEach(m => { managerMap[m.id] = m })
+
+    const contractMap: Record<string, { package_name: string; monthly_fee: number }> = {}
+    ;(contracts || []).forEach(ct => { contractMap[ct.client_id] = ct })
 
     // 2. Fetch audits
     const { data: audits } = await supabase
         .from('syndicate_audits')
-        .select('*')
+        .select('id, client_id, health_score, audit_date')
         .order('audit_date', { ascending: false })
 
     // Find latest audit for each syndicate
     const latestAuditMap: Record<string, any> = {}
-    audits?.forEach(audit => {
+    ;(audits || []).forEach(audit => {
         if (!latestAuditMap[audit.client_id]) {
             latestAuditMap[audit.client_id] = audit
         }
@@ -35,13 +52,20 @@ export default async function SyndicatesBoardPage() {
     const critical: any[] = []
     const unaudited: any[] = []
 
-    (clients || []).forEach(c => {
+    ;(clients || []).forEach(c => {
         const audit = latestAuditMap[c.id]
+        const enriched = {
+            ...c,
+            resolvedManagerName: c.manager_id
+                ? (() => { const m = managerMap[c.manager_id]; return m ? `${m.first_name[0]}.${m.last_name}` : 'N/A' })()
+                : (typeof c.manager === 'string' ? c.manager : 'N/A'),
+            contract: contractMap[c.id] || null
+        }
         if (!audit) {
-            unaudited.push({ client: c, audit: null })
+            unaudited.push({ client: enriched, audit: null })
         } else {
             const score = Number(audit.health_score)
-            const payload = { client: c, audit }
+            const payload = { client: enriched, audit }
             if (score >= 90) excellent.push(payload)
             else if (score >= 75) stable.push(payload)
             else if (score >= 60) atRisk.push(payload)
@@ -131,13 +155,8 @@ export default async function SyndicatesBoardPage() {
                                     </div>
                                 ) : (
                                     sect.list.map(({ client, audit }) => {
-                                        const m = client.managers
-                                        const managerName = m
-                                            ? (Array.isArray(m)
-                                                ? (m[0] ? `${m[0].first_name?.[0] || ''}.${m[0].last_name || ''}` : 'N/A')
-                                                : `${m.first_name?.[0] || ''}.${m.last_name || ''}`)
-                                            : (typeof client.manager === 'string' ? client.manager : 'N/A')
-                                        const contract = client.contracts?.[0]
+                                        const managerName = client.resolvedManagerName || 'N/A'
+                                        const contract = client.contract
                                         return (
                                             <div 
                                                 key={client.id}

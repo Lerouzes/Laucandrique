@@ -2,6 +2,7 @@ import { getManagerStats } from '@/actions/team-management'
 import { createClient } from '@/utils/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
+import { cn } from '@/lib/utils'
 import { Network, Users, Building2, DoorOpen, BarChart3, AlertTriangle, ArrowRight, ShieldCheck } from 'lucide-react'
 
 export default async function TeamsListPage() {
