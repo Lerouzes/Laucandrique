@@ -35,7 +35,10 @@ export async function getClients(query?: string) {
         }
 
         return data ?? []
-    } catch (err) {
+    } catch (err: any) {
+        if (err && (err.digest === 'DYNAMIC_SERVER_USAGE' || String(err.message).includes('Dynamic server usage'))) {
+            throw err
+        }
         console.error('getClients exception:', err)
         return []
     }
