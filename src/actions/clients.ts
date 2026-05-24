@@ -97,8 +97,15 @@ export async function importClients(clientsData: any[]) {
 
 export async function getClientById(id: string) {
     const supabase = await createClient()
-    const { data, error } = await supabase.from('clients').select('*').eq('id', id).single()
-    if (error) return null
+    const { data, error } = await supabase
+        .from('clients')
+        .select('*, contracts(*), doors(id)')
+        .eq('id', id)
+        .single()
+    if (error) {
+        console.error('Error fetching client by id:', error)
+        return null
+    }
     return data
 }
 
@@ -116,13 +123,65 @@ export async function updateClientAction(clientId: string, formData: FormData) {
         manager: String(formData.get('full_name') || '').trim() || null,
         manager_id: String(formData.get('manager_id') || '') || null,
         notes: String(formData.get('notes') || '') || null,
+        status: String(formData.get('status') || 'active') as 'active' | 'inactive',
     }
 
     const { error } = await supabase.from('clients').update(payload).eq('id', clientId)
     if (error) throw new Error(error.message)
 
+    // Contract details
+    const package_name = formData.get('package_name') as string | null
+    const monthly_fee_raw = formData.get('monthly_fee')
+    const financial_year_raw = formData.get('financial_year')
+
+    const monthly_fee = monthly_fee_raw != null ? Number(monthly_fee_raw) : 0
+    const start_date = financial_year_raw ? parseDateSafe(financial_year_raw) : '2026-01-01'
+    const active = payload.status !== 'inactive'
+
+    const { error: contractErr } = await supabase
+        .from('contracts')
+        .upsert(
+            { client_id: clientId, package_name: package_name || 'Non spécifié', monthly_fee: isNaN(monthly_fee) ? 0 : monthly_fee, start_date, active },
+            { onConflict: 'client_id' }
+        )
+    if (contractErr) {
+        console.error('Error updating contract on client update:', contractErr.message)
+    }
+
+    // Doors count
+    const doors_count_raw = formData.get('doors_count')
+    if (doors_count_raw !== null && doors_count_raw !== '') {
+        const doorsNum = Math.floor(Number(doors_count_raw))
+        if (!isNaN(doorsNum) && doorsNum >= 0) {
+            const { error: deleteErr } = await supabase.from('doors').delete().eq('client_id', clientId)
+            if (deleteErr) {
+                console.error('Error deleting doors on client update:', deleteErr.message)
+            }
+            if (doorsNum > 0) {
+                const doorsToInsert = Array.from({ length: doorsNum }, (_, i) => ({
+                    client_id: clientId,
+                    door_number: `Porte ${i + 1}`,
+                }))
+                const { error: insertErr } = await supabase.from('doors').insert(doorsToInsert)
+                if (insertErr) {
+                    console.error('Error inserting doors on client update:', insertErr.message)
+                }
+            } else {
+                const { error: placeholderErr } = await supabase.from('doors').insert({
+                    client_id: clientId,
+                    door_number: 'Porte non spécifiée',
+                })
+                if (placeholderErr) {
+                    console.error('Error inserting placeholder door on client update:', placeholderErr.message)
+                }
+            }
+        }
+    }
+
     revalidatePath('/clients')
     revalidatePath(`/clients/${clientId}`)
+    revalidatePath('/team-management/dashboard')
+    revalidatePath('/team-management/syndicates')
     return { success: true }
 }
 
