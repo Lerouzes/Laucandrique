@@ -1204,3 +1204,27 @@ export async function updateAuditQuestionConfigAction(key: string, description: 
     return data
 }
 
+export async function deleteOneOnOneAction(id: string) {
+    const supabase = await createClient()
+
+    // Fetch meeting to find manager_id for cache revalidation
+    const { data: meeting } = await supabase
+        .from('one_on_ones')
+        .select('manager_id')
+        .eq('id', id)
+        .single()
+
+    const { error } = await supabase
+        .from('one_on_ones')
+        .delete()
+        .eq('id', id)
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/team-management/one-on-ones')
+    if (meeting?.manager_id) {
+        revalidatePath(`/team-management/managers/${meeting.manager_id}`)
+    }
+}
+
+

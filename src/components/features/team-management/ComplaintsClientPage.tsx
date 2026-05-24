@@ -151,7 +151,7 @@ export function ComplaintsClientPage({
                         <AlertTriangle className="h-4 w-4 text-purple-400" />
                     </CardHeader>
                     <CardContent className="pb-3.5">
-                        <div className="text-xl font-bold text-white">{totalCount}</div>
+                        <div className="text-2xl font-bold text-white">{totalCount}</div>
                         <p className="text-[9px] text-zinc-500 mt-0.5">Historique complet</p>
                     </CardContent>
                 </Card>
@@ -162,7 +162,7 @@ export function ComplaintsClientPage({
                         <AlertCircle className="h-4 w-4 text-amber-500" />
                     </CardHeader>
                     <CardContent className="pb-3.5">
-                        <div className="text-xl font-bold text-white">{openCount}</div>
+                        <div className="text-2xl font-bold text-white">{openCount}</div>
                         <p className="text-[9px] text-zinc-500 mt-0.5">
                             {criticalCount} plaintes à sévérité élevée
                         </p>
@@ -175,7 +175,7 @@ export function ComplaintsClientPage({
                         <TrendingUp className="h-4 w-4 text-emerald-400" />
                     </CardHeader>
                     <CardContent className="pb-3.5">
-                        <div className="text-xl font-bold text-white">{resolutionRate}%</div>
+                        <div className="text-2xl font-bold text-white">{resolutionRate}%</div>
                         <p className="text-[9px] text-zinc-500 mt-0.5">{resolvedCount} résolues au total</p>
                     </CardContent>
                 </Card>
@@ -186,7 +186,7 @@ export function ComplaintsClientPage({
                         <CheckCircle2 className="h-4 w-4 text-purple-400" />
                     </CardHeader>
                     <CardContent className="pb-3.5">
-                        <div className="text-xs text-zinc-300 font-semibold truncate leading-tight">
+                        <div className="text-sm text-zinc-300 font-semibold truncate leading-tight">
                             {topCategories.length > 0 ? (
                                 topCategories.map(([name, count]) => `${name} (${count})`).join(', ')
                             ) : (
@@ -200,7 +200,7 @@ export function ComplaintsClientPage({
 
             {/* Filter Bar */}
             <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-sm p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xxs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs">
                     {/* Search Input */}
                     <div className="relative">
                         <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-500" />
@@ -209,7 +209,7 @@ export function ComplaintsClientPage({
                             placeholder="Rechercher syndicat, titre..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="bg-[#121318] border-zinc-800 pl-8 h-8 text-xxs text-white"
+                            className="bg-[#121318] border-zinc-800 pl-8 h-8 text-xs text-white"
                         />
                     </div>
 
@@ -282,16 +282,16 @@ export function ComplaintsClientPage({
                 <div className="lg:col-span-2">
                     <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                         <CardHeader>
-                            <CardTitle className="text-sm font-bold text-white flex items-center justify-between">
+                            <CardTitle className="text-base font-bold text-white flex items-center justify-between">
                                 <span>Registre des Plaintes ({filteredComplaints.length})</span>
                             </CardTitle>
-                            <CardDescription className="text-xxs text-zinc-400">
+                            <CardDescription className="text-xs text-zinc-400">
                                 Liste filtrée des réclamations clients formulées.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3.5">
                             {filteredComplaints.length === 0 ? (
-                                <p className="text-xxs text-zinc-500 italic py-8 text-center">Aucune plainte ne correspond aux filtres.</p>
+                                <p className="text-xs text-zinc-500 italic py-8 text-center">Aucune plainte ne correspond aux filtres.</p>
                             ) : (
                                 filteredComplaints.map((c) => {
                                     const clientName = c.clients ? (c.clients.company_name || c.clients.full_name) : 'Copropriété inconnue'
@@ -311,10 +311,10 @@ export function ComplaintsClientPage({
                                             : 'bg-emerald-500/20 text-emerald-300 border-emerald-850/40'
 
                                     return (
-                                        <div key={c.id} className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-3 text-xxs relative">
+                                        <div key={c.id} className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-3 text-xs relative">
                                             <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
                                                 <div className="space-y-1">
-                                                    <p className="text-xs font-bold text-zinc-200">{c.title}</p>
+                                                    <p className="text-sm font-bold text-zinc-200">{c.title}</p>
                                                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-zinc-500">
                                                         <span>Syndicat: <strong className="text-zinc-300">{clientName} [{sdcNum}]</strong></span>
                                                         <span>·</span>
@@ -371,16 +371,16 @@ export function ComplaintsClientPage({
                 <div>
                     <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                         <CardHeader className="pb-3 bg-zinc-950/20">
-                            <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                            <CardTitle className="text-base font-bold text-white flex items-center gap-2">
                                 <PlusCircle className="h-4 w-4 text-purple-400" />
                                 Enregistrer une Plainte
                             </CardTitle>
-                            <CardDescription className="text-xxs text-zinc-400">
+                            <CardDescription className="text-xs text-zinc-400">
                                 Déclarer une insatisfaction ou réclamation client.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="pt-4">
-                            <form action={createComplaintAction} className="space-y-4 text-xxs">
+                            <form action={createComplaintAction} className="space-y-4 text-xs">
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Syndicat de Copropriété</Label>
                                     <SearchableClientSelect 
@@ -406,11 +406,11 @@ export function ComplaintsClientPage({
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Sujet de la Plainte</Label>
-                                    <Input type="text" name="title" required placeholder="ex: Retards de PV..." className="bg-[#121318] border-zinc-800 h-8 text-white text-xxs" />
+                                    <Input type="text" name="title" required placeholder="ex: Retards de PV..." className="bg-[#121318] border-zinc-800 h-8 text-white text-xs" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Description détaillée</Label>
-                                    <Textarea name="description" required placeholder="Expliquer le litige..." rows={3} className="bg-[#121318] border-zinc-800 text-white text-xxs" />
+                                    <Textarea name="description" required placeholder="Expliquer le litige..." rows={3} className="bg-[#121318] border-zinc-800 text-white text-xs" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Niveau de Sévérité</Label>

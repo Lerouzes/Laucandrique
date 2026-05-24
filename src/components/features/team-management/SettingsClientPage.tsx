@@ -159,7 +159,7 @@ export function SettingsClientPage({
         <div className="space-y-6">
             {/* Status notification banner */}
             {alertMsg && (
-                <div className={`p-3 rounded-lg border text-xxs flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200 ${
+                <div className={`p-3 rounded-lg border text-xs flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200 ${
                     alertMsg.type === 'success' 
                         ? 'bg-emerald-500/20 text-emerald-300 border-emerald-800/40' 
                         : 'bg-rose-500/20 text-rose-300 border-rose-800/40'
@@ -173,7 +173,7 @@ export function SettingsClientPage({
             <div className="flex border-b border-zinc-800 gap-4">
                 <button
                     onClick={() => setActiveTab('categories')}
-                    className={`pb-2.5 text-xs font-bold transition-all relative ${
+                    className={`pb-2.5 text-sm font-bold transition-all relative ${
                         activeTab === 'categories' 
                             ? 'text-purple-400 font-extrabold' 
                             : 'text-zinc-400 hover:text-zinc-200'
@@ -186,7 +186,7 @@ export function SettingsClientPage({
                 </button>
                 <button
                     onClick={() => setActiveTab('audits')}
-                    className={`pb-2.5 text-xs font-bold transition-all relative ${
+                    className={`pb-2.5 text-sm font-bold transition-all relative ${
                         activeTab === 'audits' 
                             ? 'text-purple-400 font-extrabold' 
                             : 'text-zinc-400 hover:text-zinc-200'
@@ -206,16 +206,16 @@ export function SettingsClientPage({
                     <div>
                         <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                             <CardHeader className="pb-3 bg-zinc-950/20">
-                                <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                                <CardTitle className="text-base font-bold text-white flex items-center gap-2">
                                     <PlusCircle className="h-4 w-4 text-purple-400" />
                                     Créer une Catégorie
                                 </CardTitle>
-                                <CardDescription className="text-xxs text-zinc-400">
+                                <CardDescription className="text-xs text-zinc-400">
                                     Ajouter un nouveau type pour classifier les plaintes et réclamations.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="pt-4">
-                                <form onSubmit={handleAddCategory} className="space-y-4 text-xxs">
+                                <form onSubmit={handleAddCategory} className="space-y-4 text-xs">
                                     <div className="space-y-1">
                                         <Label className="text-zinc-500">Nom de la Catégorie</Label>
                                         <Input 
@@ -224,7 +224,7 @@ export function SettingsClientPage({
                                             onChange={(e) => setNewCategoryName(e.target.value)}
                                             required 
                                             placeholder="ex: Problèmes de plomberie..." 
-                                            className="bg-[#121318] border-zinc-800 h-8 text-white text-xxs" 
+                                            className="bg-[#121318] border-zinc-800 h-8 text-white text-xs" 
                                         />
                                     </div>
 
@@ -249,14 +249,14 @@ export function SettingsClientPage({
                     <div className="lg:col-span-2">
                         <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                             <CardHeader>
-                                <CardTitle className="text-sm font-bold text-white">Catégories existantes</CardTitle>
-                                <CardDescription className="text-xxs text-zinc-400">
+                                <CardTitle className="text-base font-bold text-white">Catégories existantes</CardTitle>
+                                <CardDescription className="text-xs text-zinc-400">
                                     Liste des catégories disponibles pour les plaintes et rapports.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-2">
                                 {categories.length === 0 ? (
-                                    <p className="text-xxs text-zinc-500 italic py-6 text-center">Aucune catégorie définie.</p>
+                                    <p className="text-xs text-zinc-500 italic py-6 text-center">Aucune catégorie définie.</p>
                                 ) : (
                                     categories.map((c) => {
                                         const isEditing = editingId === c.id
@@ -265,7 +265,7 @@ export function SettingsClientPage({
                                         return (
                                             <div 
                                                 key={c.id} 
-                                                className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl flex items-center justify-between text-xxs gap-4"
+                                                className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl flex items-center justify-between text-xs gap-4"
                                             >
                                                 {isEditing ? (
                                                     <div className="flex items-center gap-2 flex-1">
@@ -273,7 +273,7 @@ export function SettingsClientPage({
                                                             type="text" 
                                                             value={editingName} 
                                                             onChange={(e) => setEditingName(e.target.value)}
-                                                            className="bg-[#121318] border-zinc-700 h-7 text-xxs text-white max-w-sm"
+                                                            className="bg-[#121318] border-zinc-700 h-7 text-xs text-white max-w-sm"
                                                             autoFocus
                                                         />
                                                         <Button 
@@ -364,11 +364,11 @@ export function SettingsClientPage({
                 <div className="space-y-4">
                     <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                         <CardHeader>
-                            <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                            <CardTitle className="text-base font-bold text-white flex items-center gap-2">
                                 <ClipboardCheck className="h-4 w-4 text-purple-400" />
                                 Infobulles d'Audits de Santé
                             </CardTitle>
-                            <CardDescription className="text-xxs text-zinc-400">
+                            <CardDescription className="text-xs text-zinc-400">
                                 Personnalisez les explications qui s'affichent au survol des critères dans le formulaire d'audit.
                             </CardDescription>
                         </CardHeader>
@@ -380,7 +380,7 @@ export function SettingsClientPage({
                                 return (
                                     <div 
                                         key={q.key} 
-                                        className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-2 text-xxs"
+                                        className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-2 text-xs"
                                     >
                                         <div className="flex justify-between items-center">
                                             <div className="space-y-0.5">
@@ -412,7 +412,7 @@ export function SettingsClientPage({
                                             }}
                                             placeholder="Saisir la description à afficher pour cette question..."
                                             rows={2}
-                                            className="bg-[#121318] border-zinc-800 text-zinc-300 text-xxs leading-relaxed"
+                                            className="bg-[#121318] border-zinc-800 text-zinc-300 text-xs leading-relaxed"
                                         />
                                     </div>
                                 )

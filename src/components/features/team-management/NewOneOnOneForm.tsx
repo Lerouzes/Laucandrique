@@ -215,7 +215,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                         <Handshake className="h-5 w-5 text-purple-400" />
                     </div>
                     <div>
-                        <h2 className="text-sm font-bold text-white uppercase">Nouvel Alignement 1-à-1</h2>
+                        <h2 className="text-base font-bold text-white uppercase">Nouvel Alignement 1-à-1</h2>
                         <p className="text-[10px] text-zinc-400">Configurez et enregistrez une nouvelle rencontre de suivi individuel.</p>
                     </div>
                 </div>
@@ -225,14 +225,14 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                         onClick={() => handleSubmit('draft')}
                         disabled={loading || !managerId}
                         variant="outline" 
-                        className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800 text-xxs h-8 px-4 rounded-lg font-bold"
+                        className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800 text-xs h-8 px-4 rounded-lg font-bold"
                     >
                         Sauvegarder Brouillon
                     </Button>
                     <Button 
                         onClick={() => handleSubmit('completed')}
                         disabled={loading || !managerId}
-                        className="bg-purple-600 hover:bg-purple-700 text-white text-xxs h-8 px-4 rounded-lg font-bold"
+                        className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-8 px-4 rounded-lg font-bold"
                     >
                         Finaliser & Publier
                     </Button>
@@ -244,12 +244,12 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 {/* Left section: Manager & Date Selection */}
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardHeader>
-                        <CardTitle className="text-xs font-bold text-white flex items-center gap-2">
+                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
                             <User className="h-4 w-4 text-purple-400" />
                             Configuration Initiale
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4 text-xxs">
+                    <CardContent className="space-y-4 text-xs">
                         <div className="space-y-1">
                             <Label className="text-zinc-500">Sélectionner un Gestionnaire</Label>
                             <select 
@@ -269,7 +269,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                 type="date" 
                                 value={meetingDate}
                                 onChange={(e) => setMeetingDate(e.target.value)}
-                                className="bg-[#121318] border-zinc-800 h-9 text-xxs text-white" 
+                                className="bg-[#121318] border-zinc-800 h-9 text-xs text-white" 
                             />
                         </div>
                     </CardContent>
@@ -278,31 +278,31 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 {/* Right section: Prepopulated Operational Snapshot */}
                 <Card className="md:col-span-2 bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardHeader>
-                        <CardTitle className="text-xs font-bold text-white flex items-center gap-2">
+                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
                             <Sparkles className="h-4 w-4 text-purple-400" />
                             Aperçu Opérationnel (Calculé pour le mois en cours)
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-6 text-xxs">
+                    <CardContent className="space-y-6 text-xs">
                         {/* Section 1: Inputs manually filled during the 1-on-1 */}
                         <div className="space-y-3">
                             <h4 className="font-bold text-purple-400 uppercase tracking-wider text-[9px]">Indicateurs à renseigner</h4>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Tâches en retard</Label>
-                                    <Input type="number" value={lateTasks} onChange={(e) => setLateTasks(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                                    <Input type="number" value={lateTasks} onChange={(e) => setLateTasks(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Courriels &gt; 48 heures</Label>
-                                    <Input type="number" value={emailsOver48h} onChange={(e) => setEmailsOver48h(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                                    <Input type="number" value={emailsOver48h} onChange={(e) => setEmailsOver48h(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Factures sans notes &gt; 7 jours</Label>
-                                    <Input type="number" value={billsNoNotes} onChange={(e) => setBillsNoNotes(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                                    <Input type="number" value={billsNoNotes} onChange={(e) => setBillsNoNotes(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Rapports d'opérations clos</Label>
-                                    <Input type="number" value={opReportsClosed} onChange={(e) => setOpReportsClosed(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                                    <Input type="number" value={opReportsClosed} onChange={(e) => setOpReportsClosed(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
                                 </div>
                             </div>
                         </div>
@@ -313,17 +313,17 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
                                     <span className="text-zinc-500 block uppercase font-bold text-[8px]">Appels Répondus / Total</span>
-                                    <span className="text-xs font-bold text-zinc-200 block">
+                                    <span className="text-sm font-bold text-zinc-200 block">
                                         {callsTotal > 0 ? `${Math.round((callsAnswered / callsTotal) * 100)}% (${callsAnswered}/${callsTotal})` : 'Aucun appel'}
                                     </span>
                                 </div>
                                 <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
                                     <span className="text-zinc-500 block uppercase font-bold text-[8px]">Syndicats perdus YTD</span>
-                                    <span className="text-xs font-bold text-zinc-200 block">{syndicatesLost}</span>
+                                    <span className="text-sm font-bold text-zinc-200 block">{syndicatesLost}</span>
                                 </div>
                                 <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
                                     <span className="text-zinc-500 block uppercase font-bold text-[8px]">Changements forfait YTD</span>
-                                    <span className="text-xs font-bold text-zinc-200 block">{packageChanges}</span>
+                                    <span className="text-sm font-bold text-zinc-200 block">{packageChanges}</span>
                                 </div>
                             </div>
                         </div>
@@ -334,19 +334,19 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                 <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
                                     <span className="text-zinc-500 block uppercase font-bold text-[8px]">Taux d'Approbation</span>
-                                    <span className="text-xs font-bold text-zinc-200 block">{quoteApprovalRate}%</span>
+                                    <span className="text-sm font-bold text-zinc-200 block">{quoteApprovalRate}%</span>
                                 </div>
                                 <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
                                     <span className="text-zinc-500 block uppercase font-bold text-[8px]">Syndicats Actifs</span>
-                                    <span className="text-xs font-bold text-zinc-200 block">{syndicatesCount}</span>
+                                    <span className="text-sm font-bold text-zinc-200 block">{syndicatesCount}</span>
                                 </div>
                                 <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
                                     <span className="text-zinc-500 block uppercase font-bold text-[8px]">Nombre de Portes</span>
-                                    <span className="text-xs font-bold text-zinc-200 block">{doorsCount}</span>
+                                    <span className="text-sm font-bold text-zinc-200 block">{doorsCount}</span>
                                 </div>
                                 <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
                                     <span className="text-zinc-500 block uppercase font-bold text-[8px]">Volume Courriels (Mensuel)</span>
-                                    <span className="text-xs font-bold text-zinc-200 block">{emailsReceived}</span>
+                                    <span className="text-sm font-bold text-zinc-200 block">{emailsReceived}</span>
                                 </div>
                             </div>
                         </div>
@@ -358,14 +358,14 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
             {lastMeeting && (
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardHeader className="pb-3 border-b border-zinc-900/60 bg-zinc-950/10">
-                        <CardTitle className="text-xs font-bold text-white flex items-center justify-between">
+                        <CardTitle className="text-sm font-bold text-white flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <ClipboardList className="h-4 w-4 text-purple-400" />
                                 Rétroaction de la rencontre précédente ({new Date(lastMeeting.meeting_date).toLocaleDateString('fr-CA')})
                             </div>
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6 text-xxs text-zinc-350">
+                    <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-zinc-350">
                         <div className="space-y-3">
                             {lastMeeting.recent_wins && (
                                 <div>
@@ -421,14 +421,14 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
             {previousCommitments.length > 0 && (
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardHeader>
-                        <CardTitle className="text-xs font-bold text-white flex items-center gap-2">
+                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
                             <ClipboardList className="h-4 w-4 text-purple-400" />
                             Suivi des Engagements Précédents (Responsabilisation)
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xxs text-zinc-300">
+                            <table className="w-full text-left text-xs text-zinc-300">
                                 <thead className="bg-zinc-950/40 text-zinc-400 font-bold border-b border-zinc-800">
                                     <tr>
                                         <th className="p-3 w-1/3">Engagement</th>
@@ -477,7 +477,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                                         placeholder="Détails expliquant le retard..." 
                                                         value={c.why_not || ''}
                                                         onChange={(e) => handlePreviousCommitmentChange(idx, 'why_not', e.target.value)}
-                                                        className="bg-[#121318] border-zinc-800 h-7 text-xxs" 
+                                                        className="bg-[#121318] border-zinc-800 h-7 text-xs" 
                                                     />
                                                 )}
                                             </td>
@@ -500,17 +500,17 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
             {/* Complaints section */}
             <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                 <CardHeader>
-                    <CardTitle className="text-xs font-bold text-white flex items-center gap-2">
+                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
                         <AlertCircle className="h-4.5 w-4.5 text-purple-400" />
                         Plaintes Actives à aborder ({managerComplaints.length})
                     </CardTitle>
-                    <CardDescription className="text-xxs text-zinc-400">
+                    <CardDescription className="text-xs text-zinc-400">
                         Sélectionnez les plaintes du gestionnaire à discuter pendant la rencontre, saisissez les notes de discussion et marquez-les comme résolues au besoin.
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4 text-xxs">
+                <CardContent className="space-y-4 text-xs">
                     {managerComplaints.length === 0 ? (
-                        <p className="text-xxs text-zinc-500 italic py-3 text-center">Aucune plainte active pour ce gestionnaire.</p>
+                        <p className="text-xs text-zinc-500 italic py-3 text-center">Aucune plainte active pour ce gestionnaire.</p>
                     ) : (
                         <div className="space-y-4">
                             {managerComplaints.map((c) => {
@@ -548,7 +548,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                                     className="rounded border-zinc-800 text-purple-600 h-4.5 w-4.5 mt-0.5"
                                                 />
                                                 <div className="space-y-1">
-                                                    <label htmlFor={`comp-${c.id}`} className="text-xs font-bold text-zinc-200 cursor-pointer hover:text-white transition-colors">
+                                                    <label htmlFor={`comp-${c.id}`} className="text-sm font-bold text-zinc-200 cursor-pointer hover:text-white transition-colors">
                                                         {c.title}
                                                     </label>
                                                     <p className="text-zinc-500 text-[10px]">
@@ -583,7 +583,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                                             }}
                                                             placeholder="Qu'est-ce qui a été discuté ?" 
                                                             rows={2} 
-                                                            className="bg-[#121318] border-zinc-800 text-xxs text-white" 
+                                                            className="bg-[#121318] border-zinc-800 text-xs text-white" 
                                                         />
                                                     </div>
                                                     <div className="space-y-1">
@@ -599,7 +599,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                                             }}
                                                             placeholder="Plan d'action pour résoudre le problème..." 
                                                             rows={2} 
-                                                            className="bg-[#121318] border-zinc-800 text-xxs text-white" 
+                                                            className="bg-[#121318] border-zinc-800 text-xs text-white" 
                                                         />
                                                     </div>
                                                 </div>
@@ -636,27 +636,27 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 {/* Discussion details */}
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardHeader>
-                        <CardTitle className="text-xs font-bold text-white flex items-center gap-2">
+                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
                             <ClipboardList className="h-4 w-4 text-purple-400" />
                             Thématiques de Discussion
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4 text-xxs">
+                    <CardContent className="space-y-4 text-xs">
                         <div className="space-y-1">
                             <Label className="text-zinc-500">Succès & Bonnes Coups Récents</Label>
-                            <Textarea value={recentWins} onChange={(e) => setRecentWins(e.target.value)} placeholder="Décrire les réussites..." rows={3} className="bg-[#121318] border-zinc-800 text-xxs text-white" />
+                            <Textarea value={recentWins} onChange={(e) => setRecentWins(e.target.value)} placeholder="Décrire les réussites..." rows={3} className="bg-[#121318] border-zinc-800 text-xs text-white" />
                         </div>
                         <div className="space-y-1">
                             <Label className="text-zinc-500">Difficultés Opérationnelles</Label>
-                            <Textarea value={difficultSituations} onChange={(e) => setDifficultSituations(e.target.value)} placeholder="Difficultés rencontrées..." rows={3} className="bg-[#121318] border-zinc-800 text-xxs text-white" />
+                            <Textarea value={difficultSituations} onChange={(e) => setDifficultSituations(e.target.value)} placeholder="Difficultés rencontrées..." rows={3} className="bg-[#121318] border-zinc-800 text-xs text-white" />
                         </div>
                         <div className="space-y-1">
                             <Label className="text-zinc-500">Points & Dossiers Critiques</Label>
-                            <Textarea value={currentIssues} onChange={(e) => setCurrentIssues(e.target.value)} placeholder="Problématiques à surveiller..." rows={3} className="bg-[#121318] border-zinc-800 text-xxs text-white" />
+                            <Textarea value={currentIssues} onChange={(e) => setCurrentIssues(e.target.value)} placeholder="Problématiques à surveiller..." rows={3} className="bg-[#121318] border-zinc-800 text-xs text-white" />
                         </div>
                         <div className="space-y-1">
                             <Label className="text-zinc-500">Objectifs de la Rencontre</Label>
-                            <Textarea value={mainObjectives} onChange={(e) => setMainObjectives(e.target.value)} placeholder="Quels sont les buts ciblés..." rows={3} className="bg-[#121318] border-zinc-800 text-xxs text-white" />
+                            <Textarea value={mainObjectives} onChange={(e) => setMainObjectives(e.target.value)} placeholder="Quels sont les buts ciblés..." rows={3} className="bg-[#121318] border-zinc-800 text-xs text-white" />
                         </div>
                     </CardContent>
                 </Card>
@@ -664,27 +664,27 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 {/* Next Priorities & Support */}
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardHeader>
-                        <CardTitle className="text-xs font-bold text-white flex items-center gap-2">
+                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
                             <AlertCircle className="h-4 w-4 text-purple-400" />
                             Priorités & Besoins de Support
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4 text-xxs">
+                    <CardContent className="space-y-4 text-xs">
                         {/* Priorities */}
                         <div className="space-y-3 p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl">
                             <h4 className="font-bold text-purple-400 uppercase tracking-wider text-[9px]">Les 3 Prochaines Priorités Opérationnelles</h4>
                             <div className="space-y-2">
                                 <div className="flex items-center gap-2">
                                     <Badge className="bg-purple-900/30 text-purple-400 border border-purple-800 font-bold text-[9px]">P1</Badge>
-                                    <Input value={priority1} onChange={(e) => setPriority1(e.target.value)} placeholder="Première priorité..." className="bg-[#121318] border-zinc-800 h-8 text-xxs" />
+                                    <Input value={priority1} onChange={(e) => setPriority1(e.target.value)} placeholder="Première priorité..." className="bg-[#121318] border-zinc-800 h-8 text-xs" />
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Badge className="bg-purple-900/30 text-purple-400 border border-purple-800 font-bold text-[9px]">P2</Badge>
-                                    <Input value={priority2} onChange={(e) => setPriority2(e.target.value)} placeholder="Deuxième priorité..." className="bg-[#121318] border-zinc-800 h-8 text-xxs" />
+                                    <Input value={priority2} onChange={(e) => setPriority2(e.target.value)} placeholder="Deuxième priorité..." className="bg-[#121318] border-zinc-800 h-8 text-xs" />
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Badge className="bg-purple-900/30 text-purple-400 border border-purple-800 font-bold text-[9px]">P3</Badge>
-                                    <Input value={priority3} onChange={(e) => setPriority3(e.target.value)} placeholder="Troisième priorité..." className="bg-[#121318] border-zinc-800 h-8 text-xxs" />
+                                    <Input value={priority3} onChange={(e) => setPriority3(e.target.value)} placeholder="Troisième priorité..." className="bg-[#121318] border-zinc-800 h-8 text-xs" />
                                 </div>
                             </div>
                         </div>
@@ -693,19 +693,19 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                         <div className="space-y-3">
                             <div className="space-y-1">
                                 <Label className="text-zinc-500">Demandes de Formation / Mentorat</Label>
-                                <Input value={trainingRequested} onChange={(e) => setTrainingRequested(e.target.value)} placeholder="Formations suggérées..." className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                                <Input value={trainingRequested} onChange={(e) => setTrainingRequested(e.target.value)} placeholder="Formations suggérées..." className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-zinc-500">Sujets à Escalader à la Direction</Label>
-                                <Input value={escalationNeeded} onChange={(e) => setEscalationNeeded(e.target.value)} placeholder="Dossiers nécessitant une intervention..." className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                                <Input value={escalationNeeded} onChange={(e) => setEscalationNeeded(e.target.value)} placeholder="Dossiers nécessitant une intervention..." className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-zinc-500">Bloqueurs Opérationnels Systèmes / Processus</Label>
-                                <Input value={operationalBlockers} onChange={(e) => setOperationalBlockers(e.target.value)} placeholder="Outils ou processus inefficaces..." className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                                <Input value={operationalBlockers} onChange={(e) => setOperationalBlockers(e.target.value)} placeholder="Outils ou processus inefficaces..." className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-zinc-500">Résolution de Conflits à gérer</Label>
-                                <Input value={conflictResolution} onChange={(e) => setConflictResolution(e.target.value)} placeholder="Médiation client ou conseil..." className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                                <Input value={conflictResolution} onChange={(e) => setConflictResolution(e.target.value)} placeholder="Médiation client ou conseil..." className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
                             </div>
                         </div>
                     </CardContent>
@@ -715,18 +715,19 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
             {/* New commitments log */}
             <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                 <CardHeader>
-                    <CardTitle className="text-xs font-bold text-white flex items-center gap-2">
+                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-purple-400" />
                         Nouveaux Engagements Actés
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4 text-xxs">
+                <CardContent className="space-y-4 text-xs">
                     <div className="flex gap-2">
-                        <Input 
+                        <Textarea 
                             value={newCommitmentText} 
                             onChange={(e) => setNewCommitmentText(e.target.value)}
                             placeholder="Saisir un nouvel engagement pour la prochaine rencontre..." 
-                            className="bg-[#121318] border-zinc-800 h-9 text-xxs text-white flex-1" 
+                            rows={3}
+                            className="bg-[#121318] border-zinc-800 text-sm text-white flex-1 p-2" 
                         />
                         <Button 
                             onClick={handleAddCommitment}
