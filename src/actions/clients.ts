@@ -121,6 +121,20 @@ export async function getClientById(id: string) {
     return data
 }
 
+export async function getContractForClient(clientId: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('contracts')
+        .select('*')
+        .eq('client_id', clientId)
+        .maybeSingle()
+    if (error) {
+        console.error('Error fetching contract:', error)
+        return null
+    }
+    return data
+}
+
 export async function updateClientAction(_prevState: any, formData: FormData): Promise<{ success: boolean; error?: string }>
 export async function updateClientAction(clientId: string, formData: FormData): Promise<{ success: boolean; error?: string }>
 export async function updateClientAction(clientIdOrPrev: any, formData: FormData): Promise<{ success: boolean; error?: string }> {
@@ -220,7 +234,14 @@ export async function updateClientAction(clientIdOrPrev: any, formData: FormData
     revalidatePath(`/clients/${clientId}`)
     revalidatePath('/team-management/dashboard')
     revalidatePath('/team-management/syndicates')
-    return { success: true }
+
+    // Return saved values so the client can display them and confirm
+    return {
+        success: true,
+        savedPackage: package_name,
+        savedFee: monthly_fee,
+        savedDate: start_date,
+    }
 }
 
 function parseDateSafe(val: any): string {

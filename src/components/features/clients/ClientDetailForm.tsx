@@ -44,7 +44,9 @@ export function ClientDetailForm({
 
   useEffect(() => {
     if (state?.success) {
-      router.refresh()
+      // Short delay so user sees success banner, then hard reload for fresh data
+      const t = setTimeout(() => window.location.reload(), 1200)
+      return () => clearTimeout(t)
     }
   }, [state?.success])
 

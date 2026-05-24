@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
-import { getClientById, updateClientAction } from '@/actions/clients'
+import { getClientById, updateClientAction, getContractForClient } from '@/actions/clients'
 import { getManagers } from '@/actions/managers'
 import { getQuotes } from '@/actions/quotes'
 import { Badge } from '@/components/ui/badge'
@@ -12,12 +12,21 @@ import { ArrowLeft } from 'lucide-react'
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [client, managers, quotes] = await Promise.all([getClientById(id), getManagers(), getQuotes()])
+
+  // Fetch client + contract separately (direct query avoids join caching issues)
+  const [client, managers, quotes, contractDirect] = await Promise.all([
+    getClientById(id),
+    getManagers(),
+    getQuotes(),
+    getContractForClient(id),
+  ])
+
   if (!client) notFound()
 
   const clientQuotes = quotes.filter((q: any) => q.client_id === id)
-  const contract = (client.contracts as any[])?.[0] || null
-  const doorsCount = client.doors?.length || 0
+  // Prefer the direct contract fetch over the join result
+  const contract = contractDirect || (client.contracts as any[])?.[0] || null
+  const doorsCount = (client.doors as any[])?.length || 0
   const isStatusActive = client.status !== 'inactive'
 
   return (
@@ -37,6 +46,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             </Badge>
           </div>
           <p className="text-xs text-zinc-400 mt-1">SDC #: <span className="font-semibold text-zinc-300">{client.full_name || 'N/A'}</span></p>
+          {/* DB ground-truth debug strip — remove once confirmed working */}
+          <p className="text-[10px] text-zinc-600 mt-1 font-mono">
+            DB contract: {contract ? `${contract.package_name ?? 'null'} | $${contract.monthly_fee ?? 'null'} | ${contract.start_date ?? 'null'}` : 'aucun contrat en base'}
+          </p>
         </div>
       </div>
 
