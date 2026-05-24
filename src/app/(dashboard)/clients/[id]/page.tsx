@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import fs from 'fs'
 import { getClientById, updateClientAction } from '@/actions/clients'
 import { getManagers } from '@/actions/managers'
 import { getQuotes } from '@/actions/quotes'
@@ -30,6 +31,20 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const contract = client.contracts?.[0] || null
   const doorsCount = client.doors?.length || 0
   const isStatusActive = client.status !== 'inactive'
+
+  // Debug file log
+  try {
+    fs.writeFileSync('/Users/goon/Desktop/LAUCANDRIQUE/gustav/client_details_debug.log', JSON.stringify({
+      id,
+      client_name: client.company_name || client.full_name,
+      contracts_raw: client.contracts,
+      contract_extracted: contract,
+      doors_raw: client.doors,
+      doors_count: doorsCount,
+    }, null, 2))
+  } catch (err) {
+    // ignore
+  }
 
   return (
     <div className="space-y-6 max-w-6xl">
