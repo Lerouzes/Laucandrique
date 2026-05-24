@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { updateOneOnOneAction } from '@/actions/team-management'
+import { updateOneOnOneAction, getOneOnOneSnapshotAction } from '@/actions/team-management'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,11 +27,13 @@ import {
 export function OneOnOneDetailView({ 
     oneOnOne, 
     commitments,
-    manager
+    manager,
+    lastMeeting
 }: { 
     oneOnOne: any
     commitments: any[]
     manager: any
+    lastMeeting: any | null
 }) {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
@@ -45,10 +47,31 @@ export function OneOnOneDetailView({
     const [callsAnswered, setCallsAnswered] = useState(oneOnOne.calls_answered)
     const [billsNoNotes, setBillsNoNotes] = useState(oneOnOne.bills_no_notes_over_7d)
     const [opReportsClosed, setOpReportsClosed] = useState(oneOnOne.op_reports_closed)
-    const [agendaTemplatesUsed, setAgendaTemplatesUsed] = useState(oneOnOne.agenda_templates_used)
-    const [assembliesOnTime, setAssembliesOnTime] = useState(oneOnOne.assemblies_on_time)
     const [syndicatesLost, setSyndicatesLost] = useState(oneOnOne.syndicates_lost)
     const [packageChanges, setPackageChanges] = useState(oneOnOne.package_changes)
+
+    // Live Snapshot Metrics
+    const [quoteApprovalRate, setQuoteApprovalRate] = useState(0)
+    const [doorsCount, setDoorsCount] = useState(0)
+    const [syndicatesCount, setSyndicatesCount] = useState(0)
+    const [emailsReceived, setEmailsReceived] = useState(0)
+
+    // Load manager live statistics on edit
+    useEffect(() => {
+        if (!oneOnOne?.manager_id) return
+        async function fetchLiveStats() {
+            try {
+                const snapshot = await getOneOnOneSnapshotAction(oneOnOne.manager_id)
+                setQuoteApprovalRate(snapshot.quote_approval_rate)
+                setDoorsCount(snapshot.doors_count)
+                setSyndicatesCount(snapshot.syndicates_count)
+                setEmailsReceived(snapshot.emails_received)
+            } catch (err) {
+                console.error("Error loading live stats in detail view:", err)
+            }
+        }
+        fetchLiveStats()
+    }, [oneOnOne?.manager_id])
 
     // Commitments
     const [meetingCommitments, setMeetingCommitments] = useState<any[]>(commitments || [])
@@ -108,8 +131,8 @@ export function OneOnOneDetailView({
                 calls_answered: Number(callsAnswered),
                 bills_no_notes_over_7d: Number(billsNoNotes),
                 op_reports_closed: Number(opReportsClosed),
-                agenda_templates_used: Number(agendaTemplatesUsed),
-                assemblies_on_time: Number(assembliesOnTime),
+                agenda_templates_used: 0,
+                assemblies_on_time: 0,
                 syndicates_lost: Number(syndicatesLost),
                 package_changes: Number(packageChanges),
                 current_issues: currentIssues,
@@ -195,30 +218,126 @@ export function OneOnOneDetailView({
             {!isEditing ? (
                 <div className="space-y-6">
                     {/* Read-Only Stats Row */}
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-                        <div className="p-3.5 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-4">
+                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
                             <span className="text-zinc-500 block uppercase font-bold text-[8px]">Taux de Réponse</span>
-                            <span className="text-sm font-bold text-white mt-1 block">
+                            <span className="text-xs font-bold text-white block">
                                 {callsTotal > 0 ? `${Math.round((callsAnswered / callsTotal) * 100)}% (${callsAnswered}/${callsTotal})` : 'Aucun appel'}
                             </span>
                         </div>
-                        <div className="p-3.5 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Syndicats perdus YTD</span>
+                            <span className="text-xs font-bold text-white block">{syndicatesLost}</span>
+                        </div>
+                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Forfaits modifiés YTD</span>
+                            <span className="text-xs font-bold text-white block">{packageChanges}</span>
+                        </div>
+                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
                             <span className="text-zinc-500 block uppercase font-bold text-[8px]">Tâches en retard</span>
-                            <span className="text-sm font-bold text-white mt-1 block">{lateTasks}</span>
+                            <span className="text-xs font-bold text-white block">{lateTasks}</span>
                         </div>
-                        <div className="p-3.5 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
                             <span className="text-zinc-500 block uppercase font-bold text-[8px]">Courriels &gt; 48h</span>
-                            <span className="text-sm font-bold text-white mt-1 block">{emailsOver48h}</span>
+                            <span className="text-xs font-bold text-white block">{emailsOver48h}</span>
                         </div>
-                        <div className="p-3.5 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
                             <span className="text-zinc-500 block uppercase font-bold text-[8px]">Factures sans note</span>
-                            <span className="text-sm font-bold text-white mt-1 block">{billsNoNotes}</span>
+                            <span className="text-xs font-bold text-white block">{billsNoNotes}</span>
                         </div>
-                        <div className="p-3.5 bg-zinc-900/40 border border-zinc-850 rounded-xl">
-                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Clôtures Rapports</span>
-                            <span className="text-sm font-bold text-white mt-1 block">{opReportsClosed}</span>
+                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Rapports clos</span>
+                            <span className="text-xs font-bold text-white block">{opReportsClosed}</span>
                         </div>
                     </div>
+
+                    {/* Manager Live stats panel (only shown if loaded) */}
+                    {syndicatesCount > 0 && (
+                        <div className="space-y-3 p-4 bg-zinc-900/20 border border-zinc-850 rounded-xl">
+                            <h4 className="font-bold text-purple-400 uppercase tracking-wider text-[9px]">Indicateurs du Gestionnaire (Temps réel)</h4>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                <div className="p-3 bg-[#16171e]/40 border border-zinc-850 rounded-xl space-y-1">
+                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Taux d'Approbation</span>
+                                    <span className="text-xs font-bold text-zinc-200 block">{quoteApprovalRate}%</span>
+                                </div>
+                                <div className="p-3 bg-[#16171e]/40 border border-zinc-850 rounded-xl space-y-1">
+                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Syndicats Actifs</span>
+                                    <span className="text-xs font-bold text-zinc-200 block">{syndicatesCount}</span>
+                                </div>
+                                <div className="p-3 bg-[#16171e]/40 border border-zinc-850 rounded-xl space-y-1">
+                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Nombre de Portes</span>
+                                    <span className="text-xs font-bold text-zinc-200 block">{doorsCount}</span>
+                                </div>
+                                <div className="p-3 bg-[#16171e]/40 border border-zinc-850 rounded-xl space-y-1">
+                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Volume Courriels (Mensuel)</span>
+                                    <span className="text-xs font-bold text-zinc-200 block">{emailsReceived}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Last meeting review notes */}
+                    {lastMeeting && (
+                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                            <CardHeader className="pb-3 border-b border-zinc-900/60 bg-zinc-950/10">
+                                <CardTitle className="text-xs font-bold text-white flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <ClipboardList className="h-4 w-4 text-purple-400" />
+                                        Rétroaction de la rencontre précédente ({new Date(lastMeeting.meeting_date).toLocaleDateString('fr-CA')})
+                                    </div>
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6 text-xxs text-zinc-350">
+                                <div className="space-y-3">
+                                    {lastMeeting.recent_wins && (
+                                        <div>
+                                            <span className="text-zinc-500 block font-bold uppercase text-[8px] mb-1">Succès précédents</span>
+                                            <p className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-850 leading-relaxed whitespace-pre-wrap">{lastMeeting.recent_wins}</p>
+                                        </div>
+                                    )}
+                                    {lastMeeting.difficult_situations && (
+                                        <div>
+                                            <span className="text-zinc-500 block font-bold uppercase text-[8px] mb-1">Difficultés relevées</span>
+                                            <p className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-850 leading-relaxed whitespace-pre-wrap">{lastMeeting.difficult_situations}</p>
+                                        </div>
+                                    )}
+                                    {lastMeeting.current_issues && (
+                                        <div>
+                                            <span className="text-zinc-500 block font-bold uppercase text-[8px] mb-1">Dossiers chauds / points critiques</span>
+                                            <p className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-850 leading-relaxed whitespace-pre-wrap">{lastMeeting.current_issues}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="space-y-3">
+                                    {/* Previous priorities */}
+                                    <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-2">
+                                        <span className="text-zinc-500 block font-bold uppercase text-[8px]">Dernières priorités fixées</span>
+                                        {lastMeeting.priority_1 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/20 text-purple-400 border border-purple-800/40 text-[8px]">P1</Badge> <span>{lastMeeting.priority_1}</span></div>}
+                                        {lastMeeting.priority_2 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/20 text-purple-400 border border-purple-800/40 text-[8px]">P2</Badge> <span>{lastMeeting.priority_2}</span></div>}
+                                        {lastMeeting.priority_3 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/20 text-purple-400 border border-purple-800/40 text-[8px]">P3</Badge> <span>{lastMeeting.priority_3}</span></div>}
+                                    </div>
+
+                                    {/* Previous commitments list */}
+                                    {lastMeeting.commitments && lastMeeting.commitments.length > 0 && (
+                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-2">
+                                            <span className="text-zinc-500 block font-bold uppercase text-[8px]">Tous les engagements pris</span>
+                                            <div className="space-y-1.5 max-h-[150px] overflow-y-auto pr-1">
+                                                {lastMeeting.commitments.map((c: any, idx: number) => (
+                                                    <div key={idx} className="flex justify-between items-center gap-2 text-[10px] pb-1 border-b border-zinc-850/50 last:border-b-0 last:pb-0">
+                                                        <span className={c.completed ? "line-through text-zinc-500" : "font-semibold text-zinc-300"}>{c.commitment_text}</span>
+                                                        <Badge variant="outline" className={c.completed ? "bg-emerald-950/20 text-emerald-400 border-emerald-800/40 text-[8px]" : "bg-rose-950/20 text-rose-400 border-rose-800/40 text-[8px]"}>
+                                                            {c.completed ? 'Fait' : 'En attente'}
+                                                        </Badge>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {/* Discussion notes read-only */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -376,53 +495,142 @@ export function OneOnOneDetailView({
                             <CardHeader>
                                 <CardTitle className="text-xs font-bold text-white flex items-center gap-2">
                                     <Sparkles className="h-4 w-4 text-purple-400" />
-                                    Indicateurs Opérationnels
+                                    Aperçu Opérationnel
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xxs">
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Appels Total / Répondus</Label>
-                                    <div className="flex items-center gap-2">
-                                        <Input type="number" value={callsTotal} onChange={(e) => setCallsTotal(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
-                                        <span className="text-zinc-600">/</span>
-                                        <Input type="number" value={callsAnswered} onChange={(e) => setCallsAnswered(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                            <CardContent className="space-y-6 text-xxs">
+                                {/* Section 1: Inputs manually filled during the 1-on-1 */}
+                                <div className="space-y-3">
+                                    <h4 className="font-bold text-purple-400 uppercase tracking-wider text-[9px]">Indicateurs à renseigner</h4>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                        <div className="space-y-1">
+                                            <Label className="text-zinc-500">Tâches en retard</Label>
+                                            <Input type="number" value={lateTasks} onChange={(e) => setLateTasks(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-zinc-500">Courriels &gt; 48 heures</Label>
+                                            <Input type="number" value={emailsOver48h} onChange={(e) => setEmailsOver48h(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-zinc-500">Factures sans notes &gt; 7j</Label>
+                                            <Input type="number" value={billsNoNotes} onChange={(e) => setBillsNoNotes(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-zinc-500">Rapports opérationnels clos</Label>
+                                            <Input type="number" value={opReportsClosed} onChange={(e) => setOpReportsClosed(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Tâches en retard</Label>
-                                    <Input type="number" value={lateTasks} onChange={(e) => setLateTasks(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+
+                                {/* Section 2: Snapshotted statistics (computed & saved on publish, read-only) */}
+                                <div className="space-y-3 border-t border-zinc-900 pt-4">
+                                    <h4 className="font-bold text-purple-400 uppercase tracking-wider text-[9px]">Statistiques du mois (Capture automatique)</h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Appels Répondus / Total</span>
+                                            <span className="text-xs font-bold text-zinc-200 block">
+                                                {callsTotal > 0 ? `${Math.round((callsAnswered / callsTotal) * 100)}% (${callsAnswered}/${callsTotal})` : 'Aucun appel'}
+                                            </span>
+                                        </div>
+                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Syndicats perdus YTD</span>
+                                            <span className="text-xs font-bold text-zinc-200 block">{syndicatesLost}</span>
+                                        </div>
+                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Changements forfait YTD</span>
+                                            <span className="text-xs font-bold text-zinc-200 block">{packageChanges}</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Courriels &gt; 48 heures</Label>
-                                    <Input type="number" value={emailsOver48h} onChange={(e) => setEmailsOver48h(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Factures sans notes &gt; 7j</Label>
-                                    <Input type="number" value={billsNoNotes} onChange={(e) => setBillsNoNotes(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Rapports opérationnels clos</Label>
-                                    <Input type="number" value={opReportsClosed} onChange={(e) => setOpReportsClosed(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Gabarits ordre du jour utilisés</Label>
-                                    <Input type="number" value={agendaTemplatesUsed} onChange={(e) => setAgendaTemplatesUsed(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Assemblées à temps (%)</Label>
-                                    <Input type="number" value={assembliesOnTime} onChange={(e) => setAssembliesOnTime(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Syndicats perdus YTD</Label>
-                                    <Input type="number" value={syndicatesLost} onChange={(e) => setSyndicatesLost(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Changement forfaits YTD</Label>
-                                    <Input type="number" value={packageChanges} onChange={(e) => setPackageChanges(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+
+                                {/* Section 3: Manager Live stats at time of interview */}
+                                <div className="space-y-3 border-t border-zinc-900 pt-4">
+                                    <h4 className="font-bold text-purple-400 uppercase tracking-wider text-[9px]">Indicateurs du Gestionnaire (Temps réel)</h4>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Taux d'Approbation</span>
+                                            <span className="text-xs font-bold text-zinc-200 block">{quoteApprovalRate}%</span>
+                                        </div>
+                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Syndicats Actifs</span>
+                                            <span className="text-xs font-bold text-zinc-200 block">{syndicatesCount}</span>
+                                        </div>
+                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Nombre de Portes</span>
+                                            <span className="text-xs font-bold text-zinc-200 block">{doorsCount}</span>
+                                        </div>
+                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Volume Courriels (Mensuel)</span>
+                                            <span className="text-xs font-bold text-zinc-200 block">{emailsReceived}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
                     </div>
+
+                    {/* Last meeting review notes */}
+                    {lastMeeting && (
+                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                            <CardHeader className="pb-3 border-b border-zinc-900/60 bg-zinc-950/10">
+                                <CardTitle className="text-xs font-bold text-white flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <ClipboardList className="h-4 w-4 text-purple-400" />
+                                        Rétroaction de la rencontre précédente ({new Date(lastMeeting.meeting_date).toLocaleDateString('fr-CA')})
+                                    </div>
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6 text-xxs text-zinc-350">
+                                <div className="space-y-3">
+                                    {lastMeeting.recent_wins && (
+                                        <div>
+                                            <span className="text-zinc-500 block font-bold uppercase text-[8px] mb-1">Succès précédents</span>
+                                            <p className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-850 leading-relaxed whitespace-pre-wrap">{lastMeeting.recent_wins}</p>
+                                        </div>
+                                    )}
+                                    {lastMeeting.difficult_situations && (
+                                        <div>
+                                            <span className="text-zinc-500 block font-bold uppercase text-[8px] mb-1">Difficultés relevées</span>
+                                            <p className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-850 leading-relaxed whitespace-pre-wrap">{lastMeeting.difficult_situations}</p>
+                                        </div>
+                                    )}
+                                    {lastMeeting.current_issues && (
+                                        <div>
+                                            <span className="text-zinc-500 block font-bold uppercase text-[8px] mb-1">Dossiers chauds / points critiques</span>
+                                            <p className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-850 leading-relaxed whitespace-pre-wrap">{lastMeeting.current_issues}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="space-y-3">
+                                    {/* Previous priorities */}
+                                    <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-2">
+                                        <span className="text-zinc-500 block font-bold uppercase text-[8px]">Dernières priorités fixées</span>
+                                        {lastMeeting.priority_1 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/20 text-purple-400 border border-purple-800/40 text-[8px]">P1</Badge> <span>{lastMeeting.priority_1}</span></div>}
+                                        {lastMeeting.priority_2 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/20 text-purple-400 border border-purple-800/40 text-[8px]">P2</Badge> <span>{lastMeeting.priority_2}</span></div>}
+                                        {lastMeeting.priority_3 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/20 text-purple-400 border border-purple-800/40 text-[8px]">P3</Badge> <span>{lastMeeting.priority_3}</span></div>}
+                                    </div>
+
+                                    {/* Previous commitments list */}
+                                    {lastMeeting.commitments && lastMeeting.commitments.length > 0 && (
+                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-2">
+                                            <span className="text-zinc-500 block font-bold uppercase text-[8px]">Tous les engagements pris</span>
+                                            <div className="space-y-1.5 max-h-[150px] overflow-y-auto pr-1">
+                                                {lastMeeting.commitments.map((c: any, idx: number) => (
+                                                    <div key={idx} className="flex justify-between items-center gap-2 text-[10px] pb-1 border-b border-zinc-850/50 last:border-b-0 last:pb-0">
+                                                        <span className={c.completed ? "line-through text-zinc-500" : "font-semibold text-zinc-300"}>{c.commitment_text}</span>
+                                                        <Badge variant="outline" className={c.completed ? "bg-emerald-950/20 text-emerald-400 border-emerald-800/40 text-[8px]" : "bg-rose-950/20 text-rose-400 border-rose-800/40 text-[8px]"}>
+                                                            {c.completed ? 'Fait' : 'En attente'}
+                                                        </Badge>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {/* Discussions & Notes */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

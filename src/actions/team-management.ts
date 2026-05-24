@@ -959,86 +959,70 @@ export async function resolveComplaintAction(id: string) {
 
 export async function getOneOnOneSnapshotAction(managerId: string) {
     const supabase = await createClient()
-    const now = new Date()
-    const startOfYear = new Date(now.getFullYear(), 0, 1).toISOString().substring(0, 10)
+    const stats = await getManagerStats(managerId)
 
-    // 1. Calls total & answered (latest month)
-    const { data: latestCalls } = await supabase
-        .from('manager_monthly_calls')
-        .select('*')
-        .eq('manager_id', managerId)
-        .order('year_month', { ascending: false })
-        .limit(1)
-
-    const calls_total = latestCalls?.[0]?.total_calls || 0
-    const calls_answered = latestCalls?.[0]?.answered_calls || 0
-
-    // 2. Workload & open tasks (latest month)
-    const { data: latestWorkload } = await supabase
-        .from('manager_monthly_workload')
-        .select('*')
-        .eq('manager_id', managerId)
-        .order('year_month', { ascending: false })
-        .limit(1)
-
-    const late_tasks = latestWorkload?.[0]?.open_tasks || 0
-    const op_reports_closed = latestWorkload?.[0]?.closed_tasks || 0
-
-    // 3. Syndicates lost YTD
-    const { count: lostCount } = await supabase
-        .from('lost_syndicates')
-        .select('id', { count: 'exact', head: true })
-        .eq('manager_id', managerId)
-        .gte('departure_date', startOfYear)
-
-    // 4. Package changes YTD (we fetch manager's clients and count their package changes)
-    const { data: managerClients } = await supabase
-        .from('clients')
-        .select('id')
-        .eq('manager_id', managerId)
-    
-    let package_changes = 0
-    if (managerClients && managerClients.length > 0) {
-        const clientIds = managerClients.map(c => c.id)
-        const { count: changesCount } = await supabase
-            .from('package_change_logs')
-            .select('id', { count: 'exact', head: true })
-            .in('client_id', clientIds)
-            .gte('change_date', startOfYear)
-        package_changes = changesCount || 0
-    }
-
-    // 5. Carry-over commitments from the previous 1v1
-    const { data: previous1v1 } = await supabase
+    // Fetch last completed 1v1 meeting for review
+    const { data: lastMeetingList } = await supabase
         .from('one_on_ones')
-        .select('id')
+        .select(`
+            id,
+            meeting_date,
+            status,
+            current_issues,
+            main_objectives,
+            recent_wins,
+            difficult_situations,
+            priority_1,
+            priority_2,
+            priority_3,
+            training_requested,
+            escalation_needed,
+            operational_blockers,
+            conflict_resolution
+        `)
         .eq('manager_id', managerId)
+        .eq('status', 'completed')
         .order('meeting_date', { ascending: false })
         .limit(1)
-        .single()
 
+    const lastMeeting = lastMeetingList?.[0] || null
+    let lastMeetingCommitments: any[] = []
     let pendingCommitments: any[] = []
-    if (previous1v1) {
+
+    if (lastMeeting) {
         const { data: commitments } = await supabase
             .from('one_on_one_commitments')
             .select('*')
-            .eq('one_on_one_id', previous1v1.id)
-            .eq('completed', false)
+            .eq('one_on_one_id', lastMeeting.id)
         if (commitments) {
-            pendingCommitments = commitments.map(c => ({
-                commitment_text: c.commitment_text,
-                completed: false
-            }))
+            lastMeetingCommitments = commitments
+            pendingCommitments = commitments
+                .filter(c => !c.completed)
+                .map(c => ({
+                    commitment_text: c.commitment_text,
+                    completed: false
+                }))
         }
     }
 
     return {
-        calls_total,
-        calls_answered,
-        late_tasks,
-        op_reports_closed,
-        syndicates_lost: lostCount || 0,
-        package_changes,
-        pendingCommitments
+        calls_total: stats?.totalCalls || 0,
+        calls_answered: stats?.answeredCalls || 0,
+        late_tasks: stats?.openTasks || 0,
+        op_reports_closed: stats?.closedTasks || 0,
+        syndicates_lost: stats?.lostYtd || 0,
+        package_changes: stats?.packageChangesCount || 0,
+        
+        // Live snapshot metrics
+        quote_approval_rate: stats?.quoteApprovalRate || 0,
+        doors_count: stats?.doorsCount || 0,
+        syndicates_count: stats?.syndicatesCount || 0,
+        emails_received: stats?.communicationsReceived || 0,
+        
+        pendingCommitments,
+        lastMeeting: lastMeeting ? {
+            ...lastMeeting,
+            commitments: lastMeetingCommitments
+        } : null
     }
 }

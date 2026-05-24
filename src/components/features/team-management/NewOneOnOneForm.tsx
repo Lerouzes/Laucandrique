@@ -35,10 +35,17 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
     const [callsAnswered, setCallsAnswered] = useState(0)
     const [billsNoNotes, setBillsNoNotes] = useState(0)
     const [opReportsClosed, setOpReportsClosed] = useState(0)
-    const [agendaTemplatesUsed, setAgendaTemplatesUsed] = useState(0)
-    const [assembliesOnTime, setAssembliesOnTime] = useState(100)
     const [syndicatesLost, setSyndicatesLost] = useState(0)
     const [packageChanges, setPackageChanges] = useState(0)
+
+    // Live Snapshot Metrics
+    const [quoteApprovalRate, setQuoteApprovalRate] = useState(0)
+    const [doorsCount, setDoorsCount] = useState(0)
+    const [syndicatesCount, setSyndicatesCount] = useState(0)
+    const [emailsReceived, setEmailsReceived] = useState(0)
+
+    // Last completed meeting details
+    const [lastMeeting, setLastMeeting] = useState<any | null>(null)
 
     // Previous commitments state (carried forward)
     const [previousCommitments, setPreviousCommitments] = useState<any[]>([])
@@ -76,6 +83,13 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 setOpReportsClosed(snapshot.op_reports_closed)
                 setSyndicatesLost(snapshot.syndicates_lost)
                 setPackageChanges(snapshot.package_changes)
+                
+                // Set live snapshot metrics
+                setQuoteApprovalRate(snapshot.quote_approval_rate)
+                setDoorsCount(snapshot.doors_count)
+                setSyndicatesCount(snapshot.syndicates_count)
+                setEmailsReceived(snapshot.emails_received)
+                setLastMeeting(snapshot.lastMeeting)
                 
                 // Set carried over commitments
                 setPreviousCommitments(
@@ -142,8 +156,8 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 calls_answered: Number(callsAnswered),
                 bills_no_notes_over_7d: Number(billsNoNotes),
                 op_reports_closed: Number(opReportsClosed),
-                agenda_templates_used: Number(agendaTemplatesUsed),
-                assemblies_on_time: Number(assembliesOnTime),
+                agenda_templates_used: 0,
+                assemblies_on_time: 0,
                 syndicates_lost: Number(syndicatesLost),
                 package_changes: Number(packageChanges),
                 current_issues: currentIssues,
@@ -245,50 +259,139 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                             Aperçu Opérationnel (Calculé pour le mois en cours)
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xxs">
-                        <div className="space-y-1">
-                            <Label className="text-zinc-500">Appels Total / Répondus</Label>
-                            <div className="flex items-center gap-2">
-                                <Input type="number" value={callsTotal} onChange={(e) => setCallsTotal(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs" />
-                                <span className="text-zinc-600">/</span>
-                                <Input type="number" value={callsAnswered} onChange={(e) => setCallsAnswered(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs" />
+                    <CardContent className="space-y-6 text-xxs">
+                        {/* Section 1: Inputs manually filled during the 1-on-1 */}
+                        <div className="space-y-3">
+                            <h4 className="font-bold text-purple-400 uppercase tracking-wider text-[9px]">Indicateurs à renseigner</h4>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Tâches en retard</Label>
+                                    <Input type="number" value={lateTasks} onChange={(e) => setLateTasks(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Courriels &gt; 48 heures</Label>
+                                    <Input type="number" value={emailsOver48h} onChange={(e) => setEmailsOver48h(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Factures sans notes &gt; 7 jours</Label>
+                                    <Input type="number" value={billsNoNotes} onChange={(e) => setBillsNoNotes(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Rapports d'opérations clos</Label>
+                                    <Input type="number" value={opReportsClosed} onChange={(e) => setOpReportsClosed(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" />
+                                </div>
                             </div>
                         </div>
-                        <div className="space-y-1">
-                            <Label className="text-zinc-500">Tâches en retard</Label>
-                            <Input type="number" value={lateTasks} onChange={(e) => setLateTasks(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs" />
+
+                        {/* Section 2: Snapshotted statistics (computed & saved on publish, read-only) */}
+                        <div className="space-y-3 border-t border-zinc-900 pt-4">
+                            <h4 className="font-bold text-purple-400 uppercase tracking-wider text-[9px]">Statistiques du mois (Capture automatique)</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Appels Répondus / Total</span>
+                                    <span className="text-xs font-bold text-zinc-200 block">
+                                        {callsTotal > 0 ? `${Math.round((callsAnswered / callsTotal) * 100)}% (${callsAnswered}/${callsTotal})` : 'Aucun appel'}
+                                    </span>
+                                </div>
+                                <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Syndicats perdus YTD</span>
+                                    <span className="text-xs font-bold text-zinc-200 block">{syndicatesLost}</span>
+                                </div>
+                                <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Changements forfait YTD</span>
+                                    <span className="text-xs font-bold text-zinc-200 block">{packageChanges}</span>
+                                </div>
+                            </div>
                         </div>
-                        <div className="space-y-1">
-                            <Label className="text-zinc-500">Courriels &gt; 48 heures</Label>
-                            <Input type="number" value={emailsOver48h} onChange={(e) => setEmailsOver48h(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs" />
-                        </div>
-                        <div className="space-y-1">
-                            <Label className="text-zinc-500">Factures sans notes &gt; 7 jours</Label>
-                            <Input type="number" value={billsNoNotes} onChange={(e) => setBillsNoNotes(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs" />
-                        </div>
-                        <div className="space-y-1">
-                            <Label className="text-zinc-500">Rapports d'opérations clos</Label>
-                            <Input type="number" value={opReportsClosed} onChange={(e) => setOpReportsClosed(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs" />
-                        </div>
-                        <div className="space-y-1">
-                            <Label className="text-zinc-500">Gabarits d'ordre du jour utilisés</Label>
-                            <Input type="number" value={agendaTemplatesUsed} onChange={(e) => setAgendaTemplatesUsed(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs" />
-                        </div>
-                        <div className="space-y-1">
-                            <Label className="text-zinc-500">Assemblées tenues à temps (%)</Label>
-                            <Input type="number" value={assembliesOnTime} onChange={(e) => setAssembliesOnTime(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xxs" />
-                        </div>
-                        <div className="space-y-1">
-                            <Label className="text-zinc-500">Syndicats perdus YTD</Label>
-                            <Input type="number" value={syndicatesLost} readOnly className="bg-[#121318]/55 border-zinc-850 h-8 text-xxs text-zinc-400" />
-                        </div>
-                        <div className="space-y-1">
-                            <Label className="text-zinc-500">Modifications forfait YTD</Label>
-                            <Input type="number" value={packageChanges} readOnly className="bg-[#121318]/55 border-zinc-850 h-8 text-xxs text-zinc-400" />
+
+                        {/* Section 3: Manager Live stats at time of interview */}
+                        <div className="space-y-3 border-t border-zinc-900 pt-4">
+                            <h4 className="font-bold text-purple-400 uppercase tracking-wider text-[9px]">Indicateurs du Gestionnaire (Temps réel)</h4>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Taux d'Approbation</span>
+                                    <span className="text-xs font-bold text-zinc-200 block">{quoteApprovalRate}%</span>
+                                </div>
+                                <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Syndicats Actifs</span>
+                                    <span className="text-xs font-bold text-zinc-200 block">{syndicatesCount}</span>
+                                </div>
+                                <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Nombre de Portes</span>
+                                    <span className="text-xs font-bold text-zinc-200 block">{doorsCount}</span>
+                                </div>
+                                <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Volume Courriels (Mensuel)</span>
+                                    <span className="text-xs font-bold text-zinc-200 block">{emailsReceived}</span>
+                                </div>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Last meeting review notes */}
+            {lastMeeting && (
+                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                    <CardHeader className="pb-3 border-b border-zinc-900/60 bg-zinc-950/10">
+                        <CardTitle className="text-xs font-bold text-white flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <ClipboardList className="h-4 w-4 text-purple-400" />
+                                Rétroaction de la rencontre précédente ({new Date(lastMeeting.meeting_date).toLocaleDateString('fr-CA')})
+                            </div>
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6 text-xxs text-zinc-350">
+                        <div className="space-y-3">
+                            {lastMeeting.recent_wins && (
+                                <div>
+                                    <span className="text-zinc-500 block font-bold uppercase text-[8px] mb-1">Succès précédents</span>
+                                    <p className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-850 leading-relaxed whitespace-pre-wrap">{lastMeeting.recent_wins}</p>
+                                </div>
+                            )}
+                            {lastMeeting.difficult_situations && (
+                                <div>
+                                    <span className="text-zinc-500 block font-bold uppercase text-[8px] mb-1">Difficultés relevées</span>
+                                    <p className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-850 leading-relaxed whitespace-pre-wrap">{lastMeeting.difficult_situations}</p>
+                                </div>
+                            )}
+                            {lastMeeting.current_issues && (
+                                <div>
+                                    <span className="text-zinc-500 block font-bold uppercase text-[8px] mb-1">Dossiers chauds / points critiques</span>
+                                    <p className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-850 leading-relaxed whitespace-pre-wrap">{lastMeeting.current_issues}</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-3">
+                            {/* Previous priorities */}
+                            <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-2">
+                                <span className="text-zinc-500 block font-bold uppercase text-[8px]">Dernières priorités fixées</span>
+                                {lastMeeting.priority_1 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/20 text-purple-400 border border-purple-800/40 text-[8px]">P1</Badge> <span>{lastMeeting.priority_1}</span></div>}
+                                {lastMeeting.priority_2 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/20 text-purple-400 border border-purple-800/40 text-[8px]">P2</Badge> <span>{lastMeeting.priority_2}</span></div>}
+                                {lastMeeting.priority_3 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/20 text-purple-400 border border-purple-800/40 text-[8px]">P3</Badge> <span>{lastMeeting.priority_3}</span></div>}
+                            </div>
+
+                            {/* Previous commitments list */}
+                            {lastMeeting.commitments && lastMeeting.commitments.length > 0 && (
+                                <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-2">
+                                    <span className="text-zinc-500 block font-bold uppercase text-[8px]">Tous les engagements pris</span>
+                                    <div className="space-y-1.5 max-h-[150px] overflow-y-auto pr-1">
+                                        {lastMeeting.commitments.map((c: any, idx: number) => (
+                                            <div key={idx} className="flex justify-between items-center gap-2 text-[10px] pb-1 border-b border-zinc-850/50 last:border-b-0 last:pb-0">
+                                                <span className={c.completed ? "line-through text-zinc-500" : "font-semibold text-zinc-300"}>{c.commitment_text}</span>
+                                                <Badge variant="outline" className={c.completed ? "bg-emerald-950/20 text-emerald-400 border-emerald-800/40 text-[8px]" : "bg-rose-950/20 text-rose-400 border-rose-800/40 text-[8px]"}>
+                                                    {c.completed ? 'Fait' : 'En attente'}
+                                                </Badge>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Previous commitments / accountability */}
             {previousCommitments.length > 0 && (
