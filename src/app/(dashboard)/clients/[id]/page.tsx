@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import fs from 'fs'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,18 +34,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const doorsCount = client.doors?.length || 0
   const isStatusActive = client.status !== 'inactive'
 
-  // Debug file log
-  try {
-    fs.writeFileSync('/Users/goon/Desktop/LAUCANDRIQUE/gustav/client_details_debug.log', JSON.stringify({
-      id,
-      client_name: client.company_name || client.full_name,
-      contracts_raw: client.contracts,
-      contract_extracted: contract,
-      doors_raw: client.doors,
-      doors_count: doorsCount,
-    }, null, 2))
-  } catch (err) {
-    // ignore
+  async function saveClient(fd: FormData) {
+    'use server'
+    await updateClientAction(id, fd)
   }
 
   return (
@@ -69,7 +59,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         </div>
       </div>
 
-      <form action={async (fd) => { 'use server'; await updateClientAction(id, fd) }} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <form action={saveClient} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Columns: Client General, Address & Contacts Info */}
         <div className="lg:col-span-2 space-y-6">
           

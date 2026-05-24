@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import fs from 'fs'
 import path from 'path'
 
@@ -155,8 +156,16 @@ export async function updateClientAction(clientId: string, formData: FormData) {
     const { error } = await supabase.from('clients').update(payload).eq('id', clientId)
     if (error) throw new Error(error.message)
 
+    // Seed all known package names to avoid FK violations
+    const knownPackages = ['Bronze', 'Argent', 'Argent+', 'Or', 'Platinum', 'Non spécifié']
+    await supabase.from('packages').upsert(
+        knownPackages.map(name => ({ name })),
+        { onConflict: 'name' }
+    )
+
     // Contract details
-    const package_name = formData.get('package_name') as string | null
+    const package_name_raw = (formData.get('package_name') as string || '').trim()
+    const package_name = package_name_raw !== '' ? package_name_raw : null
     const monthly_fee_raw = formData.get('monthly_fee')
     const financial_year_raw = formData.get('financial_year')
 
@@ -167,7 +176,7 @@ export async function updateClientAction(clientId: string, formData: FormData) {
     const { error: contractErr } = await supabase
         .from('contracts')
         .upsert(
-            { client_id: clientId, package_name: package_name || 'Non spécifié', monthly_fee: isNaN(monthly_fee) ? 0 : monthly_fee, start_date, active },
+            { client_id: clientId, package_name, monthly_fee: isNaN(monthly_fee) ? 0 : monthly_fee, start_date, active },
             { onConflict: 'client_id' }
         )
     if (contractErr) {
@@ -216,7 +225,7 @@ export async function updateClientAction(clientId: string, formData: FormData) {
     revalidatePath(`/clients/${clientId}`)
     revalidatePath('/team-management/dashboard')
     revalidatePath('/team-management/syndicates')
-    return { success: true }
+    redirect(`/clients/${clientId}`)
 }
 
 function parseDateSafe(val: any): string {
