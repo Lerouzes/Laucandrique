@@ -115,7 +115,7 @@ export default async function TeamsListPage() {
 
             {/* Teams Grid */}
             <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-                {teamStatsList.map(({ team, managersCount, totalSyndicates, totalDoors, totalMrr, avgWorkload, avgPerformance, riskCount, teamManagersList }) => {
+                {teamStatsList.map(({ team, managersCount, totalSyndicates, totalDoors, totalMrr, avgWorkload, avgPerformance, riskCount, teamManagersList, quoteApprovalRate, totalApprovedQuotes, totalPresentedQuotes }) => {
                     const workloadColor = 
                         avgWorkload > 120 ? 'text-rose-400' :
                         avgWorkload > 80 ? 'text-amber-400' : 'text-emerald-400'
