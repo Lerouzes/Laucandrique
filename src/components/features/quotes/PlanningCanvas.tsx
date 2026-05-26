@@ -817,6 +817,95 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
                                     const fx2 = p1.x + (dx / pixelLen) * (cappedOffsetPx + widthPx)
                                     const fy2 = p1.y + (dy / pixelLen) * (cappedOffsetPx + widthPx)
 
+                                    // Spacing guides on both sides of the door/window (only in edit mode)
+                                    const leftDistFt = feat.offset
+                                    const rightDistFt = Math.max(0, feetLen - feat.offset - feat.width)
+
+                                    const lineOffset = 18 // distance from wall
+                                    const lx1 = p1.x - Math.sin(angle) * lineOffset
+                                    const ly1 = p1.y + Math.cos(angle) * lineOffset
+                                    const lx2 = fx1 - Math.sin(angle) * lineOffset
+                                    const ly2 = fy1 + Math.cos(angle) * lineOffset
+                                    const lx3 = fx2 - Math.sin(angle) * lineOffset
+                                    const ly3 = fy2 + Math.cos(angle) * lineOffset
+                                    const lx4 = p2.x - Math.sin(angle) * lineOffset
+                                    const ly4 = p2.y + Math.cos(angle) * lineOffset
+
+                                    const midX1 = (lx1 + lx2) / 2
+                                    const midY1 = (ly1 + ly2) / 2
+                                    const midX2 = (lx3 + lx4) / 2
+                                    const midY2 = (ly3 + ly4) / 2
+
+                                    const spacingGuides = mode === 'edit' && (
+                                        <g className="pointer-events-none opacity-80 transition-opacity">
+                                            {/* Extension lines */}
+                                            <line x1={p1.x} y1={p1.y} x2={lx1} y2={ly1} stroke="#0891b2" strokeWidth="0.5" strokeDasharray="1 2" />
+                                            <line x1={fx1} y1={fy1} x2={lx2} y2={ly2} stroke="#0891b2" strokeWidth="0.5" strokeDasharray="1 2" />
+                                            <line x1={fx2} y1={fy2} x2={lx3} y2={ly3} stroke="#0891b2" strokeWidth="0.5" strokeDasharray="1 2" />
+                                            <line x1={p2.x} y1={p2.y} x2={lx4} y2={ly4} stroke="#0891b2" strokeWidth="0.5" strokeDasharray="1 2" />
+
+                                            {/* Left dimension line */}
+                                            {leftDistFt > 0.05 && (
+                                                <>
+                                                    <line x1={lx1} y1={ly1} x2={lx2} y2={ly2} stroke="#06b6d4" strokeWidth="0.8" strokeDasharray="2 2" />
+                                                    <g>
+                                                        <rect
+                                                            x={midX1 - 18}
+                                                            y={midY1 - 6}
+                                                            width="36"
+                                                            height="12"
+                                                            rx="2"
+                                                            fill="#09090b"
+                                                            stroke="#0891b2"
+                                                            strokeWidth="0.5"
+                                                        />
+                                                        <text
+                                                            x={midX1}
+                                                            y={midY1 + 1}
+                                                            fill="#22d3ee"
+                                                            fontSize="8"
+                                                            fontWeight="medium"
+                                                            textAnchor="middle"
+                                                            alignmentBaseline="middle"
+                                                        >
+                                                            {toDisplayVal(leftDistFt).toFixed(1)} {unitLabel}
+                                                        </text>
+                                                    </g>
+                                                </>
+                                            )}
+
+                                            {/* Right dimension line */}
+                                            {rightDistFt > 0.05 && (
+                                                <>
+                                                    <line x1={lx3} y1={ly3} x2={lx4} y2={ly4} stroke="#06b6d4" strokeWidth="0.8" strokeDasharray="2 2" />
+                                                    <g>
+                                                        <rect
+                                                            x={midX2 - 18}
+                                                            y={midY2 - 6}
+                                                            width="36"
+                                                            height="12"
+                                                            rx="2"
+                                                            fill="#09090b"
+                                                            stroke="#0891b2"
+                                                            strokeWidth="0.5"
+                                                        />
+                                                        <text
+                                                            x={midX2}
+                                                            y={midY2 + 1}
+                                                            fill="#22d3ee"
+                                                            fontSize="8"
+                                                            fontWeight="medium"
+                                                            textAnchor="middle"
+                                                            alignmentBaseline="middle"
+                                                        >
+                                                            {toDisplayVal(rightDistFt).toFixed(1)} {unitLabel}
+                                                        </text>
+                                                    </g>
+                                                </>
+                                            )}
+                                        </g>
+                                    )
+
                                     if (feat.type === 'window') {
                                         const thickness = 2.5
                                         const wPoints = [
@@ -827,86 +916,90 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
                                         ].join(' ')
 
                                         return (
-                                            <g 
-                                                key={feat.id} 
-                                                className="select-none cursor-grab active:cursor-grabbing pointer-events-auto"
-                                                onMouseDown={(e) => {
-                                                    e.stopPropagation()
-                                                    if (mode === 'edit') {
-                                                        setDraggedFeature({ p1Index, featureId: feat.id })
-                                                    }
-                                                }}
-                                                onTouchStart={(e) => {
-                                                    e.stopPropagation()
-                                                    if (mode === 'edit') {
-                                                        setDraggedFeature({ p1Index, featureId: feat.id })
-                                                    }
-                                                }}
-                                            >
-                                                <polygon
-                                                    points={wPoints}
-                                                    fill="#e0f2fe"
-                                                    stroke="#0284c7"
-                                                    strokeWidth="1.5"
-                                                />
-                                                <line
-                                                    x1={fx1}
-                                                    y1={fy1}
-                                                    x2={fx2}
-                                                    y2={fy2}
-                                                    stroke="#38bdf8"
-                                                    strokeWidth="1"
-                                                />
-                                            </g>
+                                            <React.Fragment key={feat.id}>
+                                                {spacingGuides}
+                                                <g 
+                                                    className="select-none cursor-grab active:cursor-grabbing pointer-events-auto"
+                                                    onMouseDown={(e) => {
+                                                        e.stopPropagation()
+                                                        if (mode === 'edit') {
+                                                            setDraggedFeature({ p1Index, featureId: feat.id })
+                                                        }
+                                                    }}
+                                                    onTouchStart={(e) => {
+                                                        e.stopPropagation()
+                                                        if (mode === 'edit') {
+                                                            setDraggedFeature({ p1Index, featureId: feat.id })
+                                                        }
+                                                    }}
+                                                >
+                                                    <polygon
+                                                        points={wPoints}
+                                                        fill="#e0f2fe"
+                                                        stroke="#0284c7"
+                                                        strokeWidth="1.5"
+                                                    />
+                                                    <line
+                                                        x1={fx1}
+                                                        y1={fy1}
+                                                        x2={fx2}
+                                                        y2={fy2}
+                                                        stroke="#38bdf8"
+                                                        strokeWidth="1"
+                                                    />
+                                                </g>
+                                            </React.Fragment>
                                         )
                                     } else {
                                         const doorEndX = fx1 + nx * widthPx
                                         const doorEndY = fy1 + ny * widthPx
 
                                         return (
-                                            <g 
-                                                key={feat.id} 
-                                                className="select-none cursor-grab active:cursor-grabbing pointer-events-auto"
-                                                onMouseDown={(e) => {
-                                                    e.stopPropagation()
-                                                    if (mode === 'edit') {
-                                                        setDraggedFeature({ p1Index, featureId: feat.id })
-                                                    }
-                                                }}
-                                                onTouchStart={(e) => {
-                                                    e.stopPropagation()
-                                                    if (mode === 'edit') {
-                                                        setDraggedFeature({ p1Index, featureId: feat.id })
-                                                    }
-                                                }}
-                                            >
-                                                {/* Break the wall line */}
-                                                <line
-                                                    x1={fx1}
-                                                    y1={fy1}
-                                                    x2={fx2}
-                                                    y2={fy2}
-                                                    stroke="#09090b"
-                                                    strokeWidth="4"
-                                                />
-                                                {/* Door leaf */}
-                                                <line
-                                                    x1={fx1}
-                                                    y1={fy1}
-                                                    x2={doorEndX}
-                                                    y2={doorEndY}
-                                                    stroke="#f59e0b"
-                                                    strokeWidth="2"
-                                                />
-                                                {/* Swing arc */}
-                                                <path
-                                                    d={`M ${doorEndX} ${doorEndY} A ${widthPx} ${widthPx} 0 0,0 ${fx2} ${fy2}`}
-                                                    fill="none"
-                                                    stroke="#d97706"
-                                                    strokeWidth="1"
-                                                    strokeDasharray="2 2"
-                                                />
-                                            </g>
+                                            <React.Fragment key={feat.id}>
+                                                {spacingGuides}
+                                                <g 
+                                                    className="select-none cursor-grab active:cursor-grabbing pointer-events-auto"
+                                                    onMouseDown={(e) => {
+                                                        e.stopPropagation()
+                                                        if (mode === 'edit') {
+                                                            setDraggedFeature({ p1Index, featureId: feat.id })
+                                                        }
+                                                    }}
+                                                    onTouchStart={(e) => {
+                                                        e.stopPropagation()
+                                                        if (mode === 'edit') {
+                                                            setDraggedFeature({ p1Index, featureId: feat.id })
+                                                        }
+                                                    }}
+                                                >
+                                                    {/* Break the wall line */}
+                                                    <line
+                                                        x1={fx1}
+                                                        y1={fy1}
+                                                        x2={fx2}
+                                                        y2={fy2}
+                                                        stroke="#09090b"
+                                                        strokeWidth="4"
+                                                    />
+                                                    {/* Door leaf */}
+                                                    <line
+                                                        x1={fx1}
+                                                        y1={fy1}
+                                                        x2={doorEndX}
+                                                        y2={doorEndY}
+                                                        stroke="#f59e0b"
+                                                        strokeWidth="2"
+                                                    />
+                                                    {/* Swing arc */}
+                                                    <path
+                                                        d={`M ${doorEndX} ${doorEndY} A ${widthPx} ${widthPx} 0 0,0 ${fx2} ${fy2}`}
+                                                        fill="none"
+                                                        stroke="#d97706"
+                                                        strokeWidth="1"
+                                                        strokeDasharray="2 2"
+                                                    />
+                                                </g>
+                                            </React.Fragment>
                                         )
                                     }
                                 })}
