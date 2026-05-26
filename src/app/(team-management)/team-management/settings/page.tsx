@@ -15,6 +15,17 @@ export default async function SettingsPage() {
         .from('audit_question_configs')
         .select('*')
 
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = user
+        ? await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+        : { data: null }
+
+    const userRole = profile?.role || 'Operations'
+
     return (
         <div className="space-y-6 pb-12">
             <div>
@@ -29,7 +40,9 @@ export default async function SettingsPage() {
             <SettingsClientPage 
                 initialCategories={categories || []} 
                 initialAuditConfigs={auditConfigs || []} 
+                userRole={userRole}
             />
         </div>
     )
 }
+

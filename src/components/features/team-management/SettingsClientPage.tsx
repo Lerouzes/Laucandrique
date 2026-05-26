@@ -17,19 +17,22 @@ import {
     X, 
     Save, 
     Loader2,
-    Info
+    Info,
+    UserPlus,
+    Shield
 } from 'lucide-react'
 import { 
     createComplaintCategoryAction, 
     updateComplaintCategoryAction, 
     deleteComplaintCategoryAction, 
-    updateAuditQuestionConfigAction 
+    updateAuditQuestionConfigAction,
+    createGustavAccountAction
 } from '@/actions/team-management'
 
 interface ComplaintCategory {
     id: string
     name: string
-    created_at?: string
+    created_at?: string | null
 }
 
 interface AuditConfig {
@@ -40,6 +43,7 @@ interface AuditConfig {
 interface SettingsClientPageProps {
     initialCategories: ComplaintCategory[]
     initialAuditConfigs: AuditConfig[]
+    userRole: string
 }
 
 const AUDIT_QUESTIONS = [
@@ -62,9 +66,10 @@ const DEFAULT_DESCRIPTIONS: Record<string, string> = {
 
 export function SettingsClientPage({
     initialCategories,
-    initialAuditConfigs
+    initialAuditConfigs,
+    userRole
 }: SettingsClientPageProps) {
-    const [activeTab, setActiveTab] = useState<'categories' | 'audits'>('categories')
+    const [activeTab, setActiveTab] = useState<'categories' | 'audits' | 'accounts'>('categories')
     
     // Categories states
     const [categories, setCategories] = useState<ComplaintCategory[]>(initialCategories)
@@ -91,6 +96,44 @@ export function SettingsClientPage({
     const triggerAlert = (text: string, type: 'success' | 'error' = 'success') => {
         setAlertMsg({ type, text })
         setTimeout(() => setAlertMsg(null), 4000)
+    }
+
+    // Account creation states
+    const [newAccountName, setNewAccountName] = useState('')
+    const [newAccountEmail, setNewAccountEmail] = useState('')
+    const [newAccountPassword, setNewAccountPassword] = useState('')
+    const [newAccountRole, setNewAccountRole] = useState('Operations')
+    const [isCreatingAccount, setIsCreatingAccount] = useState(false)
+
+    // Create account handler
+    const handleCreateAccount = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newAccountName.trim() || !newAccountEmail.trim() || !newAccountPassword.trim()) {
+            triggerAlert('Veuillez remplir tous les champs.', 'error')
+            return
+        }
+
+        setIsCreatingAccount(true)
+        try {
+            const formData = new FormData()
+            formData.append('full_name', newAccountName.trim())
+            formData.append('email', newAccountEmail.trim())
+            formData.append('password', newAccountPassword.trim())
+            formData.append('role', newAccountRole)
+
+            const result = await createGustavAccountAction(formData)
+            if (result?.success) {
+                triggerAlert(`Le compte pour ${result.email} a été créé avec succès !`, 'success')
+                setNewAccountName('')
+                setNewAccountEmail('')
+                setNewAccountPassword('')
+                setNewAccountRole('Operations')
+            }
+        } catch (err: any) {
+            triggerAlert(err.message || 'Une erreur est survenue lors de la création du compte.', 'error')
+        } finally {
+            setIsCreatingAccount(false)
+        }
     }
 
     // Add category handler
@@ -197,6 +240,21 @@ export function SettingsClientPage({
                         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500" />
                     )}
                 </button>
+                {userRole === 'Master' && (
+                    <button
+                        onClick={() => setActiveTab('accounts')}
+                        className={`pb-2.5 text-sm font-bold transition-all relative ${
+                            activeTab === 'accounts' 
+                                ? 'text-purple-400 font-extrabold' 
+                                : 'text-zinc-400 hover:text-zinc-200'
+                        }`}
+                    >
+                        Gestion des Comptes
+                        {activeTab === 'accounts' && (
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500" />
+                        )}
+                    </button>
+                )}
             </div>
 
             {/* Tab: Categories */}
@@ -419,6 +477,137 @@ export function SettingsClientPage({
                             })}
                         </CardContent>
                     </Card>
+                </div>
+            )}
+
+            {/* Tab: Accounts (Master Only) */}
+            {userRole === 'Master' && activeTab === 'accounts' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-200">
+                    {/* Create Account Form */}
+                    <div>
+                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                            <CardHeader className="pb-3 bg-zinc-950/20">
+                                <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+                                    <UserPlus className="h-4 w-4 text-purple-400" />
+                                    Créer un Compte Gustav
+                                </CardTitle>
+                                <CardDescription className="text-xs text-zinc-400">
+                                    Enregistrez un nouvel utilisateur pour accéder à la plateforme.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="pt-4">
+                                <form onSubmit={handleCreateAccount} className="space-y-4 text-xs">
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-400 font-medium">Nom Complet</Label>
+                                        <Input 
+                                            type="text" 
+                                            value={newAccountName}
+                                            onChange={(e) => setNewAccountName(e.target.value)}
+                                            required 
+                                            placeholder="ex: Jean Tremblay" 
+                                            className="bg-[#121318] border-zinc-800 h-9 text-white text-[16px] md:text-xs" 
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-400 font-medium">Adresse Courriel</Label>
+                                        <Input 
+                                            type="email" 
+                                            value={newAccountEmail}
+                                            onChange={(e) => setNewAccountEmail(e.target.value)}
+                                            required 
+                                            placeholder="ex: jean.tremblay@example.com" 
+                                            className="bg-[#121318] border-zinc-800 h-9 text-white text-[16px] md:text-xs" 
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-400 font-medium">Mot de Passe</Label>
+                                        <Input 
+                                            type="password" 
+                                            value={newAccountPassword}
+                                            onChange={(e) => setNewAccountPassword(e.target.value)}
+                                            required 
+                                            placeholder="••••••••" 
+                                            className="bg-[#121318] border-zinc-800 h-9 text-white text-[16px] md:text-xs" 
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-400 font-medium">Rôle</Label>
+                                        <select 
+                                            value={newAccountRole}
+                                            onChange={(e) => setNewAccountRole(e.target.value)}
+                                            className="w-full rounded-md bg-[#121318] border border-zinc-800 h-9 text-white px-3 text-[16px] md:text-xs focus:ring-1 focus:ring-purple-500"
+                                        >
+                                            <option value="Operations">Operations (Accès standard, lecture seule direction)</option>
+                                            <option value="Managers">Managers (Gestionnaire d’Équipe)</option>
+                                            <option value="Direction">Direction (Accès direction complet)</option>
+                                            <option value="Master">Master (Direction Générale + Admin)</option>
+                                        </select>
+                                    </div>
+
+                                    <Button 
+                                        type="submit" 
+                                        disabled={isCreatingAccount}
+                                        className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold h-9 rounded-lg flex items-center justify-center gap-1.5 mt-2"
+                                    >
+                                        {isCreatingAccount ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <UserPlus className="h-4 w-4" />
+                                        )}
+                                        Créer le compte
+                                    </Button>
+                                </form>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Security and Info Section */}
+                    <div className="lg:col-span-2">
+                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                            <CardHeader>
+                                <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+                                    <Shield className="h-4 w-4 text-purple-400" />
+                                    Sécurité et Niveaux d'Accès
+                                </CardTitle>
+                                <CardDescription className="text-xs text-zinc-400">
+                                    Informations de sécurité pour la création de comptes.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4 text-xs text-zinc-300 leading-relaxed">
+                                <div className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-3">
+                                    <h4 className="font-bold text-zinc-100 flex items-center gap-1.5">
+                                        <AlertTriangle className="h-4 w-4 text-amber-500" /> Remarque importante sur la sécurité
+                                    </h4>
+                                    <p>
+                                        La création de compte utilise l'authentification sécurisée Supabase.
+                                        Le nouveau compte pourra se connecter immédiatement en utilisant l'adresse courriel et le mot de passe saisis.
+                                    </p>
+                                    <p className="text-zinc-400">
+                                        Veuillez vous assurer que le mot de passe est suffisamment complexe (minimum 6 caractères) et transmettez les identifiants de manière sécurisée au nouvel utilisateur.
+                                    </p>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="p-3.5 bg-zinc-900/20 border border-zinc-850 rounded-xl space-y-1">
+                                        <span className="font-bold text-white">Operations</span>
+                                        <p className="text-zinc-400 text-[11px]">Rôle de base pour le personnel d'opérations. Ne peut pas accéder à la section Gestion d'Équipe.</p>
+                                    </div>
+                                    <div className="p-3.5 bg-zinc-900/20 border border-zinc-850 rounded-xl space-y-1">
+                                        <span className="font-bold text-purple-300">Managers</span>
+                                        <p className="text-zinc-400 text-[11px]">Pour les gestionnaires d'équipe. Accès aux tableaux de bord de gestion d'équipe.</p>
+                                    </div>
+                                    <div className="p-3.5 bg-zinc-900/20 border border-zinc-850 rounded-xl space-y-1">
+                                        <span className="font-bold text-purple-400">Direction</span>
+                                        <p className="text-zinc-400 text-[11px]">Accès étendu aux rapports, KPIs et décisions opérationnelles de l'entreprise.</p>
+                                    </div>
+                                    <div className="p-3.5 bg-zinc-900/20 border border-zinc-850 rounded-xl space-y-1">
+                                        <span className="font-bold text-purple-500">Master</span>
+                                        <p className="text-zinc-400 text-[11px]">Direction générale complète. Accès exclusif à la configuration des comptes et à l'administration globale.</p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
             )}
         </div>

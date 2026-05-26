@@ -142,6 +142,24 @@ export type Database = {
           },
         ]
       }
+      audit_question_configs: {
+        Row: {
+          created_at: string | null
+          description: string
+          key: string
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          key: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          key?: string
+        }
+        Relationships: []
+      }
       bill_images: {
         Row: {
           bill_id: string
@@ -403,8 +421,27 @@ export type Database = {
           },
         ]
       }
+      complaint_categories: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       complaints: {
         Row: {
+          category_id: string | null
           client_id: string
           created_at: string | null
           description: string | null
@@ -417,6 +454,7 @@ export type Database = {
           title: string
         }
         Insert: {
+          category_id?: string | null
           client_id: string
           created_at?: string | null
           description?: string | null
@@ -429,6 +467,7 @@ export type Database = {
           title: string
         }
         Update: {
+          category_id?: string | null
           client_id?: string
           created_at?: string | null
           description?: string | null
@@ -441,6 +480,13 @@ export type Database = {
           title?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "complaints_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "complaint_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "complaints_client_id_fkey"
             columns: ["client_id"]
@@ -528,13 +574,6 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "clients"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "contracts_package_name_fkey"
-            columns: ["package_name"]
-            isOneToOne: false
-            referencedRelation: "packages"
-            referencedColumns: ["name"]
           },
         ]
       }
@@ -809,6 +848,51 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "one_on_one_commitments_one_on_one_id_fkey"
+            columns: ["one_on_one_id"]
+            isOneToOne: false
+            referencedRelation: "one_on_ones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      one_on_one_complaints: {
+        Row: {
+          complaint_id: string
+          created_at: string | null
+          discussion_notes: string | null
+          id: string
+          one_on_one_id: string
+          resolution_plan: string | null
+          resolved_in_meeting: boolean | null
+        }
+        Insert: {
+          complaint_id: string
+          created_at?: string | null
+          discussion_notes?: string | null
+          id?: string
+          one_on_one_id: string
+          resolution_plan?: string | null
+          resolved_in_meeting?: boolean | null
+        }
+        Update: {
+          complaint_id?: string
+          created_at?: string | null
+          discussion_notes?: string | null
+          id?: string
+          one_on_one_id?: string
+          resolution_plan?: string | null
+          resolved_in_meeting?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "one_on_one_complaints_complaint_id_fkey"
+            columns: ["complaint_id"]
+            isOneToOne: false
+            referencedRelation: "complaints"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "one_on_one_complaints_one_on_one_id_fkey"
             columns: ["one_on_one_id"]
             isOneToOne: false
             referencedRelation: "one_on_ones"

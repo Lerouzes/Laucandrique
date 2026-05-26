@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { createClient as createBaseClient } from '@supabase/supabase-js'
 
 // ==========================================
 // 1. DYNAMIC STATISTICS & KPI ENGINE
@@ -1226,5 +1227,88 @@ export async function deleteOneOnOneAction(id: string) {
         revalidatePath(`/team-management/managers/${meeting.manager_id}`)
     }
 }
+
+export async function createGustavAccountAction(formData: FormData) {
+    const supabase = await createClient()
+
+    // 1. Enforce Master role security check
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    if (!currentUser) {
+        throw new Error('Non authentifié. Veuillez vous connecter.')
+    }
+
+    const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', currentUser.id)
+        .single()
+
+    if (currentProfile?.role !== 'Master') {
+        throw new Error('Sécurité : Seul le rôle Master est autorisé à créer de nouveaux comptes.')
+    }
+
+    // 2. Extract inputs
+    const email = formData.get('email') as string
+    const password = formData.get('password') as string
+    const fullName = formData.get('full_name') as string
+    const role = formData.get('role') as string || 'Operations'
+
+    if (!email || !password || !fullName) {
+        throw new Error('Courriel, mot de passe et nom complet sont requis.')
+    }
+
+    if (password.length < 6) {
+        throw new Error('Le mot de passe doit contenir au moins 6 caractères.')
+    }
+
+    // 3. Create unpersisted client (avoid disrupting the Master user\'s session cookies)
+    const cleanSupabase = createBaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            auth: {
+                persistSession: false,
+                autoRefreshToken: false
+            }
+        }
+    )
+
+    // 4. Register the new account
+    const { data: signUpData, error: signUpError } = await cleanSupabase.auth.signUp({
+        email,
+        password,
+        options: {
+            data: {
+                full_name: fullName
+            }
+        }
+    })
+
+    if (signUpError) {
+        throw new Error(signUpError.message)
+    }
+
+    const newUser = signUpData.user
+    if (!newUser) {
+        throw new Error("L'inscription du compte a échoué.")
+    }
+
+    // 5. Update the profiles table row inserted by the database trigger
+    const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+            role,
+            full_name: fullName
+        })
+        .eq('id', newUser.id)
+
+    if (profileError) {
+        throw new Error(`Compte authentifié créé, mais le rôle n'a pas pu être mis à jour: ${profileError.message}`)
+    }
+
+    revalidatePath('/team-management/settings')
+    return { success: true, email: newUser.email }
+}
+
 
 
