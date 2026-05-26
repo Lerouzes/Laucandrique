@@ -462,9 +462,10 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
         const offsetX = newP2X - p2.x
         const offsetY = newP2Y - p2.y
 
-        // Shift subsequent points of this path
+        // Shift subsequent points of this path (works for both regular and closing segments)
         const newPoints = points.map((p, idx) => {
-            if (idx <= p1Idx) return p
+            const shouldShift = p2Idx > p1Idx ? (idx >= p2Idx) : (idx < p1Idx)
+            if (!shouldShift) return p
             return {
                 ...p,
                 x: Math.round(p.x + offsetX),
