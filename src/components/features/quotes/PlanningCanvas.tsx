@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Trash2, Check, Move, Plus, Ruler, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 
 interface Point {
     x: number
@@ -18,6 +19,7 @@ interface PlanningCanvasProps {
     onChange: (points: Point[]) => void
     roomName: string
     scale?: number // pixels per foot (default 20)
+    unit?: 'ft' | 'm'
 }
 
 // Helper to group flat points array into sub-paths
@@ -72,7 +74,7 @@ function getSegments(pts: Point[], isClosed: boolean, scale: number = 20) {
     return segments
 }
 
-export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: PlanningCanvasProps) {
+export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 'ft' }: PlanningCanvasProps) {
     const [mode, setMode] = useState<'draw' | 'edit'>('edit')
     const [mousePos, setMousePos] = useState<Point>({ x: 0, y: 0 })
     const [draggedPointIndex, setDraggedPointIndex] = useState<number | null>(null)
@@ -84,14 +86,24 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
     const [orthoActive, setOrthoActive] = useState(false)
     const [startNewPathNextClick, setStartNewPathNextClick] = useState(false)
     const [segmentInputValues, setSegmentInputValues] = useState<Record<number, string>>({})
+    const [canvasSize, setCanvasSize] = useState<'normal' | 'large'>('normal')
+    const [draggedFeature, setDraggedFeature] = useState<{ p1Index: number; featureId: string } | null>(null)
     
     const svgRef = useRef<SVGSVGElement>(null)
 
-    // Reset editing segment and local inputs when points change
+    const toDisplayVal = (feetVal: number) => {
+        return unit === 'm' ? feetVal * 0.3048 : feetVal
+    }
+    const fromDisplayVal = (displayVal: number) => {
+        return unit === 'm' ? displayVal / 0.3048 : displayVal
+    }
+    const unitLabel = unit === 'm' ? 'm' : 'pi'
+
+    // Reset editing segment and local inputs when points or unit change
     useEffect(() => {
         setEditingSegmentIndex(null)
         setSegmentInputValues({})
-    }, [points])
+    }, [points, unit])
 
     const isClosed = points.length === 0 || points[0]?.isClosed !== false
 
@@ -162,6 +174,89 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
             }
             onChange(newPoints)
         }
+
+        // Dragging features (Doors & Windows)
+        if (draggedFeature !== null) {
+            const segs = getSegments(points, isClosed, scale)
+            const activeSeg = segs.find(s => s.p1Index === draggedFeature.p1Index)
+            if (activeSeg) {
+                const p1 = points[activeSeg.p1Index]
+                const p2 = points[activeSeg.p2Index]
+                const dx = p2.x - p1.x
+                const dy = p2.y - p1.y
+                const wallPixelLen = Math.sqrt(dx * dx + dy * dy)
+                if (wallPixelLen > 0) {
+                    const mx = coords.x - p1.x
+                    const my = coords.y - p1.y
+                    const dotProduct = mx * dx + my * dy
+                    const t = Math.max(0, Math.min(1, dotProduct / (wallPixelLen * wallPixelLen)))
+                    
+                    const feat = p1.features?.find((f: any) => f.id === draggedFeature.featureId)
+                    if (feat) {
+                        const width = feat.width
+                        const projectedOffsetFeet = (t * wallPixelLen) / scale
+                        let newOffset = projectedOffsetFeet - width / 2
+                        newOffset = Math.max(0, Math.min(newOffset, activeSeg.feetLen - width))
+                        newOffset = Math.round(newOffset * 10) / 10
+                        updateFeature(activeSeg.p1Index, feat.id, 'offset', newOffset)
+                    }
+                }
+            }
+        }
+    }
+
+    const handleTouchMove = (e: React.TouchEvent<SVGSVGElement>) => {
+        if (e.touches.length === 0) return
+        const touch = e.touches[0]
+        if (!svgRef.current) return
+        const rect = svgRef.current.getBoundingClientRect()
+        const rawX = touch.clientX - rect.left
+        const rawY = touch.clientY - rect.top
+        const snap = 5
+        const coords = {
+            x: Math.round(rawX / snap) * snap,
+            y: Math.round(rawY / snap) * snap
+        }
+        setMousePos(coords)
+
+        // Dragging points
+        if (mode === 'edit' && draggedPointIndex !== null) {
+            const newPoints = [...points]
+            newPoints[draggedPointIndex] = {
+                ...newPoints[draggedPointIndex],
+                ...coords
+            }
+            onChange(newPoints)
+        }
+
+        // Dragging features
+        if (draggedFeature !== null) {
+            const segs = getSegments(points, isClosed, scale)
+            const activeSeg = segs.find(s => s.p1Index === draggedFeature.p1Index)
+            if (activeSeg) {
+                const p1 = points[activeSeg.p1Index]
+                const p2 = points[activeSeg.p2Index]
+                const dx = p2.x - p1.x
+                const dy = p2.y - p1.y
+                const wallPixelLen = Math.sqrt(dx * dx + dy * dy)
+                if (wallPixelLen > 0) {
+                    const mx = coords.x - p1.x
+                    const my = coords.y - p1.y
+                    const dotProduct = mx * dx + my * dy
+                    const t = Math.max(0, Math.min(1, dotProduct / (wallPixelLen * wallPixelLen)))
+                    
+                    const feat = p1.features?.find((f: any) => f.id === draggedFeature.featureId)
+                    if (feat) {
+                        const width = feat.width
+                        const projectedOffsetFeet = (t * wallPixelLen) / scale
+                        let newOffset = projectedOffsetFeet - width / 2
+                        newOffset = Math.max(0, Math.min(newOffset, activeSeg.feetLen - width))
+                        newOffset = Math.round(newOffset * 10) / 10
+                        updateFeature(activeSeg.p1Index, feat.id, 'offset', newOffset)
+                    }
+                }
+            }
+        }
     }
 
     const handleMouseDown = (e: React.MouseEvent<Element>, index: number) => {
@@ -173,6 +268,7 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
 
     const handleMouseUp = () => {
         setDraggedPointIndex(null)
+        setDraggedFeature(null)
     }
 
     const handleCanvasClick = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -273,9 +369,84 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
 
     const handleUpdateSegmentLength = () => {
         if (editingSegmentIndex === null || !manualLengthValue) return
-        updateSegmentLengthDirectly(editingSegmentIndex, manualLengthValue)
+        const valFt = fromDisplayVal(parseFloat(manualLengthValue))
+        updateSegmentLengthDirectly(editingSegmentIndex, valFt.toString())
         setEditingSegmentIndex(null)
         setManualLengthValue('')
+    }
+
+    const loadPresetShape = (shape: string) => {
+        if (points.length > 0 && !confirm("Cela va remplacer le tracé actuel de cette pièce. Continuer ?")) {
+            return
+        }
+        
+        const valInFt = (val: number) => {
+            return unit === 'm' ? val / 0.3048 : val
+        }
+
+        let newPts: Point[] = []
+        if (shape === 'square') {
+            const sizeFt = valInFt(unit === 'm' ? 4 : 12)
+            const sizePx = sizeFt * scale
+            newPts = [
+                { x: 150, y: 100, isClosed: true },
+                { x: 150 + sizePx, y: 100 },
+                { x: 150 + sizePx, y: 100 + sizePx },
+                { x: 150, y: 100 + sizePx }
+            ]
+        } else if (shape === 'rect') {
+            const wFt = valInFt(unit === 'm' ? 5 : 16)
+            const hFt = valInFt(unit === 'm' ? 4 : 12)
+            const wPx = wFt * scale
+            const hPx = hFt * scale
+            newPts = [
+                { x: 120, y: 100, isClosed: true },
+                { x: 120 + wPx, y: 100 },
+                { x: 120 + wPx, y: 100 + hPx },
+                { x: 120, y: 100 + hPx }
+            ]
+        } else if (shape === 'lshape') {
+            const w1Px = valInFt(unit === 'm' ? 2.5 : 8) * scale
+            const w2Px = valInFt(unit === 'm' ? 2.5 : 8) * scale
+            const h1Px = valInFt(unit === 'm' ? 2.0 : 6) * scale
+            const h2Px = valInFt(unit === 'm' ? 3.0 : 10) * scale
+            newPts = [
+                { x: 150, y: 100, isClosed: true },
+                { x: 150 + w1Px, y: 100 },
+                { x: 150 + w1Px, y: 100 + h1Px },
+                { x: 150 + w1Px + w2Px, y: 100 + h1Px },
+                { x: 150 + w1Px + w2Px, y: 100 + h1Px + h2Px },
+                { x: 150, y: 100 + h1Px + h2Px }
+            ]
+        } else if (shape === 'tshape') {
+            const wTotPx = valInFt(unit === 'm' ? 6 : 20) * scale
+            const h1Px = valInFt(unit === 'm' ? 2 : 6) * scale
+            const h2Px = valInFt(unit === 'm' ? 3 : 10) * scale
+            const wIndentPx = valInFt(unit === 'm' ? 1.75 : 6) * scale
+            newPts = [
+                { x: 150, y: 100, isClosed: true },
+                { x: 150 + wTotPx, y: 100 },
+                { x: 150 + wTotPx, y: 100 + h1Px },
+                { x: 150 + wTotPx - wIndentPx, y: 100 + h1Px },
+                { x: 150 + wTotPx - wIndentPx, y: 100 + h1Px + h2Px },
+                { x: 150 + wIndentPx, y: 100 + h1Px + h2Px },
+                { x: 150 + wIndentPx, y: 100 + h1Px },
+                { x: 150, y: 100 + h1Px }
+            ]
+        } else if (shape === 'corridor') {
+            const wFt = valInFt(unit === 'm' ? 8 : 24)
+            const hFt = valInFt(unit === 'm' ? 2 : 6)
+            const wPx = wFt * scale
+            const hPx = hFt * scale
+            newPts = [
+                { x: 80, y: 160, isClosed: true },
+                { x: 80 + wPx, y: 160 },
+                { x: 80 + wPx, y: 160 + hPx },
+                { x: 80, y: 160 + hPx }
+            ]
+        }
+        onChange(newPts)
+        setMode('edit')
     }
 
     // Features operations (Doors & Windows)
@@ -364,7 +535,8 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                         size="sm"
                         onClick={() => {
                             setMode('edit')
-                            setEditingSegmentIndex(null)
+                            setDraggedPointIndex(null)
+                            setDraggedFeature(null)
                         }}
                         className={mode === 'edit' ? 'bg-cyan-600 hover:bg-cyan-700 text-white' : 'border-zinc-800 text-zinc-400 hover:text-zinc-100'}
                     >
@@ -377,7 +549,8 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                         size="sm"
                         onClick={() => {
                             setMode('draw')
-                            setEditingSegmentIndex(null)
+                            setDraggedPointIndex(null)
+                            setDraggedFeature(null)
                         }}
                         className={mode === 'draw' ? 'bg-cyan-600 hover:bg-cyan-700 text-white' : 'border-zinc-800 text-zinc-400 hover:text-zinc-100'}
                     >
@@ -422,9 +595,39 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                     >
                         {isClosed ? "Type: Fermé (Polygone)" : "Type: Ouvert (Lignes)"}
                     </Button>
+
+                    {/* Shapes Presets Menu */}
+                    <select
+                        onChange={(e) => {
+                            const val = e.target.value
+                            if (val) {
+                                loadPresetShape(val)
+                            }
+                            e.target.value = "" // reset select
+                        }}
+                        className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-xs text-zinc-300 outline-none focus:border-cyan-600 h-8"
+                    >
+                        <option value="">Formes prédéfinies...</option>
+                        <option value="square">{unit === 'm' ? "Carré (4 x 4 m)" : "Carré (12 x 12 pi)"}</option>
+                        <option value="rect">{unit === 'm' ? "Rectangle (5 x 4 m)" : "Rectangle (16 x 12 pi)"}</option>
+                        <option value="lshape">{unit === 'm' ? "Pièce en L (5 x 5 m)" : "Pièce en L (16 x 16 pi)"}</option>
+                        <option value="tshape">{unit === 'm' ? "Pièce en T (6 x 5 m)" : "Pièce en T (20 x 16 pi)"}</option>
+                        <option value="corridor">{unit === 'm' ? "Corridor (8 x 2 m)" : "Corridor (24 x 6 pi)"}</option>
+                    </select>
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCanvasSize(canvasSize === 'normal' ? 'large' : 'normal')}
+                        className="border-zinc-800 text-zinc-400 hover:text-zinc-100 h-8"
+                        title={canvasSize === 'normal' ? "Agrandir l'espace de dessin" : "Réduire l'espace de dessin"}
+                    >
+                        {canvasSize === 'normal' ? "Agrandir Canv. ↕" : "Réduire Canv. ↕"}
+                    </Button>
+
                     {points.length > 0 && (
                         <Button
                             type="button"
@@ -451,7 +654,7 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                         <Input
                             type="number"
                             step="0.1"
-                            placeholder="Ex: 12.5"
+                            placeholder={unit === 'm' ? "Ex: 4.0" : "Ex: 12.5"}
                             value={manualLengthValue}
                             onChange={(e) => setManualLengthValue(e.target.value)}
                             onKeyDown={(e) => {
@@ -459,7 +662,7 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                             }}
                             className="h-8 bg-zinc-950 border-zinc-800 text-zinc-200 focus-visible:ring-zinc-700"
                         />
-                        <span className="text-sm text-zinc-400">pi</span>
+                        <span className="text-sm text-zinc-400">{unitLabel}</span>
                     </div>
                     <Button
                         type="button"
@@ -482,19 +685,28 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
             )}
 
             {/* SVG Interactive Canvas */}
-            <div className="relative border border-zinc-800 bg-zinc-950 rounded-xl overflow-hidden shadow-inner select-none h-[400px]">
+            <div 
+                className={cn(
+                    "relative border border-zinc-800 bg-zinc-950 rounded-xl overflow-hidden shadow-inner select-none transition-all duration-300 touch-none",
+                    canvasSize === 'large' ? 'h-[650px]' : 'h-[400px]'
+                )}
+                style={{ touchAction: 'none' }}
+            >
                 {/* Visual Guides */}
                 <div className="absolute top-3 left-3 pointer-events-none bg-zinc-900/80 border border-zinc-800 px-2 py-1 rounded text-[11px] text-zinc-400 font-mono">
-                    {mode === 'draw' ? 'Mode Dessin : Cliquez pour ajouter des points. Maintenez SHIFT pour des lignes droites.' : 'Mode Édition : Déplacez les points. Cliquez sur les cotes ou utilisez le tableau ci-dessous.'}
+                    {mode === 'draw' ? 'Mode Dessin : Cliquez pour ajouter des points. Maintenez SHIFT pour des lignes droites.' : 'Mode Édition : Déplacez les angles ou les ouvertures. Cliquez sur les cotes.'}
                 </div>
 
                 <svg
                     ref={svgRef}
-                    className="w-full h-full cursor-crosshair"
+                    className="w-full h-full cursor-crosshair touch-none"
+                    style={{ touchAction: 'none' }}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
                     onClick={handleCanvasClick}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleMouseUp}
                 >
                     {/* Grid Lines */}
                     <defs>
@@ -579,7 +791,7 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                         e.stopPropagation()
                                         if (mode === 'edit') {
                                             setEditingSegmentIndex(p1Index)
-                                            setManualLengthValue(feetLen.toFixed(1))
+                                            setManualLengthValue(toDisplayVal(feetLen).toFixed(1))
                                         }
                                     }}
                                 />
@@ -615,7 +827,22 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                         ].join(' ')
 
                                         return (
-                                            <g key={feat.id} className="select-none pointer-events-none">
+                                            <g 
+                                                key={feat.id} 
+                                                className="select-none cursor-grab active:cursor-grabbing pointer-events-auto"
+                                                onMouseDown={(e) => {
+                                                    e.stopPropagation()
+                                                    if (mode === 'edit') {
+                                                        setDraggedFeature({ p1Index, featureId: feat.id })
+                                                    }
+                                                }}
+                                                onTouchStart={(e) => {
+                                                    e.stopPropagation()
+                                                    if (mode === 'edit') {
+                                                        setDraggedFeature({ p1Index, featureId: feat.id })
+                                                    }
+                                                }}
+                                            >
                                                 <polygon
                                                     points={wPoints}
                                                     fill="#e0f2fe"
@@ -637,7 +864,22 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                         const doorEndY = fy1 + ny * widthPx
 
                                         return (
-                                            <g key={feat.id} className="select-none pointer-events-none">
+                                            <g 
+                                                key={feat.id} 
+                                                className="select-none cursor-grab active:cursor-grabbing pointer-events-auto"
+                                                onMouseDown={(e) => {
+                                                    e.stopPropagation()
+                                                    if (mode === 'edit') {
+                                                        setDraggedFeature({ p1Index, featureId: feat.id })
+                                                    }
+                                                }}
+                                                onTouchStart={(e) => {
+                                                    e.stopPropagation()
+                                                    if (mode === 'edit') {
+                                                        setDraggedFeature({ p1Index, featureId: feat.id })
+                                                    }
+                                                }}
+                                            >
                                                 {/* Break the wall line */}
                                                 <line
                                                     x1={fx1}
@@ -677,7 +919,7 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                             e.stopPropagation()
                                             if (mode === 'edit') {
                                                 setEditingSegmentIndex(p1Index)
-                                                setManualLengthValue(feetLen.toFixed(1))
+                                                setManualLengthValue(toDisplayVal(feetLen).toFixed(1))
                                             }
                                         }}
                                     >
@@ -700,7 +942,7 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                             textAnchor="middle"
                                             alignmentBaseline="middle"
                                         >
-                                            M{idx + 1}: {feetLen.toFixed(1)} pi
+                                            M{idx + 1}: {toDisplayVal(feetLen).toFixed(1)} {unitLabel}
                                         </text>
                                     </g>
                                 )}
@@ -759,7 +1001,7 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                             textAnchor="middle"
                                             alignmentBaseline="middle"
                                         >
-                                            M{getSegments(points, isClosed, scale).length + 1}: {feetLen.toFixed(1)} pi
+                                            M{getSegments(points, isClosed, scale).length + 1}: {toDisplayVal(feetLen).toFixed(1)} {unitLabel}
                                         </text>
                                     </g>
                                 )}
@@ -786,6 +1028,12 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                     onMouseEnter={() => setHoveredPointIndex(idx)}
                                     onMouseLeave={() => setHoveredPointIndex(null)}
                                     onMouseDown={(e) => handleMouseDown(e, idx)}
+                                    onTouchStart={(e) => {
+                                        e.stopPropagation()
+                                        if (mode === 'edit') {
+                                            setDraggedPointIndex(idx)
+                                        }
+                                    }}
                                     onClick={(e) => {
                                         e.stopPropagation()
                                         if (isCloseTarget) {
@@ -907,7 +1155,7 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                             <Input
                                                 type="number"
                                                 step="0.1"
-                                                value={segmentInputValues[p1Index] ?? feetLen.toFixed(1)}
+                                                value={segmentInputValues[p1Index] ?? toDisplayVal(feetLen).toFixed(1)}
                                                 onChange={(e) => setSegmentInputValues({
                                                     ...segmentInputValues,
                                                     [p1Index]: e.target.value
@@ -915,21 +1163,27 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                                 onBlur={() => {
                                                     const val = segmentInputValues[p1Index]
                                                     if (val) {
-                                                        updateSegmentLengthDirectly(p1Index, val)
+                                                        const displayVal = parseFloat(val)
+                                                        if (!isNaN(displayVal) && displayVal > 0) {
+                                                            updateSegmentLengthDirectly(p1Index, fromDisplayVal(displayVal).toString())
+                                                        }
                                                     }
                                                 }}
                                                 onKeyDown={(e) => {
                                                     if (e.key === 'Enter') {
                                                         const val = segmentInputValues[p1Index]
                                                         if (val) {
-                                                            updateSegmentLengthDirectly(p1Index, val)
+                                                            const displayVal = parseFloat(val)
+                                                            if (!isNaN(displayVal) && displayVal > 0) {
+                                                                updateSegmentLengthDirectly(p1Index, fromDisplayVal(displayVal).toString())
+                                                            }
                                                         }
                                                         (e.target as HTMLInputElement).blur()
                                                     }
                                                 }}
                                                 className="h-7 w-20 bg-zinc-950 border-zinc-850 text-zinc-200 text-xs text-center focus-visible:ring-zinc-700"
                                             />
-                                            <span className="text-xs text-zinc-400">pi</span>
+                                            <span className="text-xs text-zinc-400">{unitLabel}</span>
                                         </div>
                                     </div>
 
@@ -953,11 +1207,14 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                                             <Input
                                                                 type="number"
                                                                 step="0.1"
-                                                                value={feat.width}
-                                                                onChange={(e) => updateFeature(p1Index, feat.id, 'width', parseFloat(e.target.value) || 0)}
+                                                                value={parseFloat(toDisplayVal(feat.width).toFixed(2))}
+                                                                onChange={(e) => {
+                                                                    const val = parseFloat(e.target.value) || 0
+                                                                    updateFeature(p1Index, feat.id, 'width', fromDisplayVal(val))
+                                                                }}
                                                                 className="h-6 w-14 bg-zinc-950 border-zinc-850 text-zinc-200 text-xxs text-center p-0"
                                                             />
-                                                            <span className="text-[9px] text-zinc-600">pi</span>
+                                                            <span className="text-[9px] text-zinc-600">{unitLabel}</span>
                                                         </div>
 
                                                         {/* Height Input */}
@@ -966,11 +1223,14 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                                             <Input
                                                                 type="number"
                                                                 step="0.1"
-                                                                value={feat.height ?? (feat.type === 'door' ? 7.0 : 4.0)}
-                                                                onChange={(e) => updateFeature(p1Index, feat.id, 'height', parseFloat(e.target.value) || 0)}
+                                                                value={parseFloat(toDisplayVal(feat.height ?? (feat.type === 'door' ? 7.0 : 4.0)).toFixed(2))}
+                                                                onChange={(e) => {
+                                                                    const val = parseFloat(e.target.value) || 0
+                                                                    updateFeature(p1Index, feat.id, 'height', fromDisplayVal(val))
+                                                                }}
                                                                 className="h-6 w-14 bg-zinc-950 border-zinc-850 text-zinc-200 text-xxs text-center p-0"
                                                             />
-                                                            <span className="text-[9px] text-zinc-600">pi</span>
+                                                            <span className="text-[9px] text-zinc-600">{unitLabel}</span>
                                                         </div>
 
                                                         {/* Offset Input */}
@@ -979,11 +1239,14 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                                                             <Input
                                                                 type="number"
                                                                 step="0.1"
-                                                                value={feat.offset}
-                                                                onChange={(e) => updateFeature(p1Index, feat.id, 'offset', parseFloat(e.target.value) || 0)}
+                                                                value={parseFloat(toDisplayVal(feat.offset).toFixed(2))}
+                                                                onChange={(e) => {
+                                                                    const val = parseFloat(e.target.value) || 0
+                                                                    updateFeature(p1Index, feat.id, 'offset', fromDisplayVal(val))
+                                                                }}
                                                                 className="h-6 w-14 bg-zinc-950 border-zinc-850 text-zinc-200 text-xxs text-center p-0"
                                                             />
-                                                            <span className="text-[9px] text-zinc-600">pi</span>
+                                                            <span className="text-[9px] text-zinc-600">{unitLabel}</span>
                                                         </div>
 
                                                         {/* Delete button */}
@@ -1012,7 +1275,7 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20 }: Plann
                     <span className="text-[11px] font-medium text-zinc-400 px-2">Angles ({points.length}) :</span>
                     {points.map((p, idx) => (
                         <div key={`badge-${idx}`} className="inline-flex items-center gap-1.5 bg-zinc-950 px-2 py-1 rounded text-xs text-zinc-300 border border-zinc-800">
-                            <span>P{idx+1} ({Math.round(p.x/scale)} pi, {Math.round(p.y/scale)} pi)</span>
+                            <span>P{idx+1} ({toDisplayVal(p.x/scale).toFixed(1)} {unitLabel}, {toDisplayVal(p.y/scale).toFixed(1)} {unitLabel})</span>
                             <button
                                 type="button"
                                 onClick={() => deletePoint(idx)}

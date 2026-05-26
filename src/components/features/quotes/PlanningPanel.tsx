@@ -128,12 +128,23 @@ export function calculateWallSurface(points: Point[], height: number | null, sca
 }
 
 export function PlanningPanel({ sections, onChange }: PlanningPanelProps) {
+    const [unit, setUnit] = useState<'ft' | 'm'>('ft')
     const [selectedSectionId, setSelectedSectionId] = useState<string | null>(
         sections.length > 0 ? sections[0].id : null
     )
     const [selectedRoomId, setSelectedRoomId] = useState<string | null>(
         sections.length > 0 && sections[0].rooms.length > 0 ? sections[0].rooms[0].id : null
     )
+
+    const toDisplayVal = (feetVal: number | null) => {
+        if (feetVal === null) return 0
+        return unit === 'm' ? feetVal * 0.3048 : feetVal
+    }
+    const fromDisplayVal = (displayVal: number) => {
+        return unit === 'm' ? displayVal / 0.3048 : displayVal
+    }
+    const unitLabel = unit === 'm' ? 'm' : 'pi'
+    const areaLabel = unit === 'm' ? 'm²' : 'pi²'
 
     const [newSectionName, setNewSectionName] = useState('')
     const [newRoomName, setNewRoomName] = useState('')
@@ -391,6 +402,26 @@ export function PlanningPanel({ sections, onChange }: PlanningPanelProps) {
                                         Dessinez le tracé dans le canevas et configurez la hauteur des murs.
                                     </p>
                                 </div>
+                                <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-lg border border-zinc-800 shrink-0 select-none">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={unit === 'ft' ? 'default' : 'ghost'}
+                                        onClick={() => setUnit('ft')}
+                                        className={`h-7 px-2.5 text-[10px] font-bold ${unit === 'ft' ? 'bg-cyan-600 hover:bg-cyan-700 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                    >
+                                        Pieds (pi)
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={unit === 'm' ? 'default' : 'ghost'}
+                                        onClick={() => setUnit('m')}
+                                        className={`h-7 px-2.5 text-[10px] font-bold ${unit === 'm' ? 'bg-cyan-600 hover:bg-cyan-700 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                    >
+                                        Mètres (m)
+                                    </Button>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -410,13 +441,13 @@ export function PlanningPanel({ sections, onChange }: PlanningPanelProps) {
                                     <div className="flex items-center gap-2">
                                         <Input
                                             type="number"
-                                            step="0.5"
-                                            value={activeRoom.height === null ? '' : activeRoom.height}
-                                            onChange={(e) => handleUpdateRoomMeta('height', e.target.value ? parseFloat(e.target.value) : null)}
-                                            placeholder="8.0"
+                                            step="0.1"
+                                            value={activeRoom.height === null ? '' : toDisplayVal(activeRoom.height).toFixed(1)}
+                                            onChange={(e) => handleUpdateRoomMeta('height', e.target.value ? fromDisplayVal(parseFloat(e.target.value)) : null)}
+                                            placeholder={unit === 'm' ? "2.4" : "8.0"}
                                             className="h-9 bg-zinc-950 border-zinc-800 text-zinc-200 focus-visible:ring-zinc-700 text-xs"
                                         />
-                                        <span className="text-xs text-zinc-400">pi</span>
+                                        <span className="text-xs text-zinc-400">{unitLabel}</span>
                                     </div>
                                 </div>
 
@@ -437,19 +468,19 @@ export function PlanningPanel({ sections, onChange }: PlanningPanelProps) {
                                 <div className="space-y-1">
                                     <span className="text-[10px] text-zinc-400 uppercase tracking-wider">Périmètre</span>
                                     <p className="text-base font-bold text-cyan-400">
-                                        {calculatePerimeter(activeRoom.points).toFixed(1)} <span className="text-xs font-normal text-zinc-400">pi</span>
+                                        {(calculatePerimeter(activeRoom.points) * (unit === 'm' ? 0.3048 : 1)).toFixed(1)} <span className="text-xs font-normal text-zinc-400">{unitLabel}</span>
                                     </p>
                                 </div>
                                 <div className="space-y-1 border-x border-zinc-800">
                                     <span className="text-[10px] text-zinc-400 uppercase tracking-wider">Aire au sol</span>
                                     <p className="text-base font-bold text-cyan-400">
-                                        {calculateFloorArea(activeRoom.points).toFixed(1)} <span className="text-xs font-normal text-zinc-400">pi²</span>
+                                        {(calculateFloorArea(activeRoom.points) * (unit === 'm' ? 0.092903 : 1)).toFixed(1)} <span className="text-xs font-normal text-zinc-400">{areaLabel}</span>
                                     </p>
                                 </div>
                                 <div className="space-y-1">
                                     <span className="text-[10px] text-zinc-400 uppercase tracking-wider">Surface murs</span>
                                     <p className="text-base font-bold text-cyan-400">
-                                        {calculateWallSurface(activeRoom.points, activeRoom.height).toFixed(1)} <span className="text-xs font-normal text-zinc-400">pi²</span>
+                                        {(calculateWallSurface(activeRoom.points, activeRoom.height) * (unit === 'm' ? 0.092903 : 1)).toFixed(1)} <span className="text-xs font-normal text-zinc-400">{areaLabel}</span>
                                     </p>
                                 </div>
                             </div>
@@ -462,6 +493,7 @@ export function PlanningPanel({ sections, onChange }: PlanningPanelProps) {
                                 onChange={handleUpdateRoomPoints}
                                 roomName={activeRoom.name}
                                 scale={20}
+                                unit={unit}
                             />
                         </div>
                     </div>
