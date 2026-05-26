@@ -92,6 +92,51 @@ export default async function OneOnOneDetailPage({
         `)
         .eq('one_on_one_id', id)
 
+    // 6. Fetch reviewed syndicate audits
+    const { data: reviewedAudits } = await supabase
+        .from('one_on_one_syndicate_audits')
+        .select(`
+            *,
+            syndicate_audits(
+                id,
+                audit_date,
+                health_score,
+                client_id,
+                clients(company_name, full_name)
+            )
+        `)
+        .eq('one_on_one_id', id)
+
+    // 7. Fetch reviewed assembly evaluations
+    const { data: reviewedAssemblies } = await supabase
+        .from('one_on_one_assemblies')
+        .select(`
+            *,
+            assembly_evaluations(
+                id,
+                assembly_date,
+                notes,
+                client_id,
+                clients(company_name, full_name)
+            )
+        `)
+        .eq('one_on_one_id', id)
+
+    // 8. Fetch task & email audits
+    const { data: taskEmailAudits } = await supabase
+        .from('one_on_one_task_email_audits')
+        .select(`
+            *,
+            clients(company_name, full_name)
+        `)
+        .eq('one_on_one_id', id)
+
+    // 9. Fetch operational risks created in this meeting or active for the manager
+    const { data: operationalRisks } = await supabase
+        .from('manager_operational_risks')
+        .select('*')
+        .eq('manager_id', oneOnOne.manager_id)
+
     return (
         <div className="space-y-6 pb-12">
             <div>
@@ -107,6 +152,10 @@ export default async function OneOnOneDetailPage({
                 manager={manager} 
                 lastMeeting={lastMeetingWithComms}
                 discussedComplaints={(discussedComplaints || []) as any}
+                reviewedAudits={reviewedAudits || []}
+                reviewedAssemblies={reviewedAssemblies || []}
+                taskEmailAudits={taskEmailAudits || []}
+                operationalRisks={operationalRisks || []}
             />
         </div>
     )

@@ -758,6 +758,57 @@ export type Database = {
           },
         ]
       }
+      manager_operational_risks: {
+        Row: {
+          created_at: string | null
+          description: string
+          id: string
+          manager_id: string
+          one_on_one_id: string | null
+          resolution_notes: string | null
+          resolved_date: string | null
+          severity: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          id?: string
+          manager_id: string
+          one_on_one_id?: string | null
+          resolution_notes?: string | null
+          resolved_date?: string | null
+          severity?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          id?: string
+          manager_id?: string
+          one_on_one_id?: string | null
+          resolution_notes?: string | null
+          resolved_date?: string | null
+          severity?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manager_operational_risks_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manager_operational_risks_one_on_one_id_fkey"
+            columns: ["one_on_one_id"]
+            isOneToOne: false
+            referencedRelation: "one_on_ones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       manager_teams: {
         Row: {
           created_at: string | null
@@ -814,15 +865,65 @@ export type Database = {
           },
         ]
       }
+      one_on_one_assemblies: {
+        Row: {
+          assembly_evaluation_id: string
+          created_at: string | null
+          id: string
+          manager_notes: string | null
+          my_notes: string | null
+          one_on_one_id: string
+          reviewed: boolean | null
+        }
+        Insert: {
+          assembly_evaluation_id: string
+          created_at?: string | null
+          id?: string
+          manager_notes?: string | null
+          my_notes?: string | null
+          one_on_one_id: string
+          reviewed?: boolean | null
+        }
+        Update: {
+          assembly_evaluation_id?: string
+          created_at?: string | null
+          id?: string
+          manager_notes?: string | null
+          my_notes?: string | null
+          one_on_one_id?: string
+          reviewed?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "one_on_one_assemblies_assembly_evaluation_id_fkey"
+            columns: ["assembly_evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "assembly_evaluations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "one_on_one_assemblies_one_on_one_id_fkey"
+            columns: ["one_on_one_id"]
+            isOneToOne: false
+            referencedRelation: "one_on_ones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       one_on_one_commitments: {
         Row: {
           carried_forward: boolean | null
           commitment_text: string
           completed: boolean | null
           created_at: string | null
+          due_date: string | null
+          due_next_review: boolean | null
           failure_reason: string | null
           id: string
+          notes: string | null
           one_on_one_id: string
+          owner: string | null
+          status: string | null
           why_not: string | null
         }
         Insert: {
@@ -830,9 +931,14 @@ export type Database = {
           commitment_text: string
           completed?: boolean | null
           created_at?: string | null
+          due_date?: string | null
+          due_next_review?: boolean | null
           failure_reason?: string | null
           id?: string
+          notes?: string | null
           one_on_one_id: string
+          owner?: string | null
+          status?: string | null
           why_not?: string | null
         }
         Update: {
@@ -840,9 +946,14 @@ export type Database = {
           commitment_text?: string
           completed?: boolean | null
           created_at?: string | null
+          due_date?: string | null
+          due_next_review?: boolean | null
           failure_reason?: string | null
           id?: string
+          notes?: string | null
           one_on_one_id?: string
+          owner?: string | null
+          status?: string | null
           why_not?: string | null
         }
         Relationships: [
@@ -861,27 +972,36 @@ export type Database = {
           created_at: string | null
           discussion_notes: string | null
           id: string
+          manager_notes: string | null
+          my_notes: string | null
           one_on_one_id: string
           resolution_plan: string | null
           resolved_in_meeting: boolean | null
+          reviewed: boolean | null
         }
         Insert: {
           complaint_id: string
           created_at?: string | null
           discussion_notes?: string | null
           id?: string
+          manager_notes?: string | null
+          my_notes?: string | null
           one_on_one_id: string
           resolution_plan?: string | null
           resolved_in_meeting?: boolean | null
+          reviewed?: boolean | null
         }
         Update: {
           complaint_id?: string
           created_at?: string | null
           discussion_notes?: string | null
           id?: string
+          manager_notes?: string | null
+          my_notes?: string | null
           one_on_one_id?: string
           resolution_plan?: string | null
           resolved_in_meeting?: boolean | null
+          reviewed?: boolean | null
         }
         Relationships: [
           {
@@ -893,6 +1013,114 @@ export type Database = {
           },
           {
             foreignKeyName: "one_on_one_complaints_one_on_one_id_fkey"
+            columns: ["one_on_one_id"]
+            isOneToOne: false
+            referencedRelation: "one_on_ones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      one_on_one_syndicate_audits: {
+        Row: {
+          audit_id: string
+          created_at: string | null
+          id: string
+          manager_notes: string | null
+          my_notes: string | null
+          one_on_one_id: string
+          reviewed: boolean | null
+        }
+        Insert: {
+          audit_id: string
+          created_at?: string | null
+          id?: string
+          manager_notes?: string | null
+          my_notes?: string | null
+          one_on_one_id: string
+          reviewed?: boolean | null
+        }
+        Update: {
+          audit_id?: string
+          created_at?: string | null
+          id?: string
+          manager_notes?: string | null
+          my_notes?: string | null
+          one_on_one_id?: string
+          reviewed?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "one_on_one_syndicate_audits_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "syndicate_audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "one_on_one_syndicate_audits_one_on_one_id_fkey"
+            columns: ["one_on_one_id"]
+            isOneToOne: false
+            referencedRelation: "one_on_ones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      one_on_one_task_email_audits: {
+        Row: {
+          client_id: string | null
+          complexity: string | null
+          created_at: string | null
+          has_actions: boolean | null
+          has_category_selected: boolean | null
+          has_followup_date: boolean | null
+          has_good_description: boolean | null
+          id: string
+          one_on_one_id: string
+          review_notes: string | null
+          task_created_date: string | null
+          title: string
+          type: string
+        }
+        Insert: {
+          client_id?: string | null
+          complexity?: string | null
+          created_at?: string | null
+          has_actions?: boolean | null
+          has_category_selected?: boolean | null
+          has_followup_date?: boolean | null
+          has_good_description?: boolean | null
+          id?: string
+          one_on_one_id: string
+          review_notes?: string | null
+          task_created_date?: string | null
+          title: string
+          type: string
+        }
+        Update: {
+          client_id?: string | null
+          complexity?: string | null
+          created_at?: string | null
+          has_actions?: boolean | null
+          has_category_selected?: boolean | null
+          has_followup_date?: boolean | null
+          has_good_description?: boolean | null
+          id?: string
+          one_on_one_id?: string
+          review_notes?: string | null
+          task_created_date?: string | null
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "one_on_one_task_email_audits_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "one_on_one_task_email_audits_one_on_one_id_fkey"
             columns: ["one_on_one_id"]
             isOneToOne: false
             referencedRelation: "one_on_ones"
@@ -918,16 +1146,23 @@ export type Database = {
           main_objectives: string | null
           manager_id: string
           meeting_date: string
+          meeting_score: number | null
           op_reports_closed: number | null
           operational_blockers: string | null
+          organization_notes: string | null
           package_changes: number | null
+          prioritization_notes: string | null
           priority_1: string | null
           priority_2: string | null
           priority_3: string | null
           recent_wins: string | null
           status: string | null
+          stress_notes: string | null
+          support_needed: string | null
           syndicates_lost: number | null
+          training_needed: string | null
           training_requested: string | null
+          workload_notes: string | null
         }
         Insert: {
           agenda_templates_used?: number | null
@@ -946,16 +1181,23 @@ export type Database = {
           main_objectives?: string | null
           manager_id: string
           meeting_date: string
+          meeting_score?: number | null
           op_reports_closed?: number | null
           operational_blockers?: string | null
+          organization_notes?: string | null
           package_changes?: number | null
+          prioritization_notes?: string | null
           priority_1?: string | null
           priority_2?: string | null
           priority_3?: string | null
           recent_wins?: string | null
           status?: string | null
+          stress_notes?: string | null
+          support_needed?: string | null
           syndicates_lost?: number | null
+          training_needed?: string | null
           training_requested?: string | null
+          workload_notes?: string | null
         }
         Update: {
           agenda_templates_used?: number | null
@@ -974,16 +1216,23 @@ export type Database = {
           main_objectives?: string | null
           manager_id?: string
           meeting_date?: string
+          meeting_score?: number | null
           op_reports_closed?: number | null
           operational_blockers?: string | null
+          organization_notes?: string | null
           package_changes?: number | null
+          prioritization_notes?: string | null
           priority_1?: string | null
           priority_2?: string | null
           priority_3?: string | null
           recent_wins?: string | null
           status?: string | null
+          stress_notes?: string | null
+          support_needed?: string | null
           syndicates_lost?: number | null
+          training_needed?: string | null
           training_requested?: string | null
+          workload_notes?: string | null
         }
         Relationships: [
           {

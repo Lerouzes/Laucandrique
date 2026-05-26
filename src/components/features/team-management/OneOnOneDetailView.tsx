@@ -2,7 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { updateOneOnOneAction, getOneOnOneSnapshotAction, deleteOneOnOneAction } from '@/actions/team-management'
+import { 
+    updateOneOnOneAction, 
+    getOneOnOneSnapshotAction, 
+    deleteOneOnOneAction,
+    getCategoryComplaintHistoryAction
+} from '@/actions/team-management'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,10 +23,21 @@ import {
     AlertCircle, 
     PlusCircle, 
     Trash2, 
+    ArrowRightLeft, 
     Sparkles,
-    Check,
-    X,
-    Lock
+    TrendingUp,
+    TrendingDown,
+    ArrowUpRight,
+    Search,
+    BookOpen,
+    HelpCircle,
+    Sliders,
+    ChevronDown,
+    ChevronUp,
+    ShieldAlert,
+    Lock,
+    Unlock,
+    X
 } from 'lucide-react'
 
 export function OneOnOneDetailView({ 
@@ -29,153 +45,340 @@ export function OneOnOneDetailView({
     commitments,
     manager,
     lastMeeting,
-    discussedComplaints = []
+    discussedComplaints = [],
+    reviewedAudits = [],
+    reviewedAssemblies = [],
+    taskEmailAudits: initialTaskEmailAudits = [],
+    operationalRisks: initialOperationalRisks = []
 }: { 
     oneOnOne: any
     commitments: any[]
     manager: any
     lastMeeting: any | null
     discussedComplaints?: any[]
+    reviewedAudits?: any[]
+    reviewedAssemblies?: any[]
+    taskEmailAudits?: any[]
+    operationalRisks?: any[]
 }) {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [isEditing, setIsEditing] = useState(oneOnOne.status === 'draft')
     
+    // Collapsible coaching section
+    const [coachingOpen, setCoachingOpen] = useState(false)
+
     // Form fields
     const [meetingDate, setMeetingDate] = useState(oneOnOne.meeting_date)
-    const [emailsOver48h, setEmailsOver48h] = useState(oneOnOne.emails_over_48h)
-    const [lateTasks, setLateTasks] = useState(oneOnOne.late_tasks)
-    const [callsTotal, setCallsTotal] = useState(oneOnOne.calls_total)
-    const [callsAnswered, setCallsAnswered] = useState(oneOnOne.calls_answered)
-    const [billsNoNotes, setBillsNoNotes] = useState(oneOnOne.bills_no_notes_over_7d)
-    const [opReportsClosed, setOpReportsClosed] = useState(oneOnOne.op_reports_closed)
-    const [syndicatesLost, setSyndicatesLost] = useState(oneOnOne.syndicates_lost)
-    const [packageChanges, setPackageChanges] = useState(oneOnOne.package_changes)
+    const [emailsOver48h, setEmailsOver48h] = useState(oneOnOne.emails_over_48h || 0)
+    const [lateTasks, setLateTasks] = useState(oneOnOne.late_tasks || 0)
+    const [callsTotal, setCallsTotal] = useState(oneOnOne.calls_total || 0)
+    const [callsAnswered, setCallsAnswered] = useState(oneOnOne.calls_answered || 0)
+    const [billsNoNotes, setBillsNoNotes] = useState(oneOnOne.bills_no_notes_over_7d || 0)
 
-    // Live Snapshot Metrics
+    // Snapshot comparisons (fetched from DB)
+    const [callsTotalPrev, setCallsTotalPrev] = useState(0)
+    const [callsAnsweredPrev, setCallsAnsweredPrev] = useState(0)
+    const [lateTasksPrev, setLateTasksPrev] = useState(0)
+    const [emailsReceived, setEmailsReceived] = useState(0)
+    const [emailsReceivedPrev, setEmailsReceivedPrev] = useState(0)
+    const [billsNoNotesPrev, setBillsNoNotesPrev] = useState(0)
+    const [openComplaintsPrev, setOpenComplaintsPrev] = useState(0)
+
+    // Global Stats
     const [quoteApprovalRate, setQuoteApprovalRate] = useState(0)
     const [doorsCount, setDoorsCount] = useState(0)
     const [syndicatesCount, setSyndicatesCount] = useState(0)
-    const [emailsReceived, setEmailsReceived] = useState(0)
 
-    // Complaints states
-    const [managerComplaints, setManagerComplaints] = useState<any[]>(() => {
-        return discussedComplaints.map(dc => ({
-            id: dc.complaint_id,
-            title: dc.complaints?.title,
-            description: dc.complaints?.description,
-            severity: dc.complaints?.severity,
-            clients: dc.complaints?.clients,
-            complaint_categories: dc.complaints?.complaint_categories
-        }))
-    })
+    // Section 2: Previous Commitments (Carried Forward)
+    const [previousCommitments, setPreviousCommitments] = useState<any[]>([])
 
-    const [complaintDiscussions, setComplaintDiscussions] = useState<Record<string, {
+    // Section 3: Audit review details
+    const [syndicateAudits, setSyndicateAudits] = useState<any[]>([])
+    const [assemblyEvaluations, setAssemblyEvaluations] = useState<any[]>([])
+    const [managerComplaints, setManagerComplaints] = useState<any[]>([])
+    
+    // Notes for reviewed audits
+    const [reviewedAuditsState, setReviewedAuditsState] = useState<Record<string, {
         checked: boolean
-        discussion_notes: string
-        resolution_plan: string
-        resolved_in_meeting: boolean
-    }>>(() => {
-        const lookup: Record<string, any> = {}
-        discussedComplaints.forEach(dc => {
-            lookup[dc.complaint_id] = {
-                checked: true,
-                discussion_notes: dc.discussion_notes || '',
-                resolution_plan: dc.resolution_plan || '',
-                resolved_in_meeting: dc.resolved_in_meeting || false
-            }
-        })
-        return lookup
-    })
+        my_notes: string
+        manager_notes: string
+    }>>({})
 
-    // Load manager live statistics on edit
+    const [reviewedAssembliesState, setReviewedAssembliesState] = useState<Record<string, {
+        checked: boolean
+        my_notes: string
+        manager_notes: string
+    }>>({})
+
+    const [reviewedComplaintsState, setReviewedComplaintsState] = useState<Record<string, {
+        checked: boolean
+        my_notes: string
+        manager_notes: string
+        resolved_in_meeting: boolean
+    }>>({})
+
+    // Complaint History Popup State
+    const [historyPopupComplaint, setHistoryPopupComplaint] = useState<any | null>(null)
+    const [complaintHistoryList, setComplaintHistoryList] = useState<any[]>([])
+    const [loadingHistory, setLoadingHistory] = useState(false)
+
+    // Task & Email Audits list
+    const [taskEmailAudits, setTaskEmailAudits] = useState<any[]>(initialTaskEmailAudits || [])
+    const [showAuditForm, setShowAuditForm] = useState(false)
+    
+    // Audit Form States
+    const [newAuditType, setNewAuditType] = useState<'task' | 'email'>('task')
+    const [newAuditTitle, setNewAuditTitle] = useState('')
+    const [newAuditClientId, setNewAuditClientId] = useState('')
+    const [newAuditFollowUp, setNewAuditFollowUp] = useState(false)
+    const [newAuditDesc, setNewAuditDesc] = useState(false)
+    const [newAuditActions, setNewAuditActions] = useState(false)
+    const [newAuditCatSelected, setNewAuditCatSelected] = useState(false)
+    const [newAuditCreatedDate, setNewAuditCreatedDate] = useState('')
+    const [newAuditComplexity, setNewAuditComplexity] = useState<'low' | 'medium' | 'high'>('medium')
+    const [newAuditNotes, setNewAuditNotes] = useState('')
+
+    // Section 4: Operational Risks
+    const [operationalRisks, setOperationalRisks] = useState<any[]>(initialOperationalRisks || [])
+    const [showRiskForm, setShowRiskForm] = useState(false)
+    const [newRiskDesc, setNewRiskDesc] = useState('')
+    const [newRiskSeverity, setNewRiskSeverity] = useState<'low' | 'medium' | 'high' | 'critical'>('medium')
+
+    // Section 5: Coaching States
+    const [workloadNotes, setWorkloadNotes] = useState(oneOnOne.workload_notes || '')
+    const [prioritizationNotes, setPrioritizationNotes] = useState(oneOnOne.prioritization_notes || '')
+    const [stressNotes, setStressNotes] = useState(oneOnOne.stress_notes || '')
+    const [organizationNotes, setOrganizationNotes] = useState(oneOnOne.organization_notes || '')
+    const [supportNeeded, setSupportNeeded] = useState(oneOnOne.support_needed || '')
+    const [trainingNeeded, setTrainingNeeded] = useState(oneOnOne.training_needed || '')
+
+    // Section 6: New Agreed Actions (This Meeting Commitments)
+    const [newAgreedActions, setNewAgreedActions] = useState<any[]>([])
+    const [newActionText, setNewActionText] = useState('')
+    const [newActionOwner, setNewActionOwner] = useState('Manager')
+    const [newActionDueDate, setNewActionDueDate] = useState('')
+    const [newActionNextReview, setNewActionNextReview] = useState(true)
+
+    // Load initial states for edit/draft views from DB snapshot
     useEffect(() => {
         if (!oneOnOne?.manager_id) return
-        async function fetchLiveStats() {
+        async function fetchSnapshot() {
             try {
                 const snapshot = await getOneOnOneSnapshotAction(oneOnOne.manager_id)
+                // Set comparison previous values
+                setCallsTotalPrev(snapshot.calls_total_prev)
+                setCallsAnsweredPrev(snapshot.calls_answered_prev)
+                setLateTasksPrev(snapshot.late_tasks_prev)
+                setEmailsReceived(snapshot.emails_received)
+                setEmailsReceivedPrev(snapshot.emails_received_prev)
+                setBillsNoNotesPrev(snapshot.bills_no_notes_prev)
+                setOpenComplaintsPrev(snapshot.open_complaints_count_prev)
+
+                // Global stats
                 setQuoteApprovalRate(snapshot.quote_approval_rate)
                 setDoorsCount(snapshot.doors_count)
                 setSyndicatesCount(snapshot.syndicates_count)
-                setEmailsReceived(snapshot.emails_received)
 
-                // Merge open complaints that are not already in managerComplaints
-                const openComplaints = snapshot.openComplaints || []
-                setManagerComplaints(prev => {
-                    const existingIds = new Set(prev.map(c => c.id))
-                    const merged = [...prev]
-                    openComplaints.forEach(oc => {
-                        if (!existingIds.has(oc.id)) {
-                            merged.push(oc)
-                        }
-                    })
-                    return merged
+                // Merge open items for review
+                setSyndicateAudits(snapshot.syndicateAudits || [])
+                setAssemblyEvaluations(snapshot.assemblyEvaluations || [])
+                setManagerComplaints(snapshot.openComplaints || [])
+
+                // Map reviewed audits already saved for this meeting
+                const audLookup: Record<string, any> = {}
+                reviewedAudits.forEach(ra => {
+                    audLookup[ra.audit_id] = {
+                        checked: ra.reviewed,
+                        my_notes: ra.my_notes || '',
+                        manager_notes: ra.manager_notes || ''
+                    }
                 })
+                setReviewedAuditsState(audLookup)
+
+                // Map reviewed assemblies
+                const assLookup: Record<string, any> = {}
+                reviewedAssemblies.forEach(ras => {
+                    assLookup[ras.assembly_evaluation_id] = {
+                        checked: ras.reviewed,
+                        my_notes: ras.my_notes || '',
+                        manager_notes: ras.manager_notes || ''
+                    }
+                })
+                setReviewedAssembliesState(assLookup)
+
+                // Map reviewed complaints
+                const compLookup: Record<string, any> = {}
+                discussedComplaints.forEach(dc => {
+                    compLookup[dc.complaint_id] = {
+                        checked: dc.reviewed,
+                        my_notes: dc.my_notes || dc.discussion_notes || '',
+                        manager_notes: dc.manager_notes || dc.resolution_plan || '',
+                        resolved_in_meeting: dc.resolved_in_meeting || false
+                    }
+                })
+                setReviewedComplaintsState(compLookup)
+
+                // Map commitments from this meeting
+                // Previous meeting commitments carried over
+                const prevMeetingComms = commitments.filter(c => c.carried_forward)
+                setPreviousCommitments(prevMeetingComms)
+
+                // New commitments created in this meeting
+                const newComms = commitments.filter(c => !c.carried_forward)
+                setNewAgreedActions(newComms)
+
             } catch (err) {
-                console.error("Error loading live stats in detail view:", err)
+                console.error("Error loading snapshot data in details view:", err)
             }
         }
-        fetchLiveStats()
-    }, [oneOnOne?.manager_id])
+        fetchSnapshot()
+    }, [oneOnOne?.id])
 
-    // Commitments
-    const [meetingCommitments, setMeetingCommitments] = useState<any[]>(commitments || [])
-    const [newCommitmentText, setNewCommitmentText] = useState('')
+    // Dynamic Scoring Engine
+    const callsPct = callsTotal > 0 ? (callsAnswered / callsTotal) * 100 : 100
+    const prevCallsPct = callsTotalPrev > 0 ? (callsAnsweredPrev / callsTotalPrev) * 100 : 0
+    
+    const taskHygiene = Math.max(0, 100 - lateTasks * 5)
+    const emailHygiene = Math.max(0, 100 - emailsOver48h * 10)
+    const billHygiene = Math.max(0, 100 - billsNoNotes * 10)
 
-    // Discussion fields
-    const [currentIssues, setCurrentIssues] = useState(oneOnOne.current_issues || '')
-    const [mainObjectives, setMainObjectives] = useState(oneOnOne.main_objectives || '')
-    const [recentWins, setRecentWins] = useState(oneOnOne.recent_wins || '')
-    const [difficultSituations, setDifficultSituations] = useState(oneOnOne.difficult_situations || '')
+    const resolvedPrevCommsCount = previousCommitments.filter(c => c.status === 'Resolved' || c.completed).length
+    const totalPrevCommsCount = previousCommitments.length
+    const commitmentResolutionPct = totalPrevCommsCount > 0 ? (resolvedPrevCommsCount / totalPrevCommsCount) * 100 : 100
 
-    // Next Priorities
-    const [priority1, setPriority1] = useState(oneOnOne.priority_1 || '')
-    const [priority2, setPriority2] = useState(oneOnOne.priority_2 || '')
-    const [priority3, setPriority3] = useState(oneOnOne.priority_3 || '')
+    const computedScore = Math.round(
+        (callsPct * 0.3) +
+        (taskHygiene * 0.3) +
+        (emailHygiene * 0.2) +
+        (billHygiene * 0.1) +
+        (commitmentResolutionPct * 0.1)
+    )
 
-    // Support Required
-    const [trainingRequested, setTrainingRequested] = useState(oneOnOne.training_requested || '')
-    const [escalationNeeded, setEscalationNeeded] = useState(oneOnOne.escalation_needed || '')
-    const [operationalBlockers, setOperationalBlockers] = useState(oneOnOne.operational_blockers || '')
-    const [conflictResolution, setConflictResolution] = useState(oneOnOne.conflict_resolution || '')
-
-    const handleAddCommitment = () => {
-        if (!newCommitmentText.trim()) return
-        setMeetingCommitments([
-            ...meetingCommitments, 
-            { 
-                commitment_text: newCommitmentText.trim(), 
-                completed: false,
-                why_not: null,
-                failure_reason: null,
-                carried_forward: false
-            }
-        ])
-        setNewCommitmentText('')
+    const getGrade = (score: number) => {
+        if (score >= 90) return { label: 'A+', color: 'text-emerald-400 border-emerald-500/30 bg-emerald-950/20', comment: 'Excellent' }
+        if (score >= 80) return { label: 'A', color: 'text-emerald-300 border-emerald-600/30 bg-emerald-950/10', comment: 'Très Bien' }
+        if (score >= 70) return { label: 'B', color: 'text-purple-400 border-purple-500/30 bg-purple-950/20', comment: 'Bien' }
+        if (score >= 60) return { label: 'C', color: 'text-amber-400 border-amber-500/30 bg-amber-950/20', comment: 'Satisfaisant' }
+        if (score >= 50) return { label: 'D', color: 'text-orange-400 border-orange-500/30 bg-orange-950/20', comment: 'À Améliorer' }
+        return { label: 'E', color: 'text-rose-400 border-rose-500/30 bg-rose-950/20', comment: 'Insuffisant' }
     }
 
-    const handleRemoveCommitment = (idx: number) => {
-        setMeetingCommitments(meetingCommitments.filter((_, i) => i !== idx))
-    }
+    const rating = getGrade(computedScore)
 
-    const handleCommitmentChange = (idx: number, field: string, value: any) => {
-        const copy = [...meetingCommitments]
+    // Section 2: Previous Commitments State Handlers
+    const handlePrevCommitmentChange = (idx: number, field: string, value: any) => {
+        if (!isEditing) return
+        const copy = [...previousCommitments]
         copy[idx] = { ...copy[idx], [field]: value }
-        setMeetingCommitments(copy)
+        if (field === 'status') {
+            copy[idx].completed = value === 'Resolved'
+        }
+        setPreviousCommitments(copy)
     }
 
+    // Section 3: Complaint History Action
+    const handleShowComplaintHistory = async (complaint: any) => {
+        if (!complaint?.category_id) return
+        setHistoryPopupComplaint(complaint)
+        setLoadingHistory(true)
+        try {
+            const list = await getCategoryComplaintHistoryAction(manager.id, complaint.category_id)
+            setComplaintHistoryList(list.filter(c => c.id !== complaint.id))
+        } catch (err) {
+            console.error("Error loading complaint history:", err)
+        } finally {
+            setLoadingHistory(false)
+        }
+    }
+
+    // Section 3: Add Task/Email Audit
+    const handleAddTaskEmailAudit = () => {
+        if (!newAuditTitle.trim()) return
+        const newAudit = {
+            type: newAuditType,
+            title: newAuditTitle.trim(),
+            client_id: newAuditClientId || null,
+            has_followup_date: newAuditFollowUp,
+            has_good_description: newAuditDesc,
+            has_actions: newAuditActions,
+            has_category_selected: newAuditCatSelected,
+            task_created_date: newAuditCreatedDate || null,
+            complexity: newAuditType === 'task' ? newAuditComplexity : null,
+            review_notes: newAuditNotes.trim()
+        }
+        setTaskEmailAudits([...taskEmailAudits, newAudit])
+        
+        // Reset states
+        setNewAuditTitle('')
+        setNewAuditClientId('')
+        setNewAuditFollowUp(false)
+        setNewAuditDesc(false)
+        setNewAuditActions(false)
+        setNewAuditCatSelected(false)
+        setNewAuditCreatedDate('')
+        setNewAuditNotes('')
+        setShowAuditForm(false)
+    }
+
+    const handleRemoveTaskEmailAudit = (idx: number) => {
+        if (!isEditing) return
+        setTaskEmailAudits(taskEmailAudits.filter((_, i) => i !== idx))
+    }
+
+    // Section 4: Operational Risk Handlers
+    const handleAddRisk = () => {
+        if (!newRiskDesc.trim()) return
+        const newRisk = {
+            description: newRiskDesc.trim(),
+            severity: newRiskSeverity,
+            status: 'active',
+            resolution_notes: '',
+            resolved_date: null
+        }
+        setOperationalRisks([...operationalRisks, newRisk])
+        setNewRiskDesc('')
+        setShowRiskForm(false)
+    }
+
+    const handleResolveRisk = (idx: number, notes: string) => {
+        const copy = [...operationalRisks]
+        copy[idx] = {
+            ...copy[idx],
+            status: 'resolved',
+            resolution_notes: notes,
+            resolved_date: new Date().toISOString().substring(0, 10)
+        }
+        setOperationalRisks(copy)
+    }
+
+    // Section 6: New Agreed Actions Handlers
+    const handleAddAgreedAction = () => {
+        if (!newActionText.trim()) return
+        const newAction = {
+            commitment_text: newActionText.trim(),
+            owner: newActionOwner,
+            due_date: newActionNextReview ? null : newActionDueDate,
+            due_next_review: newActionNextReview,
+            status: 'Open',
+            notes: '',
+            completed: false
+        }
+        setNewAgreedActions([...newAgreedActions, newAction])
+        setNewActionText('')
+        setNewActionDueDate('')
+        setNewActionNextReview(true)
+    }
+
+    const handleRemoveAgreedAction = (idx: number) => {
+        if (!isEditing) return
+        setNewAgreedActions(newAgreedActions.filter((_, i) => i !== idx))
+    }
+
+    // Revert to draft flow
     const handleRevertToDraft = async () => {
         setLoading(true)
         try {
-            const finalComplaints = Object.entries(complaintDiscussions)
-                .filter(([_, data]) => data.checked)
-                .map(([id, data]) => ({
-                    complaint_id: id,
-                    discussion_notes: data.discussion_notes,
-                    resolution_plan: data.resolution_plan,
-                    resolved_in_meeting: data.resolved_in_meeting
-                }))
-
             await updateOneOnOneAction(oneOnOne.id, {
                 meeting_date: meetingDate,
                 status: 'draft',
@@ -184,24 +387,57 @@ export function OneOnOneDetailView({
                 calls_total: Number(callsTotal),
                 calls_answered: Number(callsAnswered),
                 bills_no_notes_over_7d: Number(billsNoNotes),
-                op_reports_closed: Number(opReportsClosed),
+                op_reports_closed: 0,
                 agenda_templates_used: 0,
                 assemblies_on_time: 0,
-                syndicates_lost: Number(syndicatesLost),
-                package_changes: Number(packageChanges),
-                current_issues: currentIssues,
-                main_objectives: mainObjectives,
-                recent_wins: recentWins,
-                difficult_situations: difficultSituations,
-                priority_1: priority1,
-                priority_2: priority2,
-                priority_3: priority3,
-                training_requested: trainingRequested,
-                escalation_needed: escalationNeeded,
-                operational_blockers: operationalBlockers,
-                conflict_resolution: conflictResolution,
-                commitments: meetingCommitments,
-                complaints: finalComplaints
+                syndicates_lost: 0,
+                package_changes: 0,
+                current_issues: '',
+                main_objectives: '',
+                recent_wins: '',
+                difficult_situations: '',
+                priority_1: '',
+                priority_2: '',
+                priority_3: '',
+                training_requested: '',
+                escalation_needed: '',
+                operational_blockers: '',
+                conflict_resolution: '',
+                workload_notes: workloadNotes,
+                prioritization_notes: prioritizationNotes,
+                stress_notes: stressNotes,
+                organization_notes: organizationNotes,
+                support_needed: supportNeeded,
+                training_needed: trainingNeeded,
+                meeting_score: computedScore,
+                commitments: [...previousCommitments, ...newAgreedActions],
+                complaints: Object.entries(reviewedComplaintsState)
+                    .filter(([_, item]) => item.checked)
+                    .map(([compId, item]) => ({
+                        complaint_id: compId,
+                        my_notes: item.my_notes,
+                        manager_notes: item.manager_notes,
+                        reviewed: true,
+                        resolved_in_meeting: item.resolved_in_meeting
+                    })),
+                reviewedAudits: Object.entries(reviewedAuditsState)
+                    .filter(([_, item]) => item.checked)
+                    .map(([auditId, item]) => ({
+                        audit_id: auditId,
+                        my_notes: item.my_notes,
+                        manager_notes: item.manager_notes,
+                        reviewed: true
+                    })),
+                reviewedAssemblies: Object.entries(reviewedAssembliesState)
+                    .filter(([_, item]) => item.checked)
+                    .map(([assId, item]) => ({
+                        assembly_evaluation_id: assId,
+                        my_notes: item.my_notes,
+                        manager_notes: item.manager_notes,
+                        reviewed: true
+                    })),
+                taskEmailAudits,
+                operationalRisks
             })
             setIsEditing(true)
             router.refresh()
@@ -226,17 +462,64 @@ export function OneOnOneDetailView({
         }
     }
 
+    // Save and Lock meeting handler
     const handleSave = async (status: 'draft' | 'completed') => {
         setLoading(true)
         try {
-            const finalComplaints = Object.entries(complaintDiscussions)
-                .filter(([_, data]) => data.checked)
-                .map(([id, data]) => ({
-                    complaint_id: id,
-                    discussion_notes: data.discussion_notes,
-                    resolution_plan: data.resolution_plan,
-                    resolved_in_meeting: data.resolved_in_meeting
+            // Build reviewed lists
+            const finalReviewedAudits = Object.entries(reviewedAuditsState)
+                .filter(([_, item]) => item.checked)
+                .map(([auditId, item]) => ({
+                    audit_id: auditId,
+                    my_notes: item.my_notes,
+                    manager_notes: item.manager_notes,
+                    reviewed: true
                 }))
+
+            const finalReviewedAssemblies = Object.entries(reviewedAssembliesState)
+                .filter(([_, item]) => item.checked)
+                .map(([assId, item]) => ({
+                    assembly_evaluation_id: assId,
+                    my_notes: item.my_notes,
+                    manager_notes: item.manager_notes,
+                    reviewed: true
+                }))
+
+            const finalReviewedComplaints = Object.entries(reviewedComplaintsState)
+                .filter(([_, item]) => item.checked)
+                .map(([compId, item]) => ({
+                    complaint_id: compId,
+                    my_notes: item.my_notes,
+                    manager_notes: item.manager_notes,
+                    reviewed: true,
+                    resolved_in_meeting: item.resolved_in_meeting,
+                    discussion_notes: item.my_notes,
+                    resolution_plan: item.manager_notes
+                }))
+
+            // Merge commitments
+            const finalCommitments = [
+                ...previousCommitments.map(c => ({
+                    id: c.id,
+                    commitment_text: c.commitment_text,
+                    owner: c.owner,
+                    due_date: c.due_date,
+                    due_next_review: c.due_next_review,
+                    status: c.status,
+                    notes: c.notes,
+                    completed: c.completed
+                })),
+                ...newAgreedActions.map(c => ({
+                    id: c.id,
+                    commitment_text: c.commitment_text,
+                    owner: c.owner,
+                    due_date: c.due_date,
+                    due_next_review: c.due_next_review,
+                    status: c.status,
+                    notes: c.notes,
+                    completed: c.completed
+                }))
+            ]
 
             await updateOneOnOneAction(oneOnOne.id, {
                 meeting_date: meetingDate,
@@ -246,24 +529,35 @@ export function OneOnOneDetailView({
                 calls_total: Number(callsTotal),
                 calls_answered: Number(callsAnswered),
                 bills_no_notes_over_7d: Number(billsNoNotes),
-                op_reports_closed: Number(opReportsClosed),
+                op_reports_closed: 0,
                 agenda_templates_used: 0,
                 assemblies_on_time: 0,
-                syndicates_lost: Number(syndicatesLost),
-                package_changes: Number(packageChanges),
-                current_issues: currentIssues,
-                main_objectives: mainObjectives,
-                recent_wins: recentWins,
-                difficult_situations: difficultSituations,
-                priority_1: priority1,
-                priority_2: priority2,
-                priority_3: priority3,
-                training_requested: trainingRequested,
-                escalation_needed: escalationNeeded,
-                operational_blockers: operationalBlockers,
-                conflict_resolution: conflictResolution,
-                commitments: meetingCommitments,
-                complaints: finalComplaints
+                syndicates_lost: 0,
+                package_changes: 0,
+                current_issues: '',
+                main_objectives: '',
+                recent_wins: '',
+                difficult_situations: '',
+                priority_1: '',
+                priority_2: '',
+                priority_3: '',
+                training_requested: '',
+                escalation_needed: '',
+                operational_blockers: '',
+                conflict_resolution: '',
+                workload_notes: workloadNotes,
+                prioritization_notes: prioritizationNotes,
+                stress_notes: stressNotes,
+                organization_notes: organizationNotes,
+                support_needed: supportNeeded,
+                training_needed: trainingNeeded,
+                meeting_score: computedScore,
+                commitments: finalCommitments,
+                complaints: finalReviewedComplaints,
+                reviewedAudits: finalReviewedAudits,
+                reviewedAssemblies: finalReviewedAssemblies,
+                taskEmailAudits,
+                operationalRisks
             })
             
             if (status === 'completed') {
@@ -271,16 +565,16 @@ export function OneOnOneDetailView({
             }
             router.refresh()
         } catch (err) {
-            alert('Erreur lors de la modification : ' + (err as Error).message)
+            alert('Erreur lors de la modification: ' + (err as Error).message)
         } finally {
             setLoading(false)
         }
     }
 
     return (
-        <div className="space-y-6 max-w-5xl mx-auto">
-            {/* Header controls */}
-            <div className="flex flex-col md:flex-row gap-4 p-6 bg-[#16171e]/70 border border-zinc-800/80 rounded-2xl shadow-xl justify-between items-start md:items-center">
+        <div className="space-y-6 max-w-5xl mx-auto pb-20">
+            {/* Header Controls */}
+            <div className="flex flex-col md:flex-row gap-4 p-6 bg-[#16171e]/70 border border-zinc-800 rounded-2xl shadow-xl justify-between items-start md:items-center">
                 <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-lg bg-purple-900/30 border border-purple-800 flex items-center justify-center">
                         <Handshake className="h-5 w-5 text-purple-400" />
@@ -304,8 +598,9 @@ export function OneOnOneDetailView({
                         <Button 
                             onClick={handleRevertToDraft}
                             disabled={loading}
-                            className="bg-amber-600 hover:bg-amber-700 text-white text-sm h-8 px-4 rounded-lg font-bold flex items-center gap-1.5"
+                            className="bg-amber-600 hover:bg-amber-700 text-white text-xs h-8 px-4 rounded-lg font-bold flex items-center gap-1.5"
                         >
+                            <Unlock className="h-3.5 w-3.5" />
                             Remettre en Brouillon
                         </Button>
                     )}
@@ -313,7 +608,7 @@ export function OneOnOneDetailView({
                     {oneOnOne.status === 'draft' && !isEditing && (
                         <Button 
                             onClick={() => setIsEditing(true)}
-                            className="bg-purple-600 hover:bg-purple-700 text-white text-sm h-8 px-4 rounded-lg font-bold"
+                            className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-8 px-4 rounded-lg font-bold"
                         >
                             Modifier le Brouillon
                         </Button>
@@ -325,14 +620,14 @@ export function OneOnOneDetailView({
                                 onClick={() => handleSave('draft')}
                                 disabled={loading}
                                 variant="outline" 
-                                className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800 text-sm h-8 px-4 rounded-lg font-bold"
+                                className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800 text-xs h-8 px-4 rounded-lg font-bold"
                             >
                                 Sauvegarder Brouillon
                             </Button>
                             <Button 
                                 onClick={() => handleSave('completed')}
                                 disabled={loading}
-                                className="bg-purple-600 hover:bg-purple-700 text-white text-sm h-8 px-4 rounded-lg font-bold"
+                                className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-8 px-4 rounded-lg font-bold"
                             >
                                 Finaliser & Verrouiller
                             </Button>
@@ -342,7 +637,7 @@ export function OneOnOneDetailView({
                     <Button 
                         onClick={handleDeleteMeeting}
                         disabled={loading}
-                        className="bg-rose-600 hover:bg-rose-700 text-white text-sm h-8 px-4 rounded-lg font-bold flex items-center gap-1.5"
+                        className="bg-rose-600 hover:bg-rose-700 text-white text-xs h-8 px-4 rounded-lg font-bold flex items-center gap-1.5"
                     >
                         <Trash2 className="h-3.5 w-3.5" />
                         Supprimer
@@ -350,617 +645,351 @@ export function OneOnOneDetailView({
                 </div>
             </div>
 
-            {/* Read-Only Layout */}
-            {!isEditing ? (
-                <div className="space-y-6">
-                    {/* Read-Only Stats Row */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-4">
-                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Taux de Réponse</span>
-                            <span className="text-sm font-bold text-white block">
-                                {callsTotal > 0 ? `${Math.round((callsAnswered / callsTotal) * 100)}% (${callsAnswered}/${callsTotal})` : 'Aucun appel'}
+            {/* dynamic performance scorecard */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="bg-[#16171e]/70 border-zinc-800 shadow-md">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-purple-400" />
+                            Détails de la Session
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4 text-xs">
+                        <div className="space-y-1">
+                            <Label className="text-zinc-500">Gestionnaire</Label>
+                            <Input value={`${manager.first_name} ${manager.last_name}`} disabled className="bg-[#121318] border-zinc-800 h-9 text-zinc-400 text-xs" />
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-zinc-500">Date de la Rencontre</Label>
+                            <Input 
+                                type="date" 
+                                value={meetingDate}
+                                onChange={(e) => setMeetingDate(e.target.value)}
+                                disabled={!isEditing}
+                                className="bg-[#121318] border-zinc-800 h-9 text-xs text-white" 
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="md:col-span-2 bg-[#16171e]/70 border-zinc-800 shadow-md flex flex-col justify-between">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-purple-400" />
+                            Imputabilité Opérationnelle & Score Gustav
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col sm:flex-row gap-6 items-center flex-1 text-xs">
+                        <div className="flex flex-col items-center justify-center p-4 bg-zinc-900/40 border border-zinc-800 rounded-xl w-32 shrink-0">
+                            <span className="text-zinc-500 uppercase font-bold text-[8px] tracking-wider mb-1">Score Gustav</span>
+                            <div className="h-16 w-16 rounded-full border-4 border-purple-500 flex items-center justify-center text-xl font-black text-white font-mono bg-purple-950/15">
+                                {computedScore}%
+                            </div>
+                            <span className={`mt-2 border px-2 py-0.5 rounded text-[9px] font-black uppercase ${rating.color}`}>
+                                {rating.label} - {rating.comment}
                             </span>
                         </div>
-                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Syndicats perdus YTD</span>
-                            <span className="text-sm font-bold text-white block">{syndicatesLost}</span>
-                        </div>
-                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Forfaits modifiés YTD</span>
-                            <span className="text-sm font-bold text-white block">{packageChanges}</span>
-                        </div>
-                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Tâches en retard</span>
-                            <span className="text-sm font-bold text-white block">{lateTasks}</span>
-                        </div>
-                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Courriels &gt; 48h</span>
-                            <span className="text-sm font-bold text-white block">{emailsOver48h}</span>
-                        </div>
-                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Factures sans note</span>
-                            <span className="text-sm font-bold text-white block">{billsNoNotes}</span>
-                        </div>
-                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Rapports clos</span>
-                            <span className="text-sm font-bold text-white block">{opReportsClosed}</span>
-                        </div>
-                    </div>
 
-                    {/* Manager Live stats panel (only shown if loaded) */}
-                    {syndicatesCount > 0 && (
-                        <div className="space-y-3 p-4 bg-zinc-900/20 border border-zinc-850 rounded-xl">
-                            <h4 className="font-bold text-purple-400 uppercase tracking-wider text-[9px]">Indicateurs du Gestionnaire (Temps réel)</h4>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                <div className="p-3 bg-[#16171e]/40 border border-zinc-850 rounded-xl space-y-1">
-                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Taux d'Approbation</span>
-                                    <span className="text-sm font-bold text-zinc-200 block">{quoteApprovalRate}%</span>
-                                </div>
-                                <div className="p-3 bg-[#16171e]/40 border border-zinc-850 rounded-xl space-y-1">
-                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Syndicats Actifs</span>
-                                    <span className="text-sm font-bold text-zinc-200 block">{syndicatesCount}</span>
-                                </div>
-                                <div className="p-3 bg-[#16171e]/40 border border-zinc-850 rounded-xl space-y-1">
-                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Nombre de Portes</span>
-                                    <span className="text-sm font-bold text-zinc-200 block">{doorsCount}</span>
-                                </div>
-                                <div className="p-3 bg-[#16171e]/40 border border-zinc-850 rounded-xl space-y-1">
-                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Volume Courriels (Mensuel)</span>
-                                    <span className="text-sm font-bold text-zinc-200 block">{emailsReceived}</span>
-                                </div>
+                        <div className="grid grid-cols-2 gap-4 w-full">
+                            <div className="p-2 bg-zinc-900/20 border border-zinc-850 rounded-lg space-y-0.5">
+                                <span className="text-zinc-500 text-[8px] uppercase font-bold">Appels Répondus</span>
+                                <span className="text-xs font-bold text-zinc-300 block">{callsTotal > 0 ? `${Math.round(callsPct)}%` : '100%'}</span>
+                            </div>
+                            <div className="p-2 bg-zinc-900/20 border border-zinc-850 rounded-lg space-y-0.5">
+                                <span className="text-zinc-500 text-[8px] uppercase font-bold">Hygiène Tâches</span>
+                                <span className="text-xs font-bold text-zinc-300 block">{taskHygiene}%</span>
+                            </div>
+                            <div className="p-2 bg-zinc-900/20 border border-zinc-850 rounded-lg space-y-0.5">
+                                <span className="text-zinc-500 text-[8px] uppercase font-bold">Hygiène Courriels</span>
+                                <span className="text-xs font-bold text-zinc-300 block">{emailHygiene}%</span>
+                            </div>
+                            <div className="p-2 bg-zinc-900/20 border border-zinc-850 rounded-lg space-y-0.5">
+                                <span className="text-zinc-500 text-[8px] uppercase font-bold">Résolution Engagements</span>
+                                <span className="text-xs font-bold text-zinc-300 block">{commitmentResolutionPct}%</span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* SECTION 1: Snapshot / Compare Section */}
+            <Card className="bg-[#16171e]/70 border-zinc-800 shadow-md">
+                <CardHeader>
+                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-purple-400" />
+                        1. Instantané Métriques (Revue & Comparaison)
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    {isEditing && (
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 pb-2 border-b border-zinc-900/60">
+                            <div className="space-y-1">
+                                <Label className="text-zinc-500 text-[10px]">Tâches en Retard</Label>
+                                <Input type="number" value={lateTasks} onChange={(e) => setLateTasks(Number(e.target.value))} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-zinc-500 text-[10px]">Courriels &gt;48h</Label>
+                                <Input type="number" value={emailsOver48h} onChange={(e) => setEmailsOver48h(Number(e.target.value))} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-zinc-500 text-[10px]">Appels Répondus</Label>
+                                <Input type="number" value={callsAnswered} onChange={(e) => setCallsAnswered(Number(e.target.value))} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-zinc-500 text-[10px]">Total Appels</Label>
+                                <Input type="number" value={callsTotal} onChange={(e) => setCallsTotal(Number(e.target.value))} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-zinc-500 text-[10px]">Factures sans note &gt;7j</Label>
+                                <Input type="number" value={billsNoNotes} onChange={(e) => setBillsNoNotes(Number(e.target.value))} className="bg-[#121318] border-zinc-800 text-xs text-white" />
                             </div>
                         </div>
                     )}
 
-                    {/* Last meeting review notes */}
-                    {lastMeeting && (
-                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                            <CardHeader className="pb-3 border-b border-zinc-900/60 bg-zinc-950/10">
-                                <CardTitle className="text-sm font-bold text-white flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <ClipboardList className="h-4 w-4 text-purple-400" />
-                                        Rétroaction de la rencontre précédente ({new Date(lastMeeting.meeting_date).toLocaleDateString('fr-CA')})
-                                    </div>
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-zinc-350">
-                                <div className="space-y-3">
-                                    {lastMeeting.recent_wins && (
-                                        <div>
-                                            <span className="text-zinc-500 block font-bold uppercase text-[8px] mb-1">Succès précédents</span>
-                                            <p className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-850 leading-relaxed whitespace-pre-wrap">{lastMeeting.recent_wins}</p>
-                                        </div>
-                                    )}
-                                    {lastMeeting.difficult_situations && (
-                                        <div>
-                                            <span className="text-zinc-500 block font-bold uppercase text-[8px] mb-1">Difficultés relevées</span>
-                                            <p className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-850 leading-relaxed whitespace-pre-wrap">{lastMeeting.difficult_situations}</p>
-                                        </div>
-                                    )}
-                                    {lastMeeting.current_issues && (
-                                        <div>
-                                            <span className="text-zinc-500 block font-bold uppercase text-[8px] mb-1">Dossiers chauds / points critiques</span>
-                                            <p className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-850 leading-relaxed whitespace-pre-wrap">{lastMeeting.current_issues}</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="space-y-3">
-                                    {/* Previous priorities */}
-                                    <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-2">
-                                        <span className="text-zinc-500 block font-bold uppercase text-[8px]">Dernières priorités fixées</span>
-                                        {lastMeeting.priority_1 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/20 text-purple-400 border border-purple-800/40 text-[8px]">P1</Badge> <span>{lastMeeting.priority_1}</span></div>}
-                                        {lastMeeting.priority_2 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/20 text-purple-400 border border-purple-800/40 text-[8px]">P2</Badge> <span>{lastMeeting.priority_2}</span></div>}
-                                        {lastMeeting.priority_3 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/20 text-purple-400 border border-purple-800/40 text-[8px]">P3</Badge> <span>{lastMeeting.priority_3}</span></div>}
-                                    </div>
-
-                                    {/* Previous commitments list */}
-                                    {lastMeeting.commitments && lastMeeting.commitments.length > 0 && (
-                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-2">
-                                            <span className="text-zinc-500 block font-bold uppercase text-[8px]">Tous les engagements pris</span>
-                                            <div className="space-y-1.5 max-h-[150px] overflow-y-auto pr-1">
-                                                {lastMeeting.commitments.map((c: any, idx: number) => (
-                                                    <div key={idx} className="flex justify-between items-center gap-2 text-[10px] pb-1 border-b border-zinc-850/50 last:border-b-0 last:pb-0">
-                                                        <span className={c.completed ? "line-through text-zinc-500" : "font-semibold text-zinc-300"}>{c.commitment_text}</span>
-                                                        <Badge variant="outline" className={c.completed ? "bg-emerald-950/20 text-emerald-400 border-emerald-800/40 text-[8px]" : "bg-rose-950/20 text-rose-400 border-rose-800/40 text-[8px]"}>
-                                                            {c.completed ? 'Fait' : 'En attente'}
-                                                        </Badge>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {/* Discussion notes read-only */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                            <CardHeader>
-                                <CardTitle className="text-sm font-bold text-white uppercase tracking-wider text-purple-400">Notes & Discussions</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4 text-xs text-zinc-300">
-                                {recentWins && (
-                                    <div>
-                                        <h4 className="text-zinc-500 font-bold uppercase text-[9px] mb-1">Succès & Bons Coups</h4>
-                                        <p className="bg-zinc-950/40 p-2.5 rounded-lg border border-zinc-900 leading-relaxed whitespace-pre-wrap">{recentWins}</p>
-                                    </div>
-                                )}
-                                {difficultSituations && (
-                                    <div>
-                                        <h4 className="text-zinc-500 font-bold uppercase text-[9px] mb-1">Difficultés Opérationnelles</h4>
-                                        <p className="bg-zinc-950/40 p-2.5 rounded-lg border border-zinc-900 leading-relaxed whitespace-pre-wrap">{difficultSituations}</p>
-                                    </div>
-                                )}
-                                {currentIssues && (
-                                    <div>
-                                        <h4 className="text-zinc-500 font-bold uppercase text-[9px] mb-1">Points & Dossiers Critiques</h4>
-                                        <p className="bg-zinc-950/40 p-2.5 rounded-lg border border-zinc-900 leading-relaxed whitespace-pre-wrap">{currentIssues}</p>
-                                    </div>
-                                )}
-                                {mainObjectives && (
-                                    <div>
-                                        <h4 className="text-zinc-500 font-bold uppercase text-[9px] mb-1">Objectifs de la Rencontre</h4>
-                                        <p className="bg-zinc-950/40 p-2.5 rounded-lg border border-zinc-900 leading-relaxed whitespace-pre-wrap">{mainObjectives}</p>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                            <CardHeader>
-                                <CardTitle className="text-sm font-bold text-white uppercase tracking-wider text-purple-400">Priorités & Support Demandé</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4 text-xs text-zinc-300">
-                                {/* Priorities */}
-                                <div className="space-y-2 p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl">
-                                    <h4 className="text-zinc-500 font-bold uppercase text-[9px] mb-1">Les 3 Priorités Opérationnelles</h4>
-                                    {priority1 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/30 text-purple-400 border border-purple-800 text-[8px] font-bold">P1</Badge> <span>{priority1}</span></div>}
-                                    {priority2 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/30 text-purple-400 border border-purple-800 text-[8px] font-bold">P2</Badge> <span>{priority2}</span></div>}
-                                    {priority3 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/30 text-purple-400 border border-purple-800 text-[8px] font-bold">P3</Badge> <span>{priority3}</span></div>}
-                                </div>
-
-                                {/* Support fields */}
-                                {trainingRequested && (
-                                    <div>
-                                        <h4 className="text-zinc-500 font-bold uppercase text-[9px] mb-1">Formation & Mentorat</h4>
-                                        <p className="bg-zinc-950/40 p-2 rounded border border-zinc-900">{trainingRequested}</p>
-                                    </div>
-                                )}
-                                {escalationNeeded && (
-                                    <div>
-                                        <h4 className="text-zinc-500 font-bold uppercase text-[9px] mb-1">Escalades Direction</h4>
-                                        <p className="bg-zinc-950/40 p-2 rounded border border-zinc-900">{escalationNeeded}</p>
-                                    </div>
-                                )}
-                                {operationalBlockers && (
-                                    <div>
-                                        <h4 className="text-zinc-500 font-bold uppercase text-[9px] mb-1">Bloqueurs Processus / Systèmes</h4>
-                                        <p className="bg-zinc-950/40 p-2 rounded border border-zinc-900">{operationalBlockers}</p>
-                                    </div>
-                                )}
-                                {conflictResolution && (
-                                    <div>
-                                        <h4 className="text-zinc-500 font-bold uppercase text-[9px] mb-1">Médiations / Conflits</h4>
-                                        <p className="bg-zinc-950/40 p-2 rounded border border-zinc-900">{conflictResolution}</p>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
+                    <div className="overflow-x-auto pt-2">
+                        <table className="w-full text-left text-xxs text-zinc-300">
+                            <thead className="bg-zinc-950/40 text-zinc-400 font-bold uppercase border-b border-zinc-850">
+                                <tr>
+                                    <th className="p-2">Indicateur</th>
+                                    <th className="p-2 text-center">Période Actuelle</th>
+                                    <th className="p-2 text-center">Période Précédente</th>
+                                    <th className="p-2 text-center">Évolution</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-850">
+                                <tr>
+                                    <td className="p-2 font-semibold text-zinc-200">Courriels &gt; 48 heures</td>
+                                    <td className="p-2 text-center font-bold text-white">{emailsOver48h}</td>
+                                    <td className="p-2 text-center text-zinc-500">{emailsReceivedPrev || 'N/A'}</td>
+                                    <td className="p-2 text-center">
+                                        {emailsOver48h < (emailsReceivedPrev || 0) ? (
+                                            <span className="text-emerald-400 flex items-center justify-center gap-0.5"><TrendingUp className="h-3 w-3 shrink-0" /> Amélioration</span>
+                                        ) : emailsOver48h > (emailsReceivedPrev || 0) ? (
+                                            <span className="text-rose-400 flex items-center justify-center gap-0.5"><TrendingDown className="h-3 w-3 shrink-0" /> Dégradation</span>
+                                        ) : <span className="text-zinc-400">-</span>}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td className="p-2 font-semibold text-zinc-200">Tâches en Retard</td>
+                                    <td className="p-2 text-center font-bold text-white">{lateTasks}</td>
+                                    <td className="p-2 text-center text-zinc-500">{lateTasksPrev}</td>
+                                    <td className="p-2 text-center">
+                                        {lateTasks < lateTasksPrev ? (
+                                            <span className="text-emerald-400 flex items-center justify-center gap-0.5"><TrendingUp className="h-3 w-3 shrink-0" /> Amélioration</span>
+                                        ) : lateTasks > lateTasksPrev ? (
+                                            <span className="text-rose-400 flex items-center justify-center gap-0.5"><TrendingDown className="h-3 w-3 shrink-0" /> Dégradation</span>
+                                        ) : <span className="text-zinc-400">-</span>}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td className="p-2 font-semibold text-zinc-200">Taux d'Appels Répondus</td>
+                                    <td className="p-2 text-center font-bold text-white">{callsTotal > 0 ? `${Math.round(callsPct)}%` : '100%'}</td>
+                                    <td className="p-2 text-center text-zinc-500">{callsTotalPrev > 0 ? `${Math.round(prevCallsPct)}%` : 'N/A'}</td>
+                                    <td className="p-2 text-center">
+                                        {callsPct > prevCallsPct ? (
+                                            <span className="text-emerald-400 flex items-center justify-center gap-0.5"><TrendingUp className="h-3 w-3 shrink-0" /> Amélioration</span>
+                                        ) : callsPct < prevCallsPct ? (
+                                            <span className="text-rose-400 flex items-center justify-center gap-0.5"><TrendingDown className="h-3 w-3 shrink-0" /> Dégradation</span>
+                                        ) : <span className="text-zinc-400">-</span>}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td className="p-2 font-semibold text-zinc-200">Plaintes Client Ouvertes</td>
+                                    <td className="p-2 text-center font-bold text-white">{managerComplaints.length}</td>
+                                    <td className="p-2 text-center text-zinc-500">{openComplaintsPrev}</td>
+                                    <td className="p-2 text-center">
+                                        {managerComplaints.length < openComplaintsPrev ? (
+                                            <span className="text-emerald-400 flex items-center justify-center gap-0.5"><TrendingUp className="h-3 w-3 shrink-0" /> Amélioration</span>
+                                        ) : managerComplaints.length > openComplaintsPrev ? (
+                                            <span className="text-rose-400 flex items-center justify-center gap-0.5"><TrendingDown className="h-3 w-3 shrink-0" /> Dégradation</span>
+                                        ) : <span className="text-zinc-400">-</span>}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td className="p-2 font-semibold text-zinc-200">Factures sans notes &gt; 7 jours</td>
+                                    <td className="p-2 text-center font-bold text-white">{billsNoNotes}</td>
+                                    <td className="p-2 text-center text-zinc-500">{billsNoNotesPrev}</td>
+                                    <td className="p-2 text-center">
+                                        {billsNoNotes < billsNoNotesPrev ? (
+                                            <span className="text-emerald-400 flex items-center justify-center gap-0.5"><TrendingUp className="h-3 w-3 shrink-0" /> Amélioration</span>
+                                        ) : billsNoNotes > billsNoNotesPrev ? (
+                                            <span className="text-rose-400 flex items-center justify-center gap-0.5"><TrendingDown className="h-3 w-3 shrink-0" /> Dégradation</span>
+                                        ) : <span className="text-zinc-400">-</span>}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
 
-                    {/* Commitments Table Read-Only */}
-                    {meetingCommitments.length > 0 && (
-                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                            <CardHeader>
-                                <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-                                    <CheckCircle2 className="h-4 w-4 text-purple-400" />
-                                    Engagements Actés & Suivi
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="overflow-x-auto">
-                                <table className="w-full text-left text-xs text-zinc-300">
-                                    <thead className="bg-zinc-950/40 text-zinc-400 font-bold border-b border-zinc-800">
-                                        <tr>
-                                            <th className="p-3 w-1/2">Engagement</th>
-                                            <th className="p-3 text-center">Statut</th>
-                                            <th className="p-3">Raison d'échec</th>
-                                            <th className="p-3 text-right">Reporté ?</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-zinc-850">
-                                        {meetingCommitments.map((c, idx) => (
-                                            <tr key={idx} className="hover:bg-zinc-900/10">
-                                                <td className="p-3 font-semibold text-zinc-200">{c.commitment_text}</td>
-                                                <td className="p-3 text-center">
-                                                    {c.completed ? (
-                                                        <Badge variant="outline" className="bg-emerald-950/20 text-emerald-400 border-emerald-800/40 text-[8px] font-bold">
-                                                            Complété
-                                                        </Badge>
-                                                    ) : (
-                                                        <Badge variant="outline" className="bg-rose-950/20 text-rose-400 border-rose-800/40 text-[8px] font-bold">
-                                                            En attente
-                                                        </Badge>
-                                                    )}
-                                                </td>
-                                                <td className="p-3 text-zinc-400 italic">
-                                                    {!c.completed && c.failure_reason ? (
-                                                        <span>
-                                                            <strong>{c.failure_reason}</strong>
-                                                            {c.why_not && ` - ${c.why_not}`}
-                                                        </span>
-                                                    ) : '-'}
-                                                </td>
-                                                <td className="p-3 text-right font-semibold">
-                                                    {c.carried_forward ? 'Oui' : 'Non'}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {/* Discussed Complaints Read-Only */}
-                    {discussedComplaints.length > 0 && (
-                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                            <CardHeader>
-                                <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-                                    <AlertCircle className="h-4 w-4 text-purple-400" />
-                                    Plaintes Client abordées lors de la rencontre ({discussedComplaints.length})
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4 text-xs">
-                                {discussedComplaints.map((dc: any) => {
-                                    const c = dc.complaints
-                                    const clientName = c?.clients ? (c.clients.company_name || c.clients.full_name) : 'Copropriété inconnue'
-                                    const sdcNum = c?.clients?.full_name || 'Inconnu'
-                                    const categoryName = c?.complaint_categories?.name || 'Non spécifiée'
-
-                                    const sevStyle = 
-                                        c?.severity === 'critical' ? 'bg-rose-500/20 text-rose-400 border-rose-800/40' :
-                                        c?.severity === 'high' ? 'bg-orange-500/20 text-orange-400 border-orange-850/40' :
-                                        c?.severity === 'medium' ? 'bg-amber-500/20 text-amber-400 border-amber-800/40' :
-                                        'bg-zinc-900 text-zinc-400 border-zinc-850'
-
-                                    return (
-                                        <div key={dc.id} className="p-4 bg-zinc-900/30 border border-zinc-850 rounded-xl space-y-3">
-                                            <div className="flex justify-between items-start gap-2">
-                                                <div className="space-y-0.5">
-                                                    <span className="font-bold text-zinc-200 block text-sm">{c?.title}</span>
-                                                    <span className="text-zinc-500 text-[10px]">
-                                                        Syndicat: <strong className="text-zinc-400">{clientName} [{sdcNum}]</strong>
-                                                    </span>
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <Badge variant="outline" className="text-[8px] font-bold bg-purple-950/20 text-purple-400 border-purple-800/30">{categoryName}</Badge>
-                                                    <Badge variant="outline" className={`text-[8px] font-bold ${sevStyle}`}>{c?.severity}</Badge>
-                                                    <Badge variant="outline" className={dc.resolved_in_meeting ? "bg-emerald-950/20 text-emerald-400 border-emerald-800/40 text-[8px] font-bold" : "bg-rose-950/20 text-rose-400 border-rose-800/40 text-[8px] font-bold"}>
-                                                        {dc.resolved_in_meeting ? 'Résolue en séance' : 'Discutée'}
-                                                    </Badge>
-                                                </div>
-                                            </div>
-
-                                            {c?.description && (
-                                                <div className="text-zinc-400 bg-zinc-950/25 p-2 rounded-lg border border-zinc-900 leading-relaxed text-[10px]">
-                                                    <strong className="text-zinc-500 block text-[9px] uppercase mb-1">Détails de la plainte:</strong>
-                                                    {c.description}
-                                                </div>
-                                            )}
-
-                                            {(dc.discussion_notes || dc.resolution_plan) && (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-zinc-850/50">
-                                                    {dc.discussion_notes && (
-                                                        <div>
-                                                            <strong className="text-zinc-500 block text-[8px] uppercase mb-1">Notes de discussion:</strong>
-                                                            <p className="bg-zinc-950/25 p-2.5 rounded-lg border border-zinc-900 text-zinc-350 whitespace-pre-wrap leading-relaxed">{dc.discussion_notes}</p>
-                                                        </div>
-                                                    )}
-                                                    {dc.resolution_plan && (
-                                                        <div>
-                                                            <strong className="text-zinc-500 block text-[8px] uppercase mb-1">Plan de résolution:</strong>
-                                                            <p className="bg-zinc-950/25 p-2.5 rounded-lg border border-zinc-900 text-zinc-350 whitespace-pre-wrap leading-relaxed">{dc.resolution_plan}</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )
-                                })}
-                            </CardContent>
-                        </Card>
-                    )}
-                </div>
-            ) : (
-                /* Editable layout (Draft State) */
-                <div className="space-y-6">
-                    {/* Setup / Metrics Input */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                            <CardHeader>
-                                <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-                                    <Calendar className="h-4 w-4 text-purple-400" />
-                                    Date de Rencontre
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="text-xs">
-                                <Label className="text-zinc-500">Date</Label>
-                                <Input 
-                                    type="date" 
-                                    value={meetingDate} 
-                                    onChange={(e) => setMeetingDate(e.target.value)} 
-                                    className="bg-[#121318] border-zinc-800 h-9 text-[16px] md:text-xs mt-1 text-white" 
-                                />
-                            </CardContent>
-                        </Card>
-
-                        <Card className="md:col-span-2 bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                            <CardHeader>
-                                <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-                                    <Sparkles className="h-4 w-4 text-purple-400" />
-                                    Aperçu Opérationnel
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-6 text-xs">
-                                {/* Section 1: Inputs manually filled during the 1-on-1 */}
-                                <div className="space-y-3">
-                                    <h4 className="font-bold text-purple-400 uppercase tracking-wider text-[9px]">Indicateurs à renseigner</h4>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                        <div className="space-y-1">
-                                            <Label className="text-zinc-500">Tâches en retard</Label>
-                                            <Input type="number" value={lateTasks} onChange={(e) => setLateTasks(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-zinc-500">Courriels &gt; 48 heures</Label>
-                                            <Input type="number" value={emailsOver48h} onChange={(e) => setEmailsOver48h(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-zinc-500">Factures sans notes &gt; 7j</Label>
-                                            <Input type="number" value={billsNoNotes} onChange={(e) => setBillsNoNotes(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-zinc-500">Rapports opérationnels clos</Label>
-                                            <Input type="number" value={opReportsClosed} onChange={(e) => setOpReportsClosed(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Section 2: Snapshotted statistics (computed & saved on publish, read-only) */}
-                                <div className="space-y-3 border-t border-zinc-900 pt-4">
-                                    <h4 className="font-bold text-purple-400 uppercase tracking-wider text-[9px]">Statistiques du mois (Capture automatique)</h4>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Appels Répondus / Total</span>
-                                            <span className="text-sm font-bold text-zinc-200 block">
-                                                {callsTotal > 0 ? `${Math.round((callsAnswered / callsTotal) * 100)}% (${callsAnswered}/${callsTotal})` : 'Aucun appel'}
-                                            </span>
-                                        </div>
-                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Syndicats perdus YTD</span>
-                                            <span className="text-sm font-bold text-zinc-200 block">{syndicatesLost}</span>
-                                        </div>
-                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Changements forfait YTD</span>
-                                            <span className="text-sm font-bold text-zinc-200 block">{packageChanges}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Section 3: Manager Live stats at time of interview */}
-                                <div className="space-y-3 border-t border-zinc-900 pt-4">
-                                    <h4 className="font-bold text-purple-400 uppercase tracking-wider text-[9px]">Indicateurs du Gestionnaire (Temps réel)</h4>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Taux d'Approbation</span>
-                                            <span className="text-sm font-bold text-zinc-200 block">{quoteApprovalRate}%</span>
-                                        </div>
-                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Syndicats Actifs</span>
-                                            <span className="text-sm font-bold text-zinc-200 block">{syndicatesCount}</span>
-                                        </div>
-                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Nombre de Portes</span>
-                                            <span className="text-sm font-bold text-zinc-200 block">{doorsCount}</span>
-                                        </div>
-                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Volume Courriels (Mensuel)</span>
-                                            <span className="text-sm font-bold text-zinc-200 block">{emailsReceived}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                    <div className="p-3 bg-zinc-900/30 border border-zinc-850 rounded-xl">
+                        <span className="text-purple-400 uppercase font-bold text-[8px] tracking-wider block mb-2">Statistiques Globales</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-zinc-300 text-xxs">
+                            <div>
+                                <span className="text-zinc-500 block">Taux d'Approbation Laucandrique</span>
+                                <strong className="text-sm text-white font-mono">{quoteApprovalRate}%</strong>
+                            </div>
+                            <div>
+                                <span className="text-zinc-500 block">Total Syndicats Actifs</span>
+                                <strong className="text-sm text-white font-mono">{syndicatesCount} syndicats ({doorsCount} portes)</strong>
+                            </div>
+                            <div>
+                                <span className="text-zinc-500 block">Volume Courriels Entrants</span>
+                                <strong className="text-sm text-white font-mono">{emailsReceived} courriels</strong>
+                            </div>
+                        </div>
                     </div>
+                </CardContent>
+            </Card>
 
-                    {/* Last meeting review notes */}
-                    {lastMeeting && (
-                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                            <CardHeader className="pb-3 border-b border-zinc-900/60 bg-zinc-950/10">
-                                <CardTitle className="text-sm font-bold text-white flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <ClipboardList className="h-4 w-4 text-purple-400" />
-                                        Rétroaction de la rencontre précédente ({new Date(lastMeeting.meeting_date).toLocaleDateString('fr-CA')})
-                                    </div>
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-zinc-350">
-                                <div className="space-y-3">
-                                    {lastMeeting.recent_wins && (
-                                        <div>
-                                            <span className="text-zinc-500 block font-bold uppercase text-[8px] mb-1">Succès précédents</span>
-                                            <p className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-850 leading-relaxed whitespace-pre-wrap">{lastMeeting.recent_wins}</p>
-                                        </div>
-                                    )}
-                                    {lastMeeting.difficult_situations && (
-                                        <div>
-                                            <span className="text-zinc-500 block font-bold uppercase text-[8px] mb-1">Difficultés relevées</span>
-                                            <p className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-850 leading-relaxed whitespace-pre-wrap">{lastMeeting.difficult_situations}</p>
-                                        </div>
-                                    )}
-                                    {lastMeeting.current_issues && (
-                                        <div>
-                                            <span className="text-zinc-500 block font-bold uppercase text-[8px] mb-1">Dossiers chauds / points critiques</span>
-                                            <p className="bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-850 leading-relaxed whitespace-pre-wrap">{lastMeeting.current_issues}</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="space-y-3">
-                                    {/* Previous priorities */}
-                                    <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-2">
-                                        <span className="text-zinc-500 block font-bold uppercase text-[8px]">Dernières priorités fixées</span>
-                                        {lastMeeting.priority_1 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/20 text-purple-400 border border-purple-800/40 text-[8px]">P1</Badge> <span>{lastMeeting.priority_1}</span></div>}
-                                        {lastMeeting.priority_2 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/20 text-purple-400 border border-purple-800/40 text-[8px]">P2</Badge> <span>{lastMeeting.priority_2}</span></div>}
-                                        {lastMeeting.priority_3 && <div className="flex items-center gap-2"><Badge className="bg-purple-900/20 text-purple-400 border border-purple-800/40 text-[8px]">P3</Badge> <span>{lastMeeting.priority_3}</span></div>}
-                                    </div>
-
-                                    {/* Previous commitments list */}
-                                    {lastMeeting.commitments && lastMeeting.commitments.length > 0 && (
-                                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-2">
-                                            <span className="text-zinc-500 block font-bold uppercase text-[8px]">Tous les engagements pris</span>
-                                            <div className="space-y-1.5 max-h-[150px] overflow-y-auto pr-1">
-                                                {lastMeeting.commitments.map((c: any, idx: number) => (
-                                                    <div key={idx} className="flex justify-between items-center gap-2 text-[10px] pb-1 border-b border-zinc-850/50 last:border-b-0 last:pb-0">
-                                                        <span className={c.completed ? "line-through text-zinc-500" : "font-semibold text-zinc-300"}>{c.commitment_text}</span>
-                                                        <Badge variant="outline" className={c.completed ? "bg-emerald-950/20 text-emerald-400 border-emerald-800/40 text-[8px]" : "bg-rose-950/20 text-rose-400 border-rose-800/40 text-[8px]"}>
-                                                            {c.completed ? 'Fait' : 'En attente'}
-                                                        </Badge>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
+            {/* SECTION 2: Previous Meeting Follow-Up */}
+            <Card className="bg-[#16171e]/70 border-zinc-800 shadow-md">
+                <CardHeader>
+                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                        <CheckCircle2 className="h-4.5 w-4.5 text-purple-400" />
+                        2. Suivi des Engagements de la Rencontre Précédente (Responsabilisation)
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="overflow-x-auto text-xs">
+                    {previousCommitments.length === 0 ? (
+                        <p className="text-xxs text-zinc-500 italic text-center py-4">Aucun engagement de la rencontre précédente en suspens.</p>
+                    ) : (
+                        <table className="w-full text-left text-xxs text-zinc-300">
+                            <thead className="bg-zinc-950/40 text-zinc-400 font-bold border-b border-zinc-850">
+                                <tr>
+                                    <th className="p-2 w-1/3">Engagement Convenu</th>
+                                    <th className="p-2 text-center w-28">Statut de Suivi</th>
+                                    <th className="p-2">Raison d'Échec / Bloqueur</th>
+                                    <th className="p-2 w-1/3">Notes / Rétroaction</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-850">
+                                {previousCommitments.map((c, idx) => (
+                                    <tr key={c.id || idx} className="hover:bg-zinc-900/10">
+                                        <td className="p-2 font-medium text-zinc-200">
+                                            {c.commitment_text}
+                                            <div className="text-[8px] text-zinc-500 mt-0.5">Propriétaire: {c.owner || 'Manager'}</div>
+                                        </td>
+                                        <td className="p-2 text-center">
+                                            <select
+                                                value={c.status || 'Open'}
+                                                onChange={(e) => handlePrevCommitmentChange(idx, 'status', e.target.value)}
+                                                disabled={!isEditing}
+                                                className="bg-[#121318] border border-zinc-850 rounded p-1 text-zinc-300 outline-none text-[10px]"
+                                            >
+                                                <option value="Open">En attente (Open)</option>
+                                                <option value="Improved">Amélioré (Improved)</option>
+                                                <option value="Partial">Résolution Partielle (Partial)</option>
+                                                <option value="Not resolved">Non Résolu (Not resolved)</option>
+                                                <option value="Resolved">Résolu (Resolved)</option>
+                                            </select>
+                                        </td>
+                                        <td className="p-2">
+                                            {c.status !== 'Resolved' && (
+                                                <select
+                                                    value={c.failure_reason || 'Lack of organization'}
+                                                    onChange={(e) => handlePrevCommitmentChange(idx, 'failure_reason', e.target.value)}
+                                                    disabled={!isEditing}
+                                                    className="w-full bg-[#121318] border border-zinc-850 rounded p-1 text-[10px] text-zinc-400 outline-none"
+                                                >
+                                                    <option value="Lack of organization">Manque d'organisation</option>
+                                                    <option value="Lack of training">Besoin de formation</option>
+                                                    <option value="Work overload">Surcharge de travail</option>
+                                                    <option value="Waiting on board">Attente après le CA</option>
+                                                    <option value="Waiting on supplier">Attente après fournisseur</option>
+                                                    <option value="Avoidance">Évitement de tâche</option>
+                                                    <option value="Prioritization issue">Problème de priorité</option>
+                                                    <option value="Process/system issue">Bloqueur système/procédure</option>
+                                                    <option value="External issue">Facteur externe</option>
+                                                </select>
+                                            )}
+                                        </td>
+                                        <td className="p-2">
+                                            <Input
+                                                placeholder="Notes explicatives..."
+                                                value={c.notes || ''}
+                                                onChange={(e) => handlePrevCommitmentChange(idx, 'notes', e.target.value)}
+                                                disabled={!isEditing}
+                                                className="bg-[#121318] border-zinc-850 h-7 text-xxs"
+                                            />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     )}
+                </CardContent>
+            </Card>
 
-                    {/* Complaints section (Editable) */}
-                    <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md mb-6">
-                        <CardHeader>
-                            <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-                                <AlertCircle className="h-4.5 w-4.5 text-purple-400" />
-                                Plaintes Actives à aborder ({managerComplaints.length})
-                            </CardTitle>
-                            <CardDescription className="text-xs text-zinc-400">
-                                Sélectionnez les plaintes du gestionnaire à discuter pendant la rencontre, saisissez les notes de discussion et marquez-les comme résolues au besoin.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4 text-xs">
-                            {managerComplaints.length === 0 ? (
-                                <p className="text-xs text-zinc-500 italic py-3 text-center">Aucune plainte active pour ce gestionnaire.</p>
+            {/* SECTION 3: Audit Review Section */}
+            <Card className="bg-[#16171e]/70 border-zinc-800 shadow-md">
+                <CardHeader>
+                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                        <BookOpen className="h-4.5 w-4.5 text-purple-400" />
+                        3. Section Revue d'Audits & Imputabilité Tâches/Courriels
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6 text-xxs">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Syndicate Audits */}
+                        <div className="p-4 bg-zinc-900/30 border border-zinc-850 rounded-xl space-y-3">
+                            <span className="font-bold text-zinc-200 uppercase text-[9px] tracking-wider block border-b border-zinc-800 pb-1.5">Audits de Syndicats Récents ({syndicateAudits.length})</span>
+                            {syndicateAudits.length === 0 ? (
+                                <p className="italic text-zinc-500 py-2">Aucun audit syndicat disponible.</p>
                             ) : (
-                                <div className="space-y-4">
-                                    {managerComplaints.map((c) => {
-                                        const isChecked = !!complaintDiscussions[c.id]?.checked
-                                        const clientName = c.clients ? (c.clients.company_name || c.clients.full_name) : 'Copropriété inconnue'
-                                        const sdcNum = c.clients?.full_name || 'Inconnu'
-                                        const categoryName = c.complaint_categories?.name || 'Non spécifiée'
-                                        
-                                        const sevStyle = 
-                                            c.severity === 'critical' ? 'bg-rose-500/20 text-rose-400 border-rose-800/40' :
-                                            c.severity === 'high' ? 'bg-orange-500/20 text-orange-400 border-orange-850/40' :
-                                            c.severity === 'medium' ? 'bg-amber-500/20 text-amber-400 border-amber-800/40' :
-                                            'bg-zinc-900 text-zinc-400 border-zinc-850'
-
+                                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                                    {syndicateAudits.map(a => {
+                                        const isChecked = !!reviewedAuditsState[a.id]?.checked
                                         return (
-                                            <div key={c.id} className="p-4 bg-zinc-900/20 border border-zinc-850 rounded-xl space-y-3">
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div className="flex items-start gap-2.5">
+                                            <div key={a.id} className="p-2.5 bg-zinc-950/20 border border-zinc-850 rounded-lg space-y-2">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <span className="font-bold text-zinc-300 block">{a.clients?.company_name || a.clients?.full_name || 'Syndicat'}</span>
+                                                        <span className="text-[8px] text-zinc-500">Date: {new Date(a.audit_date).toLocaleDateString('fr-CA')}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge variant="outline" className={a.health_score < 60 ? "bg-rose-950/20 text-rose-400 border-rose-800/40 font-mono text-[8px]" : "bg-purple-950/20 text-purple-400 border-purple-800/40 font-mono text-[8px]"}>
+                                                            Santé: {a.health_score}%
+                                                        </Badge>
                                                         <input 
                                                             type="checkbox"
-                                                            id={`comp-${c.id}`}
                                                             checked={isChecked}
                                                             onChange={(e) => {
+                                                                if (!isEditing) return
                                                                 const checked = e.target.checked
-                                                                setComplaintDiscussions(prev => ({
+                                                                setReviewedAuditsState(prev => ({
                                                                     ...prev,
-                                                                    [c.id]: {
+                                                                    [a.id]: {
                                                                         checked,
-                                                                        discussion_notes: prev[c.id]?.discussion_notes || '',
-                                                                        resolution_plan: prev[c.id]?.resolution_plan || '',
-                                                                        resolved_in_meeting: prev[c.id]?.resolved_in_meeting || false
+                                                                        my_notes: prev[a.id]?.my_notes || '',
+                                                                        manager_notes: prev[a.id]?.manager_notes || ''
                                                                     }
                                                                 }))
                                                             }}
-                                                            className="rounded border-zinc-800 text-purple-600 h-4.5 w-4.5 mt-0.5"
+                                                            disabled={!isEditing}
+                                                            className="rounded border-zinc-800 text-purple-600 h-4 w-4 cursor-pointer"
                                                         />
-                                                        <div className="space-y-1">
-                                                            <label htmlFor={`comp-${c.id}`} className="text-sm font-bold text-zinc-200 cursor-pointer hover:text-white transition-colors">
-                                                                {c.title}
-                                                            </label>
-                                                            <p className="text-zinc-500 text-[10px]">
-                                                                Syndicat: <strong className="text-zinc-400">{clientName} [{sdcNum}]</strong>
-                                                            </p>
-                                                            {c.description && (
-                                                                <p className="text-[10px] text-zinc-400 bg-zinc-950/30 p-2 rounded-lg border border-zinc-900 leading-relaxed mt-1.5 max-w-2xl">
-                                                                    {c.description}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex gap-1.5 shrink-0">
-                                                        <Badge variant="outline" className="text-[8px] font-bold bg-purple-950/20 text-purple-400 border-purple-800/30">{categoryName}</Badge>
-                                                        <Badge variant="outline" className={`text-[8px] font-bold ${sevStyle}`}>{c.severity}</Badge>
                                                     </div>
                                                 </div>
 
-                                                {isChecked && (
-                                                    <div className="pl-7 space-y-3 pt-2 border-t border-zinc-850/60 animate-in fade-in duration-200">
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                            <div className="space-y-1">
-                                                                <Label className="text-zinc-500">Notes de discussion (lors du 1v1)</Label>
-                                                                <Textarea 
-                                                                    value={complaintDiscussions[c.id]?.discussion_notes || ''}
-                                                                    onChange={(e) => {
-                                                                        const val = e.target.value
-                                                                        setComplaintDiscussions(prev => ({
-                                                                            ...prev,
-                                                                            [c.id]: { ...prev[c.id], discussion_notes: val }
-                                                                        }))
-                                                                    }}
-                                                                    placeholder="Qu'est-ce qui a été discuté ?" 
-                                                                    rows={2} 
-                                                                    className="bg-[#121318] border-zinc-800 text-[16px] md:text-xs text-white" 
-                                                                />
-                                                            </div>
-                                                            <div className="space-y-1">
-                                                                <Label className="text-zinc-500">Plan de résolution</Label>
-                                                                <Textarea 
-                                                                    value={complaintDiscussions[c.id]?.resolution_plan || ''}
-                                                                    onChange={(e) => {
-                                                                        const val = e.target.value
-                                                                        setComplaintDiscussions(prev => ({
-                                                                            ...prev,
-                                                                            [c.id]: { ...prev[c.id], resolution_plan: val }
-                                                                        }))
-                                                                    }}
-                                                                    placeholder="Plan d'action pour résoudre le problème..." 
-                                                                    rows={2} 
-                                                                    className="bg-[#121318] border-zinc-800 text-[16px] md:text-xs text-white" 
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <input 
-                                                                type="checkbox"
-                                                                id={`resolve-${c.id}`}
-                                                                checked={!!complaintDiscussions[c.id]?.resolved_in_meeting}
-                                                                onChange={(e) => {
-                                                                    const resolved_in_meeting = e.target.checked
-                                                                    setComplaintDiscussions(prev => ({
-                                                                        ...prev,
-                                                                        [c.id]: { ...prev[c.id], resolved_in_meeting }
-                                                                    }))
-                                                                }}
-                                                                className="rounded border-zinc-800 text-emerald-600 h-4 w-4"
+                                                {(isChecked || reviewedAuditsState[a.id]?.my_notes || reviewedAuditsState[a.id]?.manager_notes) && (
+                                                    <div className="grid grid-cols-1 gap-2 pt-2 border-t border-zinc-850 animate-in fade-in duration-200">
+                                                        <div className="space-y-0.5">
+                                                            <Label className="text-zinc-500 text-[8px]">Ce que j'ai dit (Notes Direction)</Label>
+                                                            <Input 
+                                                                value={reviewedAuditsState[a.id]?.my_notes || ''} 
+                                                                onChange={(e) => setReviewedAuditsState(prev => ({ ...prev, [a.id]: { ...prev[a.id], my_notes: e.target.value } }))} 
+                                                                disabled={!isEditing}
+                                                                className="bg-[#121318] border-zinc-850 h-7 text-xxs" 
                                                             />
-                                                            <label htmlFor={`resolve-${c.id}`} className="text-zinc-400 cursor-pointer font-semibold text-[10px] hover:text-zinc-200 select-none">
-                                                                Marquer comme résolue à l'issue de cette rencontre
-                                                            </label>
+                                                        </div>
+                                                        <div className="space-y-0.5">
+                                                            <Label className="text-zinc-500 text-[8px]">Ce que le gestionnaire a dit</Label>
+                                                            <Input 
+                                                                value={reviewedAuditsState[a.id]?.manager_notes || ''} 
+                                                                onChange={(e) => setReviewedAuditsState(prev => ({ ...prev, [a.id]: { ...prev[a.id], manager_notes: e.target.value } }))} 
+                                                                disabled={!isEditing}
+                                                                className="bg-[#121318] border-zinc-850 h-7 text-xxs" 
+                                                            />
                                                         </div>
                                                     </div>
                                                 )}
@@ -969,195 +998,662 @@ export function OneOnOneDetailView({
                                     })}
                                 </div>
                             )}
-                        </CardContent>
-                    </Card>
+                        </div>
 
-                    {/* Discussions & Notes */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                            <CardHeader>
-                                <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-                                    <ClipboardList className="h-4 w-4 text-purple-400" />
-                                    Thématiques de Discussion
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4 text-xs">
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Succès & Bonnes Coups</Label>
-                                    <Textarea value={recentWins} onChange={(e) => setRecentWins(e.target.value)} placeholder="Décrire les réussites..." rows={3} className="bg-[#121318] border-zinc-800 text-[16px] md:text-xs text-white" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Difficultés Opérationnelles</Label>
-                                    <Textarea value={difficultSituations} onChange={(e) => setDifficultSituations(e.target.value)} placeholder="Difficultés rencontrées..." rows={3} className="bg-[#121318] border-zinc-800 text-[16px] md:text-xs text-white" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Points & Dossiers Critiques</Label>
-                                    <Textarea value={currentIssues} onChange={(e) => setCurrentIssues(e.target.value)} placeholder="Problématiques à surveiller..." rows={3} className="bg-[#121318] border-zinc-800 text-[16px] md:text-xs text-white" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Objectifs de la Rencontre</Label>
-                                    <Textarea value={mainObjectives} onChange={(e) => setMainObjectives(e.target.value)} placeholder="Quels sont les buts ciblés..." rows={3} className="bg-[#121318] border-zinc-800 text-[16px] md:text-xs text-white" />
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                            <CardHeader>
-                                <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-                                    <AlertCircle className="h-4 w-4 text-purple-400" />
-                                    Priorités & Besoins de Support
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4 text-xs">
-                                {/* 3 Priorities */}
-                                <div className="space-y-3 p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl">
-                                    <h4 className="font-bold text-purple-400 uppercase tracking-wider text-[9px]">Les 3 Prochaines Priorités</h4>
-                                    <div className="space-y-2">
-                                        <div className="flex items-center gap-2">
-                                            <Badge className="bg-purple-900/30 text-purple-400 border border-purple-800 font-bold text-[9px]">P1</Badge>
-                                            <Input value={priority1} onChange={(e) => setPriority1(e.target.value)} placeholder="Première priorité..." className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Badge className="bg-purple-900/30 text-purple-400 border border-purple-800 font-bold text-[9px]">P2</Badge>
-                                            <Input value={priority2} onChange={(e) => setPriority2(e.target.value)} placeholder="Deuxième priorité..." className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Badge className="bg-purple-900/30 text-purple-400 border border-purple-800 font-bold text-[9px]">P3</Badge>
-                                            <Input value={priority3} onChange={(e) => setPriority3(e.target.value)} placeholder="Troisième priorité..." className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Support fields */}
-                                <div className="space-y-2">
-                                    <div className="space-y-1">
-                                        <Label className="text-zinc-500">Demandes de Formation / Mentorat</Label>
-                                        <Input value={trainingRequested} onChange={(e) => setTrainingRequested(e.target.value)} placeholder="Formations suggérées..." className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-zinc-500">Sujets à Escalader à la Direction</Label>
-                                        <Input value={escalationNeeded} onChange={(e) => setEscalationNeeded(e.target.value)} placeholder="Dossiers nécessitant une intervention..." className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-zinc-500">Bloqueurs Opérationnels Processus / Outils</Label>
-                                        <Input value={operationalBlockers} onChange={(e) => setOperationalBlockers(e.target.value)} placeholder="Outils ou processus inefficaces..." className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-zinc-500">Médiations / Conflits clients</Label>
-                                        <Input value={conflictResolution} onChange={(e) => setConflictResolution(e.target.value)} placeholder="Médiation client ou conseil..." className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Commitments list editor */}
-                    <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                        <CardHeader>
-                            <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-                                <CheckCircle2 className="h-4 w-4 text-purple-400" />
-                                Suivi des Engagements
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4 text-xs">
-                            {/* Existing commitments table */}
-                            {meetingCommitments.length > 0 && (
-                                <div className="overflow-x-auto border-b border-zinc-850 pb-4">
-                                    <table className="w-full text-left text-xs text-zinc-300">
-                                        <thead className="bg-zinc-950/40 text-zinc-400 font-bold border-b border-zinc-800">
-                                            <tr>
-                                                <th className="p-3 w-1/3">Engagement</th>
-                                                <th className="p-3 text-center w-20">Complété</th>
-                                                <th className="p-3">Raison d'Échec</th>
-                                                <th className="p-3">Explication</th>
-                                                <th className="p-3 text-center">Reporté ?</th>
-                                                <th className="p-3 text-right w-16">Supprimer</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-zinc-850">
-                                            {meetingCommitments.map((c, idx) => (
-                                                <tr key={idx} className="hover:bg-zinc-900/10">
-                                                    <td className="p-3 font-semibold text-zinc-200">
-                                                        {c.commitment_text}
-                                                    </td>
-                                                    <td className="p-3 text-center">
+                        {/* Assembly Evaluations */}
+                        <div className="p-4 bg-zinc-900/30 border border-zinc-850 rounded-xl space-y-3">
+                            <span className="font-bold text-zinc-200 uppercase text-[9px] tracking-wider block border-b border-zinc-800 pb-1.5">Évaluations d'Assemblées Récentes ({assemblyEvaluations.length})</span>
+                            {assemblyEvaluations.length === 0 ? (
+                                <p className="italic text-zinc-500 py-2">Aucune évaluation d'assemblée disponible.</p>
+                            ) : (
+                                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                                    {assemblyEvaluations.map(ae => {
+                                        const isChecked = !!reviewedAssembliesState[ae.id]?.checked
+                                        return (
+                                            <div key={ae.id} className="p-2.5 bg-zinc-950/20 border border-zinc-850 rounded-lg space-y-2">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <span className="font-bold text-zinc-300 block">{ae.clients?.company_name || ae.clients?.full_name || 'Syndicat'}</span>
+                                                        <span className="text-[8px] text-zinc-500">Date AGA: {new Date(ae.assembly_date).toLocaleDateString('fr-CA')}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
                                                         <input 
-                                                            type="checkbox" 
-                                                            checked={c.completed}
-                                                            onChange={(e) => handleCommitmentChange(idx, 'completed', e.target.checked)}
-                                                            className="rounded border-zinc-800 text-purple-600 h-4 w-4" 
+                                                            type="checkbox"
+                                                            checked={isChecked}
+                                                            onChange={(e) => {
+                                                                if (!isEditing) return
+                                                                const checked = e.target.checked
+                                                                setReviewedAssembliesState(prev => ({
+                                                                    ...prev,
+                                                                    [ae.id]: {
+                                                                        checked,
+                                                                        my_notes: prev[ae.id]?.my_notes || '',
+                                                                        manager_notes: prev[ae.id]?.manager_notes || ''
+                                                                    }
+                                                                }))
+                                                            }}
+                                                            disabled={!isEditing}
+                                                            className="rounded border-zinc-800 text-purple-600 h-4 w-4 cursor-pointer"
                                                         />
-                                                    </td>
-                                                    <td className="p-3">
-                                                        {!c.completed && (
-                                                            <select 
-                                                                value={c.failure_reason || 'Lack of organization'} 
-                                                                onChange={(e) => handleCommitmentChange(idx, 'failure_reason', e.target.value)}
-                                                                className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-1.5 text-zinc-300 outline-none text-[16px] md:text-[10px]"
-                                                            >
-                                                                <option value="Lack of organization">Manque d'organisation</option>
-                                                                <option value="Lack of training">Besoin de formation</option>
-                                                                <option value="Work overload">Surcharge de travail</option>
-                                                                <option value="Waiting on board">Attente après le CA</option>
-                                                                <option value="Waiting on supplier">Attente après fournisseur</option>
-                                                                <option value="Avoidance">Évitement de tâche</option>
-                                                                <option value="Prioritization issue">Problème de priorité</option>
-                                                                <option value="Process/system issue">Bloqueur système/procédure</option>
-                                                                <option value="External issue">Facteur externe</option>
-                                                            </select>
-                                                        )}
-                                                    </td>
-                                                    <td className="p-3">
-                                                        {!c.completed && (
+                                                    </div>
+                                                </div>
+
+                                                {(isChecked || reviewedAssembliesState[ae.id]?.my_notes || reviewedAssembliesState[ae.id]?.manager_notes) && (
+                                                    <div className="grid grid-cols-1 gap-2 pt-2 border-t border-zinc-850 animate-in fade-in duration-200">
+                                                        <div className="space-y-0.5">
+                                                            <Label className="text-zinc-500 text-[8px]">Ce que j'ai dit (Notes Direction)</Label>
                                                             <Input 
-                                                                placeholder="Détails expliquant le retard..." 
-                                                                value={c.why_not || ''}
-                                                                onChange={(e) => handleCommitmentChange(idx, 'why_not', e.target.value)}
-                                                                className="bg-[#121318] border-zinc-800 h-7 text-[16px] md:text-xs" 
+                                                                value={reviewedAssembliesState[ae.id]?.my_notes || ''} 
+                                                                onChange={(e) => setReviewedAssembliesState(prev => ({ ...prev, [ae.id]: { ...prev[ae.id], my_notes: e.target.value } }))} 
+                                                                disabled={!isEditing}
+                                                                className="bg-[#121318] border-zinc-850 h-7 text-xxs" 
                                                             />
-                                                        )}
-                                                    </td>
-                                                    <td className="p-3 text-center">
-                                                        <input 
-                                                            type="checkbox" 
-                                                            checked={c.carried_forward}
-                                                            onChange={(e) => handleCommitmentChange(idx, 'carried_forward', e.target.checked)}
-                                                            className="rounded border-zinc-800 text-purple-600 h-4 w-4" 
-                                                        />
-                                                    </td>
-                                                    <td className="p-3 text-right">
-                                                        <Button 
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            onClick={() => handleRemoveCommitment(idx)}
-                                                            className="h-6 w-6 p-0 hover:bg-zinc-850 text-rose-400"
-                                                        >
-                                                            <Trash2 className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                                        </div>
+                                                        <div className="space-y-0.5">
+                                                            <Label className="text-zinc-500 text-[8px]">Ce que le gestionnaire a dit</Label>
+                                                            <Input 
+                                                                value={reviewedAssembliesState[ae.id]?.manager_notes || ''} 
+                                                                onChange={(e) => setReviewedAssembliesState(prev => ({ ...prev, [ae.id]: { ...prev[ae.id], manager_notes: e.target.value } }))} 
+                                                                disabled={!isEditing}
+                                                                className="bg-[#121318] border-zinc-850 h-7 text-xxs" 
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
                                 </div>
                             )}
+                        </div>
+                    </div>
 
-                            {/* Add new commitment */}
-                            <div className="flex gap-2">
-                                <Input 
-                                    value={newCommitmentText} 
-                                    onChange={(e) => setNewCommitmentText(e.target.value)}
-                                    placeholder="Ajouter un engagement pris lors de cette séance..." 
-                                    className="bg-[#121318] border-zinc-800 h-9 text-[16px] md:text-xs text-white flex-1" 
-                                />
+                    {/* Part B: Complaints review */}
+                    <div className="p-4 bg-zinc-900/30 border border-zinc-850 rounded-xl space-y-3">
+                        <span className="font-bold text-zinc-200 uppercase text-[9px] tracking-wider block border-b border-zinc-800 pb-1.5">Revue des Plaintes Actives ({managerComplaints.length})</span>
+                        {managerComplaints.length === 0 ? (
+                            <p className="italic text-zinc-500 py-1 text-center">Aucune plainte active.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {managerComplaints.map(c => {
+                                    const isChecked = !!reviewedComplaintsState[c.id]?.checked
+                                    const clientName = c.clients ? (c.clients.company_name || c.clients.full_name) : 'Copropriété'
+                                    const catLabel = c.complaint_categories?.name || 'Général'
+                                    const sevColors = c.severity === 'critical' ? 'bg-rose-950/30 text-rose-400 border-rose-900/40 font-bold' : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+
+                                    return (
+                                        <div key={c.id} className="p-3 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-2">
+                                            <div className="flex justify-between items-start gap-2">
+                                                <div className="space-y-0.5">
+                                                    <span className="font-bold text-zinc-200 text-xs block">{c.title}</span>
+                                                    <span className="text-zinc-500 text-[8px]">
+                                                        Syndicat: <strong className="text-zinc-400">{clientName}</strong> · Catégorie: <strong className="text-purple-400">{catLabel}</strong>
+                                                    </span>
+                                                    {c.description && <p className="text-zinc-400 text-[8px] bg-zinc-950/40 p-1.5 rounded border border-zinc-900 mt-1 max-w-2xl">{c.description}</p>}
+                                                </div>
+                                                <div className="flex gap-2 items-center">
+                                                    <Badge variant="outline" className={`text-[8px] font-bold ${sevColors}`}>{c.severity}</Badge>
+                                                    <Button 
+                                                        onClick={() => handleShowComplaintHistory(c)}
+                                                        variant="outline" 
+                                                        className="h-6 px-2 bg-zinc-900 border-zinc-850 hover:bg-zinc-800 text-[8px] font-bold text-purple-400 flex items-center gap-1 shrink-0"
+                                                    >
+                                                        <Search className="h-2.5 w-2.5" />
+                                                        Voir Historique
+                                                    </Button>
+                                                    <input 
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        onChange={(e) => {
+                                                            if (!isEditing) return
+                                                            const checked = e.target.checked
+                                                            setReviewedComplaintsState(prev => ({
+                                                                ...prev,
+                                                                [c.id]: {
+                                                                    checked,
+                                                                    my_notes: prev[c.id]?.my_notes || '',
+                                                                    manager_notes: prev[c.id]?.manager_notes || '',
+                                                                    resolved_in_meeting: prev[c.id]?.resolved_in_meeting || false
+                                                                }
+                                                            }))
+                                                        }}
+                                                        disabled={!isEditing}
+                                                        className="rounded border-zinc-800 text-purple-600 h-4.5 w-4.5 cursor-pointer shrink-0"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {(isChecked || reviewedComplaintsState[c.id]?.my_notes || reviewedComplaintsState[c.id]?.manager_notes) && (
+                                                <div className="pl-6 space-y-3 pt-2 border-t border-zinc-850/60 animate-in fade-in duration-200">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                        <div className="space-y-0.5">
+                                                            <Label className="text-zinc-500 text-[8px]">Notes de discussion (Ce que j'ai dit)</Label>
+                                                            <Input 
+                                                                value={reviewedComplaintsState[c.id]?.my_notes || ''} 
+                                                                onChange={(e) => setReviewedComplaintsState(prev => ({ ...prev, [c.id]: { ...prev[c.id], my_notes: e.target.value } }))} 
+                                                                disabled={!isEditing}
+                                                                className="bg-[#121318] border-zinc-850 h-7 text-xxs" 
+                                                                placeholder="Qu'est-ce qui a été dit..."
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-0.5">
+                                                            <Label className="text-zinc-500 text-[8px]">Plan d'action / Ce que le gestionnaire a dit</Label>
+                                                            <Input 
+                                                                value={reviewedComplaintsState[c.id]?.manager_notes || ''} 
+                                                                onChange={(e) => setReviewedComplaintsState(prev => ({ ...prev, [c.id]: { ...prev[c.id], manager_notes: e.target.value } }))} 
+                                                                disabled={!isEditing}
+                                                                className="bg-[#121318] border-zinc-850 h-7 text-xxs" 
+                                                                placeholder="Plan de résolution..."
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <input 
+                                                            type="checkbox"
+                                                            id={`resolve-${c.id}`}
+                                                            checked={!!reviewedComplaintsState[c.id]?.resolved_in_meeting}
+                                                            onChange={(e) => {
+                                                                if (!isEditing) return
+                                                                const resolved_in_meeting = e.target.checked
+                                                                setReviewedComplaintsState(prev => ({
+                                                                    ...prev,
+                                                                    [c.id]: { ...prev[c.id], resolved_in_meeting }
+                                                                }))
+                                                            }}
+                                                            disabled={!isEditing}
+                                                            className="rounded border-zinc-800 text-emerald-600 h-3.5 w-3.5 cursor-pointer"
+                                                        />
+                                                        <label htmlFor={`resolve-${c.id}`} className="text-zinc-400 font-semibold cursor-pointer text-[9px] hover:text-zinc-200 select-none">
+                                                            Marquer comme résolue à l'issue de cette rencontre
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Part C: Task & Email Auditing */}
+                    <div className="p-4 bg-zinc-900/30 border border-zinc-850 rounded-xl space-y-4">
+                        <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
+                            <span className="font-bold text-zinc-200 uppercase text-[9px] tracking-wider block">Audits Tâches & Courriels du Gestionnaire ({taskEmailAudits.length})</span>
+                            {isEditing && (
                                 <Button 
-                                    onClick={handleAddCommitment}
-                                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold h-9 px-4 rounded-lg flex items-center gap-1.5"
+                                    onClick={() => setShowAuditForm(!showAuditForm)}
+                                    className="h-6 px-3 bg-purple-600 hover:bg-purple-700 text-white text-[8px] font-bold flex items-center gap-1"
                                 >
-                                    <PlusCircle className="h-4 w-4" />
-                                    Ajouter
+                                    <PlusCircle className="h-3 w-3" />
+                                    {showAuditForm ? 'Annuler' : 'Ajouter un Audit'}
+                                </Button>
+                            )}
+                        </div>
+
+                        {showAuditForm && (
+                            <div className="p-3 bg-zinc-950/40 border border-zinc-800 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-200">
+                                <div className="space-y-2">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="space-y-0.5">
+                                            <Label className="text-zinc-500">Type d'Audit</Label>
+                                            <select 
+                                                value={newAuditType} 
+                                                onChange={(e) => setNewAuditType(e.target.value as any)}
+                                                className="w-full bg-[#121318] border border-zinc-800 rounded p-1.5 text-white outline-none h-7 text-xxs"
+                                            >
+                                                <option value="task">Tâche</option>
+                                                <option value="email">Courriel</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-0.5">
+                                            <Label className="text-zinc-500">Copropriété (Syndicat)</Label>
+                                            <Input 
+                                                placeholder="Nom du syndicat..." 
+                                                value={newAuditClientId} 
+                                                onChange={(e) => setNewAuditClientId(e.target.value)} 
+                                                className="bg-[#121318] border-zinc-800 h-7 text-xxs text-white" 
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <Label className="text-zinc-500">{newAuditType === 'task' ? 'Nom de la Tâche' : 'Sujet du Courriel'}</Label>
+                                        <Input 
+                                            placeholder={newAuditType === 'task' ? "ex: Réparer porte garage..." : "ex: Demande de soumission..."} 
+                                            value={newAuditTitle} 
+                                            onChange={(e) => setNewAuditTitle(e.target.value)} 
+                                            className="bg-[#121318] border-zinc-800 h-7 text-xxs text-white" 
+                                            required
+                                        />
+                                    </div>
+
+                                    {newAuditType === 'task' && (
+                                        <div className="grid grid-cols-2 gap-2 pt-1">
+                                            <div className="space-y-0.5">
+                                                <Label className="text-zinc-500">Date de création</Label>
+                                                <Input 
+                                                    type="date"
+                                                    value={newAuditCreatedDate} 
+                                                    onChange={(e) => setNewAuditCreatedDate(e.target.value)} 
+                                                    className="bg-[#121318] border-zinc-800 h-7 text-xxs text-white" 
+                                                />
+                                            </div>
+                                            <div className="space-y-0.5">
+                                                <Label className="text-zinc-500">Complexité</Label>
+                                                <select 
+                                                    value={newAuditComplexity} 
+                                                    onChange={(e) => setNewAuditComplexity(e.target.value as any)}
+                                                    className="w-full bg-[#121318] border border-zinc-800 rounded p-1.5 text-white outline-none h-7 text-xxs"
+                                                >
+                                                    <option value="low">Faible (Low)</option>
+                                                    <option value="medium">Moyenne (Medium)</option>
+                                                    <option value="high">Élevée (High)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="space-y-2 flex flex-col justify-between">
+                                    {newAuditType === 'task' ? (
+                                        <div className="space-y-1.5 pt-1">
+                                            <Label className="text-zinc-500 block mb-1">Critères d'évaluation de la Tâche:</Label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <label className="flex items-center gap-1.5 text-zinc-300 font-semibold cursor-pointer">
+                                                    <input type="checkbox" checked={newAuditFollowUp} onChange={(e) => setNewAuditFollowUp(e.target.checked)} className="rounded border-zinc-800 text-purple-600 h-3.5 w-3.5" />
+                                                    Date de suivi ?
+                                                </label>
+                                                <label className="flex items-center gap-1.5 text-zinc-300 font-semibold cursor-pointer">
+                                                    <input type="checkbox" checked={newAuditDesc} onChange={(e) => setNewAuditDesc(e.target.checked)} className="rounded border-zinc-800 text-purple-600 h-3.5 w-3.5" />
+                                                    Description correcte ?
+                                                </label>
+                                                <label className="flex items-center gap-1.5 text-zinc-300 font-semibold cursor-pointer">
+                                                    <input type="checkbox" checked={newAuditActions} onChange={(e) => setNewAuditActions(e.target.checked)} className="rounded border-zinc-800 text-purple-600 h-3.5 w-3.5" />
+                                                    Actions définies ?
+                                                </label>
+                                                <label className="flex items-center gap-1.5 text-zinc-300 font-semibold cursor-pointer">
+                                                    <input type="checkbox" checked={newAuditCatSelected} onChange={(e) => setNewAuditCatSelected(e.target.checked)} className="rounded border-zinc-800 text-purple-600 h-3.5 w-3.5" />
+                                                    Catégorie OK ?
+                                                </label>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-[10px] text-zinc-400 italic pt-1">
+                                            L'audit de courriel évalue la qualité de la réponse et le délai cible.
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-0.5">
+                                        <Label className="text-zinc-500">Rétroaction / Remarques d'Audit</Label>
+                                        <Input 
+                                            placeholder="Indiquer les correctifs à apporter..." 
+                                            value={newAuditNotes} 
+                                            onChange={(e) => setNewAuditNotes(e.target.value)} 
+                                            className="bg-[#121318] border-zinc-800 h-7 text-xxs text-white" 
+                                        />
+                                    </div>
+                                    <Button 
+                                        onClick={handleAddTaskEmailAudit}
+                                        disabled={!newAuditTitle.trim()}
+                                        className="w-full bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold h-7 rounded"
+                                    >
+                                        Valider l'Audit de Tâche/Courriel
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
+                        {taskEmailAudits.length === 0 ? (
+                            <p className="text-zinc-500 italic py-1 text-center">Aucun audit effectué.</p>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                                {taskEmailAudits.map((a, idx) => (
+                                    <div key={idx} className="p-3 bg-zinc-950/20 border border-zinc-800 rounded-xl relative space-y-2">
+                                        {isEditing && (
+                                            <Button 
+                                                onClick={() => handleRemoveTaskEmailAudit(idx)}
+                                                variant="ghost" 
+                                                className="h-5 w-5 p-0 absolute top-2 right-2 text-zinc-500 hover:text-rose-500 hover:bg-transparent"
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </Button>
+                                        )}
+
+                                        <div className="flex items-center gap-1.5">
+                                            <Badge variant="outline" className={a.type === 'task' ? 'bg-cyan-950/20 text-cyan-400 border-cyan-800/40 text-[7px]' : 'bg-amber-950/20 text-amber-400 border-amber-800/40 text-[7px]'}>
+                                                {a.type === 'task' ? 'Tâche' : 'Courriel'}
+                                            </Badge>
+                                            <span className="font-bold text-zinc-200 text-xxs truncate max-w-[80%]">{a.title}</span>
+                                        </div>
+                                        {a.client_id && <div className="text-[8px] text-zinc-500">Syndicat: <strong className="text-zinc-400">{a.client_id}</strong></div>}
+
+                                        {a.type === 'task' && (
+                                            <div className="grid grid-cols-2 gap-1 text-[7px] text-zinc-400 pt-1 border-t border-zinc-900">
+                                                <div>Suivi: <strong className={a.has_followup_date ? 'text-emerald-400' : 'text-rose-400'}>{a.has_followup_date ? 'Oui' : 'Non'}</strong></div>
+                                                <div>Description: <strong className={a.has_good_description ? 'text-emerald-400' : 'text-rose-400'}>{a.has_good_description ? 'Oui' : 'Non'}</strong></div>
+                                                <div>Actions: <strong className={a.has_actions ? 'text-emerald-400' : 'text-rose-400'}>{a.has_actions ? 'Oui' : 'Non'}</strong></div>
+                                                <div>Catégorie: <strong className={a.has_category_selected ? 'text-emerald-400' : 'text-rose-400'}>{a.has_category_selected ? 'Oui' : 'Non'}</strong></div>
+                                                {a.complexity && <div className="col-span-2">Complexité: <strong className="text-zinc-300 capitalize">{a.complexity}</strong></div>}
+                                            </div>
+                                        )}
+
+                                        {a.review_notes && (
+                                            <div className="bg-zinc-950/40 p-1.5 rounded text-[8px] text-zinc-400 border border-zinc-900 leading-normal">
+                                                <strong>Notes:</strong> {a.review_notes}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* SECTION 4: Active Operational Risks */}
+            <Card className="bg-[#16171e]/70 border-zinc-800 shadow-md">
+                <CardHeader className="pb-3">
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                            <ShieldAlert className="h-4.5 w-4.5 text-purple-400" />
+                            4. Suivi des Risques Opérationnels Actifs ({operationalRisks.filter(r => r.status === 'active').length})
+                        </CardTitle>
+                        {isEditing && (
+                            <Button 
+                                onClick={() => setShowRiskForm(!showRiskForm)}
+                                className="h-6 px-3 bg-purple-600 hover:bg-purple-700 text-white text-[8px] font-bold flex items-center gap-1"
+                            >
+                                <PlusCircle className="h-3 w-3" />
+                                {showRiskForm ? 'Annuler' : 'Signaler un Risque'}
+                            </Button>
+                        )}
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4 text-xxs">
+                    {showRiskForm && (
+                        <div className="p-3 bg-zinc-950/40 border border-zinc-800 rounded-xl grid grid-cols-1 md:grid-cols-3 gap-3 items-end animate-in slide-in-from-top-1 duration-200">
+                            <div className="md:col-span-2 space-y-1">
+                                <Label className="text-zinc-500">Description du Risque Opérationnel</Label>
+                                <Input 
+                                    placeholder="ex: Risque de perte du syndicat X dû à un manque de communication..." 
+                                    value={newRiskDesc} 
+                                    onChange={(e) => setNewRiskDesc(e.target.value)} 
+                                    className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" 
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Gravité</Label>
+                                    <select 
+                                        value={newRiskSeverity} 
+                                        onChange={(e) => setNewRiskSeverity(e.target.value as any)}
+                                        className="w-full bg-[#121318] border border-zinc-800 rounded p-1.5 text-white outline-none h-8 text-xxs"
+                                    >
+                                        <option value="low">Faible (Low)</option>
+                                        <option value="medium">Moyen (Medium)</option>
+                                        <option value="high">Élevé (High)</option>
+                                        <option value="critical">Critique (Critical)</option>
+                                    </select>
+                                </div>
+                                <Button 
+                                    onClick={handleAddRisk}
+                                    disabled={!newRiskDesc.trim()}
+                                    className="bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold h-8 rounded shrink-0"
+                                >
+                                    Valider
                                 </Button>
                             </div>
+                        </div>
+                    )}
+
+                    {operationalRisks.length === 0 ? (
+                        <p className="text-zinc-500 italic text-center py-2">Aucun risque enregistré.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {operationalRisks.map((r, idx) => {
+                                const sevBadge = 
+                                    r.severity === 'critical' ? 'bg-rose-950/20 text-rose-400 border-rose-800/40 font-bold' :
+                                    r.severity === 'high' ? 'bg-orange-950/20 text-orange-400 border-orange-800/40 font-bold' :
+                                    r.severity === 'medium' ? 'bg-amber-950/20 text-amber-400 border-amber-800/40 font-bold' :
+                                    'bg-zinc-900 text-zinc-400 border-zinc-800'
+
+                                return (
+                                    <div key={idx} className="p-3 bg-zinc-900/20 border border-zinc-850 rounded-xl flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="outline" className={`text-[8px] px-1.5 ${sevBadge}`}>{r.severity}</Badge>
+                                                <span className={r.status === 'resolved' ? 'line-through text-zinc-500 text-xs font-semibold' : 'text-zinc-200 text-xs font-semibold'}>{r.description}</span>
+                                            </div>
+                                            {r.status === 'resolved' && r.resolution_notes && (
+                                                <div className="text-[9px] text-zinc-400 bg-zinc-950/40 p-1.5 rounded border border-zinc-900 max-w-2xl">
+                                                    <strong>Résolution:</strong> {r.resolution_notes} {r.resolved_date && `(${r.resolved_date})`}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {r.status === 'active' && isEditing ? (
+                                            <div className="flex gap-2 items-center">
+                                                <Input 
+                                                    id={`risk-res-input-${idx}`}
+                                                    placeholder="Notes de résolution..." 
+                                                    className="bg-[#121318] border-zinc-800 h-7 text-xxs w-40 text-white" 
+                                                />
+                                                <Button 
+                                                    onClick={() => {
+                                                        const el = document.getElementById(`risk-res-input-${idx}`) as HTMLInputElement
+                                                        handleResolveRisk(idx, el?.value || 'Résolu en 1v1')
+                                                    }}
+                                                    className="h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                                                >
+                                                    Résoudre
+                                                </Button>
+                                            </div>
+                                        ) : r.status === 'active' ? (
+                                            <Badge variant="outline" className="bg-amber-950/20 text-amber-400 border-amber-800/40 font-bold text-[8px] shrink-0">Risque Actif</Badge>
+                                        ) : (
+                                            <Badge variant="outline" className="bg-emerald-950/20 text-emerald-400 border-emerald-800/40 font-bold text-[8px] self-start sm:self-center shrink-0">Risque Résolu</Badge>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* SECTION 5: Coaching & Support Section */}
+            <Card className="bg-[#16171e]/70 border-zinc-800 shadow-md">
+                <button 
+                    type="button"
+                    onClick={() => setCoachingOpen(!coachingOpen)}
+                    className="w-full flex justify-between items-center p-6 text-left border-none focus:outline-none"
+                >
+                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2 select-none">
+                        <Sliders className="h-4.5 w-4.5 text-purple-400" />
+                        5. Coaching & Rétroaction Support (Cliquable pour Développer)
+                    </CardTitle>
+                    {coachingOpen ? <ChevronUp className="h-4 w-4 text-zinc-400" /> : <ChevronDown className="h-4 w-4 text-zinc-400" />}
+                </button>
+                {coachingOpen && (
+                    <CardContent className="pt-2 border-t border-zinc-900/60 animate-in fade-in duration-200 text-xxs">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <Label className="text-zinc-500">Charge de Travail (Workload)</Label>
+                                <Textarea value={workloadNotes} onChange={(e) => setWorkloadNotes(e.target.value)} disabled={!isEditing} placeholder="Notes sur la charge de travail ressentie..." rows={2} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-zinc-500">Priorisation des dossiers (Prioritization)</Label>
+                                <Textarea value={prioritizationNotes} onChange={(e) => setPrioritizationNotes(e.target.value)} disabled={!isEditing} placeholder="Comment le gestionnaire gère ses priorités..." rows={2} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-zinc-500">Gestion du Stress (Stress & Mood)</Label>
+                                <Textarea value={stressNotes} onChange={(e) => setStressNotes(e.target.value)} disabled={!isEditing} placeholder="Observations sur le stress ou le moral..." rows={2} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-zinc-500">Organisation personnelle</Label>
+                                <Textarea value={organizationNotes} onChange={(e) => setOrganizationNotes(e.target.value)} disabled={!isEditing} placeholder="Notes sur la structure d'organisation..." rows={2} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-zinc-500">Support Requis de la Direction</Label>
+                                <Textarea value={supportNeeded} onChange={(e) => setSupportNeeded(e.target.value)} disabled={!isEditing} placeholder="Besoins de support spécifiques..." rows={2} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-zinc-500">Besoins en Formation / Mentorat</Label>
+                                <Textarea value={trainingNeeded} onChange={(e) => setTrainingNeeded(e.target.value)} disabled={!isEditing} placeholder="Formations ou accompagnement à prévoir..." rows={2} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                            </div>
+                        </div>
+                    </CardContent>
+                )}
+            </Card>
+
+            {/* SECTION 6: Agreed Actions Section */}
+            <Card className="bg-[#16171e]/70 border-zinc-800 shadow-md">
+                <CardHeader>
+                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                        <CheckCircle2 className="h-4.5 w-4.5 text-purple-400" />
+                        6. Plan d'Action & Engagements Réciproques (Moteur d'Alignement)
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-xxs">
+                    {/* Add action row */}
+                    {isEditing && (
+                        <div className="p-3 bg-zinc-950/40 border border-zinc-800 rounded-xl grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                            <div className="sm:col-span-2 space-y-1">
+                                <Label className="text-zinc-500">Action à Accomplir</Label>
+                                <Input 
+                                    placeholder="ex: Finaliser la soumission toiture de la copropriété..." 
+                                    value={newActionText} 
+                                    onChange={(e) => setNewActionText(e.target.value)} 
+                                    className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" 
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-zinc-500">Propriétaire</Label>
+                                <select 
+                                    value={newActionOwner} 
+                                    onChange={(e) => setNewActionOwner(e.target.value)}
+                                    className="w-full bg-[#121318] border border-zinc-800 rounded p-1.5 text-white outline-none h-8 text-xxs"
+                                >
+                                    <option value="Manager">Gestionnaire (Manager)</option>
+                                    <option value="Direction">Direction (Director)</option>
+                                    <option value="Gustav">Gustav Admin</option>
+                                </select>
+                            </div>
+                            <div className="space-y-1 flex flex-col justify-end">
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                    <input 
+                                        type="checkbox" 
+                                        id="next-rev-check"
+                                        checked={newActionNextReview} 
+                                        onChange={(e) => setNewActionNextReview(e.target.checked)} 
+                                        className="rounded border-zinc-800 text-purple-600 h-3.5 w-3.5 cursor-pointer" 
+                                    />
+                                    <label htmlFor="next-rev-check" className="text-zinc-400 font-semibold cursor-pointer select-none">
+                                        Prochaine rencontre
+                                    </label>
+                                </div>
+                                
+                                {!newActionNextReview ? (
+                                    <Input 
+                                        type="date"
+                                        value={newActionDueDate} 
+                                        onChange={(e) => setNewActionDueDate(e.target.value)} 
+                                        className="bg-[#121318] border-zinc-800 h-7 text-xxs text-white" 
+                                    />
+                                ) : (
+                                    <Button 
+                                        onClick={handleAddAgreedAction}
+                                        disabled={!newActionText.trim()}
+                                        className="bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold h-7 rounded w-full"
+                                    >
+                                        Créer l'Action
+                                    </Button>
+                                )}
+                            </div>
+                            
+                            {!newActionNextReview && (
+                                <div className="sm:col-span-4 flex justify-end">
+                                    <Button 
+                                        onClick={handleAddAgreedAction}
+                                        disabled={!newActionText.trim() || (!newActionDueDate && !newActionNextReview)}
+                                        className="bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold h-7 rounded w-28"
+                                    >
+                                        Créer l'Action
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Actions list */}
+                    {newAgreedActions.length === 0 ? (
+                        <p className="text-zinc-500 italic text-center py-2">Aucun nouvel engagement acté.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {newAgreedActions.map((a, idx) => (
+                                <div key={idx} className="p-3 bg-zinc-900/20 border border-zinc-850 rounded-xl flex justify-between items-center gap-3">
+                                    <div className="space-y-0.5">
+                                        <span className="text-zinc-200 text-xs font-semibold block">{a.commitment_text}</span>
+                                        <div className="flex gap-2 text-[8px] text-zinc-500">
+                                            <span>Propriétaire: <strong className="text-zinc-400">{a.owner}</strong></span>
+                                            <span>Échéance: <strong className="text-purple-400">{a.due_next_review ? 'Prochaine rencontre' : a.due_date}</strong></span>
+                                        </div>
+                                    </div>
+                                    {isEditing && (
+                                        <Button 
+                                            onClick={() => handleRemoveAgreedAction(idx)}
+                                            variant="ghost" 
+                                            className="h-6 w-6 p-0 text-zinc-500 hover:text-rose-500 hover:bg-transparent"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Complaint History Popup Modal */}
+            {historyPopupComplaint && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <Card className="bg-[#16171e] border-zinc-800 shadow-2xl max-w-xl w-full text-xxs text-zinc-300">
+                        <CardHeader className="border-b border-zinc-900/60 pb-3">
+                            <CardTitle className="text-sm font-bold text-white flex items-center justify-between">
+                                Historique par catégorie : {historyPopupComplaint.complaint_categories?.name}
+                                <Button 
+                                    onClick={() => setHistoryPopupComplaint(null)} 
+                                    variant="ghost" 
+                                    className="h-5 w-5 p-0 text-zinc-500 hover:text-zinc-200"
+                                >
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4 space-y-4">
+                            <p className="text-[10px] text-zinc-400">
+                                Historique des plaintes de même catégorie. Utile pour détecter les récurrences.
+                            </p>
+
+                            {loadingHistory ? (
+                                <p className="text-center italic text-zinc-500">Chargement de l'historique...</p>
+                            ) : complaintHistoryList.length === 0 ? (
+                                <p className="text-center italic text-zinc-500">Aucun historique similaire trouvé.</p>
+                            ) : (
+                                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                                    {complaintHistoryList.map(h => (
+                                        <div key={h.id} className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-lg space-y-1">
+                                            <div className="flex justify-between items-start">
+                                                <span className="font-bold text-zinc-200">{h.title}</span>
+                                                <Badge variant="outline" className="text-[7px] bg-zinc-950 font-bold">{h.status}</Badge>
+                                            </div>
+                                            <span className="text-[8px] text-zinc-500 block">Date: {h.received_date} · Copropriété: {h.clients?.company_name || h.clients?.full_name}</span>
+                                            {h.description && <p className="text-zinc-400 mt-1 leading-normal">{h.description}</p>}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>

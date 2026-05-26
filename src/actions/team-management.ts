@@ -626,8 +626,66 @@ export async function createOneOnOneAction(data: {
     escalation_needed: string
     operational_blockers: string
     conflict_resolution: string
-    commitments: Array<{ commitment_text: string; completed?: boolean; why_not?: string; failure_reason?: string; carried_forward?: boolean }>
-    complaints?: Array<{ complaint_id: string; discussion_notes: string; resolution_plan: string; resolved_in_meeting: boolean }>
+    workload_notes?: string
+    prioritization_notes?: string
+    stress_notes?: string
+    organization_notes?: string
+    support_needed?: string
+    training_needed?: string
+    meeting_score?: number
+    commitments?: Array<{
+        commitment_text: string
+        owner?: string
+        due_date?: string | null
+        due_next_review?: boolean
+        status?: string
+        notes?: string
+        completed?: boolean
+        why_not?: string
+        failure_reason?: string
+        carried_forward?: boolean
+    }>
+    complaints?: Array<{
+        complaint_id: string
+        discussion_notes?: string
+        resolution_plan?: string
+        resolved_in_meeting?: boolean
+        my_notes?: string
+        manager_notes?: string
+        reviewed?: boolean
+    }>
+    reviewedAudits?: Array<{
+        audit_id: string
+        my_notes?: string
+        manager_notes?: string
+        reviewed?: boolean
+    }>
+    reviewedAssemblies?: Array<{
+        assembly_evaluation_id: string
+        my_notes?: string
+        manager_notes?: string
+        reviewed?: boolean
+    }>
+    taskEmailAudits?: Array<{
+        type: 'task' | 'email'
+        title: string
+        client_id?: string | null
+        has_followup_date?: boolean
+        has_good_description?: boolean
+        has_actions?: boolean
+        has_category_selected?: boolean
+        task_created_date?: string | null
+        complexity?: 'low' | 'medium' | 'high' | null
+        review_notes?: string
+    }>
+    operationalRisks?: Array<{
+        id?: string
+        description: string
+        severity: 'low' | 'medium' | 'high' | 'critical'
+        status: 'active' | 'resolved'
+        resolution_notes?: string
+        resolved_date?: string | null
+    }>
 }) {
     const supabase = await createClient()
 
@@ -658,7 +716,14 @@ export async function createOneOnOneAction(data: {
             training_requested: data.training_requested,
             escalation_needed: data.escalation_needed,
             operational_blockers: data.operational_blockers,
-            conflict_resolution: data.conflict_resolution
+            conflict_resolution: data.conflict_resolution,
+            workload_notes: data.workload_notes || null,
+            prioritization_notes: data.prioritization_notes || null,
+            stress_notes: data.stress_notes || null,
+            organization_notes: data.organization_notes || null,
+            support_needed: data.support_needed || null,
+            training_needed: data.training_needed || null,
+            meeting_score: data.meeting_score || null
         })
         .select()
         .single()
@@ -670,6 +735,11 @@ export async function createOneOnOneAction(data: {
         const comms = data.commitments.map(c => ({
             one_on_one_id: meeting.id,
             commitment_text: c.commitment_text,
+            owner: c.owner || 'Manager',
+            due_date: c.due_date || null,
+            due_next_review: c.due_next_review || false,
+            status: c.status || 'Open',
+            notes: c.notes || null,
             completed: c.completed || false,
             why_not: c.why_not || null,
             failure_reason: (c.failure_reason as any) || null,
@@ -684,9 +754,12 @@ export async function createOneOnOneAction(data: {
         const compData = data.complaints.map(c => ({
             one_on_one_id: meeting.id,
             complaint_id: c.complaint_id,
-            discussion_notes: c.discussion_notes || null,
+            discussion_notes: c.discussion_notes || c.my_notes || null,
             resolution_plan: c.resolution_plan || null,
-            resolved_in_meeting: c.resolved_in_meeting || false
+            resolved_in_meeting: c.resolved_in_meeting || false,
+            my_notes: c.my_notes || null,
+            manager_notes: c.manager_notes || null,
+            reviewed: c.reviewed || false
         }))
         const { error: compErr } = await supabase.from('one_on_one_complaints').insert(compData)
         if (compErr) throw new Error(compErr.message)
@@ -701,6 +774,81 @@ export async function createOneOnOneAction(data: {
                         resolved_date: data.meeting_date
                     })
                     .eq('id', c.complaint_id)
+            }
+        }
+    }
+
+    // Insert Reviewed Audits
+    if (data.reviewedAudits && data.reviewedAudits.length > 0) {
+        const auditData = data.reviewedAudits.map(a => ({
+            one_on_one_id: meeting.id,
+            audit_id: a.audit_id,
+            my_notes: a.my_notes || null,
+            manager_notes: a.manager_notes || null,
+            reviewed: a.reviewed || false
+        }))
+        const { error: auditErr } = await supabase.from('one_on_one_syndicate_audits').insert(auditData)
+        if (auditErr) throw new Error(auditErr.message)
+    }
+
+    // Insert Reviewed Assemblies
+    if (data.reviewedAssemblies && data.reviewedAssemblies.length > 0) {
+        const assemblyData = data.reviewedAssemblies.map(a => ({
+            one_on_one_id: meeting.id,
+            assembly_evaluation_id: a.assembly_evaluation_id,
+            my_notes: a.my_notes || null,
+            manager_notes: a.manager_notes || null,
+            reviewed: a.reviewed || false
+        }))
+        const { error: assErr } = await supabase.from('one_on_one_assemblies').insert(assemblyData)
+        if (assErr) throw new Error(assErr.message)
+    }
+
+    // Insert Task/Email Audits
+    if (data.taskEmailAudits && data.taskEmailAudits.length > 0) {
+        const auditData = data.taskEmailAudits.map(t => ({
+            one_on_one_id: meeting.id,
+            type: t.type,
+            title: t.title,
+            client_id: t.client_id || null,
+            has_followup_date: t.has_followup_date || false,
+            has_good_description: t.has_good_description || false,
+            has_actions: t.has_actions || false,
+            has_category_selected: t.has_category_selected || false,
+            task_created_date: t.task_created_date || null,
+            complexity: t.complexity || null,
+            review_notes: t.review_notes || null
+        }))
+        const { error: taskErr } = await supabase.from('one_on_one_task_email_audits').insert(auditData)
+        if (taskErr) throw new Error(taskErr.message)
+    }
+
+    // Insert/Update Operational Risks
+    if (data.operationalRisks && data.operationalRisks.length > 0) {
+        for (const r of data.operationalRisks) {
+            if (r.id) {
+                await supabase
+                    .from('manager_operational_risks')
+                    .update({
+                        description: r.description,
+                        severity: r.severity,
+                        status: r.status,
+                        resolution_notes: r.resolution_notes || null,
+                        resolved_date: r.resolved_date || null
+                    })
+                    .eq('id', r.id)
+            } else {
+                await supabase
+                    .from('manager_operational_risks')
+                    .insert({
+                        manager_id: data.manager_id,
+                        one_on_one_id: meeting.id,
+                        description: r.description,
+                        severity: r.severity,
+                        status: r.status,
+                        resolution_notes: r.resolution_notes || null,
+                        resolved_date: r.resolved_date || null
+                    })
             }
         }
     }
@@ -735,8 +883,67 @@ export async function updateOneOnOneAction(id: string, data: {
     escalation_needed: string
     operational_blockers: string
     conflict_resolution: string
-    commitments: Array<{ id?: string; commitment_text: string; completed?: boolean; why_not?: string; failure_reason?: string; carried_forward?: boolean }>
-    complaints?: Array<{ complaint_id: string; discussion_notes: string; resolution_plan: string; resolved_in_meeting: boolean }>
+    workload_notes?: string
+    prioritization_notes?: string
+    stress_notes?: string
+    organization_notes?: string
+    support_needed?: string
+    training_needed?: string
+    meeting_score?: number
+    commitments: Array<{
+        id?: string
+        commitment_text: string
+        owner?: string
+        due_date?: string | null
+        due_next_review?: boolean
+        status?: string
+        notes?: string
+        completed?: boolean
+        why_not?: string
+        failure_reason?: string
+        carried_forward?: boolean
+    }>
+    complaints?: Array<{
+        complaint_id: string
+        my_notes?: string
+        manager_notes?: string
+        reviewed?: boolean
+        resolved_in_meeting?: boolean
+        discussion_notes?: string
+        resolution_plan?: string
+    }>
+    reviewedAudits?: Array<{
+        audit_id: string
+        my_notes?: string
+        manager_notes?: string
+        reviewed?: boolean
+    }>
+    reviewedAssemblies?: Array<{
+        assembly_evaluation_id: string
+        my_notes?: string
+        manager_notes?: string
+        reviewed?: boolean
+    }>
+    taskEmailAudits?: Array<{
+        type: 'task' | 'email'
+        title: string
+        client_id?: string | null
+        has_followup_date?: boolean
+        has_good_description?: boolean
+        has_actions?: boolean
+        has_category_selected?: boolean
+        task_created_date?: string | null
+        complexity?: 'low' | 'medium' | 'high' | null
+        review_notes?: string
+    }>
+    operationalRisks?: Array<{
+        id?: string
+        description: string
+        severity: 'low' | 'medium' | 'high' | 'critical'
+        status: 'active' | 'resolved'
+        resolution_notes?: string
+        resolved_date?: string | null
+    }>
 }) {
     const supabase = await createClient()
 
@@ -773,14 +980,20 @@ export async function updateOneOnOneAction(id: string, data: {
             training_requested: data.training_requested,
             escalation_needed: data.escalation_needed,
             operational_blockers: data.operational_blockers,
-            conflict_resolution: data.conflict_resolution
+            conflict_resolution: data.conflict_resolution,
+            workload_notes: data.workload_notes || null,
+            prioritization_notes: data.prioritization_notes || null,
+            stress_notes: data.stress_notes || null,
+            organization_notes: data.organization_notes || null,
+            support_needed: data.support_needed || null,
+            training_needed: data.training_needed || null,
+            meeting_score: data.meeting_score || null
         })
         .eq('id', id)
 
     if (err) throw new Error(err.message)
 
     // Handle commitments sync
-    // Delete existing commitments that are not in the update payload
     const updatedCommitmentIds = data.commitments.map(c => c.id).filter(Boolean) as string[]
     if (updatedCommitmentIds.length > 0) {
         await supabase
@@ -805,7 +1018,12 @@ export async function updateOneOnOneAction(id: string, data: {
                     completed: c.completed || false,
                     why_not: c.why_not || null,
                     failure_reason: (c.failure_reason as any) || null,
-                    carried_forward: c.carried_forward || false
+                    carried_forward: c.carried_forward || false,
+                    owner: c.owner || 'Manager',
+                    due_date: c.due_date || null,
+                    due_next_review: c.due_next_review || false,
+                    status: c.status || 'Open',
+                    notes: c.notes || null
                 })
                 .eq('id', c.id)
         } else {
@@ -817,28 +1035,32 @@ export async function updateOneOnOneAction(id: string, data: {
                     completed: c.completed || false,
                     why_not: c.why_not || null,
                     failure_reason: (c.failure_reason as any) || null,
-                    carried_forward: c.carried_forward || false
+                    carried_forward: c.carried_forward || false,
+                    owner: c.owner || 'Manager',
+                    due_date: c.due_date || null,
+                    due_next_review: c.due_next_review || false,
+                    status: c.status || 'Open',
+                    notes: c.notes || null
                 })
         }
     }
 
     // Sync complaints discussions
-    // 1. Delete old complaints discussions for this meeting
     await supabase.from('one_on_one_complaints').delete().eq('one_on_one_id', id)
-
-    // 2. Insert updated complaints discussions
     if (data.complaints && data.complaints.length > 0) {
         const compData = data.complaints.map(c => ({
             one_on_one_id: id,
             complaint_id: c.complaint_id,
-            discussion_notes: c.discussion_notes || null,
+            discussion_notes: c.discussion_notes || c.my_notes || null,
             resolution_plan: c.resolution_plan || null,
-            resolved_in_meeting: c.resolved_in_meeting || false
+            resolved_in_meeting: c.resolved_in_meeting || false,
+            my_notes: c.my_notes || null,
+            manager_notes: c.manager_notes || null,
+            reviewed: c.reviewed || false
         }))
         const { error: compErr } = await supabase.from('one_on_one_complaints').insert(compData)
         if (compErr) throw new Error(compErr.message)
 
-        // Update complaint status in the database
         for (const c of data.complaints) {
             if (c.resolved_in_meeting) {
                 await supabase
@@ -848,16 +1070,98 @@ export async function updateOneOnOneAction(id: string, data: {
                         resolved_date: data.meeting_date
                     })
                     .eq('id', c.complaint_id)
-            } else {
-                // If it was resolved, reset to open if they unchecked it
+            }
+        }
+    }
+
+    // Sync reviewed syndicate audits
+    await supabase.from('one_on_one_syndicate_audits').delete().eq('one_on_one_id', id)
+    if (data.reviewedAudits && data.reviewedAudits.length > 0) {
+        const auditData = data.reviewedAudits.map(a => ({
+            one_on_one_id: id,
+            audit_id: a.audit_id,
+            my_notes: a.my_notes || null,
+            manager_notes: a.manager_notes || null,
+            reviewed: a.reviewed || false
+        }))
+        const { error: auditErr } = await supabase.from('one_on_one_syndicate_audits').insert(auditData)
+        if (auditErr) throw new Error(auditErr.message)
+    }
+
+    // Sync reviewed assemblies
+    await supabase.from('one_on_one_assemblies').delete().eq('one_on_one_id', id)
+    if (data.reviewedAssemblies && data.reviewedAssemblies.length > 0) {
+        const assemblyData = data.reviewedAssemblies.map(a => ({
+            one_on_one_id: id,
+            assembly_evaluation_id: a.assembly_evaluation_id,
+            my_notes: a.my_notes || null,
+            manager_notes: a.manager_notes || null,
+            reviewed: a.reviewed || false
+        }))
+        const { error: assErr } = await supabase.from('one_on_one_assemblies').insert(assemblyData)
+        if (assErr) throw new Error(assErr.message)
+    }
+
+    // Sync Task/Email audits
+    await supabase.from('one_on_one_task_email_audits').delete().eq('one_on_one_id', id)
+    if (data.taskEmailAudits && data.taskEmailAudits.length > 0) {
+        const auditData = data.taskEmailAudits.map(t => ({
+            one_on_one_id: id,
+            type: t.type,
+            title: t.title,
+            client_id: t.client_id || null,
+            has_followup_date: t.has_followup_date || false,
+            has_good_description: t.has_good_description || false,
+            has_actions: t.has_actions || false,
+            has_category_selected: t.has_category_selected || false,
+            task_created_date: t.task_created_date || null,
+            complexity: t.complexity || null,
+            review_notes: t.review_notes || null
+        }))
+        const { error: taskErr } = await supabase.from('one_on_one_task_email_audits').insert(auditData)
+        if (taskErr) throw new Error(taskErr.message)
+    }
+
+    // Sync Operational Risks
+    if (data.operationalRisks) {
+        const currentMeetingRiskIds = data.operationalRisks.map(r => r.id).filter(Boolean) as string[]
+        if (currentMeetingRiskIds.length > 0) {
+            await supabase
+                .from('manager_operational_risks')
+                .delete()
+                .eq('one_on_one_id', id)
+                .not('id', 'in', `(${currentMeetingRiskIds.join(',')})`)
+        } else {
+            await supabase
+                .from('manager_operational_risks')
+                .delete()
+                .eq('one_on_one_id', id)
+        }
+
+        for (const r of data.operationalRisks) {
+            if (r.id) {
                 await supabase
-                    .from('complaints')
+                    .from('manager_operational_risks')
                     .update({
-                        status: 'open',
-                        resolved_date: null
+                        description: r.description,
+                        severity: r.severity,
+                        status: r.status,
+                        resolution_notes: r.resolution_notes || null,
+                        resolved_date: r.resolved_date || null
                     })
-                    .eq('id', c.complaint_id)
-                    .eq('status', 'resolved') // Only reset if currently marked resolved
+                    .eq('id', r.id)
+            } else {
+                await supabase
+                    .from('manager_operational_risks')
+                    .insert({
+                        manager_id: oldMeeting?.manager_id,
+                        one_on_one_id: id,
+                        description: r.description,
+                        severity: r.severity,
+                        status: r.status,
+                        resolution_notes: r.resolution_notes || null,
+                        resolved_date: r.resolved_date || null
+                    })
             }
         }
     }
@@ -1039,13 +1343,66 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
     const supabase = await createClient()
     const stats = await getManagerStats(managerId)
 
-    // Fetch last completed 1v1 meeting for review
+    // Get manager's active clients
+    const { data: clients } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('manager_id', managerId)
+        .eq('status', 'active')
+    
+    const clientIds = (clients || []).map(c => c.id)
+
+    // Fetch monthly calls history
+    const { data: callsHistory } = await supabase
+        .from('manager_monthly_calls')
+        .select('*')
+        .eq('manager_id', managerId)
+        .order('year_month', { ascending: false })
+        .limit(2)
+
+    // Fetch monthly workload history
+    const { data: workloadHistory } = await supabase
+        .from('manager_monthly_workload')
+        .select('*')
+        .eq('manager_id', managerId)
+        .order('year_month', { ascending: false })
+        .limit(2)
+
+    // Calculate current bills without notes older than 7 days
+    let billsNoNotesCount = 0
+    let billsNoNotesCountPrev = 0
+    if (clientIds.length > 0) {
+        const sevenDaysAgo = new Date()
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+        const { data: currentOverdueBills } = await supabase
+            .from('bills')
+            .select('id, notes')
+            .in('client_id', clientIds)
+            .lt('bill_date', sevenDaysAgo.toISOString().substring(0, 10))
+        billsNoNotesCount = (currentOverdueBills || []).filter(b => !b.notes || b.notes.trim() === '').length
+
+        const thirtySevenDaysAgo = new Date()
+        thirtySevenDaysAgo.setDate(thirtySevenDaysAgo.getDate() - 37)
+        const { data: prevOverdueBills } = await supabase
+            .from('bills')
+            .select('id, notes')
+            .in('client_id', clientIds)
+            .lt('bill_date', thirtySevenDaysAgo.toISOString().substring(0, 10))
+        billsNoNotesCountPrev = (prevOverdueBills || []).filter(b => !b.notes || b.notes.trim() === '').length
+    }
+
+    // Fetch last completed 1v1 meeting for review and commitments
     const { data: lastMeetingList } = await supabase
         .from('one_on_ones')
         .select(`
             id,
             meeting_date,
             status,
+            emails_over_48h,
+            late_tasks,
+            calls_total,
+            calls_answered,
+            bills_no_notes_over_7d,
             current_issues,
             main_objectives,
             recent_wins,
@@ -1056,7 +1413,13 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
             training_requested,
             escalation_needed,
             operational_blockers,
-            conflict_resolution
+            conflict_resolution,
+            workload_notes,
+            prioritization_notes,
+            stress_notes,
+            organization_notes,
+            support_needed,
+            training_needed
         `)
         .eq('manager_id', managerId)
         .eq('status', 'completed')
@@ -1075,9 +1438,15 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         if (commitments) {
             lastMeetingCommitments = commitments
             pendingCommitments = commitments
-                .filter(c => !c.completed)
+                .filter(c => c.status !== 'Resolved' && !c.completed)
                 .map(c => ({
+                    id: c.id,
                     commitment_text: c.commitment_text,
+                    owner: c.owner || 'Manager',
+                    due_date: c.due_date || null,
+                    due_next_review: c.due_next_review || false,
+                    status: c.status || 'Open',
+                    notes: c.notes || '',
                     completed: false
                 }))
         }
@@ -1098,27 +1467,131 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         .eq('manager_id', managerId)
         .eq('status', 'open')
 
+    let openComplaintsPrev = 0
+    if (lastMeeting) {
+        const { count } = await supabase
+            .from('complaints')
+            .select('*', { count: 'exact', head: true })
+            .eq('manager_id', managerId)
+            .lte('received_date', lastMeeting.meeting_date)
+            .or(`resolved_date.gt.${lastMeeting.meeting_date},status.eq.open`)
+        openComplaintsPrev = count || 0
+    }
+
+    // Fetch syndicate audits for manager's clients for review
+    let syndicateAudits: any[] = []
+    if (clientIds.length > 0) {
+        const { data: audits } = await supabase
+            .from('syndicate_audits')
+            .select('*, clients(company_name, full_name)')
+            .in('client_id', clientIds)
+            .order('audit_date', { ascending: false })
+            .limit(5)
+        syndicateAudits = audits || []
+    }
+
+    // Fetch assembly evaluations for review
+    const { data: assemblies } = await supabase
+        .from('assembly_evaluations')
+        .select('*, clients(company_name, full_name)')
+        .eq('manager_id', managerId)
+        .order('assembly_date', { ascending: false })
+        .limit(5)
+
+    // Fetch operational risks for manager
+    const { data: risks } = await supabase
+        .from('manager_operational_risks')
+        .select('*')
+        .eq('manager_id', managerId)
+        .order('created_at', { ascending: false })
+
     return {
-        calls_total: stats?.totalCalls || 0,
-        calls_answered: stats?.answeredCalls || 0,
-        late_tasks: stats?.openTasks || 0,
-        op_reports_closed: stats?.closedTasks || 0,
-        syndicates_lost: stats?.lostYtd || 0,
-        package_changes: stats?.packageChangesCount || 0,
-        
-        // Live snapshot metrics
+        // Current metrics
+        calls_total: callsHistory?.[0]?.total_calls || stats?.totalCalls || 0,
+        calls_answered: callsHistory?.[0]?.answered_calls || stats?.answeredCalls || 0,
+        late_tasks: workloadHistory?.[0]?.open_tasks || stats?.openTasks || 0,
+        op_reports_closed: workloadHistory?.[0]?.closed_tasks || stats?.closedTasks || 0,
+        emails_received: workloadHistory?.[0]?.communications_received || stats?.communicationsReceived || 0,
+        bills_no_notes: billsNoNotesCount,
+        open_complaints_count: openComplaints?.length || 0,
+
+        // Previous metrics
+        calls_total_prev: callsHistory?.[1]?.total_calls || lastMeeting?.calls_total || 0,
+        calls_answered_prev: callsHistory?.[1]?.answered_calls || lastMeeting?.calls_answered || 0,
+        late_tasks_prev: workloadHistory?.[1]?.open_tasks || lastMeeting?.late_tasks || 0,
+        op_reports_closed_prev: workloadHistory?.[1]?.closed_tasks || 0,
+        emails_received_prev: workloadHistory?.[1]?.communications_received || 0,
+        bills_no_notes_prev: billsNoNotesCountPrev || lastMeeting?.bills_no_notes_over_7d || 0,
+        open_complaints_count_prev: openComplaintsPrev,
+
+        // Global stats
         quote_approval_rate: stats?.quoteApprovalRate || 0,
         doors_count: stats?.doorsCount || 0,
         syndicates_count: stats?.syndicatesCount || 0,
-        emails_received: stats?.communicationsReceived || 0,
-        
+        syndicates_lost: stats?.lostYtd || 0,
+        package_changes: stats?.packageChangesCount || 0,
+
         pendingCommitments,
         openComplaints: openComplaints || [],
+        syndicateAudits,
+        assemblyEvaluations: assemblies || [],
+        operationalRisks: risks || [],
         lastMeeting: lastMeeting ? {
             ...lastMeeting,
             commitments: lastMeetingCommitments
         } : null
     }
+}
+
+// Helpers for Redesigned 1v1 Features
+export async function getCategoryComplaintHistoryAction(managerId: string, categoryId: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('complaints')
+        .select('*, clients(company_name, full_name), complaint_categories(name)')
+        .eq('manager_id', managerId)
+        .eq('category_id', categoryId)
+        .order('received_date', { ascending: false })
+    if (error) throw new Error(error.message)
+    return data || []
+}
+
+export async function createOperationalRiskAction(data: {
+    manager_id: string
+    one_on_one_id?: string
+    description: string
+    severity: 'low' | 'medium' | 'high' | 'critical'
+}) {
+    const supabase = await createClient()
+    const { data: risk, error } = await supabase
+        .from('manager_operational_risks')
+        .insert({
+            manager_id: data.manager_id,
+            one_on_one_id: data.one_on_one_id || null,
+            description: data.description,
+            severity: data.severity,
+            status: 'active'
+        })
+        .select()
+        .single()
+    if (error) throw new Error(error.message)
+    return risk
+}
+
+export async function resolveOperationalRiskAction(id: string, notes: string) {
+    const supabase = await createClient()
+    const { data: risk, error } = await supabase
+        .from('manager_operational_risks')
+        .update({
+            status: 'resolved',
+            resolution_notes: notes,
+            resolved_date: new Date().toISOString().substring(0, 10)
+        })
+        .eq('id', id)
+        .select()
+        .single()
+    if (error) throw new Error(error.message)
+    return risk
 }
 
 // ==========================================
