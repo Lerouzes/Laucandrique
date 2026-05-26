@@ -23,6 +23,13 @@ export function Header({ user, profile }: { user: User, profile: Profile | null 
 
     const initials = profile?.full_name?.substring(0, 2).toUpperCase() || user.email?.substring(0, 2).toUpperCase() || 'U'
 
+    const getFrenchRoleLabel = (role: string) => {
+        if (role === 'Master') return 'Direction Générale'
+        if (role === 'Direction') return 'Direction'
+        if (role === 'Managers') return 'Gestionnaire d’Équipe'
+        return 'Opérations'
+    }
+
     return (
         <header className="flex h-16 items-center justify-between border-b border-white/20 bg-[#0f3f74]/70 backdrop-blur-md px-6">
             <div className="flex items-center gap-4 md:hidden">
@@ -42,7 +49,7 @@ export function Header({ user, profile }: { user: User, profile: Profile | null 
             <div className="flex items-center gap-4 ml-auto">
                 <div className="flex flex-col items-end">
                     <span className="text-sm font-medium text-white">{profile?.full_name || user.email}</span>
-                    <span className="text-xs text-white/75">{profile?.role === 'admin' ? 'Administrateur' : 'Employé'}</span>
+                    <span className="text-xs text-white/75">{getFrenchRoleLabel(profile?.role || 'Operations')}</span>
                 </div>
                 <Avatar className="h-9 w-9 border border-white/25">
                     <AvatarFallback className="bg-zinc-800 text-white font-medium">{initials}</AvatarFallback>
