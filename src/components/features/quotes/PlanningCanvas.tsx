@@ -89,6 +89,14 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
     const [canvasSize, setCanvasSize] = useState<'normal' | 'large'>('normal')
     const [draggedFeature, setDraggedFeature] = useState<{ p1Index: number; featureId: string } | null>(null)
     
+    // Zoom and pan states
+    const [zoom, setZoom] = useState<number>(1)
+    const [panX, setPanX] = useState<number>(0)
+    const [panY, setPanY] = useState<number>(0)
+    const [isPanning, setIsPanning] = useState<boolean>(false)
+    const [panStart, setPanStart] = useState<Point>({ x: 0, y: 0 })
+    const panDistance = useRef<number>(0)
+    
     const svgRef = useRef<SVGSVGElement>(null)
 
     const toDisplayVal = (feetVal: number) => {
@@ -104,6 +112,47 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
         setEditingSegmentIndex(null)
         setSegmentInputValues({})
     }, [points, unit])
+
+    // Handle CTRL/Cmd + wheel scroll zooming relative to cursor
+    useEffect(() => {
+        const svgEl = svgRef.current
+        if (!svgEl) return
+
+        const handleWheel = (e: WheelEvent) => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault()
+
+                const zoomFactor = 1.1
+                const delta = e.deltaY
+
+                const rect = svgEl.getBoundingClientRect()
+                const mouseX = e.clientX - rect.left
+                const mouseY = e.clientY - rect.top
+
+                const svgMouseX = (mouseX - panX) / zoom
+                const svgMouseY = (mouseY - panY) / zoom
+
+                let newZoom = zoom
+                if (delta < 0) {
+                    newZoom = Math.min(newZoom * zoomFactor, 8.0)
+                } else {
+                    newZoom = Math.max(newZoom / zoomFactor, 0.25)
+                }
+
+                const newPanX = mouseX - svgMouseX * newZoom
+                const newPanY = mouseY - svgMouseY * newZoom
+
+                setZoom(newZoom)
+                setPanX(newPanX)
+                setPanY(newPanY)
+            }
+        }
+
+        svgEl.addEventListener('wheel', handleWheel, { passive: false })
+        return () => {
+            svgEl.removeEventListener('wheel', handleWheel)
+        }
+    }, [zoom, panX, panY])
 
     const isClosed = points.length === 0 || points[0]?.isClosed !== false
 
@@ -122,10 +171,15 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
         // Round to nearest 5 pixels for subtle visual snapping
         const rawX = e.clientX - rect.left
         const rawY = e.clientY - rect.top
+        
+        // Convert screen pixels to transformed local coordinate space
+        const convertedX = (rawX - panX) / zoom
+        const convertedY = (rawY - panY) / zoom
+
         const snap = 5
         let coords = {
-            x: Math.round(rawX / snap) * snap,
-            y: Math.round(rawY / snap) * snap
+            x: Math.round(convertedX / snap) * snap,
+            y: Math.round(convertedY / snap) * snap
         }
 
         // Apply Ortho Snapping if orthoActive OR Shift key is pressed
@@ -145,6 +199,13 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
     }
 
     const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+        if (isPanning) {
+            setPanX(e.clientX - panStart.x)
+            setPanY(e.clientY - panStart.y)
+            panDistance.current += Math.abs(e.movementX) + Math.abs(e.movementY)
+            return
+        }
+
         const coords = getCoordinates(e)
         setMousePos(coords)
 
@@ -208,14 +269,27 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
     const handleTouchMove = (e: React.TouchEvent<SVGSVGElement>) => {
         if (e.touches.length === 0) return
         const touch = e.touches[0]
+        
+        if (isPanning && e.touches.length === 1) {
+            setPanX(touch.clientX - panStart.x)
+            setPanY(touch.clientY - panStart.y)
+            panDistance.current += 5 // Simulated move increment
+            return
+        }
+
         if (!svgRef.current) return
         const rect = svgRef.current.getBoundingClientRect()
         const rawX = touch.clientX - rect.left
         const rawY = touch.clientY - rect.top
+        
+        // Convert screen pixels to transformed local coordinate space
+        const convertedX = (rawX - panX) / zoom
+        const convertedY = (rawY - panY) / zoom
+
         const snap = 5
         const coords = {
-            x: Math.round(rawX / snap) * snap,
-            y: Math.round(rawY / snap) * snap
+            x: Math.round(convertedX / snap) * snap,
+            y: Math.round(convertedY / snap) * snap
         }
         setMousePos(coords)
 
@@ -269,9 +343,16 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
     const handleMouseUp = () => {
         setDraggedPointIndex(null)
         setDraggedFeature(null)
+        setIsPanning(false)
     }
 
     const handleCanvasClick = (e: React.MouseEvent<SVGSVGElement>) => {
+        // If they just finished a pan gesture, ignore click event
+        if (panDistance.current > 5) {
+            panDistance.current = 0
+            return
+        }
+
         if (mode !== 'draw') return
 
         const coords = getCoordinates(e)
@@ -304,6 +385,33 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
         }
 
         onChange([...points, coords])
+    }
+
+    const handleSvgMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+        const target = e.target as SVGElement
+        const isBackground = target.tagName === 'svg' || target.id === 'grid-bg'
+        
+        // Pan on middle-click, right-click, or left-click on background in edit mode or while holding zoom/ctrl key
+        const isSpaceOrCtrl = e.ctrlKey || e.metaKey || e.altKey || e.shiftKey
+        
+        if (isBackground && (mode === 'edit' || isSpaceOrCtrl || e.button === 1 || e.button === 2)) {
+            setIsPanning(true)
+            setPanStart({ x: e.clientX - panX, y: e.clientY - panY })
+            panDistance.current = 0
+            e.preventDefault()
+        }
+    }
+
+    const handleSvgTouchStart = (e: React.TouchEvent<SVGSVGElement>) => {
+        const target = e.target as SVGElement
+        const isBackground = target.tagName === 'svg' || target.id === 'grid-bg'
+        
+        if (isBackground && e.touches.length === 1) {
+            const touch = e.touches[0]
+            setIsPanning(true)
+            setPanStart({ x: touch.clientX - panX, y: touch.clientY - panY })
+            panDistance.current = 0
+        }
     }
 
     const deletePoint = (index: number) => {
@@ -617,6 +725,23 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {(zoom !== 1 || panX !== 0 || panY !== 0) && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                setZoom(1)
+                                setPanX(0)
+                                setPanY(0)
+                            }}
+                            className="border-zinc-800 text-cyan-400 hover:text-cyan-300 hover:border-cyan-900 h-8 animate-in fade-in zoom-in duration-200"
+                            title="Réinitialiser le zoom et le déplacement"
+                        >
+                            Reset Zoom 🔍
+                        </Button>
+                    )}
+
                     <Button
                         type="button"
                         variant="outline"
@@ -707,6 +832,8 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
                     onClick={handleCanvasClick}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleMouseUp}
+                    onMouseDown={handleSvgMouseDown}
+                    onTouchStart={handleSvgTouchStart}
                 >
                     {/* Grid Lines */}
                     <defs>
@@ -714,7 +841,11 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
                             <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#27272a" strokeWidth="0.5" />
                         </pattern>
                     </defs>
-                    <rect width="100%" height="100%" fill="url(#grid)" />
+
+                    {/* Transformed Group for zooming and panning */}
+                    <g transform={`translate(${panX}, ${panY}) scale(${zoom})`}>
+                        {/* Infinite Grid Background inside group so it scales with layout coordinates */}
+                        <rect id="grid-bg" x="-5000" y="-5000" width="10000" height="10000" fill="url(#grid)" />
 
                     {/* Polygon Room Fills / Polylines */}
                     {getPaths(points).map((path, pIdx) => {
@@ -1174,6 +1305,7 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
                             </text>
                         </g>
                     )}
+                    </g>
                 </svg>
 
                 {/* Empty State Instructions */}
