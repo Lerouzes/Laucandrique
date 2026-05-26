@@ -209,7 +209,7 @@ export function ComplaintsClientPage({
                             placeholder="Rechercher syndicat, titre..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="bg-[#121318] border-zinc-800 pl-8 h-8 text-xs text-white"
+                            className="bg-[#121318] border-zinc-800 pl-8 h-8 text-[16px] md:text-xs text-white"
                         />
                     </div>
 
@@ -217,7 +217,7 @@ export function ComplaintsClientPage({
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="bg-[#121318] border border-zinc-800 rounded-lg p-2 text-zinc-300 outline-none focus:border-purple-600 h-8"
+                        className="bg-[#121318] border border-zinc-800 rounded-lg p-2 text-zinc-300 outline-none focus:border-purple-600 h-8 text-[16px] md:text-xs"
                     >
                         <option value="all">Tous les Statuts</option>
                         <option value="open">En cours</option>
@@ -228,7 +228,7 @@ export function ComplaintsClientPage({
                     <select
                         value={severityFilter}
                         onChange={(e) => setSeverityFilter(e.target.value)}
-                        className="bg-[#121318] border border-zinc-800 rounded-lg p-2 text-zinc-300 outline-none focus:border-purple-600 h-8"
+                        className="bg-[#121318] border border-zinc-800 rounded-lg p-2 text-zinc-300 outline-none focus:border-purple-600 h-8 text-[16px] md:text-xs"
                     >
                         <option value="all">Toutes les Sévérités</option>
                         <option value="low">Sévérité : Faible</option>
@@ -241,7 +241,7 @@ export function ComplaintsClientPage({
                     <select
                         value={categoryFilter}
                         onChange={(e) => setCategoryFilter(e.target.value)}
-                        className="bg-[#121318] border border-zinc-800 rounded-lg p-2 text-zinc-300 outline-none focus:border-purple-600 h-8"
+                        className="bg-[#121318] border border-zinc-800 rounded-lg p-2 text-zinc-300 outline-none focus:border-purple-600 h-8 text-[16px] md:text-xs"
                     >
                         <option value="all">Toutes les Catégories</option>
                         {categories.map(c => (
@@ -254,7 +254,7 @@ export function ComplaintsClientPage({
                         <select
                             value={managerFilter}
                             onChange={(e) => setManagerFilter(e.target.value)}
-                            className="bg-[#121318] border border-zinc-800 rounded-lg p-2 text-zinc-300 outline-none focus:border-purple-600 h-8 flex-1"
+                            className="bg-[#121318] border border-zinc-800 rounded-lg p-2 text-zinc-300 outline-none focus:border-purple-600 h-8 flex-1 text-[16px] md:text-xs"
                         >
                             <option value="all">Tous les Gestionnaires</option>
                             {managers.map(m => (
@@ -392,29 +392,29 @@ export function ComplaintsClientPage({
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Gestionnaire Assigné</Label>
-                                    <select name="manager_id" className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-8" required>
+                                    <select name="manager_id" className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-8 text-[16px] md:text-xs" required>
                                         <option value="">Sélectionner un gestionnaire...</option>
                                         {managers?.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
                                     </select>
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Catégorie de la Plainte</Label>
-                                    <select name="category_id" className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-8" required>
+                                    <select name="category_id" className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-8 text-[16px] md:text-xs" required>
                                         <option value="">Sélectionner une catégorie...</option>
                                         {categories?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Sujet de la Plainte</Label>
-                                    <Input type="text" name="title" required placeholder="ex: Retards de PV..." className="bg-[#121318] border-zinc-800 h-8 text-white text-xs" />
+                                    <Input type="text" name="title" required placeholder="ex: Retards de PV..." className="bg-[#121318] border-zinc-800 h-8 text-white text-[16px] md:text-xs" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Description détaillée</Label>
-                                    <Textarea name="description" required placeholder="Expliquer le litige..." rows={3} className="bg-[#121318] border-zinc-800 text-white text-xs" />
+                                    <Textarea name="description" required placeholder="Expliquer le litige..." rows={3} className="bg-[#121318] border-zinc-800 text-white text-[16px] md:text-xs" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Niveau de Sévérité</Label>
-                                    <select name="severity" className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-8" required>
+                                    <select name="severity" className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-8 text-[16px] md:text-xs" required>
                                         <option value="low">Faible</option>
                                         <option value="medium">Moyenne</option>
                                         <option value="high">Élevée</option>

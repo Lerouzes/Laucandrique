@@ -174,7 +174,7 @@ export function NewAuditForm({
                             value={notes} 
                             onChange={(e) => setNotes(e.target.value)} 
                             placeholder="Observations globales sur ce dossier..." 
-                            className="bg-[#121318] border-zinc-800 h-9 text-xxs text-white" 
+                            className="bg-[#121318] border-zinc-800 h-9 text-[16px] md:text-xxs text-white" 
                         />
                     </div>
                 </CardContent>
@@ -214,7 +214,7 @@ export function NewAuditForm({
                                         <select 
                                             value={scores[q.key]}
                                             onChange={(e) => handleScoreChange(q.key, Number(e.target.value))}
-                                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-8 text-xxs font-semibold"
+                                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-8 text-[16px] md:text-xxs font-semibold"
                                         >
                                             <option value="5">5/5 - Parfait / Conforme</option>
                                             <option value="4">4/5 - Bon / Dérives mineures</option>
@@ -230,7 +230,7 @@ export function NewAuditForm({
                                             value={qNotes[q.key]}
                                             onChange={(e) => handleNoteChange(q.key, e.target.value)}
                                             placeholder="Remarque spécifique..." 
-                                            className="bg-[#121318] border-zinc-800 h-8 text-[10px] text-white" 
+                                            className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-[10px] text-white" 
                                         />
                                     </div>
                                 </div>

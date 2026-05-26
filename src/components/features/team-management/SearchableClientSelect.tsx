@@ -56,13 +56,17 @@ export function SearchableClientSelect({
     const containerRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
+        function handleClickOutside(event: MouseEvent | TouchEvent) {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
                 setIsOpen(false)
             }
         }
         document.addEventListener('mousedown', handleClickOutside)
-        return () => document.removeEventListener('mousedown', handleClickOutside)
+        document.addEventListener('touchstart', handleClickOutside)
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+            document.removeEventListener('touchstart', handleClickOutside)
+        }
     }, [])
 
     const cleanStr = (str: string) => {
@@ -116,7 +120,7 @@ export function SearchableClientSelect({
                             placeholder="Taper pour filtrer..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="bg-transparent border-none outline-none text-xxs text-white w-full placeholder:text-zinc-600 h-full focus:ring-0 focus:outline-none"
+                            className="bg-transparent border-none outline-none text-[16px] md:text-xxs text-white w-full placeholder:text-zinc-600 h-full focus:ring-0 focus:outline-none"
                             autoFocus
                         />
                     </div>

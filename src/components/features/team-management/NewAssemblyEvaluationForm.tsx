@@ -192,8 +192,8 @@ export function NewAssemblyEvaluationForm({
                         <Label className="text-zinc-500">Gestionnaire Animateur</Label>
                         <select 
                             value={managerId} 
-                            onChange={(e) => setManagerId(e.target.value)}
-                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9"
+                            onChange={(e) => setManagerId(e.target.value)} 
+                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-[16px] md:text-xs"
                             required
                         >
                             {managers.map(m => (
@@ -207,7 +207,7 @@ export function NewAssemblyEvaluationForm({
                             type="date" 
                             value={assemblyDate} 
                             onChange={(e) => setAssemblyDate(e.target.value)} 
-                            className="bg-[#121318] border-zinc-800 h-9 text-xxs text-white" 
+                            className="bg-[#121318] border-zinc-800 h-9 text-[16px] md:text-xxs text-white" 
                             required
                         />
                     </div>
@@ -239,7 +239,7 @@ export function NewAssemblyEvaluationForm({
                                     <select 
                                         value={scores[c.key]}
                                         onChange={(e) => handleScoreChange(c.key, Number(e.target.value))}
-                                        className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-8 font-semibold text-[10px]"
+                                        className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-8 font-semibold text-[16px] md:text-[10px]"
                                     >
                                         <option value="5">5/5 - Parfaitement maîtrisé / Conforme</option>
                                         <option value="4">4/5 - Bon niveau / Améliorations mineures</option>
@@ -254,7 +254,7 @@ export function NewAssemblyEvaluationForm({
                                         value={itemNotes[c.key]}
                                         onChange={(e) => handleItemNoteChange(c.key, e.target.value)}
                                         placeholder="Note ou remarque sur ce point..."
-                                        className="bg-[#121318] border-zinc-800 h-8 text-[10px] text-white"
+                                        className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-[10px] text-white"
                                     />
                                 </div>
                             </div>

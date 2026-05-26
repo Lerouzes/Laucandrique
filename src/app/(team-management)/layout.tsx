@@ -30,7 +30,9 @@ export default async function TeamManagementLayout({
     return (
         <div className="flex h-screen bg-[#0d0e12] text-zinc-100 overflow-hidden font-sans">
             {/* Sidebar */}
-            <TeamManagementSidebar profile={profile} />
+            <div className="hidden md:flex h-full shrink-0">
+                <TeamManagementSidebar profile={profile} />
+            </div>
             
             {/* Main Area */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#111218]">

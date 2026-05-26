@@ -49,7 +49,7 @@ export function TeamManagementSidebar({ profile }: { profile: Profile | null }) 
     const hasBothAccess = role === 'Direction' || role === 'Master'
 
     return (
-        <div className="hidden md:flex h-full w-64 flex-col border-r border-zinc-800 bg-[#0e0f14] text-zinc-300">
+        <div className="flex h-full w-64 flex-col border-r border-zinc-800 bg-[#0e0f14] text-zinc-300">
             {/* Logo area */}
             <div className="flex h-16 items-center justify-between border-b border-zinc-800/80 px-6">
                 <div className="flex items-center gap-2">

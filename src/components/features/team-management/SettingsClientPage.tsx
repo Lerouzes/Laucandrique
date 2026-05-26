@@ -224,7 +224,7 @@ export function SettingsClientPage({
                                             onChange={(e) => setNewCategoryName(e.target.value)}
                                             required 
                                             placeholder="ex: Problèmes de plomberie..." 
-                                            className="bg-[#121318] border-zinc-800 h-8 text-white text-xs" 
+                                            className="bg-[#121318] border-zinc-800 h-8 text-white text-[16px] md:text-xs" 
                                         />
                                     </div>
 
@@ -273,7 +273,7 @@ export function SettingsClientPage({
                                                             type="text" 
                                                             value={editingName} 
                                                             onChange={(e) => setEditingName(e.target.value)}
-                                                            className="bg-[#121318] border-zinc-700 h-7 text-xs text-white max-w-sm"
+                                                            className="bg-[#121318] border-zinc-700 h-7 text-[16px] md:text-xs text-white max-w-sm"
                                                             autoFocus
                                                         />
                                                         <Button 
@@ -412,7 +412,7 @@ export function SettingsClientPage({
                                             }}
                                             placeholder="Saisir la description à afficher pour cette question..."
                                             rows={2}
-                                            className="bg-[#121318] border-zinc-800 text-zinc-300 text-xs leading-relaxed"
+                                            className="bg-[#121318] border-zinc-800 text-zinc-300 text-[16px] md:text-xs leading-relaxed"
                                         />
                                     </div>
                                 )

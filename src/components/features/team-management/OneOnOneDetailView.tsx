@@ -692,7 +692,7 @@ export function OneOnOneDetailView({
                                     type="date" 
                                     value={meetingDate} 
                                     onChange={(e) => setMeetingDate(e.target.value)} 
-                                    className="bg-[#121318] border-zinc-800 h-9 text-xs mt-1 text-white" 
+                                    className="bg-[#121318] border-zinc-800 h-9 text-[16px] md:text-xs mt-1 text-white" 
                                 />
                             </CardContent>
                         </Card>
@@ -711,19 +711,19 @@ export function OneOnOneDetailView({
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                         <div className="space-y-1">
                                             <Label className="text-zinc-500">Tâches en retard</Label>
-                                            <Input type="number" value={lateTasks} onChange={(e) => setLateTasks(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
+                                            <Input type="number" value={lateTasks} onChange={(e) => setLateTasks(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="text-zinc-500">Courriels &gt; 48 heures</Label>
-                                            <Input type="number" value={emailsOver48h} onChange={(e) => setEmailsOver48h(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
+                                            <Input type="number" value={emailsOver48h} onChange={(e) => setEmailsOver48h(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="text-zinc-500">Factures sans notes &gt; 7j</Label>
-                                            <Input type="number" value={billsNoNotes} onChange={(e) => setBillsNoNotes(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
+                                            <Input type="number" value={billsNoNotes} onChange={(e) => setBillsNoNotes(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="text-zinc-500">Rapports opérationnels clos</Label>
-                                            <Input type="number" value={opReportsClosed} onChange={(e) => setOpReportsClosed(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
+                                            <Input type="number" value={opReportsClosed} onChange={(e) => setOpReportsClosed(Number(e.target.value))} className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
                                         </div>
                                     </div>
                                 </div>
@@ -924,7 +924,7 @@ export function OneOnOneDetailView({
                                                                     }}
                                                                     placeholder="Qu'est-ce qui a été discuté ?" 
                                                                     rows={2} 
-                                                                    className="bg-[#121318] border-zinc-800 text-xs text-white" 
+                                                                    className="bg-[#121318] border-zinc-800 text-[16px] md:text-xs text-white" 
                                                                 />
                                                             </div>
                                                             <div className="space-y-1">
@@ -940,7 +940,7 @@ export function OneOnOneDetailView({
                                                                     }}
                                                                     placeholder="Plan d'action pour résoudre le problème..." 
                                                                     rows={2} 
-                                                                    className="bg-[#121318] border-zinc-800 text-xs text-white" 
+                                                                    className="bg-[#121318] border-zinc-800 text-[16px] md:text-xs text-white" 
                                                                 />
                                                             </div>
                                                         </div>
@@ -984,19 +984,19 @@ export function OneOnOneDetailView({
                             <CardContent className="space-y-4 text-xs">
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Succès & Bonnes Coups</Label>
-                                    <Textarea value={recentWins} onChange={(e) => setRecentWins(e.target.value)} placeholder="Décrire les réussites..." rows={3} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                                    <Textarea value={recentWins} onChange={(e) => setRecentWins(e.target.value)} placeholder="Décrire les réussites..." rows={3} className="bg-[#121318] border-zinc-800 text-[16px] md:text-xs text-white" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Difficultés Opérationnelles</Label>
-                                    <Textarea value={difficultSituations} onChange={(e) => setDifficultSituations(e.target.value)} placeholder="Difficultés rencontrées..." rows={3} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                                    <Textarea value={difficultSituations} onChange={(e) => setDifficultSituations(e.target.value)} placeholder="Difficultés rencontrées..." rows={3} className="bg-[#121318] border-zinc-800 text-[16px] md:text-xs text-white" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Points & Dossiers Critiques</Label>
-                                    <Textarea value={currentIssues} onChange={(e) => setCurrentIssues(e.target.value)} placeholder="Problématiques à surveiller..." rows={3} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                                    <Textarea value={currentIssues} onChange={(e) => setCurrentIssues(e.target.value)} placeholder="Problématiques à surveiller..." rows={3} className="bg-[#121318] border-zinc-800 text-[16px] md:text-xs text-white" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Objectifs de la Rencontre</Label>
-                                    <Textarea value={mainObjectives} onChange={(e) => setMainObjectives(e.target.value)} placeholder="Quels sont les buts ciblés..." rows={3} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                                    <Textarea value={mainObjectives} onChange={(e) => setMainObjectives(e.target.value)} placeholder="Quels sont les buts ciblés..." rows={3} className="bg-[#121318] border-zinc-800 text-[16px] md:text-xs text-white" />
                                 </div>
                             </CardContent>
                         </Card>
@@ -1015,15 +1015,15 @@ export function OneOnOneDetailView({
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-2">
                                             <Badge className="bg-purple-900/30 text-purple-400 border border-purple-800 font-bold text-[9px]">P1</Badge>
-                                            <Input value={priority1} onChange={(e) => setPriority1(e.target.value)} placeholder="Première priorité..." className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
+                                            <Input value={priority1} onChange={(e) => setPriority1(e.target.value)} placeholder="Première priorité..." className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <Badge className="bg-purple-900/30 text-purple-400 border border-purple-800 font-bold text-[9px]">P2</Badge>
-                                            <Input value={priority2} onChange={(e) => setPriority2(e.target.value)} placeholder="Deuxième priorité..." className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
+                                            <Input value={priority2} onChange={(e) => setPriority2(e.target.value)} placeholder="Deuxième priorité..." className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <Badge className="bg-purple-900/30 text-purple-400 border border-purple-800 font-bold text-[9px]">P3</Badge>
-                                            <Input value={priority3} onChange={(e) => setPriority3(e.target.value)} placeholder="Troisième priorité..." className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
+                                            <Input value={priority3} onChange={(e) => setPriority3(e.target.value)} placeholder="Troisième priorité..." className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
                                         </div>
                                     </div>
                                 </div>
@@ -1032,19 +1032,19 @@ export function OneOnOneDetailView({
                                 <div className="space-y-2">
                                     <div className="space-y-1">
                                         <Label className="text-zinc-500">Demandes de Formation / Mentorat</Label>
-                                        <Input value={trainingRequested} onChange={(e) => setTrainingRequested(e.target.value)} placeholder="Formations suggérées..." className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
+                                        <Input value={trainingRequested} onChange={(e) => setTrainingRequested(e.target.value)} placeholder="Formations suggérées..." className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
                                     </div>
                                     <div className="space-y-1">
                                         <Label className="text-zinc-500">Sujets à Escalader à la Direction</Label>
-                                        <Input value={escalationNeeded} onChange={(e) => setEscalationNeeded(e.target.value)} placeholder="Dossiers nécessitant une intervention..." className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
+                                        <Input value={escalationNeeded} onChange={(e) => setEscalationNeeded(e.target.value)} placeholder="Dossiers nécessitant une intervention..." className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
                                     </div>
                                     <div className="space-y-1">
                                         <Label className="text-zinc-500">Bloqueurs Opérationnels Processus / Outils</Label>
-                                        <Input value={operationalBlockers} onChange={(e) => setOperationalBlockers(e.target.value)} placeholder="Outils ou processus inefficaces..." className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
+                                        <Input value={operationalBlockers} onChange={(e) => setOperationalBlockers(e.target.value)} placeholder="Outils ou processus inefficaces..." className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
                                     </div>
                                     <div className="space-y-1">
                                         <Label className="text-zinc-500">Médiations / Conflits clients</Label>
-                                        <Input value={conflictResolution} onChange={(e) => setConflictResolution(e.target.value)} placeholder="Médiation client ou conseil..." className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
+                                        <Input value={conflictResolution} onChange={(e) => setConflictResolution(e.target.value)} placeholder="Médiation client ou conseil..." className="bg-[#121318] border-zinc-800 h-8 text-[16px] md:text-xs text-white" />
                                     </div>
                                 </div>
                             </CardContent>
@@ -1093,7 +1093,7 @@ export function OneOnOneDetailView({
                                                             <select 
                                                                 value={c.failure_reason || 'Lack of organization'} 
                                                                 onChange={(e) => handleCommitmentChange(idx, 'failure_reason', e.target.value)}
-                                                                className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-1.5 text-zinc-300 outline-none text-[10px]"
+                                                                className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-1.5 text-zinc-300 outline-none text-[16px] md:text-[10px]"
                                                             >
                                                                 <option value="Lack of organization">Manque d'organisation</option>
                                                                 <option value="Lack of training">Besoin de formation</option>
@@ -1113,7 +1113,7 @@ export function OneOnOneDetailView({
                                                                 placeholder="Détails expliquant le retard..." 
                                                                 value={c.why_not || ''}
                                                                 onChange={(e) => handleCommitmentChange(idx, 'why_not', e.target.value)}
-                                                                className="bg-[#121318] border-zinc-800 h-7 text-xs" 
+                                                                className="bg-[#121318] border-zinc-800 h-7 text-[16px] md:text-xs" 
                                                             />
                                                         )}
                                                     </td>
@@ -1148,7 +1148,7 @@ export function OneOnOneDetailView({
                                     value={newCommitmentText} 
                                     onChange={(e) => setNewCommitmentText(e.target.value)}
                                     placeholder="Ajouter un engagement pris lors de cette séance..." 
-                                    className="bg-[#121318] border-zinc-800 h-9 text-xs text-white flex-1" 
+                                    className="bg-[#121318] border-zinc-800 h-9 text-[16px] md:text-xs text-white flex-1" 
                                 />
                                 <Button 
                                     onClick={handleAddCommitment}
