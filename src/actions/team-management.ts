@@ -1936,5 +1936,60 @@ export async function createGustavAccountAction(formData: FormData) {
     return { success: true, email: newUser.email }
 }
 
+export async function getGustavUsersAction() {
+    const supabase = await createClient()
 
+    // Security: only Master can list users
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    if (!currentUser) throw new Error('Non authentifié.')
 
+    const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', currentUser.id)
+        .single()
+
+    if (currentProfile?.role !== 'Master') {
+        throw new Error('Accès refusé.')
+    }
+
+    const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, role, created_at, updated_at')
+        .order('created_at', { ascending: false })
+
+    if (error) throw new Error(error.message)
+    return profiles || []
+}
+
+export async function updateUserRoleAction(userId: string, newRole: string) {
+    const supabase = await createClient()
+
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    if (!currentUser) throw new Error('Non authentifié.')
+
+    const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', currentUser.id)
+        .single()
+
+    if (currentProfile?.role !== 'Master') {
+        throw new Error('Seul le rôle Master peut modifier les rôles.')
+    }
+
+    // Prevent demoting yourself
+    if (userId === currentUser.id) {
+        throw new Error('Vous ne pouvez pas modifier votre propre rôle.')
+    }
+
+    const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', userId)
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/team-management/settings')
+    return { success: true }
+}

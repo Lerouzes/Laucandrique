@@ -19,14 +19,18 @@ import {
     Loader2,
     Info,
     UserPlus,
-    Shield
+    Shield,
+    Users,
+    RefreshCw
 } from 'lucide-react'
 import { 
     createComplaintCategoryAction, 
     updateComplaintCategoryAction, 
     deleteComplaintCategoryAction, 
     updateAuditQuestionConfigAction,
-    createGustavAccountAction
+    createGustavAccountAction,
+    getGustavUsersAction,
+    updateUserRoleAction
 } from '@/actions/team-management'
 
 interface ComplaintCategory {
@@ -44,6 +48,8 @@ interface SettingsClientPageProps {
     initialCategories: ComplaintCategory[]
     initialAuditConfigs: AuditConfig[]
     userRole: string
+    currentUserId: string
+    initialUsers: any[]
 }
 
 const AUDIT_QUESTIONS = [
@@ -67,7 +73,9 @@ const DEFAULT_DESCRIPTIONS: Record<string, string> = {
 export function SettingsClientPage({
     initialCategories,
     initialAuditConfigs,
-    userRole
+    userRole,
+    currentUserId,
+    initialUsers
 }: SettingsClientPageProps) {
     const [activeTab, setActiveTab] = useState<'categories' | 'audits' | 'accounts'>('categories')
     
@@ -105,6 +113,97 @@ export function SettingsClientPage({
     const [newAccountRole, setNewAccountRole] = useState('Operations')
     const [isCreatingAccount, setIsCreatingAccount] = useState(false)
 
+    // Platform users list states
+    const [users, setUsers] = useState<any[]>(initialUsers)
+    const [isRefreshingUsers, setIsRefreshingUsers] = useState(false)
+    const [savingRoleId, setSavingRoleId] = useState<string | null>(null)
+    const [roleChanges, setRoleChanges] = useState<Record<string, string>>({})
+
+    const refreshUsers = async () => {
+        setIsRefreshingUsers(true)
+        try {
+            const data = await getGustavUsersAction()
+            setUsers(data)
+        } catch (err: any) {
+            triggerAlert(err.message || 'Erreur lors du chargement des utilisateurs.', 'error')
+        } finally {
+            setIsRefreshingUsers(false)
+        }
+    }
+
+    const handleUpdateRole = async (userId: string) => {
+        const newRole = roleChanges[userId]
+        if (!newRole) return
+
+        setSavingRoleId(userId)
+        try {
+            await updateUserRoleAction(userId, newRole)
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u))
+            setRoleChanges(prev => {
+                const copy = { ...prev }
+                delete copy[userId]
+                return copy
+            })
+            triggerAlert('Rôle mis à jour avec succès !', 'success')
+        } catch (err: any) {
+            triggerAlert(err.message || 'Erreur lors de la modification du rôle.', 'error')
+        } finally {
+            setSavingRoleId(null)
+        }
+    }
+
+    const getRoleBadge = (role: string) => {
+        switch (role) {
+            case 'Operations':
+                return <Badge className="bg-zinc-800 hover:bg-zinc-800 text-zinc-300 border-zinc-700">Operations</Badge>
+            case 'Managers':
+                return <Badge className="bg-blue-950/40 hover:bg-blue-950/40 text-blue-400 border border-blue-800/40">Managers</Badge>
+            case 'Direction':
+                return <Badge className="bg-purple-950/40 hover:bg-purple-950/40 text-purple-400 border border-purple-800/40">Direction</Badge>
+            case 'Master':
+                return <Badge className="bg-amber-950/40 hover:bg-amber-950/40 text-amber-400 border border-amber-800/40">Master</Badge>
+            default:
+                return <Badge className="bg-zinc-800 hover:bg-zinc-800 text-zinc-300 border-zinc-700">{role}</Badge>
+        }
+    }
+
+    const getInitials = (name: string) => {
+        if (!name) return '??'
+        const parts = name.trim().split(/\s+/)
+        if (parts.length >= 2) {
+            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+        }
+        return name.substring(0, 2).toUpperCase()
+    }
+
+    const getAvatarGradient = (role: string) => {
+        switch (role) {
+            case 'Master':
+                return 'from-amber-600 to-yellow-500'
+            case 'Direction':
+                return 'from-purple-600 to-pink-500'
+            case 'Managers':
+                return 'from-blue-600 to-cyan-500'
+            case 'Operations':
+            default:
+                return 'from-zinc-600 to-slate-500'
+        }
+    }
+
+    const formatDate = (dateStr?: string | null) => {
+        if (!dateStr) return '-'
+        try {
+            const date = new Date(dateStr)
+            return date.toLocaleDateString('fr-CA', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            })
+        } catch {
+            return '-'
+        }
+    }
+
     // Create account handler
     const handleCreateAccount = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -128,6 +227,7 @@ export function SettingsClientPage({
                 setNewAccountEmail('')
                 setNewAccountPassword('')
                 setNewAccountRole('Operations')
+                await refreshUsers()
             }
         } catch (err: any) {
             triggerAlert(err.message || 'Une erreur est survenue lors de la création du compte.', 'error')
@@ -483,8 +583,9 @@ export function SettingsClientPage({
             {/* Tab: Accounts (Master Only) */}
             {userRole === 'Master' && activeTab === 'accounts' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-200">
-                    {/* Create Account Form */}
-                    <div>
+                    {/* Left Column: Create Form + Info */}
+                    <div className="space-y-6">
+                        {/* Create Account Form */}
                         <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                             <CardHeader className="pb-3 bg-zinc-950/20">
                                 <CardTitle className="text-base font-bold text-white flex items-center gap-2">
@@ -559,10 +660,8 @@ export function SettingsClientPage({
                                 </form>
                             </CardContent>
                         </Card>
-                    </div>
 
-                    {/* Security and Info Section */}
-                    <div className="lg:col-span-2">
+                        {/* Security and Info Section */}
                         <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                             <CardHeader>
                                 <CardTitle className="text-base font-bold text-white flex items-center gap-2">
@@ -604,6 +703,129 @@ export function SettingsClientPage({
                                         <span className="font-bold text-purple-500">Master</span>
                                         <p className="text-zinc-400 text-[11px]">Direction générale complète. Accès exclusif à la configuration des comptes et à l'administration globale.</p>
                                     </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Right Column: Users List Card */}
+                    <div className="lg:col-span-2">
+                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md h-full flex flex-col">
+                            <CardHeader className="pb-3 bg-zinc-950/20 flex flex-row items-center justify-between space-y-0">
+                                <div className="space-y-1">
+                                    <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+                                        <Users className="h-4 w-4 text-purple-400" />
+                                        Comptes Utilisateurs
+                                    </CardTitle>
+                                    <CardDescription className="text-xs text-zinc-400">
+                                        Liste des comptes existants et gestion des rôles de la plateforme.
+                                    </CardDescription>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={refreshUsers}
+                                    disabled={isRefreshingUsers}
+                                    className="border-zinc-850 hover:bg-zinc-900 text-zinc-400 h-8 w-8 p-0 rounded-md"
+                                    title="Rafraîchir la liste"
+                                >
+                                    <RefreshCw className={`h-3.5 w-3.5 ${isRefreshingUsers ? 'animate-spin' : ''}`} />
+                                </Button>
+                            </CardHeader>
+                            <CardContent className="pt-4 flex-1">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-xs border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-zinc-800 text-zinc-450 pb-2">
+                                                <th className="py-2 font-bold uppercase tracking-wider">Utilisateur</th>
+                                                <th className="py-2 font-bold uppercase tracking-wider hidden sm:table-cell">Rôle actuel</th>
+                                                <th className="py-2 font-bold uppercase tracking-wider hidden md:table-cell">Créé le</th>
+                                                <th className="py-2 font-bold uppercase tracking-wider text-right">Rôle & Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {users.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={4} className="py-8 text-center text-zinc-500 font-medium">
+                                                        Aucun utilisateur trouvé.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                users.map((user) => {
+                                                    const isCurrentUser = user.id === currentUserId
+                                                    const hasChange = roleChanges[user.id] !== undefined && roleChanges[user.id] !== user.role
+                                                    const isSaving = savingRoleId === user.id
+                                                    const selectedRole = roleChanges[user.id] !== undefined ? roleChanges[user.id] : user.role
+
+                                                    return (
+                                                        <tr 
+                                                            key={user.id} 
+                                                            className={`border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors ${
+                                                                isCurrentUser ? 'bg-purple-950/10' : ''
+                                                            }`}
+                                                        >
+                                                            <td className="py-3 pr-2">
+                                                                <div className="flex items-center gap-2.5">
+                                                                    <div className={`h-8 w-8 rounded-full bg-gradient-to-br ${getAvatarGradient(user.role)} flex items-center justify-center text-[10px] font-bold text-white shadow-inner shrink-0`}>
+                                                                        {getInitials(user.full_name)}
+                                                                    </div>
+                                                                    <div className="space-y-0.5 min-w-0">
+                                                                        <span className="font-bold text-zinc-200 flex items-center gap-1.5 truncate">
+                                                                            {user.full_name}
+                                                                            {isCurrentUser && (
+                                                                                <Badge className="bg-purple-950/50 text-purple-300 text-[9px] h-4 px-1.5 hover:bg-purple-950/50 border border-purple-800/40">
+                                                                                    Vous
+                                                                                </Badge>
+                                                                            )}
+                                                                        </span>
+                                                                        <span className="text-[10px] text-zinc-550 block truncate max-w-[150px] sm:max-w-xs">{user.email}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-3 pr-2 hidden sm:table-cell">
+                                                                {getRoleBadge(user.role)}
+                                                            </td>
+                                                            <td className="py-3 pr-2 hidden md:table-cell text-zinc-450">
+                                                                {formatDate(user.created_at)}
+                                                            </td>
+                                                            <td className="py-3 text-right">
+                                                                <div className="flex items-center justify-end gap-2">
+                                                                    <select
+                                                                        value={selectedRole}
+                                                                        disabled={isCurrentUser || isSaving}
+                                                                        onChange={(e) => {
+                                                                            const val = e.target.value
+                                                                            setRoleChanges(prev => ({ ...prev, [user.id]: val }))
+                                                                        }}
+                                                                        className="rounded-md bg-[#121318] border border-zinc-800 text-zinc-200 text-xs px-2 py-1 focus:ring-1 focus:ring-purple-500 disabled:opacity-50 h-7"
+                                                                    >
+                                                                        <option value="Operations">Operations</option>
+                                                                        <option value="Managers">Managers</option>
+                                                                        <option value="Direction">Direction</option>
+                                                                        <option value="Master">Master</option>
+                                                                    </select>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        disabled={!hasChange || isSaving || isCurrentUser}
+                                                                        onClick={() => handleUpdateRole(user.id)}
+                                                                        className="h-7 w-7 p-0 border-zinc-800 hover:bg-purple-650 hover:text-white"
+                                                                        title="Sauvegarder le rôle"
+                                                                    >
+                                                                        {isSaving ? (
+                                                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-400" />
+                                                                        ) : (
+                                                                            <Check className="h-3.5 w-3.5 text-emerald-400" />
+                                                                        )}
+                                                                    </Button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </CardContent>
                         </Card>

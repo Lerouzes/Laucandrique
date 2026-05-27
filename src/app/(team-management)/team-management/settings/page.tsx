@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { SettingsClientPage } from '@/components/features/team-management/SettingsClientPage'
+import { getGustavUsersAction } from '@/actions/team-management'
 
 export default async function SettingsPage() {
     const supabase = await createClient()
@@ -19,12 +20,22 @@ export default async function SettingsPage() {
     const { data: profile } = user
         ? await supabase
             .from('profiles')
-            .select('role')
+            .select('role, id')
             .eq('id', user.id)
             .single()
         : { data: null }
 
     const userRole = profile?.role || 'Operations'
+
+    // Fetch all users (Master only — safe to call, action handles auth check)
+    let platformUsers: any[] = []
+    if (userRole === 'Master') {
+        try {
+            platformUsers = await getGustavUsersAction()
+        } catch {
+            platformUsers = []
+        }
+    }
 
     return (
         <div className="space-y-6 pb-12">
@@ -33,7 +44,7 @@ export default async function SettingsPage() {
                     Configuration Globale
                 </h2>
                 <p className="text-xs text-zinc-400">
-                    Gérez les catégories de plaintes et personnalisez les infobulles d'audits de santé des syndicats.
+                    Gérez les catégories de plaintes, personnalisez les infobulles d'audits et administrez les comptes de la plateforme.
                 </p>
             </div>
 
@@ -41,8 +52,9 @@ export default async function SettingsPage() {
                 initialCategories={categories || []} 
                 initialAuditConfigs={auditConfigs || []} 
                 userRole={userRole}
+                currentUserId={user?.id || ''}
+                initialUsers={platformUsers}
             />
         </div>
     )
 }
-
