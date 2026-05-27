@@ -116,6 +116,10 @@ export function OneOnOneDetailView({
         my_notes: string
         manager_notes: string
         resolved_in_meeting: boolean
+        title?: string
+        description?: string
+        severity?: 'low' | 'medium' | 'high' | 'critical'
+        category_id?: string
     }>>({})
 
     // Complaint History Popup State
@@ -160,6 +164,80 @@ export function OneOnOneDetailView({
     const [newActionDueDate, setNewActionDueDate] = useState('')
     const [newActionNextReview, setNewActionNextReview] = useState(true)
 
+    // Additional custom states for dropdowns and interactive cards/modal
+    const [clientsList, setClientsList] = useState<any[]>([])
+    const [activeEditingComplaint, setActiveEditingComplaint] = useState<any | null>(null)
+    const [editingComplaintTitle, setEditingComplaintTitle] = useState('')
+    const [editingComplaintDesc, setEditingComplaintDesc] = useState('')
+    const [editingComplaintSeverity, setEditingComplaintSeverity] = useState<'low' | 'medium' | 'high' | 'critical'>('medium')
+    const [editingComplaintMyNotes, setEditingComplaintMyNotes] = useState('')
+    const [editingComplaintManagerNotes, setEditingComplaintManagerNotes] = useState('')
+    const [editingComplaintStatus, setEditingComplaintStatus] = useState<'not_discussed' | 'postponed' | 'resolved'>('not_discussed')
+
+    const [newRiskClientId, setNewRiskClientId] = useState('')
+    const [newRiskFutureActions, setNewRiskFutureActions] = useState('')
+    const [newActionClientId, setNewActionClientId] = useState('')
+
+    const getClientName = (id: string) => {
+        const found = clientsList.find(c => c.id === id)
+        return found ? (found.company_name || found.full_name) : id
+    }
+
+    const openComplaintModal = (c: any) => {
+        setActiveEditingComplaint(c)
+        setEditingComplaintTitle(c.title || '')
+        setEditingComplaintDesc(c.description || '')
+        setEditingComplaintSeverity(c.severity || 'medium')
+
+        const state = reviewedComplaintsState[c.id] || { checked: false, my_notes: '', manager_notes: '', resolved_in_meeting: false }
+        setEditingComplaintMyNotes(state.my_notes || '')
+        setEditingComplaintManagerNotes(state.manager_notes || '')
+        
+        if (!state.checked) {
+            setEditingComplaintStatus('not_discussed')
+        } else if (state.resolved_in_meeting) {
+            setEditingComplaintStatus('resolved')
+        } else {
+            setEditingComplaintStatus('postponed')
+        }
+    }
+
+    const handleSaveComplaintChanges = () => {
+        if (!activeEditingComplaint) return
+        
+        const id = activeEditingComplaint.id
+        const isChecked = editingComplaintStatus !== 'not_discussed'
+        const isResolved = editingComplaintStatus === 'resolved'
+
+        setReviewedComplaintsState(prev => ({
+            ...prev,
+            [id]: {
+                checked: isChecked,
+                my_notes: editingComplaintMyNotes,
+                manager_notes: editingComplaintManagerNotes,
+                resolved_in_meeting: isResolved,
+                title: editingComplaintTitle,
+                description: editingComplaintDesc,
+                severity: editingComplaintSeverity,
+                category_id: activeEditingComplaint.category_id
+            }
+        }))
+
+        setManagerComplaints(prev => prev.map(comp => {
+            if (comp.id === id) {
+                return {
+                    ...comp,
+                    title: editingComplaintTitle,
+                    description: editingComplaintDesc,
+                    severity: editingComplaintSeverity
+                }
+            }
+            return comp
+        }))
+
+        setActiveEditingComplaint(null)
+    }
+
     // Load initial states for edit/draft views from DB snapshot
     useEffect(() => {
         if (!oneOnOne?.manager_id) return
@@ -183,7 +261,20 @@ export function OneOnOneDetailView({
                 // Merge open items for review
                 setSyndicateAudits(snapshot.syndicateAudits || [])
                 setAssemblyEvaluations(snapshot.assemblyEvaluations || [])
-                setManagerComplaints(snapshot.openComplaints || [])
+                setClientsList(snapshot.clientsList || [])
+
+                // Merge open complaints and discussed ones
+                const open = snapshot.openComplaints || []
+                const activeAndDiscussed = [...open]
+                discussedComplaints.forEach(dc => {
+                    if (dc.complaints && !activeAndDiscussed.some(oc => oc.id === dc.complaint_id)) {
+                        activeAndDiscussed.push({
+                            ...dc.complaints,
+                            id: dc.complaint_id
+                        })
+                    }
+                })
+                setManagerComplaints(activeAndDiscussed)
 
                 // Map reviewed audits already saved for this meeting
                 const audLookup: Record<string, any> = {}
@@ -214,7 +305,11 @@ export function OneOnOneDetailView({
                         checked: dc.reviewed,
                         my_notes: dc.my_notes || dc.discussion_notes || '',
                         manager_notes: dc.manager_notes || dc.resolution_plan || '',
-                        resolved_in_meeting: dc.resolved_in_meeting || false
+                        resolved_in_meeting: dc.resolved_in_meeting || false,
+                        title: dc.title || dc.complaints?.title || '',
+                        description: dc.description || dc.complaints?.description || '',
+                        severity: dc.severity || dc.complaints?.severity || 'medium',
+                        category_id: dc.complaints?.category_id
                     }
                 })
                 setReviewedComplaintsState(compLookup)
@@ -334,10 +429,14 @@ export function OneOnOneDetailView({
             severity: newRiskSeverity,
             status: 'active',
             resolution_notes: '',
-            resolved_date: null
+            resolved_date: null,
+            client_id: newRiskClientId || null,
+            future_actions: newRiskFutureActions.trim() || null
         }
         setOperationalRisks([...operationalRisks, newRisk])
         setNewRiskDesc('')
+        setNewRiskClientId('')
+        setNewRiskFutureActions('')
         setShowRiskForm(false)
     }
 
@@ -362,12 +461,14 @@ export function OneOnOneDetailView({
             due_next_review: newActionNextReview,
             status: 'Open',
             notes: '',
-            completed: false
+            completed: false,
+            client_id: newActionClientId || null
         }
         setNewAgreedActions([...newAgreedActions, newAction])
         setNewActionText('')
         setNewActionDueDate('')
         setNewActionNextReview(true)
+        setNewActionClientId('')
     }
 
     const handleRemoveAgreedAction = (idx: number) => {
@@ -410,16 +511,47 @@ export function OneOnOneDetailView({
                 support_needed: supportNeeded,
                 training_needed: trainingNeeded,
                 meeting_score: computedScore,
-                commitments: [...previousCommitments, ...newAgreedActions],
+                commitments: [
+                    ...previousCommitments.map(c => ({
+                        id: c.id,
+                        commitment_text: c.commitment_text,
+                        owner: c.owner,
+                        due_date: c.due_date,
+                        due_next_review: c.due_next_review,
+                        status: c.status,
+                        notes: c.notes,
+                        completed: c.completed,
+                        client_id: c.client_id || null
+                    })),
+                    ...newAgreedActions.map(c => ({
+                        id: c.id,
+                        commitment_text: c.commitment_text,
+                        owner: c.owner,
+                        due_date: c.due_date,
+                        due_next_review: c.due_next_review,
+                        status: c.status,
+                        notes: c.notes,
+                        completed: c.completed,
+                        client_id: c.client_id || null
+                    }))
+                ],
                 complaints: Object.entries(reviewedComplaintsState)
                     .filter(([_, item]) => item.checked)
-                    .map(([compId, item]) => ({
-                        complaint_id: compId,
-                        my_notes: item.my_notes,
-                        manager_notes: item.manager_notes,
-                        reviewed: true,
-                        resolved_in_meeting: item.resolved_in_meeting
-                    })),
+                    .map(([compId, item]) => {
+                        const complaintObj = managerComplaints.find(mc => mc.id === compId)
+                        return {
+                            complaint_id: compId,
+                            my_notes: item.my_notes,
+                            manager_notes: item.manager_notes,
+                            reviewed: true,
+                            resolved_in_meeting: item.resolved_in_meeting,
+                            discussion_notes: item.my_notes,
+                            resolution_plan: item.manager_notes,
+                            title: (item as any).title || complaintObj?.title,
+                            description: (item as any).description || complaintObj?.description,
+                            severity: (item as any).severity || complaintObj?.severity
+                        }
+                    }),
                 reviewedAudits: Object.entries(reviewedAuditsState)
                     .filter(([_, item]) => item.checked)
                     .map(([auditId, item]) => ({
@@ -487,15 +619,21 @@ export function OneOnOneDetailView({
 
             const finalReviewedComplaints = Object.entries(reviewedComplaintsState)
                 .filter(([_, item]) => item.checked)
-                .map(([compId, item]) => ({
-                    complaint_id: compId,
-                    my_notes: item.my_notes,
-                    manager_notes: item.manager_notes,
-                    reviewed: true,
-                    resolved_in_meeting: item.resolved_in_meeting,
-                    discussion_notes: item.my_notes,
-                    resolution_plan: item.manager_notes
-                }))
+                .map(([compId, item]) => {
+                    const complaintObj = managerComplaints.find(mc => mc.id === compId)
+                    return {
+                        complaint_id: compId,
+                        my_notes: item.my_notes,
+                        manager_notes: item.manager_notes,
+                        reviewed: true,
+                        resolved_in_meeting: item.resolved_in_meeting,
+                        discussion_notes: item.my_notes,
+                        resolution_plan: item.manager_notes,
+                        title: (item as any).title || complaintObj?.title,
+                        description: (item as any).description || complaintObj?.description,
+                        severity: (item as any).severity || complaintObj?.severity
+                    }
+                })
 
             // Merge commitments
             const finalCommitments = [
@@ -507,7 +645,8 @@ export function OneOnOneDetailView({
                     due_next_review: c.due_next_review,
                     status: c.status,
                     notes: c.notes,
-                    completed: c.completed
+                    completed: c.completed,
+                    client_id: c.client_id || null
                 })),
                 ...newAgreedActions.map(c => ({
                     id: c.id,
@@ -517,7 +656,8 @@ export function OneOnOneDetailView({
                     due_next_review: c.due_next_review,
                     status: c.status,
                     notes: c.notes,
-                    completed: c.completed
+                    completed: c.completed,
+                    client_id: c.client_id || null
                 }))
             ]
 
@@ -572,7 +712,7 @@ export function OneOnOneDetailView({
     }
 
     return (
-        <div className="space-y-6 max-w-5xl mx-auto pb-20">
+        <div className="space-y-6 w-full max-w-[1600px] mx-auto px-4 md:px-8 pb-20">
             {/* Header Controls */}
             <div className="flex flex-col md:flex-row gap-4 p-6 bg-[#16171e]/70 border border-zinc-800 rounded-2xl shadow-xl justify-between items-start md:items-center">
                 <div className="flex items-center gap-3">
@@ -867,7 +1007,10 @@ export function OneOnOneDetailView({
                                     <tr key={c.id || idx} className="hover:bg-zinc-900/10">
                                         <td className="p-2 font-medium text-zinc-200">
                                             {c.commitment_text}
-                                            <div className="text-[8px] text-zinc-500 mt-0.5">Propriétaire: {c.owner || 'Manager'}</div>
+                                            <div className="text-[8px] text-zinc-500 mt-0.5 flex gap-2">
+                                                <span>Propriétaire: {c.owner || 'Manager'}</span>
+                                                {c.client_id && <span>· Syndicat: {getClientName(c.client_id)}</span>}
+                                            </div>
                                         </td>
                                         <td className="p-2 text-center">
                                             <select
@@ -1074,101 +1217,54 @@ export function OneOnOneDetailView({
                         {managerComplaints.length === 0 ? (
                             <p className="italic text-zinc-500 py-1 text-center">Aucune plainte active.</p>
                         ) : (
-                            <div className="space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                 {managerComplaints.map(c => {
-                                    const isChecked = !!reviewedComplaintsState[c.id]?.checked
+                                    const state = reviewedComplaintsState[c.id] || { checked: false, my_notes: '', manager_notes: '', resolved_in_meeting: false }
+                                    const isDiscussed = state.checked
+                                    const isResolved = state.resolved_in_meeting
                                     const clientName = c.clients ? (c.clients.company_name || c.clients.full_name) : 'Copropriété'
                                     const catLabel = c.complaint_categories?.name || 'Général'
-                                    const sevColors = c.severity === 'critical' ? 'bg-rose-950/30 text-rose-400 border-rose-900/40 font-bold' : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                                    
+                                    const sevColors = 
+                                        c.severity === 'critical' ? 'bg-rose-955/30 text-rose-400 border-rose-900/40' :
+                                        c.severity === 'high' ? 'bg-orange-955/30 text-orange-400 border-orange-900/40' :
+                                        'bg-zinc-900 text-zinc-400 border-zinc-800'
 
                                     return (
-                                        <div key={c.id} className="p-3 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-2">
-                                            <div className="flex justify-between items-start gap-2">
-                                                <div className="space-y-0.5">
-                                                    <span className="font-bold text-zinc-200 text-xs block">{c.title}</span>
-                                                    <span className="text-zinc-500 text-[8px]">
-                                                        Syndicat: <strong className="text-zinc-400">{clientName}</strong> · Catégorie: <strong className="text-purple-400">{catLabel}</strong>
-                                                    </span>
-                                                    {c.description && <p className="text-zinc-400 text-[8px] bg-zinc-950/40 p-1.5 rounded border border-zinc-900 mt-1 max-w-2xl">{c.description}</p>}
+                                        <div 
+                                            key={c.id} 
+                                            onClick={() => openComplaintModal(c)}
+                                            className={`p-4 rounded-xl border transition-all cursor-pointer hover:border-purple-500/50 hover:shadow-lg flex flex-col justify-between space-y-3 ${
+                                                isDiscussed 
+                                                    ? isResolved 
+                                                        ? 'bg-emerald-950/10 border-emerald-500/30' 
+                                                        : 'bg-amber-955/10 border-amber-500/30'
+                                                    : 'bg-zinc-950/20 border-zinc-850'
+                                            }`}
+                                        >
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between items-start gap-2">
+                                                    <span className="font-bold text-zinc-200 text-xs line-clamp-1">{c.title}</span>
+                                                    <Badge variant="outline" className={`text-[8px] font-bold shrink-0 ${sevColors}`}>{c.severity}</Badge>
                                                 </div>
-                                                <div className="flex gap-2 items-center">
-                                                    <Badge variant="outline" className={`text-[8px] font-bold ${sevColors}`}>{c.severity}</Badge>
-                                                    <Button 
-                                                        onClick={() => handleShowComplaintHistory(c)}
-                                                        variant="outline" 
-                                                        className="h-6 px-2 bg-zinc-900 border-zinc-850 hover:bg-zinc-800 text-[8px] font-bold text-purple-400 flex items-center gap-1 shrink-0"
-                                                    >
-                                                        <Search className="h-2.5 w-2.5" />
-                                                        Voir Historique
-                                                    </Button>
-                                                    <input 
-                                                        type="checkbox"
-                                                        checked={isChecked}
-                                                        onChange={(e) => {
-                                                            if (!isEditing) return
-                                                            const checked = e.target.checked
-                                                            setReviewedComplaintsState(prev => ({
-                                                                ...prev,
-                                                                [c.id]: {
-                                                                    checked,
-                                                                    my_notes: prev[c.id]?.my_notes || '',
-                                                                    manager_notes: prev[c.id]?.manager_notes || '',
-                                                                    resolved_in_meeting: prev[c.id]?.resolved_in_meeting || false
-                                                                }
-                                                            }))
-                                                        }}
-                                                        disabled={!isEditing}
-                                                        className="rounded border-zinc-800 text-purple-600 h-4.5 w-4.5 cursor-pointer shrink-0"
-                                                    />
+                                                <p className="text-zinc-400 text-[10px] line-clamp-2 leading-relaxed">{c.description || "Aucune description."}</p>
+                                            </div>
+                                            <div className="pt-2 border-t border-zinc-800/50 flex justify-between items-center text-[9px]">
+                                                <span className="text-zinc-500 truncate max-w-[120px]">
+                                                    {clientName} · <strong className="text-purple-400">{catLabel}</strong>
+                                                </span>
+                                                <div className="flex items-center gap-1">
+                                                    {isDiscussed ? (
+                                                        isResolved ? (
+                                                            <span className="text-emerald-400 font-bold flex items-center gap-0.5"><CheckCircle2 className="h-3 w-3" /> Résolue</span>
+                                                        ) : (
+                                                            <span className="text-amber-400 font-bold flex items-center gap-0.5"><AlertCircle className="h-3 w-3" /> Reportée</span>
+                                                        )
+                                                    ) : (
+                                                        <span className="text-zinc-500">Non discutée</span>
+                                                    )}
                                                 </div>
                                             </div>
-
-                                            {(isChecked || reviewedComplaintsState[c.id]?.my_notes || reviewedComplaintsState[c.id]?.manager_notes) && (
-                                                <div className="pl-6 space-y-3 pt-2 border-t border-zinc-850/60 animate-in fade-in duration-200">
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                        <div className="space-y-0.5">
-                                                            <Label className="text-zinc-500 text-[8px]">Notes de discussion (Ce que j'ai dit)</Label>
-                                                            <Input 
-                                                                value={reviewedComplaintsState[c.id]?.my_notes || ''} 
-                                                                onChange={(e) => setReviewedComplaintsState(prev => ({ ...prev, [c.id]: { ...prev[c.id], my_notes: e.target.value } }))} 
-                                                                disabled={!isEditing}
-                                                                className="bg-[#121318] border-zinc-850 h-7 text-xxs" 
-                                                                placeholder="Qu'est-ce qui a été dit..."
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-0.5">
-                                                            <Label className="text-zinc-500 text-[8px]">Plan d'action / Ce que le gestionnaire a dit</Label>
-                                                            <Input 
-                                                                value={reviewedComplaintsState[c.id]?.manager_notes || ''} 
-                                                                onChange={(e) => setReviewedComplaintsState(prev => ({ ...prev, [c.id]: { ...prev[c.id], manager_notes: e.target.value } }))} 
-                                                                disabled={!isEditing}
-                                                                className="bg-[#121318] border-zinc-850 h-7 text-xxs" 
-                                                                placeholder="Plan de résolution..."
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <input 
-                                                            type="checkbox"
-                                                            id={`resolve-${c.id}`}
-                                                            checked={!!reviewedComplaintsState[c.id]?.resolved_in_meeting}
-                                                            onChange={(e) => {
-                                                                if (!isEditing) return
-                                                                const resolved_in_meeting = e.target.checked
-                                                                setReviewedComplaintsState(prev => ({
-                                                                    ...prev,
-                                                                    [c.id]: { ...prev[c.id], resolved_in_meeting }
-                                                                }))
-                                                            }}
-                                                            disabled={!isEditing}
-                                                            className="rounded border-zinc-800 text-emerald-600 h-3.5 w-3.5 cursor-pointer"
-                                                        />
-                                                        <label htmlFor={`resolve-${c.id}`} className="text-zinc-400 font-semibold cursor-pointer text-[9px] hover:text-zinc-200 select-none">
-                                                            Marquer comme résolue à l'issue de cette rencontre
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                            )}
                                         </div>
                                     )
                                 })}
@@ -1200,29 +1296,33 @@ export function OneOnOneDetailView({
                                             <select 
                                                 value={newAuditType} 
                                                 onChange={(e) => setNewAuditType(e.target.value as any)}
-                                                className="w-full bg-[#121318] border border-zinc-800 rounded p-1.5 text-white outline-none h-7 text-xxs"
+                                                className="w-full bg-[#121318] border border-zinc-800 rounded-lg px-2 text-white outline-none focus:border-purple-600 h-8 text-xs"
                                             >
-                                                <option value="task">Tâche</option>
-                                                <option value="email">Courriel</option>
+                                                <option value="task">Tâche (Task)</option>
+                                                <option value="email">Courriel (Email)</option>
                                             </select>
                                         </div>
                                         <div className="space-y-0.5">
                                             <Label className="text-zinc-500">Copropriété (Syndicat)</Label>
-                                            <Input 
-                                                placeholder="Nom du syndicat..." 
-                                                value={newAuditClientId} 
-                                                onChange={(e) => setNewAuditClientId(e.target.value)} 
-                                                className="bg-[#121318] border-zinc-800 h-7 text-xxs text-white" 
-                                            />
+                                            <select
+                                                value={newAuditClientId}
+                                                onChange={(e) => setNewAuditClientId(e.target.value)}
+                                                className="w-full bg-[#121318] border border-zinc-800 rounded-lg px-2 text-white outline-none focus:border-purple-600 h-8 text-xs"
+                                            >
+                                                <option value="">Choisir un syndicat...</option>
+                                                {clientsList.map(c => (
+                                                    <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                     </div>
                                     <div className="space-y-0.5">
                                         <Label className="text-zinc-500">{newAuditType === 'task' ? 'Nom de la Tâche' : 'Sujet du Courriel'}</Label>
                                         <Input 
-                                            placeholder={newAuditType === 'task' ? "ex: Réparer porte garage..." : "ex: Demande de soumission..."} 
+                                            placeholder={newAuditType === 'task' ? "ex: Réparer porte garage..." : "ex: Demande de soumission toiture..."} 
                                             value={newAuditTitle} 
                                             onChange={(e) => setNewAuditTitle(e.target.value)} 
-                                            className="bg-[#121318] border-zinc-800 h-7 text-xxs text-white" 
+                                            className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" 
                                             required
                                         />
                                     </div>
@@ -1235,7 +1335,7 @@ export function OneOnOneDetailView({
                                                     type="date"
                                                     value={newAuditCreatedDate} 
                                                     onChange={(e) => setNewAuditCreatedDate(e.target.value)} 
-                                                    className="bg-[#121318] border-zinc-800 h-7 text-xxs text-white" 
+                                                    className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" 
                                                 />
                                             </div>
                                             <div className="space-y-0.5">
@@ -1243,7 +1343,7 @@ export function OneOnOneDetailView({
                                                 <select 
                                                     value={newAuditComplexity} 
                                                     onChange={(e) => setNewAuditComplexity(e.target.value as any)}
-                                                    className="w-full bg-[#121318] border border-zinc-800 rounded p-1.5 text-white outline-none h-7 text-xxs"
+                                                    className="w-full bg-[#121318] border border-zinc-800 rounded-lg px-2 text-white outline-none focus:border-purple-600 h-8 text-xs"
                                                 >
                                                     <option value="low">Faible (Low)</option>
                                                     <option value="medium">Moyenne (Medium)</option>
@@ -1265,7 +1365,7 @@ export function OneOnOneDetailView({
                                                 </label>
                                                 <label className="flex items-center gap-1.5 text-zinc-300 font-semibold cursor-pointer">
                                                     <input type="checkbox" checked={newAuditDesc} onChange={(e) => setNewAuditDesc(e.target.checked)} className="rounded border-zinc-800 text-purple-600 h-3.5 w-3.5" />
-                                                    Description correcte ?
+                                                    Bonne description ?
                                                 </label>
                                                 <label className="flex items-center gap-1.5 text-zinc-300 font-semibold cursor-pointer">
                                                     <input type="checkbox" checked={newAuditActions} onChange={(e) => setNewAuditActions(e.target.checked)} className="rounded border-zinc-800 text-purple-600 h-3.5 w-3.5" />
@@ -1273,29 +1373,30 @@ export function OneOnOneDetailView({
                                                 </label>
                                                 <label className="flex items-center gap-1.5 text-zinc-300 font-semibold cursor-pointer">
                                                     <input type="checkbox" checked={newAuditCatSelected} onChange={(e) => setNewAuditCatSelected(e.target.checked)} className="rounded border-zinc-800 text-purple-600 h-3.5 w-3.5" />
-                                                    Catégorie OK ?
+                                                    Catégorie sélectionnée ?
                                                 </label>
                                             </div>
                                         </div>
                                     ) : (
                                         <div className="text-[10px] text-zinc-400 italic pt-1">
-                                            L'audit de courriel évalue la qualité de la réponse et le délai cible.
+                                            L'audit de courriel évalue la qualité de la réponse, le professionnalisme de la communication et le respect du délai cible de 48 heures.
                                         </div>
                                     )}
 
-                                    <div className="space-y-0.5">
+                                    <div className="space-y-1">
                                         <Label className="text-zinc-500">Rétroaction / Remarques d'Audit</Label>
-                                        <Input 
+                                        <Textarea 
                                             placeholder="Indiquer les correctifs à apporter..." 
                                             value={newAuditNotes} 
                                             onChange={(e) => setNewAuditNotes(e.target.value)} 
-                                            className="bg-[#121318] border-zinc-800 h-7 text-xxs text-white" 
+                                            className="bg-[#121318] border-zinc-800 text-xs text-white" 
+                                            rows={3}
                                         />
                                     </div>
                                     <Button 
                                         onClick={handleAddTaskEmailAudit}
                                         disabled={!newAuditTitle.trim()}
-                                        className="w-full bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold h-7 rounded"
+                                        className="w-full bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold h-8 rounded"
                                     >
                                         Valider l'Audit de Tâche/Courriel
                                     </Button>
@@ -1304,7 +1405,7 @@ export function OneOnOneDetailView({
                         )}
 
                         {taskEmailAudits.length === 0 ? (
-                            <p className="text-zinc-500 italic py-1 text-center">Aucun audit effectué.</p>
+                            <p className="text-zinc-500 italic py-1 text-center">Aucun audit de tâche ou de courriel effectué pour le moment.</p>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                                 {taskEmailAudits.map((a, idx) => (
@@ -1320,12 +1421,16 @@ export function OneOnOneDetailView({
                                         )}
 
                                         <div className="flex items-center gap-1.5">
-                                            <Badge variant="outline" className={a.type === 'task' ? 'bg-cyan-950/20 text-cyan-400 border-cyan-800/40 text-[7px]' : 'bg-amber-950/20 text-amber-400 border-amber-800/40 text-[7px]'}>
+                                            <Badge variant="outline" className={a.type === 'task' ? 'bg-cyan-950/20 text-cyan-400 border-cyan-800/40 text-[7px]' : 'bg-amber-955/20 text-amber-400 border-amber-800/40 text-[7px]'}>
                                                 {a.type === 'task' ? 'Tâche' : 'Courriel'}
                                             </Badge>
                                             <span className="font-bold text-zinc-200 text-xxs truncate max-w-[80%]">{a.title}</span>
                                         </div>
-                                        {a.client_id && <div className="text-[8px] text-zinc-500">Syndicat: <strong className="text-zinc-400">{a.client_id}</strong></div>}
+                                        {a.client_id && (
+                                            <div className="text-[8px] text-zinc-500">
+                                                Syndicat: <strong className="text-zinc-400">{a.clients?.company_name || a.clients?.full_name || getClientName(a.client_id)}</strong>
+                                            </div>
+                                        )}
 
                                         {a.type === 'task' && (
                                             <div className="grid grid-cols-2 gap-1 text-[7px] text-zinc-400 pt-1 border-t border-zinc-900">
@@ -1656,6 +1761,179 @@ export function OneOnOneDetailView({
                             )}
                         </CardContent>
                     </Card>
+                </div>
+            )}
+
+            {/* Complaint Edit Modal */}
+            {activeEditingComplaint && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#16171e] border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6 text-xs text-zinc-300">
+                        {/* Modal Header */}
+                        <div className="flex justify-between items-start border-b border-zinc-800 pb-4">
+                            <div>
+                                <span className="text-purple-400 uppercase font-black text-[9px] tracking-widest block mb-1">Revue de Plainte Active</span>
+                                <h3 className="text-sm font-bold text-white uppercase">Détails & Modification</h3>
+                            </div>
+                            <button 
+                                type="button"
+                                onClick={() => setActiveEditingComplaint(null)} 
+                                className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {/* Complaint Edit/View Section */}
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Titre de la plainte</Label>
+                                    <Input 
+                                        value={editingComplaintTitle}
+                                        onChange={(e) => setEditingComplaintTitle(e.target.value)}
+                                        disabled={!isEditing}
+                                        className="bg-[#121318] border-zinc-850 h-9 text-xs text-white disabled:opacity-75 disabled:text-zinc-400"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Gravité</Label>
+                                    <select 
+                                        value={editingComplaintSeverity}
+                                        onChange={(e) => setEditingComplaintSeverity(e.target.value as any)}
+                                        disabled={!isEditing}
+                                        className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-xs disabled:opacity-75 disabled:text-zinc-400"
+                                    >
+                                        <option value="low">Faible (Low)</option>
+                                        <option value="medium">Moyenne (Medium)</option>
+                                        <option value="high">Élevée (High)</option>
+                                        <option value="critical">Critique (Critical)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <Label className="text-zinc-500">Description de la plainte</Label>
+                                <Textarea 
+                                    value={editingComplaintDesc}
+                                    onChange={(e) => setEditingComplaintDesc(e.target.value)}
+                                    disabled={!isEditing}
+                                    className="bg-[#121318] border-zinc-800 text-xs text-white disabled:opacity-75 disabled:text-zinc-400"
+                                    rows={4}
+                                />
+                            </div>
+
+                            <div className="p-3 bg-zinc-955/40 border border-zinc-900 rounded-xl space-y-1.5 text-xxs">
+                                <span className="text-zinc-500 block">Détails additionnels:</span>
+                                <div>Syndicat: <strong className="text-zinc-300">{activeEditingComplaint.clients?.company_name || activeEditingComplaint.clients?.full_name || 'Copropriété'}</strong></div>
+                                <div className="flex justify-between items-center">
+                                    <div>Catégorie: <strong className="text-purple-400">{activeEditingComplaint.complaint_categories?.name || 'Général'}</strong></div>
+                                    <Button 
+                                        type="button"
+                                        onClick={() => handleShowComplaintHistory(activeEditingComplaint)}
+                                        variant="outline" 
+                                        className="h-6 px-2.5 bg-zinc-900 border-zinc-850 hover:bg-zinc-800 text-[9px] font-bold text-purple-400 flex items-center gap-1.5"
+                                    >
+                                        <Search className="h-3 w-3" />
+                                        Voir Historique Catégorie
+                                    </Button>
+                                </div>
+                                {activeEditingComplaint.received_date && <div>Date de réception: <strong className="text-zinc-300">{new Date(activeEditingComplaint.received_date).toLocaleDateString('fr-CA')}</strong></div>}
+                            </div>
+                        </div>
+
+                        {/* Discussion Notes Section */}
+                        <div className="space-y-4 pt-4 border-t border-zinc-850">
+                            <h4 className="font-bold text-white text-xs">Alignement & Rétroaction en Rencontre</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Notes de la Direction (Ce que j'ai dit)</Label>
+                                    <Textarea 
+                                        value={editingComplaintMyNotes}
+                                        onChange={(e) => setEditingComplaintMyNotes(e.target.value)}
+                                        disabled={!isEditing}
+                                        placeholder="Indiquer vos notes ou directives..."
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white disabled:opacity-75 disabled:text-zinc-400"
+                                        rows={3}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Notes du Gestionnaire (Plan d'action)</Label>
+                                    <Textarea 
+                                        value={editingComplaintManagerNotes}
+                                        onChange={(e) => setEditingComplaintManagerNotes(e.target.value)}
+                                        disabled={!isEditing}
+                                        placeholder="Plan de résolution ou retour du gestionnaire..."
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white disabled:opacity-75 disabled:text-zinc-400"
+                                        rows={3}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Resolution status buttons */}
+                            <div className="space-y-2">
+                                <Label className="text-zinc-500">Statut de discussion de la plainte</Label>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => isEditing && setEditingComplaintStatus('not_discussed')}
+                                        disabled={!isEditing}
+                                        className={`flex-1 py-2 px-3 rounded-lg border text-xxs font-bold transition-all ${
+                                            editingComplaintStatus === 'not_discussed'
+                                                ? 'bg-zinc-900 border-zinc-700 text-white'
+                                                : 'bg-transparent border-zinc-850 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/10'
+                                        } disabled:opacity-75`}
+                                    >
+                                        Non discutée
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => isEditing && setEditingComplaintStatus('postponed')}
+                                        disabled={!isEditing}
+                                        className={`flex-1 py-2 px-3 rounded-lg border text-xxs font-bold transition-all ${
+                                            editingComplaintStatus === 'postponed'
+                                                ? 'bg-amber-955/20 border-amber-600/30 text-amber-400'
+                                                : 'bg-transparent border-zinc-850 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/10'
+                                        } disabled:opacity-75`}
+                                    >
+                                        Reporter (Postpone)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => isEditing && setEditingComplaintStatus('resolved')}
+                                        disabled={!isEditing}
+                                        className={`flex-1 py-2 px-3 rounded-lg border text-xxs font-bold transition-all ${
+                                            editingComplaintStatus === 'resolved'
+                                                ? 'bg-emerald-950/20 border-emerald-600/30 text-emerald-400'
+                                                : 'bg-transparent border-zinc-850 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/10'
+                                        } disabled:opacity-75`}
+                                    >
+                                        Résoudre (Resolve)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Action Buttons */}
+                        <div className="flex justify-end gap-3 pt-4 border-t border-zinc-850">
+                            <Button 
+                                type="button"
+                                variant="outline" 
+                                onClick={() => setActiveEditingComplaint(null)}
+                                className="bg-zinc-900 border-zinc-800 text-zinc-300 text-xs h-9 px-4"
+                            >
+                                {isEditing ? 'Annuler' : 'Fermer'}
+                            </Button>
+                            {isEditing && (
+                                <Button 
+                                    type="button"
+                                    onClick={handleSaveComplaintChanges}
+                                    className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-9 px-4"
+                                >
+                                    Enregistrer les modifications
+                                </Button>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

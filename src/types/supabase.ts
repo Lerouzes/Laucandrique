@@ -763,8 +763,10 @@ export type Database = {
       }
       manager_operational_risks: {
         Row: {
+          client_id: string | null
           created_at: string | null
           description: string
+          future_actions: string | null
           id: string
           manager_id: string
           one_on_one_id: string | null
@@ -774,8 +776,10 @@ export type Database = {
           status: string | null
         }
         Insert: {
+          client_id?: string | null
           created_at?: string | null
           description: string
+          future_actions?: string | null
           id?: string
           manager_id: string
           one_on_one_id?: string | null
@@ -785,8 +789,10 @@ export type Database = {
           status?: string | null
         }
         Update: {
+          client_id?: string | null
           created_at?: string | null
           description?: string
+          future_actions?: string | null
           id?: string
           manager_id?: string
           one_on_one_id?: string | null
@@ -796,6 +802,13 @@ export type Database = {
           status?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "manager_operational_risks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "manager_operational_risks_manager_id_fkey"
             columns: ["manager_id"]
@@ -916,6 +929,7 @@ export type Database = {
       one_on_one_commitments: {
         Row: {
           carried_forward: boolean | null
+          client_id: string | null
           commitment_text: string
           completed: boolean | null
           created_at: string | null
@@ -931,6 +945,7 @@ export type Database = {
         }
         Insert: {
           carried_forward?: boolean | null
+          client_id?: string | null
           commitment_text: string
           completed?: boolean | null
           created_at?: string | null
@@ -946,6 +961,7 @@ export type Database = {
         }
         Update: {
           carried_forward?: boolean | null
+          client_id?: string | null
           commitment_text?: string
           completed?: boolean | null
           created_at?: string | null
@@ -960,6 +976,13 @@ export type Database = {
           why_not?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "one_on_one_commitments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "one_on_one_commitments_one_on_one_id_fkey"
             columns: ["one_on_one_id"]

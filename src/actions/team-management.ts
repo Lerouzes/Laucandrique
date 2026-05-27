@@ -644,6 +644,7 @@ export async function createOneOnOneAction(data: {
         why_not?: string
         failure_reason?: string
         carried_forward?: boolean
+        client_id?: string | null
     }>
     complaints?: Array<{
         complaint_id: string
@@ -653,6 +654,10 @@ export async function createOneOnOneAction(data: {
         my_notes?: string
         manager_notes?: string
         reviewed?: boolean
+        title?: string
+        description?: string
+        severity?: 'low' | 'medium' | 'high' | 'critical'
+        category_id?: string | null
     }>
     reviewedAudits?: Array<{
         audit_id: string
@@ -685,6 +690,8 @@ export async function createOneOnOneAction(data: {
         status: 'active' | 'resolved'
         resolution_notes?: string
         resolved_date?: string | null
+        client_id?: string | null
+        future_actions?: string | null
     }>
 }) {
     const supabase = await createClient()
@@ -743,7 +750,8 @@ export async function createOneOnOneAction(data: {
             completed: c.completed || false,
             why_not: c.why_not || null,
             failure_reason: (c.failure_reason as any) || null,
-            carried_forward: c.carried_forward || false
+            carried_forward: c.carried_forward || false,
+            client_id: c.client_id || null
         }))
         const { error: commsErr } = await supabase.from('one_on_one_commitments').insert(comms)
         if (commsErr) throw new Error(commsErr.message)
@@ -764,15 +772,22 @@ export async function createOneOnOneAction(data: {
         const { error: compErr } = await supabase.from('one_on_one_complaints').insert(compData)
         if (compErr) throw new Error(compErr.message)
 
-        // Resolve addressed complaints if marked as resolved
+        // Resolve addressed complaints if marked as resolved, and update modified details
         for (const c of data.complaints) {
+            const updates: Record<string, any> = {}
             if (c.resolved_in_meeting) {
+                updates.status = 'resolved'
+                updates.resolved_date = data.meeting_date
+            }
+            if (c.title) updates.title = c.title
+            if (c.description) updates.description = c.description
+            if (c.severity) updates.severity = c.severity
+            if (c.category_id !== undefined) updates.category_id = c.category_id
+
+            if (Object.keys(updates).length > 0) {
                 await supabase
                     .from('complaints')
-                    .update({
-                        status: 'resolved',
-                        resolved_date: data.meeting_date
-                    })
+                    .update(updates)
                     .eq('id', c.complaint_id)
             }
         }
@@ -834,7 +849,9 @@ export async function createOneOnOneAction(data: {
                         severity: r.severity,
                         status: r.status,
                         resolution_notes: r.resolution_notes || null,
-                        resolved_date: r.resolved_date || null
+                        resolved_date: r.resolved_date || null,
+                        client_id: r.client_id || null,
+                        future_actions: r.future_actions || null
                     })
                     .eq('id', r.id)
             } else {
@@ -847,7 +864,9 @@ export async function createOneOnOneAction(data: {
                         severity: r.severity,
                         status: r.status,
                         resolution_notes: r.resolution_notes || null,
-                        resolved_date: r.resolved_date || null
+                        resolved_date: r.resolved_date || null,
+                        client_id: r.client_id || null,
+                        future_actions: r.future_actions || null
                     })
             }
         }
@@ -902,6 +921,7 @@ export async function updateOneOnOneAction(id: string, data: {
         why_not?: string
         failure_reason?: string
         carried_forward?: boolean
+        client_id?: string | null
     }>
     complaints?: Array<{
         complaint_id: string
@@ -911,6 +931,10 @@ export async function updateOneOnOneAction(id: string, data: {
         resolved_in_meeting?: boolean
         discussion_notes?: string
         resolution_plan?: string
+        title?: string
+        description?: string
+        severity?: 'low' | 'medium' | 'high' | 'critical'
+        category_id?: string | null
     }>
     reviewedAudits?: Array<{
         audit_id: string
@@ -943,6 +967,8 @@ export async function updateOneOnOneAction(id: string, data: {
         status: 'active' | 'resolved'
         resolution_notes?: string
         resolved_date?: string | null
+        client_id?: string | null
+        future_actions?: string | null
     }>
 }) {
     const supabase = await createClient()
@@ -1026,7 +1052,8 @@ export async function updateOneOnOneAction(id: string, data: {
                     due_date: c.due_date || null,
                     due_next_review: c.due_next_review || false,
                     status: c.status || 'Open',
-                    notes: c.notes || null
+                    notes: c.notes || null,
+                    client_id: c.client_id || null
                 })
                 .eq('id', c.id)
         } else {
@@ -1043,7 +1070,8 @@ export async function updateOneOnOneAction(id: string, data: {
                     due_date: c.due_date || null,
                     due_next_review: c.due_next_review || false,
                     status: c.status || 'Open',
-                    notes: c.notes || null
+                    notes: c.notes || null,
+                    client_id: c.client_id || null
                 })
         }
     }
@@ -1065,13 +1093,20 @@ export async function updateOneOnOneAction(id: string, data: {
         if (compErr) throw new Error(compErr.message)
 
         for (const c of data.complaints) {
+            const updates: Record<string, any> = {}
             if (c.resolved_in_meeting) {
+                updates.status = 'resolved'
+                updates.resolved_date = data.meeting_date
+            }
+            if (c.title) updates.title = c.title
+            if (c.description) updates.description = c.description
+            if (c.severity) updates.severity = c.severity
+            if (c.category_id !== undefined) updates.category_id = c.category_id
+
+            if (Object.keys(updates).length > 0) {
                 await supabase
                     .from('complaints')
-                    .update({
-                        status: 'resolved',
-                        resolved_date: data.meeting_date
-                    })
+                    .update(updates)
                     .eq('id', c.complaint_id)
             }
         }
@@ -1150,7 +1185,9 @@ export async function updateOneOnOneAction(id: string, data: {
                         severity: r.severity,
                         status: r.status,
                         resolution_notes: r.resolution_notes || null,
-                        resolved_date: r.resolved_date || null
+                        resolved_date: r.resolved_date || null,
+                        client_id: r.client_id || null,
+                        future_actions: r.future_actions || null
                     })
                     .eq('id', r.id)
             } else {
@@ -1163,7 +1200,9 @@ export async function updateOneOnOneAction(id: string, data: {
                         severity: r.severity,
                         status: r.status,
                         resolution_notes: r.resolution_notes || null,
-                        resolved_date: r.resolved_date || null
+                        resolved_date: r.resolved_date || null,
+                        client_id: r.client_id || null,
+                        future_actions: r.future_actions || null
                     })
             }
         }
@@ -1353,6 +1392,13 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
     
     const clientIds = (clients || []).map(c => c.id)
 
+    // Get all active clients/syndicates for dropdown lists
+    const { data: clientsList } = await supabase
+        .from('clients')
+        .select('id, company_name, full_name')
+        .eq('status', 'active')
+        .order('company_name')
+
     // Fetch monthly calls history
     const { data: callsHistory } = await supabase
         .from('manager_monthly_calls')
@@ -1537,6 +1583,7 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         syndicateAudits,
         assemblyEvaluations: assemblies || [],
         operationalRisks: risks || [],
+        clientsList: clientsList || [],
         lastMeeting: lastMeeting ? {
             ...lastMeeting,
             commitments: lastMeetingCommitments

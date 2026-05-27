@@ -93,6 +93,10 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
         my_notes: string
         manager_notes: string
         resolved_in_meeting: boolean
+        title?: string
+        description?: string
+        severity?: 'low' | 'medium' | 'high' | 'critical'
+        category_id?: string
     }>>({})
 
     // Complaint History Popup State
@@ -137,6 +141,80 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
     const [newActionDueDate, setNewActionDueDate] = useState('')
     const [newActionNextReview, setNewActionNextReview] = useState(true)
 
+    // Additional custom states for dropdowns and interactive cards/modal
+    const [clientsList, setClientsList] = useState<any[]>([])
+    const [activeEditingComplaint, setActiveEditingComplaint] = useState<any | null>(null)
+    const [editingComplaintTitle, setEditingComplaintTitle] = useState('')
+    const [editingComplaintDesc, setEditingComplaintDesc] = useState('')
+    const [editingComplaintSeverity, setEditingComplaintSeverity] = useState<'low' | 'medium' | 'high' | 'critical'>('medium')
+    const [editingComplaintMyNotes, setEditingComplaintMyNotes] = useState('')
+    const [editingComplaintManagerNotes, setEditingComplaintManagerNotes] = useState('')
+    const [editingComplaintStatus, setEditingComplaintStatus] = useState<'not_discussed' | 'postponed' | 'resolved'>('not_discussed')
+
+    const [newRiskClientId, setNewRiskClientId] = useState('')
+    const [newRiskFutureActions, setNewRiskFutureActions] = useState('')
+    const [newActionClientId, setNewActionClientId] = useState('')
+
+    const getClientName = (id: string) => {
+        const found = clientsList.find(c => c.id === id)
+        return found ? (found.company_name || found.full_name) : id
+    }
+
+    const openComplaintModal = (c: any) => {
+        setActiveEditingComplaint(c)
+        setEditingComplaintTitle(c.title || '')
+        setEditingComplaintDesc(c.description || '')
+        setEditingComplaintSeverity(c.severity || 'medium')
+
+        const state = reviewedComplaintsState[c.id] || { checked: false, my_notes: '', manager_notes: '', resolved_in_meeting: false }
+        setEditingComplaintMyNotes(state.my_notes || '')
+        setEditingComplaintManagerNotes(state.manager_notes || '')
+        
+        if (!state.checked) {
+            setEditingComplaintStatus('not_discussed')
+        } else if (state.resolved_in_meeting) {
+            setEditingComplaintStatus('resolved')
+        } else {
+            setEditingComplaintStatus('postponed')
+        }
+    }
+
+    const handleSaveComplaintChanges = () => {
+        if (!activeEditingComplaint) return
+        
+        const id = activeEditingComplaint.id
+        const isChecked = editingComplaintStatus !== 'not_discussed'
+        const isResolved = editingComplaintStatus === 'resolved'
+
+        setReviewedComplaintsState(prev => ({
+            ...prev,
+            [id]: {
+                checked: isChecked,
+                my_notes: editingComplaintMyNotes,
+                manager_notes: editingComplaintManagerNotes,
+                resolved_in_meeting: isResolved,
+                title: editingComplaintTitle,
+                description: editingComplaintDesc,
+                severity: editingComplaintSeverity,
+                category_id: activeEditingComplaint.category_id
+            }
+        }))
+
+        setManagerComplaints(prev => prev.map(comp => {
+            if (comp.id === id) {
+                return {
+                    ...comp,
+                    title: editingComplaintTitle,
+                    description: editingComplaintDesc,
+                    severity: editingComplaintSeverity
+                }
+            }
+            return comp
+        }))
+
+        setActiveEditingComplaint(null)
+    }
+
     // Fetch snapshot metrics when managerId changes
     useEffect(() => {
         if (!managerId) return
@@ -171,6 +249,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 setAssemblyEvaluations(snapshot.assemblyEvaluations || [])
                 setManagerComplaints(snapshot.openComplaints || [])
                 setOperationalRisks(snapshot.operationalRisks || [])
+                setClientsList(snapshot.clientsList || [])
 
                 // Reset review states
                 setReviewedAuditsState({})
@@ -285,10 +364,14 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
             severity: newRiskSeverity,
             status: 'active',
             resolution_notes: '',
-            resolved_date: null
+            resolved_date: null,
+            client_id: newRiskClientId || null,
+            future_actions: newRiskFutureActions.trim() || null
         }
         setOperationalRisks([...operationalRisks, newRisk])
         setNewRiskDesc('')
+        setNewRiskClientId('')
+        setNewRiskFutureActions('')
         setShowRiskForm(false)
     }
 
@@ -312,12 +395,14 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
             due_date: newActionNextReview ? null : newActionDueDate,
             due_next_review: newActionNextReview,
             status: 'Open',
-            notes: ''
+            notes: '',
+            client_id: newActionClientId || null
         }
         setNewAgreedActions([...newAgreedActions, newAction])
         setNewActionText('')
         setNewActionDueDate('')
         setNewActionNextReview(true)
+        setNewActionClientId('')
     }
 
     const handleRemoveAgreedAction = (idx: number) => {
@@ -351,15 +436,21 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
 
             const finalReviewedComplaints = Object.entries(reviewedComplaintsState)
                 .filter(([_, item]) => item.checked)
-                .map(([compId, item]) => ({
-                    complaint_id: compId,
-                    my_notes: item.my_notes,
-                    manager_notes: item.manager_notes,
-                    reviewed: true,
-                    resolved_in_meeting: item.resolved_in_meeting,
-                    discussion_notes: item.my_notes,
-                    resolution_plan: item.manager_notes
-                }))
+                .map(([compId, item]) => {
+                    const complaintObj = managerComplaints.find(mc => mc.id === compId)
+                    return {
+                        complaint_id: compId,
+                        my_notes: item.my_notes,
+                        manager_notes: item.manager_notes,
+                        reviewed: true,
+                        resolved_in_meeting: item.resolved_in_meeting,
+                        discussion_notes: item.my_notes,
+                        resolution_plan: item.manager_notes,
+                        title: item.title || complaintObj?.title,
+                        description: item.description || complaintObj?.description,
+                        severity: item.severity || complaintObj?.severity
+                    }
+                })
 
             // Merge carried over commitments (previousCommitments) and new agreed actions
             const finalCommitments = [
@@ -371,7 +462,8 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                     due_next_review: c.due_next_review,
                     status: c.status,
                     notes: c.notes,
-                    completed: c.completed
+                    completed: c.completed,
+                    client_id: c.client_id || null
                 })),
                 ...newAgreedActions.map(c => ({
                     commitment_text: c.commitment_text,
@@ -380,7 +472,8 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                     due_next_review: c.due_next_review,
                     status: c.status,
                     notes: c.notes,
-                    completed: false
+                    completed: false,
+                    client_id: c.client_id || null
                 }))
             ]
 
@@ -434,7 +527,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
     }
 
     return (
-        <div className="space-y-6 max-w-5xl mx-auto pb-20">
+        <div className="space-y-6 w-full max-w-[1600px] mx-auto px-4 md:px-8 pb-20">
             {/* Header / Main Configuration */}
             <div className="flex flex-col md:flex-row gap-4 p-6 bg-[#16171e]/70 border border-zinc-800 rounded-2xl shadow-xl justify-between items-start md:items-center">
                 <div className="flex items-center gap-3">
@@ -901,9 +994,11 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                         {managerComplaints.length === 0 ? (
                             <p className="italic text-zinc-500 py-1 text-center">Aucune plainte active pour ce gestionnaire.</p>
                         ) : (
-                            <div className="space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                 {managerComplaints.map(c => {
-                                    const isChecked = !!reviewedComplaintsState[c.id]?.checked
+                                    const state = reviewedComplaintsState[c.id] || { checked: false, my_notes: '', manager_notes: '', resolved_in_meeting: false }
+                                    const isDiscussed = state.checked
+                                    const isResolved = state.resolved_in_meeting
                                     const clientName = c.clients ? (c.clients.company_name || c.clients.full_name) : 'Copropriété'
                                     const catLabel = c.complaint_categories?.name || 'Général'
                                     
@@ -913,87 +1008,40 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                         'bg-zinc-900 text-zinc-400 border-zinc-800'
 
                                     return (
-                                        <div key={c.id} className="p-3 bg-zinc-950/20 border border-zinc-850 rounded-xl space-y-2">
-                                            <div className="flex justify-between items-start gap-2">
-                                                <div className="space-y-0.5">
-                                                    <span className="font-bold text-zinc-200 text-xs block">{c.title}</span>
-                                                    <span className="text-zinc-500 text-[8px]">
-                                                        Syndicat: <strong className="text-zinc-400">{clientName}</strong> · Catégorie: <strong className="text-purple-400">{catLabel}</strong>
-                                                    </span>
-                                                    {c.description && <p className="text-zinc-400 text-[8px] bg-zinc-950/40 p-1.5 rounded border border-zinc-900 max-w-2xl mt-1">{c.description}</p>}
+                                        <div 
+                                            key={c.id} 
+                                            onClick={() => openComplaintModal(c)}
+                                            className={`p-4 rounded-xl border transition-all cursor-pointer hover:border-purple-500/50 hover:shadow-lg flex flex-col justify-between space-y-3 ${
+                                                isDiscussed 
+                                                    ? isResolved 
+                                                        ? 'bg-emerald-950/10 border-emerald-500/30' 
+                                                        : 'bg-amber-950/10 border-amber-500/30'
+                                                    : 'bg-zinc-950/20 border-zinc-850'
+                                            }`}
+                                        >
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between items-start gap-2">
+                                                    <span className="font-bold text-zinc-200 text-xs line-clamp-1">{c.title}</span>
+                                                    <Badge variant="outline" className={`text-[8px] font-bold shrink-0 ${sevColors}`}>{c.severity}</Badge>
                                                 </div>
-                                                <div className="flex gap-2 items-center">
-                                                    <Badge variant="outline" className={`text-[8px] font-bold ${sevColors}`}>{c.severity}</Badge>
-                                                    <Button 
-                                                        onClick={() => handleShowComplaintHistory(c)}
-                                                        variant="outline" 
-                                                        className="h-6 px-2 bg-zinc-900 border-zinc-850 hover:bg-zinc-800 text-[8px] font-bold text-purple-400 flex items-center gap-1 shrink-0"
-                                                    >
-                                                        <Search className="h-2.5 w-2.5" />
-                                                        Voir Historique
-                                                    </Button>
-                                                    <input 
-                                                        type="checkbox"
-                                                        checked={isChecked}
-                                                        onChange={(e) => {
-                                                            const checked = e.target.checked
-                                                            setReviewedComplaintsState(prev => ({
-                                                                ...prev,
-                                                                [c.id]: {
-                                                                    checked,
-                                                                    my_notes: prev[c.id]?.my_notes || '',
-                                                                    manager_notes: prev[c.id]?.manager_notes || '',
-                                                                    resolved_in_meeting: prev[c.id]?.resolved_in_meeting || false
-                                                                }
-                                                            }))
-                                                        }}
-                                                        className="rounded border-zinc-800 text-purple-600 h-4.5 w-4.5 cursor-pointer shrink-0"
-                                                    />
+                                                <p className="text-zinc-400 text-[10px] line-clamp-2 leading-relaxed">{c.description || "Aucune description."}</p>
+                                            </div>
+                                            <div className="pt-2 border-t border-zinc-800/50 flex justify-between items-center text-[9px]">
+                                                <span className="text-zinc-500 truncate max-w-[120px]">
+                                                    {clientName} · <strong className="text-purple-400">{catLabel}</strong>
+                                                </span>
+                                                <div className="flex items-center gap-1">
+                                                    {isDiscussed ? (
+                                                        isResolved ? (
+                                                            <span className="text-emerald-400 font-bold flex items-center gap-0.5"><CheckCircle2 className="h-3 w-3" /> Résolue</span>
+                                                        ) : (
+                                                            <span className="text-amber-400 font-bold flex items-center gap-0.5"><AlertCircle className="h-3 w-3" /> Reportée</span>
+                                                        )
+                                                    ) : (
+                                                        <span className="text-zinc-500">Non discutée</span>
+                                                    )}
                                                 </div>
                                             </div>
-
-                                            {isChecked && (
-                                                <div className="pl-6 space-y-3 pt-2 border-t border-zinc-850/60 animate-in fade-in duration-200">
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                        <div className="space-y-0.5">
-                                                            <Label className="text-zinc-500 text-[8px]">Notes de discussion (Ce que j'ai dit)</Label>
-                                                            <Input 
-                                                                value={reviewedComplaintsState[c.id]?.my_notes || ''} 
-                                                                onChange={(e) => setReviewedComplaintsState(prev => ({ ...prev, [c.id]: { ...prev[c.id], my_notes: e.target.value } }))} 
-                                                                className="bg-[#121318] border-zinc-850 h-7 text-xxs" 
-                                                                placeholder="Qu'est-ce qui a été dit..."
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-0.5">
-                                                            <Label className="text-zinc-500 text-[8px]">Plan d'action / Ce que le gestionnaire a dit</Label>
-                                                            <Input 
-                                                                value={reviewedComplaintsState[c.id]?.manager_notes || ''} 
-                                                                onChange={(e) => setReviewedComplaintsState(prev => ({ ...prev, [c.id]: { ...prev[c.id], manager_notes: e.target.value } }))} 
-                                                                className="bg-[#121318] border-zinc-850 h-7 text-xxs" 
-                                                                placeholder="Plan de résolution..."
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <input 
-                                                            type="checkbox"
-                                                            id={`resolve-${c.id}`}
-                                                            checked={!!reviewedComplaintsState[c.id]?.resolved_in_meeting}
-                                                            onChange={(e) => {
-                                                                const resolved_in_meeting = e.target.checked
-                                                                setReviewedComplaintsState(prev => ({
-                                                                    ...prev,
-                                                                    [c.id]: { ...prev[c.id], resolved_in_meeting }
-                                                                }))
-                                                            }}
-                                                            className="rounded border-zinc-800 text-emerald-600 h-3.5 w-3.5 cursor-pointer"
-                                                        />
-                                                        <label htmlFor={`resolve-${c.id}`} className="text-zinc-400 font-semibold cursor-pointer text-[9px] hover:text-zinc-200 select-none">
-                                                            Marquer comme résolue à l'issue de cette rencontre
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                            )}
                                         </div>
                                     )
                                 })}
@@ -1023,21 +1071,24 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                             <select 
                                                 value={newAuditType} 
                                                 onChange={(e) => setNewAuditType(e.target.value as any)}
-                                                className="w-full bg-[#121318] border border-zinc-800 rounded p-1.5 text-white outline-none h-7 text-xxs"
+                                                className="w-full bg-[#121318] border border-zinc-800 rounded-lg px-2 text-white outline-none focus:border-purple-600 h-8 text-xs"
                                             >
-                                                <option value="task">Tâche</option>
-                                                <option value="email">Courriel</option>
+                                                <option value="task">Tâche (Task)</option>
+                                                <option value="email">Courriel (Email)</option>
                                             </select>
                                         </div>
                                         <div className="space-y-0.5">
                                             <Label className="text-zinc-500">Copropriété (Syndicat)</Label>
-                                            {/* Simple input search or text field */}
-                                            <Input 
-                                                placeholder="Nom du syndicat..." 
-                                                value={newAuditClientId} 
-                                                onChange={(e) => setNewAuditClientId(e.target.value)} 
-                                                className="bg-[#121318] border-zinc-800 h-7 text-xxs text-white" 
-                                            />
+                                            <select
+                                                value={newAuditClientId}
+                                                onChange={(e) => setNewAuditClientId(e.target.value)}
+                                                className="w-full bg-[#121318] border border-zinc-800 rounded-lg px-2 text-white outline-none focus:border-purple-600 h-8 text-xs"
+                                            >
+                                                <option value="">Choisir un syndicat...</option>
+                                                {clientsList.map(c => (
+                                                    <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                     </div>
                                     <div className="space-y-0.5">
@@ -1046,7 +1097,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                             placeholder={newAuditType === 'task' ? "ex: Réparer porte garage..." : "ex: Demande de soumission toiture..."} 
                                             value={newAuditTitle} 
                                             onChange={(e) => setNewAuditTitle(e.target.value)} 
-                                            className="bg-[#121318] border-zinc-800 h-7 text-xxs text-white" 
+                                            className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" 
                                             required
                                         />
                                     </div>
@@ -1059,7 +1110,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                                     type="date"
                                                     value={newAuditCreatedDate} 
                                                     onChange={(e) => setNewAuditCreatedDate(e.target.value)} 
-                                                    className="bg-[#121318] border-zinc-800 h-7 text-xxs text-white" 
+                                                    className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" 
                                                 />
                                             </div>
                                             <div className="space-y-0.5">
@@ -1067,7 +1118,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                                 <select 
                                                     value={newAuditComplexity} 
                                                     onChange={(e) => setNewAuditComplexity(e.target.value as any)}
-                                                    className="w-full bg-[#121318] border border-zinc-800 rounded p-1.5 text-white outline-none h-7 text-xxs"
+                                                    className="w-full bg-[#121318] border border-zinc-800 rounded-lg px-2 text-white outline-none focus:border-purple-600 h-8 text-xs"
                                                 >
                                                     <option value="low">Faible (Low)</option>
                                                     <option value="medium">Moyenne (Medium)</option>
@@ -1107,19 +1158,20 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                         </div>
                                     )}
 
-                                    <div className="space-y-0.5">
+                                    <div className="space-y-1">
                                         <Label className="text-zinc-500">Rétroaction / Remarques d'Audit</Label>
-                                        <Input 
+                                        <Textarea 
                                             placeholder="Indiquer les correctifs à apporter..." 
                                             value={newAuditNotes} 
                                             onChange={(e) => setNewAuditNotes(e.target.value)} 
-                                            className="bg-[#121318] border-zinc-800 h-7 text-xxs text-white" 
+                                            className="bg-[#121318] border-zinc-800 text-xs text-white" 
+                                            rows={3}
                                         />
                                     </div>
                                     <Button 
                                         onClick={handleAddTaskEmailAudit}
                                         disabled={!newAuditTitle.trim()}
-                                        className="w-full bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold h-7 rounded"
+                                        className="w-full bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold h-8 rounded"
                                     >
                                         Valider l'Audit de Tâche/Courriel
                                     </Button>
@@ -1147,7 +1199,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                             </Badge>
                                             <span className="font-bold text-zinc-200 text-xxs truncate max-w-[80%]">{a.title}</span>
                                         </div>
-                                        {a.client_id && <div className="text-[8px] text-zinc-500">Syndicat: <strong className="text-zinc-400">{a.client_id}</strong></div>}
+                                        {a.client_id && <div className="text-[8px] text-zinc-500">Syndicat: <strong className="text-zinc-400">{getClientName(a.client_id)}</strong></div>}
 
                                         {a.type === 'task' && (
                                             <div className="grid grid-cols-2 gap-1 text-[7px] text-zinc-400 pt-1 border-t border-zinc-900">
@@ -1191,36 +1243,64 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 </CardHeader>
                 <CardContent className="space-y-4 text-xxs">
                     {showRiskForm && (
-                        <div className="p-3 bg-zinc-950/40 border border-zinc-800 rounded-xl grid grid-cols-1 md:grid-cols-3 gap-3 items-end animate-in slide-in-from-top-1 duration-200">
-                            <div className="md:col-span-2 space-y-1">
-                                <Label className="text-zinc-500">Description du Risque Opérationnel</Label>
-                                <Input 
-                                    placeholder="ex: Risque de perte du syndicat X dû à un manque de communication..." 
-                                    value={newRiskDesc} 
-                                    onChange={(e) => setNewRiskDesc(e.target.value)} 
-                                    className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" 
-                                />
+                        <div className="p-4 bg-zinc-950/50 border border-zinc-850 rounded-xl space-y-4 animate-in slide-in-from-top-1 duration-200">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="md:col-span-2 space-y-1">
+                                    <Label className="text-zinc-500">Description du Risque Opérationnel</Label>
+                                    <Textarea 
+                                        placeholder="ex: Risque de perte du syndicat X dû à un manque de communication..." 
+                                        value={newRiskDesc} 
+                                        onChange={(e) => setNewRiskDesc(e.target.value)} 
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white" 
+                                        rows={3}
+                                    />
+                                </div>
+                                <div className="space-y-4 flex flex-col justify-between">
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500">Copropriété (Syndicat)</Label>
+                                        <select
+                                            value={newRiskClientId}
+                                            onChange={(e) => setNewRiskClientId(e.target.value)}
+                                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-xs"
+                                        >
+                                            <option value="">Aucun syndicat (Général)</option>
+                                            {clientsList.map(c => (
+                                                <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500">Gravité du Risque</Label>
+                                        <select 
+                                            value={newRiskSeverity} 
+                                            onChange={(e) => setNewRiskSeverity(e.target.value as any)}
+                                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-xs"
+                                        >
+                                            <option value="low">Faible (Low)</option>
+                                            <option value="medium">Moyen (Medium)</option>
+                                            <option value="high">Élevé (High)</option>
+                                            <option value="critical">Critique (Critical)</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Gravité</Label>
-                                    <select 
-                                        value={newRiskSeverity} 
-                                        onChange={(e) => setNewRiskSeverity(e.target.value as any)}
-                                        className="w-full bg-[#121318] border border-zinc-800 rounded p-1.5 text-white outline-none h-8 text-xxs"
-                                    >
-                                        <option value="low">Faible (Low)</option>
-                                        <option value="medium">Moyen (Medium)</option>
-                                        <option value="high">Élevé (High)</option>
-                                        <option value="critical">Critique (Critical)</option>
-                                    </select>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                                <div className="md:col-span-2 space-y-1">
+                                    <Label className="text-zinc-500">Actions futures à entreprendre</Label>
+                                    <Textarea 
+                                        placeholder="ex: Contacter le président d'ici la fin de semaine..." 
+                                        value={newRiskFutureActions} 
+                                        onChange={(e) => setNewRiskFutureActions(e.target.value)} 
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white" 
+                                        rows={2}
+                                    />
                                 </div>
                                 <Button 
                                     onClick={handleAddRisk}
                                     disabled={!newRiskDesc.trim()}
-                                    className="bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold h-8 rounded shrink-0"
+                                    className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold h-9 rounded-lg w-full"
                                 >
-                                    Valider
+                                    Valider le Risque Opérationnel
                                 </Button>
                             </div>
                         </div>
@@ -1239,10 +1319,18 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
 
                                 return (
                                     <div key={idx} className="p-3 bg-zinc-900/20 border border-zinc-850 rounded-xl flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2">
+                                        <div className="space-y-1.5 flex-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
                                                 <Badge variant="outline" className={`text-[8px] px-1.5 ${sevBadge}`}>{r.severity}</Badge>
                                                 <span className={r.status === 'resolved' ? 'line-through text-zinc-500 text-xs font-semibold' : 'text-zinc-200 text-xs font-semibold'}>{r.description}</span>
+                                            </div>
+                                            <div className="flex gap-4 text-[9px] text-zinc-500 flex-wrap">
+                                                {r.client_id && (
+                                                    <span>Syndicat: <strong className="text-zinc-400">{getClientName(r.client_id)}</strong></span>
+                                                )}
+                                                {r.future_actions && (
+                                                    <span>Actions futures: <strong className="text-purple-400">{r.future_actions}</strong></span>
+                                                )}
                                             </div>
                                             {r.status === 'resolved' && r.resolution_notes && (
                                                 <div className="text-[9px] text-zinc-400 bg-zinc-950/40 p-1.5 rounded border border-zinc-900 max-w-2xl">
@@ -1252,18 +1340,18 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                         </div>
 
                                         {r.status === 'active' ? (
-                                            <div className="flex gap-2 items-center">
+                                            <div className="flex gap-2 items-center shrink-0">
                                                 <Input 
                                                     id={`risk-res-input-${idx}`}
                                                     placeholder="Notes de résolution..." 
-                                                    className="bg-[#121318] border-zinc-800 h-7 text-xxs w-40 text-white" 
+                                                    className="bg-[#121318] border-zinc-800 h-8 text-xs w-40 text-white" 
                                                 />
                                                 <Button 
                                                     onClick={() => {
                                                         const el = document.getElementById(`risk-res-input-${idx}`) as HTMLInputElement
                                                         handleResolveRisk(idx, el?.value || 'Résolu en 1v1')
                                                     }}
-                                                    className="h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                                                    className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
                                                 >
                                                     Résoudre
                                                 </Button>
@@ -1332,76 +1420,88 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                         6. Plan d'Action & Engagements Réciproques (Moteur d'Alignement)
                     </CardTitle>
                     <CardDescription className="text-[10px] text-zinc-400">
-                        Définissez des actions précises à accomplir. Si "Prochaine rencontre" est coché, l'action sera automatiquement rechargée lors du prochain 1v1.
+                        Définissez des actions précises à accomplir. Si "Prochaine rencontre" est cochée, l'engagement est reporté automatiquement si non complété.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 text-xxs">
                     {/* Add action row */}
-                    <div className="p-3 bg-zinc-950/40 border border-zinc-800 rounded-xl grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-                        <div className="sm:col-span-2 space-y-1">
-                            <Label className="text-zinc-500">Action à Accomplir</Label>
-                            <Input 
-                                placeholder="ex: Finaliser la soumission toiture de la copropriété..." 
-                                value={newActionText} 
-                                onChange={(e) => setNewActionText(e.target.value)} 
-                                className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" 
-                            />
+                    <div className="p-4 bg-zinc-955/40 border border-zinc-850 rounded-xl space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="md:col-span-2 space-y-1">
+                                <Label className="text-zinc-500">Action à Accomplir</Label>
+                                <Textarea 
+                                    placeholder="ex: Finaliser la soumission toiture de la copropriété..." 
+                                    value={newActionText} 
+                                    onChange={(e) => setNewActionText(e.target.value)} 
+                                    className="bg-[#121318] border-zinc-800 text-xs text-white" 
+                                    rows={3}
+                                />
+                            </div>
+                            <div className="space-y-3 flex flex-col justify-between">
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Propriétaire</Label>
+                                    <select 
+                                        value={newActionOwner} 
+                                        onChange={(e) => setNewActionOwner(e.target.value)}
+                                        className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-xs"
+                                    >
+                                        <option value="Manager">Gestionnaire (Manager)</option>
+                                        <option value="Direction">Direction (Director)</option>
+                                        <option value="Gustav">Gustav Admin</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Copropriété (Syndicat associé)</Label>
+                                    <select
+                                        value={newActionClientId}
+                                        onChange={(e) => setNewActionClientId(e.target.value)}
+                                        className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-xs"
+                                    >
+                                        <option value="">Aucun (Général / Interne)</option>
+                                        {clientsList.map(c => (
+                                            <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
                         </div>
-                        <div className="space-y-1">
-                            <Label className="text-zinc-500">Propriétaire</Label>
-                            <select 
-                                value={newActionOwner} 
-                                onChange={(e) => setNewActionOwner(e.target.value)}
-                                className="w-full bg-[#121318] border border-zinc-800 rounded p-1.5 text-white outline-none h-8 text-xxs"
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                            <div className="md:col-span-2 flex flex-col justify-end">
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                    <input 
+                                        type="checkbox" 
+                                        id="next-rev-check"
+                                        checked={newActionNextReview} 
+                                        onChange={(e) => setNewActionNextReview(e.target.checked)} 
+                                        className="rounded border-zinc-800 text-purple-600 h-3.5 w-3.5 cursor-pointer" 
+                                    />
+                                    <label htmlFor="next-rev-check" className="text-zinc-400 font-semibold cursor-pointer select-none text-[10px]">
+                                        Échéance : Prochaine rencontre
+                                    </label>
+                                </div>
+                                
+                                {!newActionNextReview && (
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500">Date d'échéance spécifique</Label>
+                                        <Input 
+                                            type="date"
+                                            value={newActionDueDate} 
+                                            onChange={(e) => setNewActionDueDate(e.target.value)} 
+                                            className="bg-[#121318] border-zinc-800 h-9 text-xs text-white" 
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            <Button 
+                                onClick={handleAddAgreedAction}
+                                disabled={!newActionText.trim() || (!newActionDueDate && !newActionNextReview)}
+                                className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold h-9 rounded-lg w-full"
                             >
-                                <option value="Manager">Gestionnaire (Manager)</option>
-                                <option value="Direction">Direction (Director)</option>
-                                <option value="Gustav">Gustav Admin</option>
-                            </select>
+                                Créer l'Action
+                            </Button>
                         </div>
-                        <div className="space-y-1 flex flex-col justify-end">
-                            <div className="flex items-center gap-1.5 mb-1.5">
-                                <input 
-                                    type="checkbox" 
-                                    id="next-rev-check"
-                                    checked={newActionNextReview} 
-                                    onChange={(e) => setNewActionNextReview(e.target.checked)} 
-                                    className="rounded border-zinc-800 text-purple-600 h-3.5 w-3.5 cursor-pointer" 
-                                />
-                                <label htmlFor="next-rev-check" className="text-zinc-400 font-semibold cursor-pointer select-none">
-                                    Prochaine rencontre
-                                </label>
-                            </div>
-                            
-                            {!newActionNextReview ? (
-                                <Input 
-                                    type="date"
-                                    value={newActionDueDate} 
-                                    onChange={(e) => setNewActionDueDate(e.target.value)} 
-                                    className="bg-[#121318] border-zinc-800 h-7 text-xxs text-white" 
-                                />
-                            ) : (
-                                <Button 
-                                    onClick={handleAddAgreedAction}
-                                    disabled={!newActionText.trim()}
-                                    className="bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold h-7 rounded w-full"
-                                >
-                                    Créer l'Action
-                                </Button>
-                            )}
-                        </div>
-                        
-                        {!newActionNextReview && (
-                            <div className="sm:col-span-4 flex justify-end">
-                                <Button 
-                                    onClick={handleAddAgreedAction}
-                                    disabled={!newActionText.trim() || (!newActionDueDate && !newActionNextReview)}
-                                    className="bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold h-7 rounded w-28"
-                                >
-                                    Créer l'Action
-                                </Button>
-                            </div>
-                        )}
                     </div>
 
                     {/* Actions list */}
@@ -1411,17 +1511,20 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                         <div className="space-y-2">
                             {newAgreedActions.map((a, idx) => (
                                 <div key={idx} className="p-3 bg-zinc-900/20 border border-zinc-850 rounded-xl flex justify-between items-center gap-3">
-                                    <div className="space-y-0.5">
+                                    <div className="space-y-1 flex-1">
                                         <span className="text-zinc-200 text-xs font-semibold block">{a.commitment_text}</span>
-                                        <div className="flex gap-2 text-[8px] text-zinc-500">
+                                        <div className="flex gap-3 text-[8px] text-zinc-500 flex-wrap">
                                             <span>Propriétaire: <strong className="text-zinc-400">{a.owner}</strong></span>
                                             <span>Échéance: <strong className="text-purple-400">{a.due_next_review ? 'Prochaine rencontre' : a.due_date}</strong></span>
+                                            {a.client_id && (
+                                                <span>Syndicat: <strong className="text-zinc-400">{getClientName(a.client_id)}</strong></span>
+                                            )}
                                         </div>
                                     </div>
                                     <Button 
                                         onClick={() => handleRemoveAgreedAction(idx)}
                                         variant="ghost" 
-                                        className="h-6 w-6 p-0 text-zinc-500 hover:text-rose-500 hover:bg-transparent"
+                                        className="h-6 w-6 p-0 text-zinc-500 hover:text-rose-500 hover:bg-transparent shrink-0"
                                     >
                                         <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
@@ -1473,6 +1576,158 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                             )}
                         </CardContent>
                     </Card>
+                </div>
+            )}
+
+            {/* Complaint Edit Modal */}
+            {activeEditingComplaint && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#16171e] border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6 text-xs text-zinc-300">
+                        {/* Modal Header */}
+                        <div className="flex justify-between items-start border-b border-zinc-800 pb-4">
+                            <div>
+                                <span className="text-purple-400 uppercase font-black text-[9px] tracking-widest block mb-1">Revue de Plainte Active</span>
+                                <h3 className="text-sm font-bold text-white uppercase">Détails & Modification</h3>
+                            </div>
+                            <button 
+                                type="button"
+                                onClick={() => setActiveEditingComplaint(null)} 
+                                className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {/* Complaint Edit/View Section */}
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Titre de la plainte</Label>
+                                    <Input 
+                                        value={editingComplaintTitle}
+                                        onChange={(e) => setEditingComplaintTitle(e.target.value)}
+                                        className="bg-[#121318] border-zinc-850 h-9 text-xs text-white"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Gravité</Label>
+                                    <select 
+                                        value={editingComplaintSeverity}
+                                        onChange={(e) => setEditingComplaintSeverity(e.target.value as any)}
+                                        className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-xs"
+                                    >
+                                        <option value="low">Faible (Low)</option>
+                                        <option value="medium">Moyenne (Medium)</option>
+                                        <option value="high">Élevée (High)</option>
+                                        <option value="critical">Critique (Critical)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <Label className="text-zinc-500">Description de la plainte</Label>
+                                <Textarea 
+                                    value={editingComplaintDesc}
+                                    onChange={(e) => setEditingComplaintDesc(e.target.value)}
+                                    className="bg-[#121318] border-zinc-800 text-xs text-white"
+                                    rows={4}
+                                />
+                            </div>
+
+                            <div className="p-3 bg-zinc-950/40 border border-zinc-900 rounded-xl space-y-1 text-xxs">
+                                <span className="text-zinc-500 block">Détails additionnels:</span>
+                                <div>Syndicat: <strong className="text-zinc-300">{activeEditingComplaint.clients?.company_name || activeEditingComplaint.clients?.full_name || 'Copropriété'}</strong></div>
+                                <div>Catégorie: <strong className="text-purple-400">{activeEditingComplaint.complaint_categories?.name || 'Général'}</strong></div>
+                                {activeEditingComplaint.received_date && <div>Date de réception: <strong className="text-zinc-300">{new Date(activeEditingComplaint.received_date).toLocaleDateString('fr-CA')}</strong></div>}
+                            </div>
+                        </div>
+
+                        {/* Discussion Notes Section */}
+                        <div className="space-y-4 pt-4 border-t border-zinc-850">
+                            <h4 className="font-bold text-white text-xs">Alignement & Rétroaction en Rencontre</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Notes de la Direction (Ce que j'ai dit)</Label>
+                                    <Textarea 
+                                        value={editingComplaintMyNotes}
+                                        onChange={(e) => setEditingComplaintMyNotes(e.target.value)}
+                                        placeholder="Indiquer vos notes ou directives..."
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white"
+                                        rows={3}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Notes du Gestionnaire (Plan d'action)</Label>
+                                    <Textarea 
+                                        value={editingComplaintManagerNotes}
+                                        onChange={(e) => setEditingComplaintManagerNotes(e.target.value)}
+                                        placeholder="Plan de résolution ou retour du gestionnaire..."
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white"
+                                        rows={3}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Resolution status buttons */}
+                            <div className="space-y-2">
+                                <Label className="text-zinc-500">Statut de discussion de la plainte</Label>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingComplaintStatus('not_discussed')}
+                                        className={`flex-1 py-2 px-3 rounded-lg border text-xxs font-bold transition-all ${
+                                            editingComplaintStatus === 'not_discussed'
+                                                ? 'bg-zinc-900 border-zinc-700 text-white'
+                                                : 'bg-transparent border-zinc-850 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/10'
+                                        }`}
+                                    >
+                                        Non discutée
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingComplaintStatus('postponed')}
+                                        className={`flex-1 py-2 px-3 rounded-lg border text-xxs font-bold transition-all ${
+                                            editingComplaintStatus === 'postponed'
+                                                ? 'bg-amber-950/20 border-amber-600/30 text-amber-400'
+                                                : 'bg-transparent border-zinc-850 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/10'
+                                        }`}
+                                    >
+                                        Reporter (Postpone)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingComplaintStatus('resolved')}
+                                        className={`flex-1 py-2 px-3 rounded-lg border text-xxs font-bold transition-all ${
+                                            editingComplaintStatus === 'resolved'
+                                                ? 'bg-emerald-950/20 border-emerald-600/30 text-emerald-400'
+                                                : 'bg-transparent border-zinc-850 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/10'
+                                        }`}
+                                    >
+                                        Résoudre (Resolve)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Action Buttons */}
+                        <div className="flex justify-end gap-3 pt-4 border-t border-zinc-850">
+                            <Button 
+                                type="button"
+                                variant="outline" 
+                                onClick={() => setActiveEditingComplaint(null)}
+                                className="bg-zinc-900 border-zinc-800 text-zinc-300 text-xs h-9 px-4"
+                            >
+                                Annuler
+                            </Button>
+                            <Button 
+                                type="button"
+                                onClick={handleSaveComplaintChanges}
+                                className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-9 px-4"
+                            >
+                                Enregistrer les modifications
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
