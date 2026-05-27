@@ -393,6 +393,56 @@ export async function saveMonthlyCallsAction(formData: FormData) {
     revalidatePath(`/team-management/managers/${managerId}`)
 }
 
+export async function saveBatchMonthlyCallsAction(data: {
+    yearMonth: string
+    entries: {
+        managerId: string
+        totalCalls: number
+        answeredCalls: number
+    }[]
+}) {
+    const supabase = await createClient()
+    const { yearMonth, entries } = data
+
+    const records = entries.map(entry => ({
+        manager_id: entry.managerId,
+        year_month: yearMonth,
+        total_calls: entry.totalCalls,
+        answered_calls: entry.answeredCalls
+    }))
+
+    const { error } = await supabase
+        .from('manager_monthly_calls')
+        .upsert(records, { onConflict: 'manager_id,year_month' })
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/team-management/dashboard')
+    for (const entry of entries) {
+        revalidatePath(`/team-management/managers/${entry.managerId}`)
+    }
+}
+
+export async function getBatchMonthlyCallsAction(yearMonth: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('manager_monthly_calls')
+        .select('manager_id, total_calls, answered_calls')
+        .eq('year_month', yearMonth)
+
+    if (error) {
+        console.error('Error fetching batch monthly calls:', error)
+        return []
+    }
+
+    return (data || []).map(row => ({
+        managerId: row.manager_id,
+        totalCalls: row.total_calls,
+        answeredCalls: row.answered_calls
+    }))
+}
+
+
 export async function saveMonthlyWorkloadAction(formData: FormData) {
     const supabase = await createClient()
     const managerId = formData.get('manager_id') as string
@@ -1392,10 +1442,11 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
     
     const clientIds = (clients || []).map(c => c.id)
 
-    // Get all active clients/syndicates for dropdown lists
+    // Get all active clients/syndicates for dropdown lists (Only those the manager is in charge of!)
     const { data: clientsList } = await supabase
         .from('clients')
         .select('id, company_name, full_name')
+        .eq('manager_id', managerId)
         .eq('status', 'active')
         .order('company_name')
 

@@ -39,6 +39,7 @@ import {
     Unlock,
     X
 } from 'lucide-react'
+import { SearchableClientSelect } from './SearchableClientSelect'
 
 export function OneOnOneDetailView({ 
     oneOnOne, 
@@ -1304,16 +1305,17 @@ export function OneOnOneDetailView({
                                         </div>
                                         <div className="space-y-0.5">
                                             <Label className="text-zinc-500">Copropriété (Syndicat)</Label>
-                                            <select
-                                                value={newAuditClientId}
-                                                onChange={(e) => setNewAuditClientId(e.target.value)}
-                                                className="w-full bg-[#121318] border border-zinc-800 rounded-lg px-2 text-white outline-none focus:border-purple-600 h-8 text-xs"
-                                            >
-                                                <option value="">Choisir un syndicat...</option>
-                                                {clientsList.map(c => (
-                                                    <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>
-                                                ))}
-                                            </select>
+                                            <SearchableClientSelect
+                                                clients={clientsList.map(c => ({
+                                                    id: c.id,
+                                                    name: c.company_name || c.full_name,
+                                                    sdc: c.full_name
+                                                }))}
+                                                name="audit_client_id"
+                                                placeholder="Choisir un syndicat..."
+                                                defaultValue={newAuditClientId}
+                                                onChange={(val) => setNewAuditClientId(val)}
+                                            />
                                         </div>
                                     </div>
                                     <div className="space-y-0.5">
@@ -1476,36 +1478,65 @@ export function OneOnOneDetailView({
                 </CardHeader>
                 <CardContent className="space-y-4 text-xxs">
                     {showRiskForm && (
-                        <div className="p-3 bg-zinc-950/40 border border-zinc-800 rounded-xl grid grid-cols-1 md:grid-cols-3 gap-3 items-end animate-in slide-in-from-top-1 duration-200">
-                            <div className="md:col-span-2 space-y-1">
-                                <Label className="text-zinc-500">Description du Risque Opérationnel</Label>
-                                <Input 
-                                    placeholder="ex: Risque de perte du syndicat X dû à un manque de communication..." 
-                                    value={newRiskDesc} 
-                                    onChange={(e) => setNewRiskDesc(e.target.value)} 
-                                    className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" 
-                                />
+                        <div className="p-4 bg-zinc-950/50 border border-zinc-850 rounded-xl space-y-4 animate-in slide-in-from-top-1 duration-200">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="md:col-span-2 space-y-1">
+                                    <Label className="text-zinc-500">Description du Risque Opérationnel</Label>
+                                    <Textarea 
+                                        placeholder="ex: Risque de perte du syndicat X dû à un manque de communication..." 
+                                        value={newRiskDesc} 
+                                        onChange={(e) => setNewRiskDesc(e.target.value)} 
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white" 
+                                        rows={3}
+                                    />
+                                </div>
+                                <div className="space-y-4 flex flex-col justify-between">
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500">Copropriété (Syndicat)</Label>
+                                        <SearchableClientSelect
+                                            clients={clientsList.map(c => ({
+                                                id: c.id,
+                                                name: c.company_name || c.full_name,
+                                                sdc: c.full_name
+                                            }))}
+                                            name="risk_client_id"
+                                            placeholder="Aucun syndicat (Général)..."
+                                            defaultValue={newRiskClientId}
+                                            onChange={(val) => setNewRiskClientId(val)}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500">Gravité du Risque</Label>
+                                        <select 
+                                            value={newRiskSeverity} 
+                                            onChange={(e) => setNewRiskSeverity(e.target.value as any)}
+                                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-xs"
+                                        >
+                                            <option value="low">Faible (Low)</option>
+                                            <option value="medium">Moyen (Medium)</option>
+                                            <option value="high">Élevé (High)</option>
+                                            <option value="critical">Critique (Critical)</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Gravité</Label>
-                                    <select 
-                                        value={newRiskSeverity} 
-                                        onChange={(e) => setNewRiskSeverity(e.target.value as any)}
-                                        className="w-full bg-[#121318] border border-zinc-800 rounded p-1.5 text-white outline-none h-8 text-xxs"
-                                    >
-                                        <option value="low">Faible (Low)</option>
-                                        <option value="medium">Moyen (Medium)</option>
-                                        <option value="high">Élevé (High)</option>
-                                        <option value="critical">Critique (Critical)</option>
-                                    </select>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                                <div className="md:col-span-2 space-y-1">
+                                    <Label className="text-zinc-500">Actions futures à entreprendre</Label>
+                                    <Textarea 
+                                        placeholder="ex: Contacter le président d'ici la fin de semaine..." 
+                                        value={newRiskFutureActions} 
+                                        onChange={(e) => setNewRiskFutureActions(e.target.value)} 
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white" 
+                                        rows={2}
+                                    />
                                 </div>
                                 <Button 
                                     onClick={handleAddRisk}
                                     disabled={!newRiskDesc.trim()}
-                                    className="bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold h-8 rounded shrink-0"
+                                    className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold h-9 rounded-lg w-full"
                                 >
-                                    Valider
+                                    Valider le Risque Opérationnel
                                 </Button>
                             </div>
                         </div>
@@ -1622,71 +1653,97 @@ export function OneOnOneDetailView({
                 <CardContent className="space-y-4 text-xxs">
                     {/* Add action row */}
                     {isEditing && (
-                        <div className="p-3 bg-zinc-950/40 border border-zinc-800 rounded-xl grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-                            <div className="sm:col-span-2 space-y-1">
-                                <Label className="text-zinc-500">Action à Accomplir</Label>
-                                <Input 
-                                    placeholder="ex: Finaliser la soumission toiture de la copropriété..." 
-                                    value={newActionText} 
-                                    onChange={(e) => setNewActionText(e.target.value)} 
-                                    className="bg-[#121318] border-zinc-800 h-8 text-xxs text-white" 
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-zinc-500">Propriétaire</Label>
-                                <select 
-                                    value={newActionOwner} 
-                                    onChange={(e) => setNewActionOwner(e.target.value)}
-                                    className="w-full bg-[#121318] border border-zinc-800 rounded p-1.5 text-white outline-none h-8 text-xxs"
-                                >
-                                    <option value="Manager">Gestionnaire (Manager)</option>
-                                    <option value="Direction">Direction (Director)</option>
-                                    <option value="Gustav">Gustav Admin</option>
-                                </select>
-                            </div>
-                            <div className="space-y-1 flex flex-col justify-end">
-                                <div className="flex items-center gap-1.5 mb-1.5">
-                                    <input 
-                                        type="checkbox" 
-                                        id="next-rev-check"
-                                        checked={newActionNextReview} 
-                                        onChange={(e) => setNewActionNextReview(e.target.checked)} 
-                                        className="rounded border-zinc-800 text-purple-600 h-3.5 w-3.5 cursor-pointer" 
+                        <div className="p-4 bg-zinc-950/50 border border-zinc-850 rounded-xl space-y-4 animate-in slide-in-from-top-1 duration-200">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="md:col-span-3 space-y-1">
+                                    <Label className="text-zinc-500">Nouvel Engagement / Action</Label>
+                                    <Textarea 
+                                        placeholder="ex: Contacter le syndicat pour la mise à jour du budget..." 
+                                        value={newActionText} 
+                                        onChange={(e) => setNewActionText(e.target.value)} 
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white" 
+                                        rows={3}
                                     />
-                                    <label htmlFor="next-rev-check" className="text-zinc-400 font-semibold cursor-pointer select-none">
-                                        Prochaine rencontre
-                                    </label>
+                                </div>
+                                <div className="space-y-3 flex flex-col justify-between">
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500">Propriétaire</Label>
+                                        <select 
+                                            value={newActionOwner} 
+                                            onChange={(e) => setNewActionOwner(e.target.value)}
+                                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-xs"
+                                        >
+                                            <option value="Manager">Gestionnaire (Manager)</option>
+                                            <option value="Direction">Direction (Director)</option>
+                                            <option value="Gustav">Gustav Admin</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500">Copropriété (Syndicat associé)</Label>
+                                        <SearchableClientSelect
+                                            clients={clientsList.map(c => ({
+                                                id: c.id,
+                                                name: c.company_name || c.full_name,
+                                                sdc: c.full_name
+                                            }))}
+                                            name="action_client_id"
+                                            placeholder="Aucun (Général / Interne)"
+                                            defaultValue={newActionClientId}
+                                            onChange={(val) => setNewActionClientId(val)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                                <div className="md:col-span-2 flex flex-col justify-end">
+                                    <div className="flex items-center gap-1.5 mb-1.5">
+                                        <input 
+                                            type="checkbox" 
+                                            id="next-rev-check"
+                                            checked={newActionNextReview} 
+                                            onChange={(e) => setNewActionNextReview(e.target.checked)} 
+                                            className="rounded border-zinc-800 text-purple-600 h-3.5 w-3.5 cursor-pointer" 
+                                        />
+                                        <label htmlFor="next-rev-check" className="text-zinc-400 font-semibold cursor-pointer select-none">
+                                            À revoir à la prochaine rencontre
+                                        </label>
+                                    </div>
+                                    
+                                    {!newActionNextReview && (
+                                        <Input 
+                                            type="date"
+                                            value={newActionDueDate} 
+                                            onChange={(e) => setNewActionDueDate(e.target.value)} 
+                                            className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" 
+                                        />
+                                    )}
                                 </div>
                                 
-                                {!newActionNextReview ? (
-                                    <Input 
-                                        type="date"
-                                        value={newActionDueDate} 
-                                        onChange={(e) => setNewActionDueDate(e.target.value)} 
-                                        className="bg-[#121318] border-zinc-800 h-7 text-xxs text-white" 
-                                    />
-                                ) : (
-                                    <Button 
-                                        onClick={handleAddAgreedAction}
-                                        disabled={!newActionText.trim()}
-                                        className="bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold h-7 rounded w-full"
-                                    >
-                                        Créer l'Action
-                                    </Button>
+                                {!newActionNextReview && (
+                                    <div className="md:col-span-1 flex justify-end">
+                                        <Button 
+                                            onClick={handleAddAgreedAction}
+                                            disabled={!newActionText.trim() || (!newActionDueDate && !newActionNextReview)}
+                                            className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold h-8 rounded-lg w-full"
+                                        >
+                                            Créer l'Action
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {newActionNextReview && (
+                                    <div className="md:col-span-1 flex justify-end">
+                                        <Button 
+                                            onClick={handleAddAgreedAction}
+                                            disabled={!newActionText.trim()}
+                                            className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold h-8 rounded-lg w-full"
+                                        >
+                                            Créer l'Action
+                                        </Button>
+                                    </div>
                                 )}
                             </div>
-                            
-                            {!newActionNextReview && (
-                                <div className="sm:col-span-4 flex justify-end">
-                                    <Button 
-                                        onClick={handleAddAgreedAction}
-                                        disabled={!newActionText.trim() || (!newActionDueDate && !newActionNextReview)}
-                                        className="bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold h-7 rounded w-28"
-                                    >
-                                        Créer l'Action
-                                    </Button>
-                                </div>
-                            )}
                         </div>
                     )}
 

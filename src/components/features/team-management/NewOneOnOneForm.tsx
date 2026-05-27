@@ -36,6 +36,7 @@ import {
     ShieldAlert,
     X
 } from 'lucide-react'
+import { SearchableClientSelect } from './SearchableClientSelect'
 
 export function NewOneOnOneForm({ managers }: { managers: any[] }) {
     const router = useRouter()
@@ -1079,16 +1080,17 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                         </div>
                                         <div className="space-y-0.5">
                                             <Label className="text-zinc-500">Copropriété (Syndicat)</Label>
-                                            <select
-                                                value={newAuditClientId}
-                                                onChange={(e) => setNewAuditClientId(e.target.value)}
-                                                className="w-full bg-[#121318] border border-zinc-800 rounded-lg px-2 text-white outline-none focus:border-purple-600 h-8 text-xs"
-                                            >
-                                                <option value="">Choisir un syndicat...</option>
-                                                {clientsList.map(c => (
-                                                    <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>
-                                                ))}
-                                            </select>
+                                            <SearchableClientSelect
+                                                clients={clientsList.map(c => ({
+                                                    id: c.id,
+                                                    name: c.company_name || c.full_name,
+                                                    sdc: c.full_name
+                                                }))}
+                                                name="audit_client_id"
+                                                placeholder="Choisir un syndicat..."
+                                                defaultValue={newAuditClientId}
+                                                onChange={(val) => setNewAuditClientId(val)}
+                                            />
                                         </div>
                                     </div>
                                     <div className="space-y-0.5">
@@ -1258,16 +1260,17 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                 <div className="space-y-4 flex flex-col justify-between">
                                     <div className="space-y-1">
                                         <Label className="text-zinc-500">Copropriété (Syndicat)</Label>
-                                        <select
-                                            value={newRiskClientId}
-                                            onChange={(e) => setNewRiskClientId(e.target.value)}
-                                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-xs"
-                                        >
-                                            <option value="">Aucun syndicat (Général)</option>
-                                            {clientsList.map(c => (
-                                                <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>
-                                            ))}
-                                        </select>
+                                        <SearchableClientSelect
+                                            clients={clientsList.map(c => ({
+                                                id: c.id,
+                                                name: c.company_name || c.full_name,
+                                                sdc: c.full_name
+                                            }))}
+                                            name="risk_client_id"
+                                            placeholder="Aucun syndicat (Général)..."
+                                            defaultValue={newRiskClientId}
+                                            onChange={(val) => setNewRiskClientId(val)}
+                                        />
                                     </div>
                                     <div className="space-y-1">
                                         <Label className="text-zinc-500">Gravité du Risque</Label>
@@ -1452,16 +1455,17 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Copropriété (Syndicat associé)</Label>
-                                    <select
-                                        value={newActionClientId}
-                                        onChange={(e) => setNewActionClientId(e.target.value)}
-                                        className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-xs"
-                                    >
-                                        <option value="">Aucun (Général / Interne)</option>
-                                        {clientsList.map(c => (
-                                            <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>
-                                        ))}
-                                    </select>
+                                    <SearchableClientSelect
+                                        clients={clientsList.map(c => ({
+                                            id: c.id,
+                                            name: c.company_name || c.full_name,
+                                            sdc: c.full_name
+                                        }))}
+                                        name="action_client_id"
+                                        placeholder="Aucun (Général / Interne)"
+                                        defaultValue={newActionClientId}
+                                        onChange={(val) => setNewActionClientId(val)}
+                                    />
                                 </div>
                             </div>
                         </div>

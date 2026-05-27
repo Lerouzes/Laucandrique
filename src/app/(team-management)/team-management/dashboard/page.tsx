@@ -1,6 +1,7 @@
 import { getGlobalTeamStats, saveMonthlyCallsAction, saveMonthlyWorkloadAction } from '@/actions/team-management'
 import { getManagers } from '@/actions/managers'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { BatchCallStatsModal } from '@/components/features/team-management/BatchCallStatsModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -195,7 +196,10 @@ export default async function TeamManagementDashboard() {
                     <CardContent className="space-y-6">
                         {/* Call Stats Input */}
                         <form action={saveMonthlyCallsAction} className="space-y-3 p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl">
-                            <h4 className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Statistiques d'Appels</h4>
+                            <div className="flex justify-between items-center mb-1">
+                                <h4 className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Statistiques d'Appels</h4>
+                                <BatchCallStatsModal managers={managers} />
+                            </div>
                             <div className="grid grid-cols-2 gap-2 text-xxs">
                                 <div>
                                     <Label className="text-zinc-400 mb-1 block">Gestionnaire</Label>
