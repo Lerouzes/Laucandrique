@@ -85,8 +85,19 @@ export default async function OneOnOnesListPage() {
                                                 {new Date(o.meeting_date).toLocaleDateString('fr-CA')}
                                             </td>
                                             <td className="p-3 text-center font-semibold text-zinc-300">{o.late_tasks}</td>
-                                            <td className="p-3 text-center text-zinc-300">
-                                                {callsTotal > 0 ? `${callsPct}% (${callsAnswered}/${callsTotal})` : 'N/A'}
+                                            <td className="p-3 text-center">
+                                                {callsTotal > 0 ? (
+                                                    <span className={`font-bold text-xs ${
+                                                        callsPct >= 80 ? 'text-emerald-400' :
+                                                        callsPct > 55 ? 'text-amber-400' :
+                                                        'text-rose-500'
+                                                    }`}>
+                                                        {callsPct}%
+                                                        <span className="text-zinc-500 font-normal ml-1 text-[10px]">({callsAnswered}/{callsTotal})</span>
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-zinc-500 italic text-[10px]">N/A</span>
+                                                )}
                                             </td>
                                             <td className="p-3 text-center text-zinc-300">{o.emails_over_48h}</td>
                                             <td className="p-3 text-center">

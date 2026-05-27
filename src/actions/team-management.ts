@@ -442,6 +442,60 @@ export async function getBatchMonthlyCallsAction(yearMonth: string) {
     }))
 }
 
+export async function getCallsHistoryAction(opts: {
+    managerId?: string   // if undefined => all managers
+    monthsBack?: number  // default 12
+    fromMonth?: string   // e.g. '2024-01'
+    toMonth?: string     // e.g. '2025-05'
+}) {
+    const supabase = await createClient()
+
+    let query = supabase
+        .from('manager_monthly_calls')
+        .select('manager_id, year_month, total_calls, answered_calls, managers(first_name, last_name)')
+        .order('year_month', { ascending: false })
+
+    if (opts.managerId) {
+        query = query.eq('manager_id', opts.managerId)
+    }
+
+    if (opts.fromMonth) {
+        query = query.gte('year_month', opts.fromMonth)
+    } else if (!opts.toMonth) {
+        // default: last N months
+        const n = opts.monthsBack ?? 12
+        const d = new Date()
+        d.setMonth(d.getMonth() - n)
+        const from = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        query = query.gte('year_month', from)
+    }
+
+    if (opts.toMonth) {
+        query = query.lte('year_month', opts.toMonth)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+        console.error('Error fetching call history:', error)
+        return []
+    }
+
+    return (data || []).map(row => {
+        const m = row.managers as any
+        const managerName = m ? `${m.first_name} ${m.last_name}` : 'Inconnu'
+        const pct = row.total_calls > 0 ? Math.round((row.answered_calls / row.total_calls) * 100) : null
+        return {
+            managerId: row.manager_id,
+            managerName,
+            yearMonth: row.year_month,
+            totalCalls: row.total_calls,
+            answeredCalls: row.answered_calls,
+            pct
+        }
+    })
+}
+
 
 export async function saveMonthlyWorkloadAction(formData: FormData) {
     const supabase = await createClient()

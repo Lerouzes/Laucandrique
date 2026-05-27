@@ -40,6 +40,7 @@ import {
     X
 } from 'lucide-react'
 import { SearchableClientSelect } from './SearchableClientSelect'
+import { CallsStatsPanel } from './CallsStatsPanel'
 
 export function OneOnOneDetailView({ 
     oneOnOne, 
@@ -834,7 +835,12 @@ export function OneOnOneDetailView({
                         <div className="grid grid-cols-2 gap-4 w-full">
                             <div className="p-2 bg-zinc-900/20 border border-zinc-850 rounded-lg space-y-0.5">
                                 <span className="text-zinc-500 text-[8px] uppercase font-bold">Appels Répondus</span>
-                                <span className="text-xs font-bold text-zinc-300 block">{callsTotal > 0 ? `${Math.round(callsPct)}%` : '100%'}</span>
+                                <span className={`text-xs font-bold block ${
+                                    callsTotal === 0 ? 'text-zinc-300' :
+                                    Math.round(callsPct) >= 80 ? 'text-emerald-400' :
+                                    Math.round(callsPct) > 55 ? 'text-amber-400' :
+                                    'text-rose-500'
+                                }`}>{callsTotal > 0 ? `${Math.round(callsPct)}%` : '100%'}</span>
                             </div>
                             <div className="p-2 bg-zinc-900/20 border border-zinc-850 rounded-lg space-y-0.5">
                                 <span className="text-zinc-500 text-[8px] uppercase font-bold">Hygiène Tâches</span>
@@ -924,7 +930,14 @@ export function OneOnOneDetailView({
                                 </tr>
                                 <tr>
                                     <td className="p-2 font-semibold text-zinc-200">Taux d'Appels Répondus</td>
-                                    <td className="p-2 text-center font-bold text-white">{callsTotal > 0 ? `${Math.round(callsPct)}%` : '100%'}</td>
+                                    <td className="p-2 text-center font-bold">
+                                        <span className={`${
+                                            callsTotal === 0 ? 'text-white' :
+                                            Math.round(callsPct) >= 80 ? 'text-emerald-400' :
+                                            Math.round(callsPct) > 55 ? 'text-amber-400' :
+                                            'text-rose-500'
+                                        }`}>{callsTotal > 0 ? `${Math.round(callsPct)}%` : '100%'}</span>
+                                    </td>
                                     <td className="p-2 text-center text-zinc-500">{callsTotalPrev > 0 ? `${Math.round(prevCallsPct)}%` : 'N/A'}</td>
                                     <td className="p-2 text-center">
                                         {callsPct > prevCallsPct ? (
@@ -978,6 +991,14 @@ export function OneOnOneDetailView({
                                 <strong className="text-sm text-white font-mono">{emailsReceived} courriels</strong>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Interactive calls history for this manager */}
+                    <div className="border-t border-zinc-900 pt-4 mt-2">
+                        <CallsStatsPanel
+                            managerId={manager.id}
+                            title="Historique des Appels — Cliquez pour explorer"
+                        />
                     </div>
                 </CardContent>
             </Card>

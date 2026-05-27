@@ -2,6 +2,7 @@ import { getGlobalTeamStats, saveMonthlyCallsAction, saveMonthlyWorkloadAction }
 import { getManagers } from '@/actions/managers'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { BatchCallStatsModal } from '@/components/features/team-management/BatchCallStatsModal'
+import { CallsStatsPanel } from '@/components/features/team-management/CallsStatsPanel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -259,6 +260,21 @@ export default async function TeamManagementDashboard() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Calls Statistics Panel – interactive, month navigation + custom range */}
+            <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                <CardHeader>
+                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                        Tableau des Appels — Tous les Gestionnaires
+                    </CardTitle>
+                    <CardDescription className="text-xxs text-zinc-400">
+                        Naviguez par mois ou définissez une période personnalisée. Cliquez sur "Historique" pour voir l'évolution MoM par gestionnaire.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <CallsStatsPanel />
+                </CardContent>
+            </Card>
         </div>
     )
 }

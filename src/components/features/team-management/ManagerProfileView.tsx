@@ -21,6 +21,7 @@ import {
     PlusCircle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { CallsStatsPanel } from './CallsStatsPanel'
 
 export function ManagerProfileView({
     manager,
@@ -265,40 +266,12 @@ export function ManagerProfileView({
                                     </div>
                                 </div>
 
-                                {/* Call logs history table */}
-                                <div className="mt-8 space-y-3">
-                                    <h4 className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Historique des Appels</h4>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left text-xxs text-zinc-300">
-                                            <thead className="bg-zinc-950/40 text-zinc-400 font-bold border-b border-zinc-800 uppercase">
-                                                <tr>
-                                                    <th className="p-2.5">Période</th>
-                                                    <th className="p-2.5 text-center">Appels reçus</th>
-                                                    <th className="p-2.5 text-center">Appels répondus</th>
-                                                    <th className="p-2.5 text-right">Taux de réponse</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-zinc-850">
-                                                {monthlyCalls.length === 0 ? (
-                                                    <tr>
-                                                        <td colSpan={4} className="p-4 text-center italic text-zinc-500">Aucune donnée historique.</td>
-                                                    </tr>
-                                                ) : (
-                                                    monthlyCalls.map((c) => {
-                                                        const pct = c.total_calls > 0 ? Math.round((c.answered_calls / c.total_calls) * 100) : 0
-                                                        return (
-                                                            <tr key={c.id}>
-                                                                <td className="p-2.5 font-mono">{c.year_month}</td>
-                                                                <td className="p-2.5 text-center">{c.total_calls}</td>
-                                                                <td className="p-2.5 text-center">{c.answered_calls}</td>
-                                                                <td className="p-2.5 text-right text-purple-400 font-bold">{pct}%</td>
-                                                            </tr>
-                                                        )
-                                                    })
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                {/* Interactive call history panel */}
+                                <div className="mt-8">
+                                    <CallsStatsPanel
+                                        managerId={manager.id}
+                                        title="Historique des Appels"
+                                    />
                                 </div>
                             </CardContent>
                         </Card>
