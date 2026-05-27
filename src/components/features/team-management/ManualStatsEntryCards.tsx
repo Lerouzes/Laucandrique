@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
 import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { 
     saveMonthlyCallsAction, 
@@ -38,6 +39,8 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
     const router = useRouter()
     const now = new Date()
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+    const [activeTab, setActiveTab] = useState<'calls' | 'comms' | 'tasks'>('calls')
 
     // State for Call form
     const [callManagerId, setCallManagerId] = useState(managers[0]?.id || '')
@@ -179,239 +182,301 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
     return (
         <div className="space-y-6">
             {/* Header / Group Stats modal trigger */}
-            <div className="flex justify-between items-center bg-zinc-950/20 p-2.5 rounded-lg border border-zinc-850">
-                <span className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Actions globales de saisie</span>
-                <BatchCallStatsModal managers={managers} teams={teams} />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-950/20 p-4 rounded-xl border border-zinc-850/80">
+                <div className="space-y-1">
+                    <h3 className="text-sm font-bold text-zinc-200">Saisie Manuelle des Statistiques</h3>
+                    <p className="text-xxs text-zinc-400">Enregistrez les KPI mensuels de performance des gestionnaires.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <BatchCallStatsModal managers={managers} teams={teams} />
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* 1. Appels Form */}
-                <form onSubmit={handleCallsSubmit} className="space-y-3.5 p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl flex flex-col justify-between">
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-center border-b border-zinc-850 pb-2">
-                            <h4 className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">1. Appels Téléphoniques</h4>
-                            
-                            {loadingCallsCheck ? (
-                                <Loader2 className="h-3.5 w-3.5 text-zinc-600 animate-spin" />
-                            ) : hasCalls ? (
-                                <Badge className="bg-emerald-950/40 border-emerald-900/40 text-emerald-400 font-extrabold text-[9px] flex items-center gap-0.5 px-1.5 py-0.2 rounded">
-                                    <CheckCircle2 className="h-2.5 w-2.5" /> Saisi
-                                </Badge>
-                            ) : (
-                                <Badge className="bg-zinc-900 border-zinc-800 text-zinc-500 font-bold text-[9px] flex items-center gap-0.5 px-1.5 py-0.2 rounded">
-                                    <AlertCircle className="h-2.5 w-2.5" /> À saisir
-                                </Badge>
-                            )}
-                        </div>
-
-                        <div className="space-y-2.5 text-xs">
-                            <div>
-                                <Label className="text-zinc-500 text-[10px] mb-0.5 block">Gestionnaire</Label>
-                                <select 
-                                    name="manager_id" 
-                                    value={callManagerId}
-                                    onChange={(e) => setCallManagerId(e.target.value)}
-                                    className="w-full bg-[#121318] border border-zinc-850 rounded-lg p-2 text-white outline-none focus:border-purple-650 text-xs cursor-pointer" 
-                                    required
-                                >
-                                    {managers.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <Label className="text-zinc-500 text-[10px] mb-0.5 block">Mois</Label>
-                                <Input 
-                                    type="month" 
-                                    name="year_month" 
-                                    value={callMonth} 
-                                    onChange={(e) => setCallMonth(e.target.value)}
-                                    required 
-                                    className="bg-[#121318] border-zinc-850 h-8 text-xs text-white" 
-                                />
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <Label className="text-zinc-500 text-[10px] mb-0.5 block">Appels Totaux</Label>
-                                    <Input 
-                                        type="number" 
-                                        name="total_calls" 
-                                        placeholder="Ex: 150" 
-                                        required 
-                                        min="0" 
-                                        className="bg-[#121318] border-zinc-850 h-8 text-xs text-white" 
-                                    />
-                                </div>
-                                <div>
-                                    <Label className="text-zinc-500 text-[10px] mb-0.5 block">Répondus</Label>
-                                    <Input 
-                                        type="number" 
-                                        name="answered_calls" 
-                                        placeholder="Ex: 132" 
-                                        required 
-                                        min="0" 
-                                        className="bg-[#121318] border-zinc-850 h-8 text-xs text-white" 
-                                    />
-                                </div>
-                            </div>
-                        </div>
+            <Card className="bg-zinc-900/30 border border-zinc-850 rounded-2xl shadow-xl overflow-hidden">
+                {/* Tabs Bar */}
+                <div className="border-b border-zinc-850 p-4 bg-zinc-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex p-1 bg-zinc-950 border border-zinc-850 rounded-xl w-full sm:w-auto">
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('calls')}
+                            className={`flex-1 sm:flex-none text-xxs font-extrabold px-4 py-2 rounded-lg transition-all whitespace-nowrap ${
+                                activeTab === 'calls'
+                                    ? 'bg-zinc-800 text-purple-400 border border-purple-900/35 shadow-md'
+                                    : 'text-zinc-400 hover:text-zinc-200'
+                            }`}
+                        >
+                            📞 Appels Téléphoniques
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('comms')}
+                            className={`flex-1 sm:flex-none text-xxs font-extrabold px-4 py-2 rounded-lg transition-all whitespace-nowrap ${
+                                activeTab === 'comms'
+                                    ? 'bg-zinc-800 text-purple-400 border border-purple-900/35 shadow-md'
+                                    : 'text-zinc-400 hover:text-zinc-200'
+                            }`}
+                        >
+                            💬 Communications Reçues
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('tasks')}
+                            className={`flex-1 sm:flex-none text-xxs font-extrabold px-4 py-2 rounded-lg transition-all whitespace-nowrap ${
+                                activeTab === 'tasks'
+                                    ? 'bg-zinc-800 text-purple-400 border border-purple-900/35 shadow-md'
+                                    : 'text-zinc-400 hover:text-zinc-200'
+                            }`}
+                        >
+                            ✅ Tâches & Suivi
+                        </button>
                     </div>
 
-                    <Button 
-                        type="submit" 
-                        disabled={isPendingCalls}
-                        className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs h-8 rounded-lg mt-4 flex items-center justify-center gap-1 shadow-md"
-                    >
-                        {isPendingCalls && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                        {hasCalls ? "Mettre à jour les Appels" : "Enregistrer les Appels"}
-                    </Button>
-                </form>
-
-                {/* 2. Communications Form */}
-                <form onSubmit={handleCommsSubmit} className="space-y-3.5 p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl flex flex-col justify-between">
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-center border-b border-zinc-850 pb-2">
-                            <h4 className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">2. Communications Reçues</h4>
-                            
-                            {loadingCommsCheck ? (
-                                <Loader2 className="h-3.5 w-3.5 text-zinc-600 animate-spin" />
-                            ) : hasComms ? (
-                                <Badge className="bg-emerald-950/40 border-emerald-900/40 text-emerald-400 font-extrabold text-[9px] flex items-center gap-0.5 px-1.5 py-0.2 rounded">
-                                    <CheckCircle2 className="h-2.5 w-2.5" /> Saisi
+                    {/* Status Badge */}
+                    <div className="shrink-0 flex items-center">
+                        {activeTab === 'calls' && (
+                            loadingCallsCheck ? <Loader2 className="h-4 w-4 text-zinc-500 animate-spin" /> :
+                            hasCalls ? (
+                                <Badge className="bg-emerald-950/40 border border-emerald-800/40 text-emerald-400 font-extrabold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                    <CheckCircle2 className="h-3 w-3" /> Appels Saisis
                                 </Badge>
                             ) : (
-                                <Badge className="bg-zinc-900 border-zinc-800 text-zinc-500 font-bold text-[9px] flex items-center gap-0.5 px-1.5 py-0.2 rounded">
-                                    <AlertCircle className="h-2.5 w-2.5" /> À saisir
+                                <Badge className="bg-zinc-950 border border-zinc-800 text-zinc-500 font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                    <AlertCircle className="h-3 w-3" /> Appels à Saisir
                                 </Badge>
-                            )}
-                        </div>
-
-                        <div className="space-y-2.5 text-xs">
-                            <div>
-                                <Label className="text-zinc-500 text-[10px] mb-0.5 block">Gestionnaire</Label>
-                                <select 
-                                    name="manager_id" 
-                                    value={commManagerId}
-                                    onChange={(e) => setCommManagerId(e.target.value)}
-                                    className="w-full bg-[#121318] border border-zinc-850 rounded-lg p-2 text-white outline-none focus:border-purple-600 text-xs cursor-pointer" 
-                                    required
-                                >
-                                    {managers.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <Label className="text-zinc-500 text-[10px] mb-0.5 block">Mois</Label>
-                                <Input 
-                                    type="month" 
-                                    name="year_month" 
-                                    value={commMonth} 
-                                    onChange={(e) => setCommMonth(e.target.value)}
-                                    required 
-                                    className="bg-[#121318] border-zinc-850 h-8 text-xs text-white" 
-                                />
-                            </div>
-                            <div>
-                                <Label className="text-zinc-500 text-[10px] mb-0.5 block">Communications Reçues</Label>
-                                <Input 
-                                    type="number" 
-                                    name="communications_received" 
-                                    placeholder="Ex: 420" 
-                                    required 
-                                    min="0" 
-                                    className="bg-[#121318] border-zinc-850 h-8 text-xs text-white" 
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <Button 
-                        type="submit" 
-                        disabled={isPendingComms}
-                        className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs h-8 rounded-lg mt-4 flex items-center justify-center gap-1 shadow-md"
-                    >
-                        {isPendingComms && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                        {hasComms ? "Mettre à jour Comm." : "Enregistrer la Charge"}
-                    </Button>
-                </form>
-
-                {/* 3. Tâches Form */}
-                <form onSubmit={handleTasksSubmit} className="space-y-3.5 p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl flex flex-col justify-between">
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-center border-b border-zinc-850 pb-2">
-                            <h4 className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">3. Tâches & Suivi</h4>
-                            
-                            {loadingTasksCheck ? (
-                                <Loader2 className="h-3.5 w-3.5 text-zinc-600 animate-spin" />
-                            ) : hasTasks ? (
-                                <Badge className="bg-emerald-950/40 border-emerald-900/40 text-emerald-400 font-extrabold text-[9px] flex items-center gap-0.5 px-1.5 py-0.2 rounded">
-                                    <CheckCircle2 className="h-2.5 w-2.5" /> Saisi
+                            )
+                        )}
+                        {activeTab === 'comms' && (
+                            loadingCommsCheck ? <Loader2 className="h-4 w-4 text-zinc-500 animate-spin" /> :
+                            hasComms ? (
+                                <Badge className="bg-emerald-950/40 border border-emerald-800/40 text-emerald-400 font-extrabold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                    <CheckCircle2 className="h-3 w-3" /> Communications Saisies
                                 </Badge>
                             ) : (
-                                <Badge className="bg-zinc-900 border-zinc-800 text-zinc-500 font-bold text-[9px] flex items-center gap-0.5 px-1.5 py-0.2 rounded">
-                                    <AlertCircle className="h-2.5 w-2.5" /> À saisir
+                                <Badge className="bg-zinc-950 border border-zinc-800 text-zinc-500 font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                    <AlertCircle className="h-3 w-3" /> Comm. à Saisir
                                 </Badge>
-                            )}
-                        </div>
-
-                        <div className="space-y-2.5 text-xs">
-                            <div>
-                                <Label className="text-zinc-500 text-[10px] mb-0.5 block">Gestionnaire</Label>
-                                <select 
-                                    name="manager_id" 
-                                    value={taskManagerId}
-                                    onChange={(e) => setTaskManagerId(e.target.value)}
-                                    className="w-full bg-[#121318] border border-zinc-850 rounded-lg p-2 text-white outline-none focus:border-purple-650 text-xs cursor-pointer" 
-                                    required
-                                >
-                                    {managers.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <Label className="text-zinc-500 text-[10px] mb-0.5 block">Mois</Label>
-                                <Input 
-                                    type="month" 
-                                    name="year_month" 
-                                    value={taskMonth} 
-                                    onChange={(e) => setTaskMonth(e.target.value)}
-                                    required 
-                                    className="bg-[#121318] border-zinc-850 h-8 text-xs text-white" 
-                                />
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <Label className="text-zinc-500 text-[10px] mb-0.5 block">Tâches Ouvertes</Label>
-                                    <Input 
-                                        type="number" 
-                                        name="open_tasks" 
-                                        placeholder="Ex: 45" 
-                                        required 
-                                        min="0" 
-                                        className="bg-[#121318] border-zinc-850 h-8 text-xs text-white" 
-                                    />
-                                </div>
-                                <div>
-                                    <Label className="text-zinc-500 text-[10px] mb-0.5 block">Tâches Fermées</Label>
-                                    <Input 
-                                        type="number" 
-                                        name="closed_tasks" 
-                                        placeholder="Ex: 38" 
-                                        required 
-                                        min="0" 
-                                        className="bg-[#121318] border-zinc-850 h-8 text-xs text-white" 
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                            )
+                        )}
+                        {activeTab === 'tasks' && (
+                            loadingTasksCheck ? <Loader2 className="h-4 w-4 text-zinc-500 animate-spin" /> :
+                            hasTasks ? (
+                                <Badge className="bg-emerald-950/40 border border-emerald-800/40 text-emerald-400 font-extrabold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                    <CheckCircle2 className="h-3 w-3" /> Tâches Saisies
+                                </Badge>
+                            ) : (
+                                <Badge className="bg-zinc-950 border border-zinc-800 text-zinc-500 font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                    <AlertCircle className="h-3 w-3" /> Tâches à Saisir
+                                </Badge>
+                            )
+                        )}
                     </div>
+                </div>
 
-                    <Button 
-                        type="submit" 
-                        disabled={isPendingTasks}
-                        className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs h-8 rounded-lg mt-4 flex items-center justify-center gap-1 shadow-md"
-                    >
-                        {isPendingTasks && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                        {hasTasks ? "Mettre à jour Tâches" : "Enregistrer les Tâches"}
-                    </Button>
-                </form>
-            </div>
+                <CardContent className="p-6 bg-zinc-900/10">
+                    {/* Active Form */}
+                    {activeTab === 'calls' && (
+                        <form onSubmit={handleCallsSubmit} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-4">
+                                    <div>
+                                        <Label className="text-zinc-400 text-xs mb-1.5 block">Gestionnaire</Label>
+                                        <select 
+                                            name="manager_id" 
+                                            value={callManagerId}
+                                            onChange={(e) => setCallManagerId(e.target.value)}
+                                            className="w-full h-10 bg-zinc-950 border border-zinc-850 rounded-xl px-3 text-white outline-none focus:ring-1 focus:ring-purple-500 text-xs cursor-pointer" 
+                                            required
+                                        >
+                                            {managers.map(m => (
+                                                <option key={m.id} value={m.id} className="bg-zinc-900 text-zinc-100">
+                                                    {m.first_name} {m.last_name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <Label className="text-zinc-400 text-xs mb-1.5 block">Mois de la statistique</Label>
+                                        <Input 
+                                            type="month" 
+                                            name="year_month" 
+                                            value={callMonth} 
+                                            onChange={(e) => setCallMonth(e.target.value)}
+                                            required 
+                                            className="bg-zinc-950 border-zinc-850 h-10 text-xs text-white rounded-xl focus-visible:ring-purple-500" 
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <Label className="text-zinc-400 text-xs mb-1.5 block">Nombre total d'appels reçus</Label>
+                                        <Input 
+                                            type="number" 
+                                            name="total_calls" 
+                                            placeholder="Ex: 150" 
+                                            required 
+                                            min="0" 
+                                            className="bg-zinc-950 border-zinc-850 h-10 text-xs text-white rounded-xl focus-visible:ring-purple-500" 
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="text-zinc-400 text-xs mb-1.5 block">Nombre d'appels répondus</Label>
+                                        <Input 
+                                            type="number" 
+                                            name="answered_calls" 
+                                            placeholder="Ex: 132" 
+                                            required 
+                                            min="0" 
+                                            className="bg-zinc-950 border-zinc-850 h-10 text-xs text-white rounded-xl focus-visible:ring-purple-500" 
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end pt-4 border-t border-zinc-850/50">
+                                <Button 
+                                    type="submit" 
+                                    disabled={isPendingCalls}
+                                    className="bg-purple-650 hover:bg-purple-750 text-white font-semibold text-xs h-10 px-6 rounded-xl flex items-center justify-center gap-1.5 shadow-md w-full sm:w-auto"
+                                >
+                                    {isPendingCalls && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                                    {hasCalls ? "Mettre à jour les Appels" : "Enregistrer les Appels"}
+                                </Button>
+                            </div>
+                        </form>
+                    )}
+
+                    {activeTab === 'comms' && (
+                        <form onSubmit={handleCommsSubmit} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-4">
+                                    <div>
+                                        <Label className="text-zinc-400 text-xs mb-1.5 block">Gestionnaire</Label>
+                                        <select 
+                                            name="manager_id" 
+                                            value={commManagerId}
+                                            onChange={(e) => setCommManagerId(e.target.value)}
+                                            className="w-full h-10 bg-zinc-950 border border-zinc-850 rounded-xl px-3 text-white outline-none focus:ring-1 focus:ring-purple-500 text-xs cursor-pointer" 
+                                            required
+                                        >
+                                            {managers.map(m => (
+                                                <option key={m.id} value={m.id} className="bg-zinc-900 text-zinc-100">
+                                                    {m.first_name} {m.last_name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <Label className="text-zinc-400 text-xs mb-1.5 block">Mois de la statistique</Label>
+                                        <Input 
+                                            type="month" 
+                                            name="year_month" 
+                                            value={commMonth} 
+                                            onChange={(e) => setCommMonth(e.target.value)}
+                                            required 
+                                            className="bg-zinc-950 border-zinc-850 h-10 text-xs text-white rounded-xl focus-visible:ring-purple-500" 
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <Label className="text-zinc-400 text-xs mb-1.5 block">Volume de communications reçues</Label>
+                                        <Input 
+                                            type="number" 
+                                            name="communications_received" 
+                                            placeholder="Ex: 420" 
+                                            required 
+                                            min="0" 
+                                            className="bg-zinc-950 border-zinc-850 h-10 text-xs text-white rounded-xl focus-visible:ring-purple-500" 
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end pt-4 border-t border-zinc-850/50">
+                                <Button 
+                                    type="submit" 
+                                    disabled={isPendingComms}
+                                    className="bg-purple-650 hover:bg-purple-750 text-white font-semibold text-xs h-10 px-6 rounded-xl flex items-center justify-center gap-1.5 shadow-md w-full sm:w-auto"
+                                >
+                                    {isPendingComms && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                                    {hasComms ? "Mettre à jour Communications" : "Enregistrer la Charge"}
+                                </Button>
+                            </div>
+                        </form>
+                    )}
+
+                    {activeTab === 'tasks' && (
+                        <form onSubmit={handleTasksSubmit} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-4">
+                                    <div>
+                                        <Label className="text-zinc-400 text-xs mb-1.5 block">Gestionnaire</Label>
+                                        <select 
+                                            name="manager_id" 
+                                            value={taskManagerId}
+                                            onChange={(e) => setTaskManagerId(e.target.value)}
+                                            className="w-full h-10 bg-zinc-950 border border-zinc-850 rounded-xl px-3 text-white outline-none focus:ring-1 focus:ring-purple-500 text-xs cursor-pointer" 
+                                            required
+                                        >
+                                            {managers.map(m => (
+                                                <option key={m.id} value={m.id} className="bg-zinc-900 text-zinc-100">
+                                                    {m.first_name} {m.last_name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <Label className="text-zinc-400 text-xs mb-1.5 block">Mois de la statistique</Label>
+                                        <Input 
+                                            type="month" 
+                                            name="year_month" 
+                                            value={taskMonth} 
+                                            onChange={(e) => setTaskMonth(e.target.value)}
+                                            required 
+                                            className="bg-zinc-950 border-zinc-850 h-10 text-xs text-white rounded-xl focus-visible:ring-purple-500" 
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <Label className="text-zinc-400 text-xs mb-1.5 block">Nombre de tâches ouvertes</Label>
+                                        <Input 
+                                            type="number" 
+                                            name="open_tasks" 
+                                            placeholder="Ex: 45" 
+                                            required 
+                                            min="0" 
+                                            className="bg-zinc-950 border-zinc-850 h-10 text-xs text-white rounded-xl focus-visible:ring-purple-500" 
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="text-zinc-400 text-xs mb-1.5 block">Nombre de tâches fermées (complétées)</Label>
+                                        <Input 
+                                            type="number" 
+                                            name="closed_tasks" 
+                                            placeholder="Ex: 38" 
+                                            required 
+                                            min="0" 
+                                            className="bg-zinc-950 border-zinc-850 h-10 text-xs text-white rounded-xl focus-visible:ring-purple-500" 
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end pt-4 border-t border-zinc-850/50">
+                                <Button 
+                                    type="submit" 
+                                    disabled={isPendingTasks}
+                                    className="bg-purple-650 hover:bg-purple-750 text-white font-semibold text-xs h-10 px-6 rounded-xl flex items-center justify-center gap-1.5 shadow-md w-full sm:w-auto"
+                                >
+                                    {isPendingTasks && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                                    {hasTasks ? "Mettre à jour les Tâches" : "Enregistrer les Tâches"}
+                                </Button>
+                            </div>
+                        </form>
+                    )}
+                </CardContent>
+            </Card>
         </div>
     )
 }

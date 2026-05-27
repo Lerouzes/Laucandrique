@@ -492,7 +492,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                 </div>
             </div>
 
-            <div className="flex-1 flex gap-6 h-[calc(100vh-250px)] min-h-[500px]">
+            <div className="flex-1 flex gap-6 h-[calc(100vh-200px)] min-h-[750px]">
                 {/* Sidebar */}
                 <Card className="w-80 h-full border-zinc-800 bg-transparent flex flex-col shrink-0">
                     <CardHeader className="border-b border-zinc-800 py-3 px-4 shrink-0">

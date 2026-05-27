@@ -33,7 +33,7 @@ export default async function PlanificationPage({
                 </form>
             </div>
 
-            <div className="flex-1 min-h-[600px] h-[calc(100vh-180px)]">
+            <div className="flex-1 min-h-[750px] h-[calc(100vh-150px)]">
                 <PlanningCalendar initialProjects={projects} query={query} />
             </div>
         </div>
