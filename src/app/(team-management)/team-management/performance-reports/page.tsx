@@ -25,7 +25,6 @@ export default async function PerformanceReportsPage() {
         const stats = await getManagerStats(m.id)
         if (stats) {
             managerKPIs.push({
-                manager: m,
                 ...stats
             })
             totalPortfolioMRR += stats.mrr

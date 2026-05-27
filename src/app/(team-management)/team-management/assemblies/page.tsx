@@ -69,9 +69,9 @@ export default async function AssembliesListPage() {
                                     const clientName = e.clients ? (e.clients.company_name || e.clients.full_name) : 'Copropriété inconnue'
                                     const managerName = e.managers ? `${e.managers.first_name} ${e.managers.last_name}` : 'Inconnu'
                                     
-                                    const opsSum = e.agenda_sent_on_time + e.quorum_respected + e.voting_controlled + e.duration_reasonable + e.technical_prep_complete
-                                    const ldrSum = e.manager_controlled_room + e.discussions_on_track + e.conflict_handled_professionally + e.answers_clear_confident + e.board_confidence_level + e.financial_statement_quality
-                                    const docSum = e.pv_drafted_quickly + e.templates_respected + e.resolutions_clear + e.followup_tasks_created
+                                    const opsSum = (e.agenda_sent_on_time || 0) + (e.quorum_respected || 0) + (e.voting_controlled || 0) + (e.duration_reasonable || 0) + (e.technical_prep_complete || 0)
+                                    const ldrSum = (e.manager_controlled_room || 0) + (e.discussions_on_track || 0) + (e.conflict_handled_professionally || 0) + (e.answers_clear_confident || 0) + (e.board_confidence_level || 0) + (e.financial_statement_quality || 0)
+                                    const docSum = (e.pv_drafted_quickly || 0) + (e.templates_respected || 0) + (e.resolutions_clear || 0) + (e.followup_tasks_created || 0)
                                     
                                     const totalPoints = opsSum + ldrSum + docSum
                                     const maxPoints = 15 * 5 // 75 max points

@@ -66,7 +66,9 @@ export default async function OneOnOnesListPage() {
                             ) : (
                                 oneOnOnes.map((o) => {
                                     const managerName = o.managers ? `${o.managers.first_name} ${o.managers.last_name}` : 'Inconnu'
-                                    const callsPct = o.calls_total > 0 ? Math.round((o.calls_answered / o.calls_total) * 100) : 0
+                                    const callsTotal = o.calls_total || 0
+                                    const callsAnswered = o.calls_answered || 0
+                                    const callsPct = callsTotal > 0 ? Math.round((callsAnswered / callsTotal) * 100) : 0
                                     
                                     const statusBadge = 
                                         o.status === 'completed' 
@@ -84,7 +86,7 @@ export default async function OneOnOnesListPage() {
                                             </td>
                                             <td className="p-3 text-center font-semibold text-zinc-300">{o.late_tasks}</td>
                                             <td className="p-3 text-center text-zinc-300">
-                                                {o.calls_total > 0 ? `${callsPct}% (${o.calls_answered}/${o.calls_total})` : 'N/A'}
+                                                {callsTotal > 0 ? `${callsPct}% (${callsAnswered}/${callsTotal})` : 'N/A'}
                                             </td>
                                             <td className="p-3 text-center text-zinc-300">{o.emails_over_48h}</td>
                                             <td className="p-3 text-center">

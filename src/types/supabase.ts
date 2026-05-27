@@ -54,6 +54,7 @@ export type Database = {
           financial_statement_quality: number | null
           followup_tasks_created: number | null
           id: string
+          item_notes: Json | null
           manager_controlled_room: number | null
           manager_id: string
           notes: string | null
@@ -80,6 +81,7 @@ export type Database = {
           financial_statement_quality?: number | null
           followup_tasks_created?: number | null
           id?: string
+          item_notes?: Json | null
           manager_controlled_room?: number | null
           manager_id: string
           notes?: string | null
@@ -106,6 +108,7 @@ export type Database = {
           financial_statement_quality?: number | null
           followup_tasks_created?: number | null
           id?: string
+          item_notes?: Json | null
           manager_controlled_room?: number | null
           manager_id?: string
           notes?: string | null

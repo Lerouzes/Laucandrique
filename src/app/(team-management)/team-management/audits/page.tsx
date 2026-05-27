@@ -91,7 +91,7 @@ export default async function AuditsListPage() {
                                                 {managerName}
                                             </td>
                                             <td className="p-3 text-zinc-300 font-mono">
-                                                {new Date(a.audit_date).toLocaleDateString('fr-CA')}
+                                                {a.audit_date ? new Date(a.audit_date).toLocaleDateString('fr-CA') : 'Inconnue'}
                                             </td>
                                             <td className="p-3 text-center font-extrabold text-white">
                                                 {Math.round(score)}%

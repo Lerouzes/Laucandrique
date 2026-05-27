@@ -28,8 +28,8 @@ export default async function SyndicatesBoardPage() {
     const managerMap: Record<string, { first_name: string; last_name: string }> = {}
     ;(allManagers || []).forEach(m => { managerMap[m.id] = m })
 
-    const contractMap: Record<string, { package_name: string; monthly_fee: number }> = {}
-    ;(contracts || []).forEach(ct => { contractMap[ct.client_id] = ct })
+    const contractMap: Record<string, { package_name: string | null; monthly_fee: number | null }> = {}
+    ;(contracts || []).forEach(ct => { if (ct.client_id) contractMap[ct.client_id] = ct })
 
     // 2. Fetch audits
     const { data: audits } = await supabase

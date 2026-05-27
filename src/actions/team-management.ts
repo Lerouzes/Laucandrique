@@ -75,7 +75,7 @@ export async function getManagerStats(managerId: string) {
     // Filter active new ones
     const newYtd = (newList || []).filter(c => {
         const hasDeparture = !!c.departure_date
-        return !hasDeparture || new Date(c.departure_date) > now
+        return !hasDeparture || new Date(c.departure_date as string) > now
     }).length
 
     // 6. Last One-on-One
@@ -218,7 +218,7 @@ export async function getManagerStats(managerId: string) {
         .select('status')
         .eq('manager_id', managerId)
 
-    const approvedQuotesCount = (managerQuotes || []).filter(q => ['approved', 'completed', 'billed'].includes(q.status)).length
+    const approvedQuotesCount = (managerQuotes || []).filter(q => ['approved', 'completed', 'billed'].includes(q.status || '')).length
     const deniedQuotesCount = (managerQuotes || []).filter(q => q.status === 'denied').length
     const sentQuotesCount = (managerQuotes || []).filter(q => q.status === 'sent').length
     const quotesTotalPresented = approvedQuotesCount + deniedQuotesCount + sentQuotesCount
@@ -346,7 +346,7 @@ export async function getGlobalTeamStats() {
         .from('quotes')
         .select('status')
 
-    const globalApproved = (allQuotes || []).filter(q => ['approved', 'completed', 'billed'].includes(q.status)).length
+    const globalApproved = (allQuotes || []).filter(q => ['approved', 'completed', 'billed'].includes(q.status || '')).length
     const globalDenied = (allQuotes || []).filter(q => q.status === 'denied').length
     const globalSent = (allQuotes || []).filter(q => q.status === 'sent').length
     const globalTotalPresented = globalApproved + globalDenied + globalSent
@@ -954,6 +954,9 @@ export async function updateOneOnOneAction(id: string, data: {
         .eq('id', id)
         .single()
 
+    if (!oldMeeting) throw new Error("One-on-One meeting not found")
+    const managerId = oldMeeting.manager_id
+
     // Update meeting
     const { error: err } = await supabase
         .from('one_on_ones')
@@ -1154,7 +1157,7 @@ export async function updateOneOnOneAction(id: string, data: {
                 await supabase
                     .from('manager_operational_risks')
                     .insert({
-                        manager_id: oldMeeting?.manager_id,
+                        manager_id: managerId,
                         one_on_one_id: id,
                         description: r.description,
                         severity: r.severity,
@@ -1169,9 +1172,7 @@ export async function updateOneOnOneAction(id: string, data: {
     revalidatePath('/team-management/one-on-ones')
     revalidatePath('/team-management/complaints')
     revalidatePath(`/team-management/one-on-ones/${id}`)
-    if (oldMeeting?.manager_id) {
-        revalidatePath(`/team-management/managers/${oldMeeting.manager_id}`)
-    }
+    revalidatePath(`/team-management/managers/${managerId}`)
 }
 
 // ==========================================

@@ -94,7 +94,7 @@ export default async function AuditDetailPage({
                         <h2 className="text-sm font-bold text-white uppercase">{clientName}</h2>
                         <p className="text-[10px] text-zinc-400">
                             Gestionnaire responsable : <strong className="text-zinc-300">{managerName}</strong> · 
-                            Audit du {new Date(audit.audit_date).toLocaleDateString('fr-CA')}
+                            Audit du {audit.audit_date ? new Date(audit.audit_date).toLocaleDateString('fr-CA') : 'Inconnue'}
                         </p>
                     </div>
                 </div>
@@ -152,11 +152,11 @@ export default async function AuditDetailPage({
                                                 {Array.from({ length: 5 }).map((_, i) => (
                                                     <Star 
                                                         key={i} 
-                                                        className={`h-3 w-3 ${i < ans.score ? 'fill-purple-400 text-purple-400' : 'text-zinc-800'}`} 
+                                                        className={`h-3 w-3 ${i < (ans.score || 0) ? 'fill-purple-400 text-purple-400' : 'text-zinc-800'}`} 
                                                     />
                                                 ))}
                                             </div>
-                                            <span className="font-bold text-zinc-300">{ans.score}/5</span>
+                                            <span className="font-bold text-zinc-300">{(ans.score || 0)}/5</span>
                                         </div>
                                         <div className="md:col-span-4 text-[10px] text-zinc-400 italic">
                                             {ans.note || '-'}

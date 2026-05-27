@@ -45,9 +45,9 @@ export default async function AssemblyDetailPage({
     const clientName = evalData.clients ? (evalData.clients.company_name || evalData.clients.full_name) : 'Copropriété inconnue'
     const managerName = evalData.managers ? `${evalData.managers.first_name} ${evalData.managers.last_name}` : 'Inconnu'
     
-    const opsSum = evalData.agenda_sent_on_time + evalData.quorum_respected + evalData.voting_controlled + evalData.duration_reasonable + evalData.technical_prep_complete
-    const ldrSum = evalData.manager_controlled_room + evalData.discussions_on_track + evalData.conflict_handled_professionally + evalData.answers_clear_confident + evalData.board_confidence_level + evalData.financial_statement_quality
-    const docSum = evalData.pv_drafted_quickly + evalData.templates_respected + evalData.resolutions_clear + evalData.followup_tasks_created
+    const opsSum = (evalData.agenda_sent_on_time || 0) + (evalData.quorum_respected || 0) + (evalData.voting_controlled || 0) + (evalData.duration_reasonable || 0) + (evalData.technical_prep_complete || 0)
+    const ldrSum = (evalData.manager_controlled_room || 0) + (evalData.discussions_on_track || 0) + (evalData.conflict_handled_professionally || 0) + (evalData.answers_clear_confident || 0) + (evalData.board_confidence_level || 0) + (evalData.financial_statement_quality || 0)
+    const docSum = (evalData.pv_drafted_quickly || 0) + (evalData.templates_respected || 0) + (evalData.resolutions_clear || 0) + (evalData.followup_tasks_created || 0)
     
     const totalPoints = opsSum + ldrSum + docSum
     const maxPoints = 15 * 5 // 75 max points
@@ -60,27 +60,27 @@ export default async function AssemblyDetailPage({
         'text-rose-400 border-rose-800/40 bg-rose-950/20'
 
     const opQuestions = [
-        { key: 'agenda_sent_on_time', val: evalData.agenda_sent_on_time },
-        { key: 'quorum_respected', val: evalData.quorum_respected },
-        { key: 'voting_controlled', val: evalData.voting_controlled },
-        { key: 'duration_reasonable', val: evalData.duration_reasonable },
-        { key: 'technical_prep_complete', val: evalData.technical_prep_complete }
+        { key: 'agenda_sent_on_time', val: evalData.agenda_sent_on_time || 0 },
+        { key: 'quorum_respected', val: evalData.quorum_respected || 0 },
+        { key: 'voting_controlled', val: evalData.voting_controlled || 0 },
+        { key: 'duration_reasonable', val: evalData.duration_reasonable || 0 },
+        { key: 'technical_prep_complete', val: evalData.technical_prep_complete || 0 }
     ]
 
     const ldrQuestions = [
-        { key: 'manager_controlled_room', val: evalData.manager_controlled_room },
-        { key: 'discussions_on_track', val: evalData.discussions_on_track },
-        { key: 'conflict_handled_professionally', val: evalData.conflict_handled_professionally },
-        { key: 'answers_clear_confident', val: evalData.answers_clear_confident },
-        { key: 'board_confidence_level', val: evalData.board_confidence_level },
-        { key: 'financial_statement_quality', val: evalData.financial_statement_quality }
+        { key: 'manager_controlled_room', val: evalData.manager_controlled_room || 0 },
+        { key: 'discussions_on_track', val: evalData.discussions_on_track || 0 },
+        { key: 'conflict_handled_professionally', val: evalData.conflict_handled_professionally || 0 },
+        { key: 'answers_clear_confident', val: evalData.answers_clear_confident || 0 },
+        { key: 'board_confidence_level', val: evalData.board_confidence_level || 0 },
+        { key: 'financial_statement_quality', val: evalData.financial_statement_quality || 0 }
     ]
 
     const docQuestions = [
-        { key: 'pv_drafted_quickly', val: evalData.pv_drafted_quickly },
-        { key: 'templates_respected', val: evalData.templates_respected },
-        { key: 'resolutions_clear', val: evalData.resolutions_clear },
-        { key: 'followup_tasks_created', val: evalData.followup_tasks_created }
+        { key: 'pv_drafted_quickly', val: evalData.pv_drafted_quickly || 0 },
+        { key: 'templates_respected', val: evalData.templates_respected || 0 },
+        { key: 'resolutions_clear', val: evalData.resolutions_clear || 0 },
+        { key: 'followup_tasks_created', val: evalData.followup_tasks_created || 0 }
     ]
 
     return (
@@ -168,7 +168,8 @@ export default async function AssemblyDetailPage({
                     <CardContent className="pt-4 space-y-4 text-xxs">
                         {sect.list.map(c => {
                             const label = CRITERIA_LABELS[c.key] || c.key
-                            const note = evalData.item_notes?.[c.key]
+                            const itemNotes = (evalData.item_notes as Record<string, string> | null) || {}
+                            const note = itemNotes[c.key]
                             return (
                                 <div key={c.key} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border-b border-zinc-900 pb-4 last:border-b-0 last:pb-0">
                                     <div className="md:col-span-8 font-semibold text-zinc-200">
