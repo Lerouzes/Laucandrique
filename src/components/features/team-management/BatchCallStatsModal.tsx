@@ -249,7 +249,7 @@ export function BatchCallStatsModal({ managers = [] }: BatchCallStatsModalProps)
                 Saisie Groupée
             </DialogTrigger>
 
-            <DialogContent className="max-w-4xl bg-zinc-950 border-zinc-800 text-zinc-100 max-h-[95vh] flex flex-col p-6 rounded-xl shadow-2xl">
+            <DialogContent className="sm:max-w-4xl w-full bg-zinc-950 border-zinc-800 text-zinc-100 max-h-[95vh] flex flex-col p-6 rounded-xl shadow-2xl">
                 <DialogHeader className="pb-4 border-b border-zinc-900">
                     <DialogTitle className="text-lg font-bold flex items-center gap-2 text-white">
                         <FileSpreadsheet className="h-5 w-5 text-purple-400" />
