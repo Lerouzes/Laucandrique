@@ -1,7 +1,7 @@
 'use client'
 
 import { User } from '@supabase/supabase-js'
-import { LogOut, Menu, User2 } from 'lucide-react'
+import { LogOut, Menu } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
@@ -9,10 +9,23 @@ import { TeamManagementSidebar } from '@/components/shared/TeamManagementSidebar
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Database } from '@/types/supabase'
+import { setSelectedTeamCookieAction } from '@/actions/team-management'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
+type Team = { id: string; name: string }
+type TeamContext = { role: string; teamId: string | null; isRestricted: boolean; managedTeamId: string | null }
 
-export function TeamManagementHeader({ user, profile }: { user: User, profile: Profile | null }) {
+export function TeamManagementHeader({ 
+    user, 
+    profile,
+    teams = [],
+    activeContext
+}: { 
+    user: User
+    profile: Profile | null
+    teams?: Team[]
+    activeContext: TeamContext
+}) {
     const router = useRouter()
     const supabase = createClient()
 
@@ -45,6 +58,38 @@ export function TeamManagementHeader({ user, profile }: { user: User, profile: P
                         </div>
                     </SheetContent>
                 </Sheet>
+            </div>
+
+            {/* Team Selection Dropdown / Read-only Team Badge */}
+            <div className="flex items-center gap-2">
+                {!activeContext.isRestricted ? (
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider hidden sm:inline-block">Équipe :</span>
+                        <select
+                            value={activeContext.teamId || 'all'}
+                            onChange={async (e) => {
+                                const val = e.target.value === 'all' ? null : e.target.value
+                                await setSelectedTeamCookieAction(val)
+                                router.refresh()
+                            }}
+                            className="bg-[#121318] border border-zinc-800 rounded-lg px-2.5 py-1 text-xs text-zinc-300 font-semibold outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600/30 cursor-pointer"
+                        >
+                            <option value="all">Toutes les équipes</option>
+                            {teams.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                    {t.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                ) : (
+                    activeContext.teamId && (
+                        <div className="flex items-center gap-1.5 bg-blue-950/20 border border-blue-900/40 text-blue-400 text-[10px] font-bold px-2.5 py-1 rounded-lg">
+                            <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+                            Équipe : {teams.find(t => t.id === activeContext.teamId)?.name || 'Assignée'}
+                        </div>
+                    )
+                )}
             </div>
 
             {/* Profile Info & Actions on the Right */}

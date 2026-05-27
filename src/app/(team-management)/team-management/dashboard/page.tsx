@@ -1,11 +1,9 @@
-import { getGlobalTeamStats, saveMonthlyCallsAction, saveMonthlyWorkloadAction } from '@/actions/team-management'
-import { getManagers } from '@/actions/managers'
+import { getGlobalTeamStats } from '@/actions/team-management'
+import { getManagers, getManagerTeams } from '@/actions/managers'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { BatchCallStatsModal } from '@/components/features/team-management/BatchCallStatsModal'
 import { CallsStatsPanel } from '@/components/features/team-management/CallsStatsPanel'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { DashboardFilterBar } from '@/components/features/team-management/DashboardFilterBar'
+import { ManualStatsEntryCards } from '@/components/features/team-management/ManualStatsEntryCards'
 import { 
     Building2, 
     DoorOpen, 
@@ -14,64 +12,126 @@ import {
     ShieldAlert, 
     UserMinus, 
     UserPlus, 
-    AlertTriangle,
-    FileSpreadsheet,
-    PlusCircle,
-    Calendar,
-    Award
+    FileSpreadsheet, 
+    PhoneCall,
+    Mail,
+    CheckSquare,
+    TrendingUp,
+    TrendingDown,
+    Activity
 } from 'lucide-react'
 
-export default async function TeamManagementDashboard() {
-    const [stats, managers] = await Promise.all([
-        getGlobalTeamStats(),
-        getManagers()
-    ])
+export default async function TeamManagementDashboard(props: {
+    searchParams: Promise<{ range?: string; from?: string; to?: string }>
+}) {
+    const searchParams = await props.searchParams
+    const range = searchParams.range || 'current-year'
+    const from = searchParams.from
+    const to = searchParams.to
 
-    const now = new Date()
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const [stats, managers, teams] = await Promise.all([
+        getGlobalTeamStats({ range, fromMonth: from, toMonth: to }),
+        getManagers(),
+        getManagerTeams()
+    ])
 
     const packageData = Object.entries(stats.packageCounts).map(([name, count]) => ({
         name,
         count
     }))
 
+    const getCallColor = (pct: number) => {
+        if (pct >= 80) return 'text-emerald-400'
+        if (pct > 55) return 'text-amber-450 text-amber-400'
+        return 'text-rose-500'
+    }
+
+    const getFrenchRangeLabel = (rangeStr: string) => {
+        if (rangeStr === 'this-month') return 'ce mois'
+        if (rangeStr === 'last-month') return 'le mois dernier'
+        if (rangeStr === 'current-quarter') return 'ce trimestre'
+        if (rangeStr === 'custom') return 'la période personnalisée'
+        return 'cette année'
+    }
+
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div>
-                <h2 className="text-xl font-bold tracking-tight text-white uppercase">Tableau de bord Gestion d'Équipe</h2>
-                <p className="text-xs text-zinc-400">
-                    Aperçu stratégique de la charge de travail, de la conformité réglementaire et de la satisfaction client.
-                </p>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 className="text-xl font-bold tracking-tight text-white uppercase">Tableau de bord Gestion d'Équipe</h2>
+                    <p className="text-xs text-zinc-400">
+                        Aperçu stratégique de la charge de travail, de la conformité réglementaire et de la satisfaction client.
+                    </p>
+                </div>
             </div>
 
-            {/* Metrics cards */}
-            <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+            {/* Filter Bar */}
+            <DashboardFilterBar />
+
+            {/* Metrics cards grid */}
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
+                {/* 1. Calls stats */}
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Syndicats Actifs</CardTitle>
+                        <CardTitle className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Appels Répondus</CardTitle>
+                        <PhoneCall className="h-4 w-4 text-purple-400" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-xl font-extrabold text-white flex items-baseline gap-1.5">
+                            {stats.totalCalls > 0 ? (
+                                <>
+                                    <span className={getCallColor(stats.callsAnsweredPct)}>{stats.callsAnsweredPct}%</span>
+                                    <span className="text-[10px] text-zinc-500 font-normal">({stats.answeredCalls}/{stats.totalCalls})</span>
+                                </>
+                            ) : (
+                                <span className="text-zinc-500 italic text-xs">Aucun appel</span>
+                            )}
+                        </div>
+                        <p className="text-[10px] text-zinc-500 mt-1">Appels reçus sur {getFrenchRangeLabel(range)}</p>
+                    </CardContent>
+                </Card>
+
+                {/* 2. Communications */}
+                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                        <CardTitle className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Communications</CardTitle>
+                        <Mail className="h-4 w-4 text-purple-400" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-xl font-extrabold text-white">{stats.totalCommunications}</div>
+                        <p className="text-[10px] text-zinc-500 mt-1">Moyenne: {stats.communicationsPerManager} / gestionnaire</p>
+                    </CardContent>
+                </Card>
+
+                {/* 3. Tasks */}
+                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                        <CardTitle className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Complétion Tâches</CardTitle>
+                        <CheckSquare className="h-4 w-4 text-purple-400" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-xl font-extrabold text-white">{stats.taskCompletionRate}%</div>
+                        <p className="text-[10px] text-zinc-500 mt-1">Ouvertes: {stats.totalOpenTasks} | Fermées: {stats.totalClosedTasks}</p>
+                    </CardContent>
+                </Card>
+
+                {/* 4. Active Portfolio */}
+                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                        <CardTitle className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Syndicats & Portes</CardTitle>
                         <Building2 className="h-4 w-4 text-purple-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-xl font-extrabold text-white">{stats.totalSyndicates}</div>
-                        <p className="text-[10px] text-zinc-500 mt-1">Syndicats sous contrat actif</p>
+                        <div className="text-xl font-extrabold text-white">{stats.totalSyndicates} <span className="text-xs text-zinc-500 font-normal">({stats.totalDoors} portes)</span></div>
+                        <p className="text-[10px] text-zinc-500 mt-1">Total des actifs administrés</p>
                     </CardContent>
                 </Card>
 
+                {/* 5. Recurring Revenue */}
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Portes Totales</CardTitle>
-                        <DoorOpen className="h-4 w-4 text-purple-400" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-xl font-extrabold text-white">{stats.totalDoors}</div>
-                        <p className="text-[10px] text-zinc-500 mt-1">Unités administrées</p>
-                    </CardContent>
-                </Card>
-
-                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Revenu Mensuel Récurrent</CardTitle>
+                        <CardTitle className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Revenu Récurrent (MRR)</CardTitle>
                         <DollarSign className="h-4 w-4 text-emerald-400" />
                     </CardHeader>
                     <CardContent>
@@ -79,69 +139,62 @@ export default async function TeamManagementDashboard() {
                         <p className="text-[10px] text-zinc-500 mt-1">Honoraires de gestion récurrents</p>
                     </CardContent>
                 </Card>
-
-                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Rencontres YTD</CardTitle>
-                        <Handshake className="h-4 w-4 text-purple-400" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-xl font-extrabold text-white">{stats.meetingsCount}</div>
-                        <p className="text-[10px] text-zinc-500 mt-1">Rencontres 1-à-1 complétées</p>
-                    </CardContent>
-                </Card>
-
-                <Card className="bg-[#16171e]/70 border-zinc-800/80 border-purple-900/30 shadow-md">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-xxs font-bold text-purple-400 uppercase tracking-wider">Projets Approuvés</CardTitle>
-                        <Award className="h-4 w-4 text-purple-400" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-xl font-extrabold text-white">{stats.quoteApprovalRate}%</div>
-                        <p className="text-[10px] text-zinc-500 mt-1">Taux d'approbation global (Ops)</p>
-                    </CardContent>
-                </Card>
             </div>
 
-            {/* Risk, Lost & New Row */}
-            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+            {/* Row 2: Secondary indicators */}
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                    <CardHeader className="pb-2">
-                        <CardDescription className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Syndicats à Risque</CardDescription>
+                    <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0">
+                        <span className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Alignements 1v1</span>
+                        <Handshake className="h-4 w-4 text-purple-400" />
                     </CardHeader>
-                    <CardContent className="flex items-center justify-between">
-                        <div className="text-lg font-bold text-amber-400">{stats.atRiskCount}</div>
+                    <CardContent className="pb-3">
+                        <div className="text-lg font-extrabold text-white">{stats.meetingsCount}</div>
+                        <p className="text-[9px] text-zinc-500">Rencontres complétées</p>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                    <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0">
+                        <span className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Syndicats à Risque</span>
+                        <Activity className="h-4 w-4 text-amber-400" />
+                    </CardHeader>
+                    <CardContent className="pb-3 flex items-center justify-between">
+                        <div className="text-lg font-extrabold text-amber-400">{stats.atRiskCount}</div>
                         <div className="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></div>
                     </CardContent>
                 </Card>
 
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                    <CardHeader className="pb-2">
-                        <CardDescription className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Dossiers Critiques</CardDescription>
+                    <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0">
+                        <span className="text-xxs font-bold text-rose-400 uppercase tracking-wider">Dossiers Critiques</span>
+                        <ShieldAlert className="h-4 w-4 text-rose-500" />
                     </CardHeader>
-                    <CardContent className="flex items-center justify-between">
-                        <div className="text-lg font-bold text-rose-500">{stats.criticalCount}</div>
+                    <CardContent className="pb-3 flex items-center justify-between">
+                        <div className="text-lg font-extrabold text-rose-500">{stats.criticalCount}</div>
                         <div className="h-2 w-2 rounded-full bg-rose-500 animate-pulse"></div>
                     </CardContent>
                 </Card>
 
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Nouveaux YTD</CardTitle>
-                        <UserPlus className="h-4 w-4 text-emerald-400" />
+                    <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0">
+                        <span className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Nouveaux</span>
+                        <UserPlus className="h-4 w-4 text-emerald-450 text-emerald-400" />
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-lg font-bold text-white">+{stats.newYtd}</div>
+                    <CardContent className="pb-3">
+                        <div className="text-lg font-extrabold text-white">+{stats.newYtd}</div>
+                        <p className="text-[9px] text-zinc-500">Mouvement entrant</p>
                     </CardContent>
                 </Card>
 
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Perdus YTD</CardTitle>
+                    <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0">
+                        <span className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Perdus</span>
                         <UserMinus className="h-4 w-4 text-rose-500" />
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-lg font-bold text-white">-{stats.lostYtd}</div>
+                    <CardContent className="pb-3">
+                        <div className="text-lg font-extrabold text-white">-{stats.lostYtd}</div>
+                        <p className="text-[9px] text-zinc-500">Mouvement sortant</p>
                     </CardContent>
                 </Card>
             </div>
@@ -183,85 +236,23 @@ export default async function TeamManagementDashboard() {
                     </CardContent>
                 </Card>
 
-                {/* Manual entry card */}
+                {/* Manual stats entry split component */}
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardHeader>
                         <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-                            <PlusCircle className="h-4 w-4 text-purple-400" />
                             Saisie Manuelle des Indicateurs
                         </CardTitle>
                         <CardDescription className="text-xxs text-zinc-400">
-                            Enregistrer les appels et la charge de travail mensuelle des gestionnaires.
+                            Enregistrer les appels, les courriels reçus et le suivi des tâches des gestionnaires.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-6">
-                        {/* Call Stats Input */}
-                        <form action={saveMonthlyCallsAction} className="space-y-3 p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl">
-                            <div className="flex justify-between items-center mb-1">
-                                <h4 className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Statistiques d'Appels</h4>
-                                <BatchCallStatsModal managers={managers} />
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 text-xxs">
-                                <div>
-                                    <Label className="text-zinc-400 mb-1 block">Gestionnaire</Label>
-                                    <select name="manager_id" className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600" required>
-                                        {managers.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <Label className="text-zinc-400 mb-1 block">Mois</Label>
-                                    <Input type="month" name="year_month" defaultValue={currentMonth} required className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
-                                </div>
-                                <div>
-                                    <Label className="text-zinc-400 mb-1 block">Appels Totaux</Label>
-                                    <Input type="number" name="total_calls" placeholder="Ex: 150" required min="0" className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
-                                </div>
-                                <div>
-                                    <Label className="text-zinc-400 mb-1 block">Appels Répondus</Label>
-                                    <Input type="number" name="answered_calls" placeholder="Ex: 132" required min="0" className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
-                                </div>
-                            </div>
-                            <Button type="submit" size="sm" className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs h-8 rounded-lg mt-1">
-                                Enregistrer les Appels
-                            </Button>
-                        </form>
-
-                        {/* Workload Stats Input */}
-                        <form action={saveMonthlyWorkloadAction} className="space-y-3 p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl">
-                            <h4 className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Tâches & Communications</h4>
-                            <div className="grid grid-cols-2 gap-2 text-xxs">
-                                <div className="col-span-2">
-                                    <Label className="text-zinc-400 mb-1 block">Gestionnaire</Label>
-                                    <select name="manager_id" className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600" required>
-                                        {managers.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <Label className="text-zinc-400 mb-1 block">Mois</Label>
-                                    <Input type="month" name="year_month" defaultValue={currentMonth} required className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
-                                </div>
-                                <div>
-                                    <Label className="text-zinc-400 mb-1 block">Communications Reçues</Label>
-                                    <Input type="number" name="communications_received" placeholder="Ex: 400" required min="0" className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
-                                </div>
-                                <div>
-                                    <Label className="text-zinc-400 mb-1 block">Tâches Ouvertes</Label>
-                                    <Input type="number" name="open_tasks" placeholder="Ex: 45" required min="0" className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
-                                </div>
-                                <div>
-                                    <Label className="text-zinc-400 mb-1 block">Tâches Fermées</Label>
-                                    <Input type="number" name="closed_tasks" placeholder="Ex: 38" required min="0" className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" />
-                                </div>
-                            </div>
-                            <Button type="submit" size="sm" className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs h-8 rounded-lg mt-1">
-                                Enregistrer la Charge
-                            </Button>
-                        </form>
+                    <CardContent className="pt-2">
+                        <ManualStatsEntryCards managers={managers} teams={teams} />
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Calls Statistics Panel – interactive, month navigation + custom range */}
+            {/* Calls Statistics Panel */}
             <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                 <CardHeader>
                     <CardTitle className="text-sm font-bold text-white flex items-center gap-2">

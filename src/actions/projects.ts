@@ -3,6 +3,24 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
+function getMonthsSpanned(startIso: string, endIso: string): string[] {
+    const start = new Date(startIso)
+    const end = new Date(endIso)
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return []
+    
+    const months: string[] = []
+    const current = new Date(start.getFullYear(), start.getMonth(), 1)
+    const endLimit = new Date(end.getFullYear(), end.getMonth(), 1)
+    
+    while (current <= endLimit) {
+        const year = current.getFullYear()
+        const month = String(current.getMonth() + 1).padStart(2, '0')
+        months.push(`${year}-${month}`)
+        current.setMonth(current.getMonth() + 1)
+    }
+    return months
+}
+
 export async function getProjects(query?: string) {
     const supabase = await createClient()
 
@@ -32,11 +50,14 @@ export async function getProjects(query?: string) {
 export async function updateProjectDates(projectId: string, startDate: string, endDate: string) {
     const supabase = await createClient()
 
+    const plannedMonths = getMonthsSpanned(startDate, endDate)
+
     // if dates are updated via calendar, it becomes 'planned' if it was unplanned
     const { error } = await supabase.from('projects').update({
         start_date: startDate,
         end_date: endDate,
-        status: 'planned'
+        status: 'planned',
+        planned_months: plannedMonths
     }).eq('id', projectId)
 
     if (error) throw new Error(error.message)
@@ -46,29 +67,55 @@ export async function updateProjectDates(projectId: string, startDate: string, e
     return { success: true }
 }
 
-export async function updateProjectStatus(projectId: string, status: 'unplanned' | 'planned' | 'in_progress' | 'completed') {
+export async function updateProjectStatus(
+    projectId: string, 
+    status: 'unplanned' | 'planned' | 'in_progress' | 'completed' | 'deferred' | 'cancelled'
+) {
     const supabase = await createClient()
 
     const updates: any = { status }
-    if (status === 'completed') updates.completed_at = new Date().toISOString()
+    if (status === 'completed') {
+        updates.completed_at = new Date().toISOString()
+    } else {
+        updates.completed_at = null
+    }
+
     if (status === 'unplanned') {
         updates.start_date = null
         updates.end_date = null
     }
 
+    if (status === 'deferred') {
+        updates.start_date = null
+        updates.end_date = null
+        updates.contractor_id = null
+    }
+
     const { data: project, error: projectFetchError } = await supabase
         .from('projects')
-        .select('quote_id')
+        .select('quote_id, completed_months')
         .eq('id', projectId)
         .maybeSingle()
 
     if (projectFetchError) throw new Error(projectFetchError.message)
 
+    if (status === 'completed') {
+        const now = new Date()
+        const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+        const existingCompleted = project?.completed_months || []
+        if (!existingCompleted.includes(currentMonth)) {
+            updates.completed_months = [...existingCompleted, currentMonth]
+        }
+    }
+
     const { error } = await supabase.from('projects').update(updates).eq('id', projectId)
     if (error) throw new Error(error.message)
 
     if (project?.quote_id) {
-        const quoteStatus = status === 'completed' ? 'completed' : 'approved'
+        let quoteStatus: 'completed' | 'draft' | 'sent' | 'approved' | 'denied' | 'billed' = 'approved'
+        if (status === 'completed') quoteStatus = 'completed'
+        else if (status === 'cancelled') quoteStatus = 'denied'
+
         const { error: quoteError } = await supabase
             .from('quotes')
             .update({ status: quoteStatus })
@@ -88,16 +135,27 @@ export async function markProjectCompletedByQuote(quoteId: string) {
 
     const { data: project, error: findError } = await supabase
         .from('projects')
-        .select('id')
+        .select('id, completed_months')
         .eq('quote_id', quoteId)
         .maybeSingle()
 
     if (findError) throw new Error(findError.message)
     if (!project?.id) throw new Error('Aucun projet lié à cette soumission.')
 
+    const now = new Date()
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const existingCompleted = project?.completed_months || []
+    const newCompleted = existingCompleted.includes(currentMonth)
+        ? existingCompleted
+        : [...existingCompleted, currentMonth]
+
     const { error } = await supabase
         .from('projects')
-        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .update({ 
+            status: 'completed', 
+            completed_at: now.toISOString(),
+            completed_months: newCompleted
+        })
         .eq('id', project.id)
 
     if (error) throw new Error(error.message)
@@ -142,12 +200,15 @@ export async function scheduleProjectStartByQuote(quoteId: string, startDateIso:
         end.setDate(end.getDate() + (Math.ceil(durationDays) - 1))
     }
 
+    const plannedMonths = getMonthsSpanned(start.toISOString(), end.toISOString())
+
     const { error } = await supabase
         .from('projects')
         .update({
             start_date: start.toISOString(),
             end_date: end.toISOString(),
             status: 'planned',
+            planned_months: plannedMonths
         })
         .eq('id', project.id)
 

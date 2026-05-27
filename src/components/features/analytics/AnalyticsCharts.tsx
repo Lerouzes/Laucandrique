@@ -42,8 +42,8 @@ export function AnalyticsCharts({ monthlyRevenue }: { monthlyRevenue: any[] }) {
                                         boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)'
                                     }} 
                                     itemStyle={{ color: '#f4f4f5' }}
-                                    formatter={(value: number, name: string) => [
-                                        `$${value.toLocaleString('fr-CA')}`, 
+                                    formatter={(value: any, name: any) => [
+                                        `$${Number(value || 0).toLocaleString('fr-CA')}`, 
                                         name
                                     ]}
                                     labelStyle={{ color: '#a1a1aa', fontWeight: 'bold' }}

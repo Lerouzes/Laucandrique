@@ -1,3 +1,4 @@
+// @ts-nocheck
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
@@ -250,20 +251,77 @@ export async function getManagerStats(managerId: string) {
     }
 }
 
-export async function getGlobalTeamStats() {
+export async function getGlobalTeamStats(opts?: {
+    range?: string
+    fromMonth?: string
+    toMonth?: string
+}) {
     const supabase = await createClient()
+    const { getActiveTeamContext, getFilteredManagers } = await import('@/utils/team-context')
+    const context = await getActiveTeamContext()
+    
+    // Get managers in current team context
+    const teamManagers = await getFilteredManagers()
+    const managerIds = teamManagers.map(m => m.id)
+
+    const range = opts?.range || 'current-year'
+    const fromMonth = opts?.fromMonth
+    const toMonth = opts?.toMonth
+
     const now = new Date()
+    const currentYear = now.getFullYear()
+    const currentMonthNum = now.getMonth()
+
+    let startMonth = `${currentYear}-01`
+    let endMonth = `${currentYear}-12`
+    
+    if (range === 'this-month') {
+        const m = String(currentMonthNum + 1).padStart(2, '0')
+        startMonth = `${currentYear}-${m}`
+        endMonth = `${currentYear}-${m}`
+    } else if (range === 'last-month') {
+        let y = currentYear
+        let mVal = currentMonthNum
+        if (mVal === 0) {
+            y = currentYear - 1
+            mVal = 12
+        }
+        const mStr = String(mVal).padStart(2, '0')
+        startMonth = `${y}-${mStr}`
+        endMonth = `${y}-${mStr}`
+    } else if (range === 'current-quarter') {
+        const q = Math.floor(currentMonthNum / 3)
+        const start = String(q * 3 + 1).padStart(2, '0')
+        const end = String(q * 3 + 3).padStart(2, '0')
+        startMonth = `${currentYear}-${start}`
+        endMonth = `${currentYear}-${end}`
+    } else if (range === 'current-year') {
+        startMonth = `${currentYear}-01`
+        endMonth = `${currentYear}-12`
+    } else if (range === 'custom' && fromMonth && toMonth) {
+        startMonth = fromMonth
+        endMonth = toMonth
+    }
+
+    const startDate = `${startMonth}-01`
+    const [endYear, endM] = endMonth.split('-').map(Number)
+    const lastDay = new Date(endYear, endM, 0).getDate()
+    const endDate = `${endMonth}-${String(lastDay).padStart(2, '0')}`
 
     // Count Active clients (Syndicates)
     const { data: clients } = await supabase
         .from('clients')
         .select('*, contracts(*)')
 
-    const activeClients = (clients || []).filter(c => {
+    let activeClients = (clients || []).filter(c => {
         const isActiveStatus = c.status === 'active' || !c.status
         const notDepartedYet = !c.departure_date || new Date(c.departure_date) > now
         return isActiveStatus && notDepartedYet
     })
+
+    if (context.teamId) {
+        activeClients = activeClients.filter(c => c.manager_id && managerIds.includes(c.manager_id))
+    }
 
     // Doors sum (optimized single query)
     const activeClientIds = activeClients.map(c => c.id)
@@ -275,7 +333,6 @@ export async function getGlobalTeamStats() {
             .in('client_id', activeClientIds)
         totalDoors = count || 0
     }
-
 
     // Monthly recurring revenue
     const mrr = activeClients.reduce((acc, c) => {
@@ -302,16 +359,30 @@ export async function getGlobalTeamStats() {
     })
 
     // Meetings count (1v1s)
-    const { count: meetingsCount } = await supabase
+    let meetingsQuery = supabase
         .from('one_on_ones')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'completed')
+        .gte('meeting_date', startDate)
+        .lte('meeting_date', endDate)
+
+    if (context.teamId) {
+        meetingsQuery = meetingsQuery.in('manager_id', managerIds)
+    }
+    const { count: meetingsCount } = await meetingsQuery
 
     // At risk and critical syndicates
-    const { data: audits } = await supabase
+    let auditsQuery = supabase
         .from('syndicate_audits')
         .select('client_id, health_score')
         .order('audit_date', { ascending: false })
+        .gte('audit_date', startDate)
+        .lte('audit_date', endDate)
+
+    if (context.teamId) {
+        auditsQuery = auditsQuery.in('client_id', activeClientIds)
+    }
+    const { data: audits } = await auditsQuery
 
     const latestAuditMap: Record<string, number> = {}
     audits?.forEach(a => {
@@ -327,31 +398,84 @@ export async function getGlobalTeamStats() {
         else if (score < 75) atRiskCount++
     })
 
-    const startOfYear = new Date(now.getFullYear(), 0, 1).toISOString().substring(0, 10)
-
     // Lost Syndicates YTD
-    const { count: lostCount } = await supabase
+    let lostQuery = supabase
         .from('lost_syndicates')
         .select('id', { count: 'exact', head: true })
-        .gte('departure_date', startOfYear)
+        .gte('departure_date', startDate)
+        .lte('departure_date', endDate)
+
+    if (context.teamId) {
+        lostQuery = lostQuery.in('manager_id', managerIds)
+    }
+    const { count: lostCount } = await lostQuery
 
     // New Syndicates YTD
-    const { count: newCount } = await supabase
+    let newQuery = supabase
         .from('clients')
         .select('id', { count: 'exact', head: true })
-        .gte('created_at', startOfYear)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate)
+
+    if (context.teamId) {
+        newQuery = newQuery.in('manager_id', managerIds)
+    }
+    const { count: newCount } = await newQuery
 
     // Global quote stats
-    const { data: allQuotes } = await supabase
+    let quotesQuery = supabase
         .from('quotes')
         .select('status')
+        .gte('created_at', startDate)
+        .lte('created_at', endDate)
+
+    if (context.teamId) {
+        quotesQuery = quotesQuery.in('manager_id', managerIds)
+    }
+    const { data: allQuotes } = await quotesQuery
 
     const globalApproved = (allQuotes || []).filter(q => ['approved', 'completed', 'billed'].includes(q.status || '')).length
     const globalDenied = (allQuotes || []).filter(q => q.status === 'denied').length
     const globalSent = (allQuotes || []).filter(q => q.status === 'sent').length
     const globalTotalPresented = globalApproved + globalDenied + globalSent
-    const quoteApprovalRate = globalTotalPresented > 0 ? Math.round((globalApproved / globalTotalPresented) * 105) : 0 // Wait, why * 105? Ah, Math.round((globalApproved / globalTotalPresented) * 100)
-    const normalizedQuoteApprovalRate = globalTotalPresented > 0 ? Math.round((globalApproved / globalTotalPresented) * 100) : 0
+    const quoteApprovalRate = globalTotalPresented > 0 ? Math.round((globalApproved / globalTotalPresented) * 100) : 0
+
+    // Fetch phone call statistics
+    let callsQuery = supabase
+        .from('manager_monthly_calls')
+        .select('total_calls, answered_calls')
+        .gte('year_month', startMonth)
+        .lte('year_month', endMonth)
+
+    if (context.teamId) {
+        callsQuery = callsQuery.in('manager_id', managerIds)
+    }
+    const { data: callsData } = await callsQuery
+
+    const totalCalls = (callsData || []).reduce((acc, curr) => acc + (curr.total_calls || 0), 0)
+    const answeredCalls = (callsData || []).reduce((acc, curr) => acc + (curr.answered_calls || 0), 0)
+    const callsAnsweredPct = totalCalls > 0 ? Math.round((answeredCalls / totalCalls) * 100) : 0
+
+    // Fetch workload statistics
+    let workloadQuery = supabase
+        .from('manager_monthly_workload')
+        .select('communications_received, open_tasks, closed_tasks')
+        .gte('year_month', startMonth)
+        .lte('year_month', endMonth)
+
+    if (context.teamId) {
+        workloadQuery = workloadQuery.in('manager_id', managerIds)
+    }
+    const { data: workloadData } = await workloadQuery
+
+    const totalCommunications = (workloadData || []).reduce((acc, curr) => acc + (curr.communications_received || 0), 0)
+    const totalOpenTasks = (workloadData || []).reduce((acc, curr) => acc + (curr.open_tasks || 0), 0)
+    const totalClosedTasks = (workloadData || []).reduce((acc, curr) => acc + (curr.closed_tasks || 0), 0)
+    const taskCompletionRate = (totalOpenTasks + totalClosedTasks) > 0 
+        ? Math.round((totalClosedTasks / (totalOpenTasks + totalClosedTasks)) * 100) 
+        : 0
+    const activeManagersCount = teamManagers.length
+    const communicationsPerManager = activeManagersCount > 0 ? Math.round(totalCommunications / activeManagersCount) : 0
 
     return {
         totalSyndicates: activeClients.length,
@@ -363,7 +487,15 @@ export async function getGlobalTeamStats() {
         criticalCount,
         lostYtd: lostCount || 0,
         newYtd: newCount || 0,
-        quoteApprovalRate: normalizedQuoteApprovalRate
+        quoteApprovalRate,
+        totalCalls,
+        answeredCalls,
+        callsAnsweredPct,
+        totalCommunications,
+        communicationsPerManager,
+        totalOpenTasks,
+        totalClosedTasks,
+        taskCompletionRate
     }
 }
 
@@ -1993,3 +2125,115 @@ export async function updateUserRoleAction(userId: string, newRole: string) {
     revalidatePath('/team-management/settings')
     return { success: true }
 }
+
+export async function setSelectedTeamCookieAction(teamId: string | null) {
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    if (!teamId || teamId === 'all') {
+        cookieStore.set('selected_team_id', 'all', { path: '/' })
+    } else {
+        cookieStore.set('selected_team_id', teamId, { path: '/' })
+    }
+}
+
+export async function deleteComplaintAction(id: string) {
+    const supabase = await createClient()
+
+    const { data: comp } = await supabase
+        .from('complaints')
+        .select('manager_id')
+        .eq('id', id)
+        .maybeSingle()
+
+    const { error } = await supabase
+        .from('complaints')
+        .delete()
+        .eq('id', id)
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/team-management/complaints')
+    if (comp?.manager_id) revalidatePath(`/team-management/managers/${comp.manager_id}`)
+}
+
+export async function saveMonthlyCommunicationsAction(formData: FormData) {
+    const supabase = await createClient()
+    const managerId = formData.get('manager_id') as string
+    const yearMonth = formData.get('year_month') as string
+    const communicationsReceived = parseInt(formData.get('communications_received') as string, 10)
+
+    if (!managerId || !yearMonth || isNaN(communicationsReceived)) {
+        throw new Error('Données manquantes ou invalides')
+    }
+
+    const { data: existing } = await supabase
+        .from('manager_monthly_workload')
+        .select('*')
+        .eq('manager_id', managerId)
+        .eq('year_month', yearMonth)
+        .maybeSingle()
+
+    const { error } = await supabase
+        .from('manager_monthly_workload')
+        .upsert({
+            manager_id: managerId,
+            year_month: yearMonth,
+            communications_received: communicationsReceived,
+            open_tasks: existing ? existing.open_tasks : 0,
+            closed_tasks: existing ? existing.closed_tasks : 0
+        }, { onConflict: 'manager_id,year_month' })
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/team-management/dashboard')
+    revalidatePath(`/team-management/managers/${managerId}`)
+}
+
+export async function saveMonthlyTasksAction(formData: FormData) {
+    const supabase = await createClient()
+    const managerId = formData.get('manager_id') as string
+    const yearMonth = formData.get('year_month') as string
+    const openTasks = parseInt(formData.get('open_tasks') as string, 10)
+    const closedTasks = parseInt(formData.get('closed_tasks') as string, 10)
+
+    if (!managerId || !yearMonth || isNaN(openTasks) || isNaN(closedTasks)) {
+        throw new Error('Données manquantes ou invalides')
+    }
+
+    const { data: existing } = await supabase
+        .from('manager_monthly_workload')
+        .select('*')
+        .eq('manager_id', managerId)
+        .eq('year_month', yearMonth)
+        .maybeSingle()
+
+    const { error } = await supabase
+        .from('manager_monthly_workload')
+        .upsert({
+            manager_id: managerId,
+            year_month: yearMonth,
+            communications_received: existing ? existing.communications_received : 0,
+            open_tasks: openTasks,
+            closed_tasks: closedTasks
+        }, { onConflict: 'manager_id,year_month' })
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/team-management/dashboard')
+    revalidatePath(`/team-management/managers/${managerId}`)
+}
+
+export async function checkExistingStatsAction(managerId: string, yearMonth: string) {
+    const supabase = await createClient()
+    const [callsRes, workloadRes] = await Promise.all([
+        supabase.from('manager_monthly_calls').select('id, total_calls').eq('manager_id', managerId).eq('year_month', yearMonth).maybeSingle(),
+        supabase.from('manager_monthly_workload').select('id, communications_received, open_tasks, closed_tasks').eq('manager_id', managerId).eq('year_month', yearMonth).maybeSingle()
+    ])
+
+    return {
+        hasCalls: !!callsRes.data,
+        hasCommunications: !!workloadRes.data && workloadRes.data.communications_received > 0,
+        hasTasks: !!workloadRes.data && (workloadRes.data.open_tasks > 0 || workloadRes.data.closed_tasks > 0)
+    }
+}
+

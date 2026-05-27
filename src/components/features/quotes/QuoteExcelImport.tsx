@@ -70,7 +70,9 @@ interface ImportQuoteRow {
     contractor_id: string | null // Resolved contractor UUID
     amount: number // Montant ($)
     amount_raw: string // raw string representation for edits
-    status: 'draft' | 'sent' | 'approved' | 'denied' | 'completed' // Statut
+    status: 'draft' | 'sent' | 'approved' | 'denied' | 'completed' | 'deferred' | 'cancelled' // Statut
+    planned_months_str: string
+    completed_months_str: string
     import_action: 'create' | 'update' | 'skip'
 }
 
@@ -135,13 +137,15 @@ export function QuoteExcelImport({
     }
 
     // Parse statuses from French to DB Enums
-    const parseStatus = (val: any): 'draft' | 'sent' | 'approved' | 'denied' | 'completed' => {
+    const parseStatus = (val: any): 'draft' | 'sent' | 'approved' | 'denied' | 'completed' | 'deferred' | 'cancelled' => {
         const s = String(val || '').trim().toLowerCase()
         if (s.includes('brouillon') || s === 'draft') return 'draft'
         if (s.includes('envoy') || s === 'sent') return 'sent'
         if (s.includes('approuv') || s === 'approved') return 'approved'
         if (s.includes('refus') || s === 'denied') return 'denied'
         if (s.includes('complet') || s === 'completed') return 'completed'
+        if (s.includes('report') || s.includes('differ') || s === 'deferred') return 'deferred'
+        if (s.includes('annul') || s === 'cancelled') return 'cancelled'
         return 'draft' // Default fallback
     }
 
@@ -152,9 +156,9 @@ export function QuoteExcelImport({
             
             // Sheet 1: Main template data
             const wsData = [
-                ["No soumission", "SDC #", "Gestionnaire", "Description / Titre", "Échéancier souhaité", "Contracteur", "Montant ($)", "Statut"],
-                [101, "SDC-101", managers[0] ? `${managers[0].first_name} ${managers[0].last_name}` : "Jean Gérant", "Réfection de toiture principale", "2026-06-01", contractors[0] ? contractors[0].full_name : "ABC Construction", "5500.00", "Brouillon"],
-                [102, "SDC-102", "", "Nettoyage des drains pluviaux", "2026-06-15", "", "1200,50", "Approuvée"]
+                ["No soumission", "SDC #", "Gestionnaire", "Description / Titre", "Échéancier souhaité", "Contracteur", "Montant ($)", "Statut", "Mois planifiés", "Mois complétés"],
+                [101, "SDC-101", managers[0] ? `${managers[0].first_name} ${managers[0].last_name}` : "Jean Gérant", "Réfection de toiture principale", "2026-06-01", contractors[0] ? contractors[0].full_name : "ABC Construction", "5500.00", "Brouillon", "2026-06", ""],
+                [102, "SDC-102", "", "Nettoyage des drains pluviaux", "2026-06-15", "", "1200,50", "Approuvée", "2026-06", ""]
             ]
             
             const ws = XLSX.utils.aoa_to_sheet(wsData)
@@ -189,7 +193,9 @@ export function QuoteExcelImport({
                 ["Envoyée"],
                 ["Approuvée"],
                 ["Refusée"],
-                ["Complétée"]
+                ["Complétée"],
+                ["Reportée"],
+                ["Annulée"]
             ]
             const wsStatuses = XLSX.utils.aoa_to_sheet(statusSheetData)
             wsStatuses['!cols'] = [{ wch: 25 }]
@@ -257,6 +263,8 @@ export function QuoteExcelImport({
                     const amountRaw = String(row['Montant ($)'] || row['montant'] || row['Montant'] || '0')
                     const amount = parseAmount(amountRaw)
                     const statusStr = parseStatus(row['Statut'] || row['statut'] || row['Status'] || '')
+                    const plannedMonthsRaw = String(row['Mois planifiés'] || row['mois_planifies'] || row['mois planifiés'] || '').trim()
+                    const completedMonthsRaw = String(row['Mois complétés'] || row['mois_completes'] || row['mois complétés'] || '').trim()
 
                     // Check for existing duplicate in quotes table matching quote_number
                     const duplicateMatch = quoteNumber 
@@ -279,6 +287,8 @@ export function QuoteExcelImport({
                         amount,
                         amount_raw: amountRaw,
                         status: statusStr,
+                        planned_months_str: plannedMonthsRaw,
+                        completed_months_str: completedMonthsRaw,
                         import_action: duplicateMatch ? 'update' : 'create' // Default update if duplicate exists
                     }
                 })
@@ -454,7 +464,28 @@ export function QuoteExcelImport({
         startTransition(async () => {
             try {
                 // Send mapped data to server action
-                const response = await confirmBulkQuoteImportAction(rows)
+                const mappedRows = rows.map(r => {
+                    const parseMonths = (str: string): string[] => {
+                        if (!str) return []
+                        return str.split(/[;,]+/).map(m => m.trim()).filter(Boolean)
+                    }
+                    return {
+                        id: r.id,
+                        quote_number: r.quote_number,
+                        sdc_num: r.sdc_num,
+                        client_name: r.client_name,
+                        manager_id: r.manager_id,
+                        contractor_id: r.contractor_id,
+                        title: r.title,
+                        start_date_str: r.start_date_str,
+                        amount: r.amount,
+                        status: r.status,
+                        import_action: r.import_action,
+                        planned_months: parseMonths(r.planned_months_str),
+                        completed_months: parseMonths(r.completed_months_str),
+                    }
+                })
+                const response = await confirmBulkQuoteImportAction(mappedRows)
                 if (response.success && response.summary) {
                     setImportResult(response.summary)
                     setStep('result')
@@ -616,6 +647,8 @@ export function QuoteExcelImport({
                                                     <th className="p-3 w-[160px]">Contracteur</th>
                                                     <th className="p-3 w-[120px]">Montant ($) *</th>
                                                     <th className="p-3 w-[120px]">Statut</th>
+                                                    <th className="p-3 w-[120px]">Mois Planifiés</th>
+                                                    <th className="p-3 w-[120px]">Mois Complétés</th>
                                                     <th className="p-3 w-[140px]">Action d'Import</th>
                                                     <th className="p-3 w-[50px] text-center">Suppr.</th>
                                                 </tr>
@@ -761,7 +794,29 @@ export function QuoteExcelImport({
                                                                     <option value="approved" className="bg-zinc-900">Approuvée</option>
                                                                     <option value="denied" className="bg-zinc-900">Refusée</option>
                                                                     <option value="completed" className="bg-zinc-900">Complétée</option>
+                                                                    <option value="deferred" className="bg-zinc-900">Reportée</option>
+                                                                    <option value="cancelled" className="bg-zinc-900">Annulée</option>
                                                                 </select>
+                                                            </td>
+
+                                                            {/* Planned Months */}
+                                                            <td className="p-2">
+                                                                <Input 
+                                                                    value={row.planned_months_str || ''} 
+                                                                    onChange={(e) => handleUpdateRowField(row.temp_id, 'planned_months_str', e.target.value)}
+                                                                    placeholder="ex: 2026-05"
+                                                                    className="bg-zinc-950/60 border-zinc-850 h-8 text-xs focus-visible:ring-zinc-800"
+                                                                />
+                                                            </td>
+
+                                                            {/* Completed Months */}
+                                                            <td className="p-2">
+                                                                <Input 
+                                                                    value={row.completed_months_str || ''} 
+                                                                    onChange={(e) => handleUpdateRowField(row.temp_id, 'completed_months_str', e.target.value)}
+                                                                    placeholder="ex: 2026-05"
+                                                                    className="bg-zinc-950/60 border-zinc-850 h-8 text-xs focus-visible:ring-zinc-800"
+                                                                />
                                                             </td>
 
                                                             {/* Action Selector */}

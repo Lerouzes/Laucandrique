@@ -28,9 +28,12 @@ import {
 
 export default async function ManagersControlTowerPage() {
     const supabase = await createClient()
+    const { getActiveTeamContext } = await import('@/utils/team-context')
+    const context = await getActiveTeamContext()
 
     // 1. Get managers
     const managersList = await getManagers()
+    const managerIds = managersList.map(m => m.id)
 
     // 2. Compute stats for each manager in parallel
     const managerStatsList = (await Promise.all(
@@ -38,10 +41,15 @@ export default async function ManagersControlTowerPage() {
     )).filter((s): s is NonNullable<typeof s> => s !== null)
 
     // 3. Get all active syndicates/clients for loss and package actions
-    const { data: clients } = await supabase
+    let clientsQuery = supabase
         .from('clients')
         .select('*')
-        .order('company_name')
+
+    if (context.teamId) {
+        clientsQuery = clientsQuery.in('manager_id', managerIds)
+    }
+
+    const { data: clients } = await clientsQuery.order('company_name')
 
     const activeClients = (clients || []).filter(c => c.status === 'active' || !c.status)
 

@@ -4,11 +4,8 @@ import { NewOneOnOneForm } from '@/components/features/team-management/NewOneOnO
 export default async function NewOneOnOnePage() {
     const supabase = await createClient()
 
-    // Fetch managers to choose from
-    const { data: managers } = await supabase
-        .from('managers')
-        .select('*')
-        .order('first_name')
+    const { getFilteredManagers } = await import('@/utils/team-context')
+    const managers = await getFilteredManagers()
 
     return (
         <div className="space-y-6 pb-12">

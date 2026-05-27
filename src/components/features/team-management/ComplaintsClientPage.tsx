@@ -22,7 +22,7 @@ import {
     AlertCircle,
     CheckCircle2
 } from 'lucide-react'
-import { createComplaintAction, resolveComplaintAction } from '@/actions/team-management'
+import { createComplaintAction, resolveComplaintAction, deleteComplaintAction } from '@/actions/team-management'
 
 interface Complaint {
     id: string
@@ -345,18 +345,34 @@ export function ComplaintsClientPage({
                                                 {c.resolved_date && <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-emerald-400" /> Résolue le : {new Date(c.resolved_date).toLocaleDateString('fr-CA')}</span>}
                                                 
                                                 {c.status === 'open' && (
-                                                    <form action={async () => {
-                                                        await resolveComplaintAction(c.id)
-                                                    }}>
-                                                        <Button 
-                                                            type="submit" 
-                                                            size="sm" 
-                                                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[9px] px-2.5 h-6 rounded flex items-center gap-0.5 shadow-md"
-                                                        >
-                                                            <Check className="h-3 w-3" />
-                                                            Résoudre
-                                                        </Button>
-                                                    </form>
+                                                    <div className="flex gap-2">
+                                                        <form action={async () => {
+                                                            await resolveComplaintAction(c.id)
+                                                        }}>
+                                                            <Button 
+                                                                type="submit" 
+                                                                size="sm" 
+                                                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[9px] px-2.5 h-6 rounded flex items-center gap-0.5 shadow-md"
+                                                            >
+                                                                <Check className="h-3 w-3" />
+                                                                Résoudre
+                                                            </Button>
+                                                        </form>
+                                                        
+                                                        <form action={async () => {
+                                                            if (confirm("Voulez-vous vraiment supprimer cette plainte ? Elle sera définitivement effacée.")) {
+                                                                await deleteComplaintAction(c.id)
+                                                            }
+                                                        }}>
+                                                            <Button 
+                                                                type="submit" 
+                                                                size="sm" 
+                                                                className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-[9px] px-2.5 h-6 rounded flex items-center gap-0.5 shadow-md animate-fade-in"
+                                                            >
+                                                                Supprimer
+                                                            </Button>
+                                                        </form>
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>

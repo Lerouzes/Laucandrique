@@ -24,9 +24,7 @@ import {
     FileSpreadsheet, 
     Loader2, 
     AlertTriangle, 
-    CheckCircle,
-    CheckSquare,
-    Square
+    CheckCircle
 } from 'lucide-react'
 import { saveBatchMonthlyCallsAction, getBatchMonthlyCallsAction } from '@/actions/team-management'
 
@@ -38,11 +36,17 @@ interface Manager {
     manager_teams: { id: string; name: string } | null
 }
 
-interface BatchCallStatsModalProps {
-    managers: Manager[]
+interface Team {
+    id: string
+    name: string
 }
 
-export function BatchCallStatsModal({ managers = [] }: BatchCallStatsModalProps) {
+interface BatchCallStatsModalProps {
+    managers: Manager[]
+    teams?: Team[]
+}
+
+export function BatchCallStatsModal({ managers = [], teams = [] }: BatchCallStatsModalProps) {
     const router = useRouter()
     const [open, setOpen] = useState(false)
     const [isPending, startTransition] = useTransition()
@@ -53,6 +57,7 @@ export function BatchCallStatsModal({ managers = [] }: BatchCallStatsModalProps)
     const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const [yearMonth, setYearMonth] = useState(defaultMonth)
     const [searchQuery, setSearchQuery] = useState('')
+    const [selectedTeamId, setSelectedTeamId] = useState<string>('all')
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     
     // Map of managerId -> { total: string, answered: string }
@@ -65,6 +70,7 @@ export function BatchCallStatsModal({ managers = [] }: BatchCallStatsModalProps)
             setSelectedIds(new Set())
             setInputs({})
             setYearMonth(defaultMonth)
+            setSelectedTeamId('all')
         }
     }, [open, defaultMonth])
 
@@ -90,26 +96,18 @@ export function BatchCallStatsModal({ managers = [] }: BatchCallStatsModalProps)
                     existingIds.add(entry.managerId)
                 })
 
-                setInputs(prev => {
-                    const next = { ...prev }
-                    managers.forEach(m => {
-                        if (existingMap[m.id]) {
-                            next[m.id] = existingMap[m.id]
-                        } else {
-                            // If they already typed something, don't overwrite if it's not empty, otherwise set empty
-                            if (!next[m.id]?.total && !next[m.id]?.answered) {
-                                next[m.id] = { total: '', answered: '' }
-                            }
-                        }
-                    })
-                    return next
+                // Reset inputs and selectedIds completely on month change to avoid carrying over previous month's state
+                const nextInputs: Record<string, { total: string; answered: string }> = {}
+                managers.forEach(m => {
+                    if (existingMap[m.id]) {
+                        nextInputs[m.id] = existingMap[m.id]
+                    } else {
+                        nextInputs[m.id] = { total: '', answered: '' }
+                    }
                 })
-
-                setSelectedIds(prev => {
-                    const next = new Set(prev)
-                    existingIds.forEach(id => next.add(id))
-                    return next
-                })
+                
+                setInputs(nextInputs)
+                setSelectedIds(existingIds)
             } catch (err: any) {
                 toast.error("Erreur lors du chargement des données existantes.")
                 console.error(err)
@@ -124,12 +122,16 @@ export function BatchCallStatsModal({ managers = [] }: BatchCallStatsModalProps)
         }
     }, [yearMonth, open, managers])
 
-    // Filtering managers based on search query
+    // Filtering managers based on search query and selected team
     const filteredManagers = managers.filter(m => {
         const name = `${m.first_name} ${m.last_name}`.toLowerCase()
-        const team = m.manager_teams?.name?.toLowerCase() || ''
+        const teamName = m.manager_teams?.name?.toLowerCase() || ''
         const query = searchQuery.toLowerCase()
-        return name.includes(query) || team.includes(query)
+        
+        const matchesQuery = name.includes(query) || teamName.includes(query)
+        const matchesTeam = selectedTeamId === 'all' || m.team_id === selectedTeamId
+        
+        return matchesQuery && matchesTeam
     })
 
     const handleSelectAllFiltered = (checked: boolean | 'indeterminate') => {
@@ -272,12 +274,26 @@ export function BatchCallStatsModal({ managers = [] }: BatchCallStatsModalProps)
                             className="bg-zinc-900 border-zinc-800 text-[16px] md:text-sm text-white focus:border-purple-600 focus:ring-purple-600/20 h-9 rounded-lg"
                         />
                     </div>
-                    <div className="md:col-span-2 space-y-1.5">
-                        <Label className="text-xs font-semibold text-zinc-400">Filtrer les gestionnaires</Label>
+                    <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-zinc-400">Filtrer par équipe</Label>
+                        <select
+                            value={selectedTeamId}
+                            onChange={(e) => setSelectedTeamId(e.target.value)}
+                            disabled={isPending || loadingExisting}
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 font-semibold outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600/30 h-9 cursor-pointer"
+                        >
+                            <option value="all">Toutes les équipes</option>
+                            {teams.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-zinc-400">Rechercher</Label>
                         <div className="relative">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-500" />
                             <Input 
-                                placeholder="Rechercher par nom ou par équipe..." 
+                                placeholder="Nom du gestionnaire..." 
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="bg-zinc-900 border-zinc-800 pl-9 text-[16px] md:text-sm text-white focus:border-purple-600 focus:ring-purple-600/20 h-9 rounded-lg"

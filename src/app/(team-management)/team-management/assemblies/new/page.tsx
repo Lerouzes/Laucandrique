@@ -4,18 +4,25 @@ import { NewAssemblyEvaluationForm } from '@/components/features/team-management
 export default async function NewAssemblyPage() {
     const supabase = await createClient()
 
+    const { getActiveTeamContext, getFilteredManagers } = await import('@/utils/team-context')
+    const context = await getActiveTeamContext()
+    const teamManagers = await getFilteredManagers()
+    const managerIds = teamManagers.map(m => m.id)
+
     // Fetch active clients (syndicates)
-    const { data: clients } = await supabase
+    let clientsQuery = supabase
         .from('clients')
         .select('*')
         .eq('status', 'active')
-        .order('company_name')
+
+    if (context.teamId) {
+        clientsQuery = clientsQuery.in('manager_id', managerIds)
+    }
+
+    const { data: clients } = await clientsQuery.order('company_name')
 
     // Fetch managers
-    const { data: managers } = await supabase
-        .from('managers')
-        .select('*')
-        .order('first_name')
+    const managers = teamManagers
 
     return (
         <div className="space-y-6 pb-12">

@@ -6,12 +6,21 @@ import { UsersRound, PlusCircle, ArrowRight, Calendar } from 'lucide-react'
 
 export default async function AssembliesListPage() {
     const supabase = await createClient()
+    const { getActiveTeamContext, getFilteredManagers } = await import('@/utils/team-context')
+    const context = await getActiveTeamContext()
+    const teamManagers = await getFilteredManagers()
+    const managerIds = teamManagers.map(m => m.id)
 
     // Fetch assembly evaluations including client and manager details
-    const { data: evals } = await supabase
+    let query = supabase
         .from('assembly_evaluations')
         .select('*, clients(company_name, full_name), managers(first_name, last_name)')
-        .order('assembly_date', { ascending: false })
+
+    if (context.teamId) {
+        query = query.in('manager_id', managerIds)
+    }
+
+    const { data: evals } = await query.order('assembly_date', { ascending: false })
 
     return (
         <div className="space-y-6 pb-12">

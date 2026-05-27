@@ -10,7 +10,17 @@ import { updateProjectDates, updateProjectStatus } from '@/actions/projects'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { CalendarX, ExternalLink, CalendarClock, CheckCircle2 } from 'lucide-react'
+import { 
+    CalendarX, 
+    ExternalLink, 
+    CalendarClock, 
+    CheckCircle2, 
+    Clock, 
+    Ban, 
+    RefreshCw, 
+    Calendar as CalendarIcon, 
+    TrendingUp 
+} from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import {
     Dialog,
@@ -19,13 +29,15 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog'
 
-type StatusFilter = 'unscheduled' | 'scheduled' | 'completed' | 'all'
+type StatusFilter = 'unscheduled' | 'scheduled' | 'completed' | 'cancelled' | 'all'
 
 const STATUS_COLORS: Record<string, string> = {
     unscheduled: 'bg-zinc-700 text-zinc-200',
     planned: 'bg-yellow-700 text-yellow-100',
     in_progress: 'bg-blue-800 text-blue-100',
     completed: 'bg-emerald-800 text-emerald-100',
+    deferred: 'bg-rose-950/60 border-rose-800 text-rose-200',
+    cancelled: 'bg-zinc-900 border-zinc-800 text-zinc-400 opacity-60',
 }
 
 const TYPE_DOT: Record<string, string> = { interior: '#60a5fa', exterior: '#f59e0b' }
@@ -35,6 +47,8 @@ const STATUS_LABELS: Record<string, string> = {
     planned: 'Planifié',
     in_progress: 'En cours',
     completed: 'Complété',
+    deferred: 'Reporté',
+    cancelled: 'Annulé',
 }
 
 function formatProjectDate(dateStr: string, isHourly: boolean) {
@@ -60,11 +74,33 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     const [isMoreEventsOpen, setIsMoreEventsOpen] = useState(false)
     const [selectedDate, setSelectedDate] = useState<Date | null>(null)
     const [selectedEvents, setSelectedEvents] = useState<any[]>([])
+    const [viewMode, setViewMode] = useState<'calendar' | 'board'>('calendar')
     const normalizedQuery = query.trim().toLowerCase()
+    
     const getDurationDays = (project: any) => Number(project?.estimated_duration_days || 1)
     const getDurationMinutes = (project: any) => Math.max(15, Math.round(getDurationDays(project) * 24 * 60))
 
-    // Initialize draggable only ONCE on mount for supreme DOM delegation performance
+    // Initialize projects from prop
+    useEffect(() => {
+        setProjects(initialProjects)
+    }, [initialProjects])
+
+    // Generate list of the next 12 months starting from the current month
+    const months = useMemo(() => {
+        const list = []
+        const now = new Date()
+        for (let i = 0; i < 12; i++) {
+            const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+            const year = d.getFullYear()
+            const month = d.getMonth()
+            const key = `${year}-${String(month + 1).padStart(2, '0')}`
+            const label = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+            list.push({ key, label, year, month })
+        }
+        return list
+    }, [])
+
+    // Initialize draggable only ONCE on mount for FullCalendar external drag source
     useEffect(() => {
         let draggableInstance: Draggable | null = null
         if (externalEventsRef.current) {
@@ -84,7 +120,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         return () => {
             draggableInstance?.destroy()
         }
-    }, [])
+    }, [viewMode]) // Re-bind draggable if view changes layout
 
     // Memoize filtered projects to prevent CPU cycle wastes during render passes
     const filteredProjects = useMemo(() => {
@@ -101,16 +137,17 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     // Memoize sidebar project list based on filter to completely avoid recalculation lags
     const sidebarProjects = useMemo(() => {
         return filteredProjects.filter(p => {
-            if (filter === 'unscheduled') return p.status === 'unplanned'
-            if (filter === 'scheduled') return p.status !== 'unplanned' && p.status !== 'completed'
+            if (filter === 'unscheduled') return p.status === 'unplanned' || p.status === 'deferred'
+            if (filter === 'scheduled') return p.status === 'planned' || p.status === 'in_progress'
             if (filter === 'completed') return p.status === 'completed'
+            if (filter === 'cancelled') return p.status === 'cancelled'
             return true // 'all'
         })
     }, [filteredProjects, filter])
 
     // Memoize calendar events to ensure FullCalendar receives direct reference updates
     const events = useMemo(() => {
-        return filteredProjects.filter(p => p.status !== 'unplanned').map(p => {
+        return filteredProjects.filter(p => p.status !== 'unplanned' && p.status !== 'deferred' && p.status !== 'cancelled').map(p => {
             const durationDays = Number(p.estimated_duration_days || 1)
             const durationMinutes = Math.max(15, Math.round(durationDays * 24 * 60))
             const isHourly = durationDays < 1
@@ -170,6 +207,42 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         })
     }, [filteredProjects])
 
+    // Calculates budget portion or total for a month column key (YYYY-MM)
+    const getProjectMonthlyBudget = (project: any, monthKey: string) => {
+        const total = Number(project.quotes?.total || 0)
+        if (total <= 0) return 0
+        const pMonths = project.planned_months || []
+        if (pMonths.length > 0) {
+            if (pMonths.includes(monthKey)) {
+                return total / pMonths.length
+            }
+            return 0
+        }
+        // Fallback to start date month
+        if (project.start_date && project.start_date.slice(0, 7) === monthKey) {
+            return total
+        }
+        return 0
+    }
+
+    const getMonthlySum = (monthKey: string) => {
+        return projects.reduce((sum, p) => {
+            if (p.status === 'unplanned' || p.status === 'deferred' || p.status === 'cancelled') return sum
+            return sum + getProjectMonthlyBudget(p, monthKey)
+        }, 0)
+    }
+
+    const getProjectsForMonth = (monthKey: string) => {
+        return projects.filter(p => {
+            if (p.status === 'unplanned' || p.status === 'deferred' || p.status === 'cancelled') return false
+            const pMonths = p.planned_months || []
+            if (pMonths.length > 0) {
+                return pMonths.includes(monthKey)
+            }
+            return p.start_date && p.start_date.slice(0, 7) === monthKey
+        })
+    }
+
     const buildRangeFromEvent = (event: any) => {
         const start = event.start as Date | null
         let end = event.end as Date | null
@@ -183,8 +256,6 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         }
 
         if (event.allDay) {
-            // For all-day events, the end date should be inclusive in the database.
-            // Subtract 1 day from FullCalendar's exclusive end date.
             const adjustedEnd = new Date(end.getTime() - 24 * 60 * 60 * 1000)
             const startUTC = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(), 0, 0, 0))
             const endUTC = new Date(Date.UTC(adjustedEnd.getUTCFullYear(), adjustedEnd.getUTCMonth(), adjustedEnd.getUTCDate(), 0, 0, 0))
@@ -200,18 +271,19 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         }
     }
 
-    // FIX: call info.event.remove() to prevent duplication — FullCalendar adds the event
-    // automatically on drop; since we control the `events` array, remove the duplicated internal copy.
     const handleEventReceive = (info: any) => {
         const projectId = info.event.id
         const { startDate, endDate } = buildRangeFromEvent(info.event)
-
-        // Remove the auto-added duplicate event from FullCalendar's internal state
         info.event.remove()
 
-        // Update local state — this drives the controlled `events` array
+        let plannedMonths: string[] = []
+        if (startDate && endDate) {
+            const startD = new Date(startDate)
+            plannedMonths = [`${startD.getFullYear()}-${String(startD.getMonth() + 1).padStart(2, '0')}`]
+        }
+
         setProjects(prev => prev.map(p => p.id === projectId ? {
-            ...p, status: 'planned', start_date: startDate, end_date: endDate
+            ...p, status: 'planned', start_date: startDate, end_date: endDate, planned_months: plannedMonths
         } : p))
 
         startTransition(async () => {
@@ -228,8 +300,14 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         const projectId = info.event.id
         const { startDate, endDate } = buildRangeFromEvent(info.event)
 
+        let plannedMonths: string[] = []
+        if (startDate && endDate) {
+            const startD = new Date(startDate)
+            plannedMonths = [`${startD.getFullYear()}-${String(startD.getMonth() + 1).padStart(2, '0')}`]
+        }
+
         setProjects(prev => prev.map(p => p.id === projectId ? {
-            ...p, start_date: startDate, end_date: endDate
+            ...p, start_date: startDate, end_date: endDate, planned_months: plannedMonths
         } : p))
 
         startTransition(async () => {
@@ -260,35 +338,41 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         })
     }
 
-    const handleUnschedule = (projectId: string) => {
-        setProjects(prev => prev.map(p => p.id === projectId ? {
-            ...p, status: 'unplanned', start_date: null, end_date: null
-        } : p))
+    // Centralized handler for status changes (e.g. Unplan, Complete, Defer, Cancel)
+    const handleStatusChange = (projectId: string, newStatus: 'unplanned' | 'planned' | 'in_progress' | 'completed' | 'deferred' | 'cancelled') => {
+        setProjects(prev => prev.map(p => {
+            if (p.id !== projectId) return p
+            const updated = { ...p, status: newStatus }
+            if (newStatus === 'unplanned' || newStatus === 'deferred') {
+                updated.start_date = null
+                updated.end_date = null
+                updated.planned_months = []
+                if (newStatus === 'deferred') {
+                    updated.contractor_id = null
+                }
+            }
+            if (newStatus === 'completed') {
+                updated.completed_at = new Date().toISOString()
+            }
+            return updated
+        }))
 
         startTransition(async () => {
             try {
-                await updateProjectStatus(projectId, 'unplanned')
-                toast.success("Projet retiré du calendrier.")
+                await updateProjectStatus(projectId, newStatus)
+                toast.success(`Statut du projet mis à jour: ${STATUS_LABELS[newStatus] || newStatus}`)
             } catch (e: any) {
-                toast.error("Erreur", { description: e.message })
+                toast.error("Erreur de modification du statut", { description: e.message })
             }
         })
     }
 
+    const handleUnschedule = (projectId: string) => {
+        handleStatusChange(projectId, 'unplanned')
+    }
 
     const handleMarkCompleted = (projectId: string) => {
-        setProjects(prev => prev.map(p => p.id === projectId ? {
-            ...p, status: 'completed', completed_at: new Date().toISOString()
-        } : p))
-
-        startTransition(async () => {
-            try {
-                await updateProjectStatus(projectId, 'completed')
-                toast.success("Projet marqué comme complété.")
-            } catch (e: any) {
-                toast.error("Erreur", { description: e.message })
-            }
-        })
+        handleStatusChange(projectId, 'completed')
     }
 
     const handleEventClick = (info: any) => {
@@ -304,6 +388,59 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         }
     }
 
+    // HTML5 Drag and Drop Handlers for annual board
+    const handleDragStart = (e: React.DragEvent, projectId: string) => {
+        e.dataTransfer.setData('text/plain', projectId)
+    }
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault()
+    }
+
+    const handleDropOnMonth = (e: React.DragEvent, targetMonthKey: string, targetYear: number, targetMonthIdx: number) => {
+        e.preventDefault()
+        const projectId = e.dataTransfer.getData('text/plain')
+        if (!projectId) return
+
+        const project = projects.find(p => p.id === projectId)
+        if (!project) return
+
+        const durationDays = Number(project.estimated_duration_days || 1)
+        
+        // Calculate inclusive start/end dates on 1st of target month
+        const start = new Date(Date.UTC(targetYear, targetMonthIdx, 1, 8, 0, 0))
+        const end = new Date(start.getTime())
+        const dur = Math.max(0.01, durationDays)
+        if (dur < 1) {
+            const durationMinutes = Math.max(15, Math.round(dur * 24 * 60))
+            end.setTime(start.getTime() + durationMinutes * 60 * 1000)
+        } else {
+            end.setDate(end.getDate() + (Math.ceil(dur) - 1))
+            end.setUTCHours(17, 0, 0, 0)
+        }
+
+        const startDateIso = start.toISOString()
+        const endDateIso = end.toISOString()
+        const updatedPlannedMonths = [targetMonthKey]
+
+        setProjects(prev => prev.map(p => p.id === projectId ? {
+            ...p,
+            status: 'planned',
+            start_date: startDateIso,
+            end_date: endDateIso,
+            planned_months: updatedPlannedMonths
+        } : p))
+
+        startTransition(async () => {
+            try {
+                await updateProjectDates(projectId, startDateIso, endDateIso)
+                toast.success(`Planifié pour ${targetMonthKey}`)
+            } catch (err: any) {
+                toast.error("Erreur de déplacement", { description: err.message })
+            }
+        })
+    }
+
     const formattedModalDate = selectedDate
         ? selectedDate.toLocaleDateString('fr-FR', {
               weekday: 'long',
@@ -317,174 +454,430 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         : ''
 
     return (
-        <div className="flex gap-6 h-full">
-            {/* Sidebar */}
-            <Card className="w-80 h-full border-zinc-800 bg-transparent flex flex-col shrink-0">
-                <CardHeader className="border-b border-zinc-800 py-3 px-4">
-                    <CardTitle className="text-zinc-100 text-base font-semibold mb-2">Projets</CardTitle>
-                    {/* Filter tabs */}
-                    <div className="flex gap-1 bg-zinc-900/40 rounded-md p-1 border border-zinc-800">
-                        {(['unscheduled', 'scheduled', 'completed', 'all'] as StatusFilter[]).map(f => (
-                            <button
-                                key={f}
-                                onClick={() => setFilter(f)}
-                                className={`flex-1 text-xs py-1 rounded transition-colors ${filter === f
-                                    ? 'bg-zinc-700 text-zinc-100 font-medium'
-                                    : 'text-zinc-400 hover:text-zinc-200'
-                                    }`}
-                            >
-                                {f === 'unscheduled' ? 'Non planifiés' : f === 'scheduled' ? 'Planifiés' : f === 'completed' ? 'Complétés' : 'Tous'}
-                            </button>
-                        ))}
+        <div className="flex flex-col h-full space-y-4">
+            
+            {/* View Mode Switch bar */}
+            <div className="flex justify-between items-center bg-zinc-950/20 p-2 border border-zinc-800 rounded-xl">
+                <div className="flex gap-2">
+                    <Button
+                        variant={viewMode === 'calendar' ? 'default' : 'outline'}
+                        onClick={() => setViewMode('calendar')}
+                        type="button"
+                        className={`h-8 text-xs font-semibold rounded-lg flex items-center gap-1.5 ${viewMode === 'calendar' ? 'bg-cyan-600 hover:bg-cyan-700 text-white' : 'border-zinc-800 bg-zinc-950 text-zinc-300 hover:bg-zinc-900'}`}
+                    >
+                        <CalendarIcon className="h-3.5 w-3.5" />
+                        Calendrier Mensuel
+                    </Button>
+                    <Button
+                        variant={viewMode === 'board' ? 'default' : 'outline'}
+                        onClick={() => setViewMode('board')}
+                        type="button"
+                        className={`h-8 text-xs font-semibold rounded-lg flex items-center gap-1.5 ${viewMode === 'board' ? 'bg-cyan-600 hover:bg-cyan-700 text-white' : 'border-zinc-800 bg-zinc-950 text-zinc-300 hover:bg-zinc-900'}`}
+                    >
+                        <TrendingUp className="h-3.5 w-3.5 text-yellow-400" />
+                        Prévisions Annuelles (12 Mois)
+                    </Button>
+                </div>
+                
+                {/* Visual Type Indicator */}
+                <div className="hidden sm:flex items-center gap-4 text-xxs text-zinc-400">
+                    <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: TYPE_DOT.interior }} />
+                        <span>Intérieur</span>
                     </div>
-                </CardHeader>
-                <CardContent
-                    className="flex-1 p-3 overflow-y-auto"
-                    ref={externalEventsRef}
-                >
-                    {sidebarProjects.length === 0 ? (
-                        <div className="text-zinc-500 text-sm text-center py-6">Aucun projet ici.</div>
-                    ) : (
-                        <div className="space-y-2">
-                            {sidebarProjects.map(project => {
-                                const isUnplanned = project.status === 'unplanned'
-                                const statusColor = isUnplanned
-                                    ? 'border-zinc-700 hover:border-zinc-500'
-                                    : 'border-yellow-800/60 hover:border-yellow-600'
+                    <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: TYPE_DOT.exterior }} />
+                        <span>Extérieur</span>
+                    </div>
+                </div>
+            </div>
 
-                                return (
-                                    <div
-                                        key={project.id}
-                                        data-id={project.id}
-                                        data-title={project.title}
-                                        data-duration-days={project.estimated_duration_days}
-                                        className={`fc-event-external p-3 bg-transparent border rounded-md transition-colors shadow-sm ${statusColor} ${isUnplanned ? 'fc-event-external-draggable cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
-                                    >
-                                        <div className="flex items-start justify-between gap-2 mb-1">
-                                            <div className="font-medium text-zinc-100 text-sm leading-tight flex items-center gap-2"><span className='inline-block h-2 w-2 rounded-full' style={{ backgroundColor: TYPE_DOT[project.project_type || 'interior'] }} />{project.title}</div>
-                                            {project.quotes?.quote_number && <div className='text-[11px] text-zinc-400'>Soumission #{project.quotes.quote_number}</div>}
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleProjectClick(project.quote_id) }}
-                                                className="text-zinc-500 hover:text-zinc-200 transition-colors shrink-0 mt-0.5"
-                                                title="Voir la soumission"
-                                            >
-                                                <ExternalLink className="h-3.5 w-3.5" />
-                                            </button>
-                                        </div>
-                                        <div className="text-xs text-zinc-400 mb-2 truncate">{project.clients?.full_name}</div>
-                                        {project.contractors?.full_name && <div className='text-xs mb-2' style={{ color: project.contractors.color }}>👷 {project.contractors.full_name}</div>}
-                                        <div className="flex items-center justify-between gap-2">
-                                            <div className="flex items-center gap-1.5">
-                                                <Badge variant="secondary" className="bg-zinc-800 text-zinc-100 pointer-events-none text-xs">
-                                                    {project.estimated_duration_days} j
-                                                </Badge>
-                                                <Badge
-                                                    variant="secondary"
-                                                    className={`pointer-events-none text-xs ${project.status === 'completed' ? 'bg-emerald-900/60 text-emerald-300' : isUnplanned ? 'bg-zinc-800 text-zinc-300' : project.status === 'in_progress' ? 'bg-blue-900/60 text-blue-300' : 'bg-yellow-900/60 text-yellow-300'}`}
+            <div className="flex-1 flex gap-6 h-[calc(100vh-250px)] min-h-[500px]">
+                {/* Sidebar */}
+                <Card className="w-80 h-full border-zinc-800 bg-transparent flex flex-col shrink-0">
+                    <CardHeader className="border-b border-zinc-800 py-3 px-4 shrink-0">
+                        <CardTitle className="text-zinc-100 text-base font-semibold mb-2">Projets</CardTitle>
+                        {/* Filter tabs */}
+                        <div className="flex gap-0.5 bg-zinc-900/40 rounded-md p-0.5 border border-zinc-800 overflow-x-auto">
+                            {(['unscheduled', 'scheduled', 'completed', 'cancelled', 'all'] as StatusFilter[]).map(f => (
+                                <button
+                                    key={f}
+                                    type="button"
+                                    onClick={() => setFilter(f)}
+                                    className={`flex-1 text-[10px] py-1 px-1.5 rounded transition-colors whitespace-nowrap ${filter === f
+                                        ? 'bg-zinc-700 text-zinc-100 font-medium'
+                                        : 'text-zinc-400 hover:text-zinc-200'
+                                        }`}
+                                >
+                                    {f === 'unscheduled' ? 'Non plan./Reportés' : f === 'scheduled' ? 'Planifiés' : f === 'completed' ? 'Complétés' : f === 'cancelled' ? 'Annulés' : 'Tous'}
+                                </button>
+                            ))}
+                        </div>
+                    </CardHeader>
+                    
+                    <CardContent
+                        className="flex-1 p-3 overflow-y-auto"
+                        ref={externalEventsRef}
+                    >
+                        {sidebarProjects.length === 0 ? (
+                            <div className="text-zinc-500 text-sm text-center py-6">Aucun projet ici.</div>
+                        ) : (
+                            <div className="space-y-2">
+                                {sidebarProjects.map(project => {
+                                    const isDraggable = project.status === 'unplanned' || project.status === 'deferred'
+                                    
+                                    return (
+                                        <div
+                                            key={project.id}
+                                            data-id={project.id}
+                                            data-title={project.title}
+                                            data-duration-days={project.estimated_duration_days}
+                                            draggable={isDraggable}
+                                            onDragStart={(e) => handleDragStart(e, project.id)}
+                                            className={`fc-event-external p-3 bg-zinc-950/20 border rounded-md transition-all shadow-sm flex flex-col gap-1.5 ${
+                                                project.status === 'deferred'
+                                                    ? 'border-rose-900/80 bg-rose-950/20 text-rose-200 hover:border-rose-700'
+                                                    : project.status === 'cancelled'
+                                                        ? 'border-zinc-900 bg-zinc-950/40 text-zinc-500 opacity-60'
+                                                        : project.status === 'completed'
+                                                            ? 'border-emerald-900/60 bg-emerald-950/10 text-emerald-200'
+                                                            : project.status === 'in_progress'
+                                                                ? 'border-blue-900/60 bg-blue-950/10 text-blue-200'
+                                                                : project.status === 'planned'
+                                                                    ? 'border-yellow-900/60 bg-yellow-950/10 text-yellow-200'
+                                                                    : 'border-zinc-800 hover:border-zinc-700 text-zinc-100'
+                                            } ${isDraggable ? 'fc-event-external-draggable cursor-grab active:cursor-grabbing hover:bg-zinc-900/30' : 'cursor-default'}`}
+                                        >
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="font-medium text-zinc-100 text-xs leading-tight flex items-center gap-1.5 min-w-0">
+                                                    <span className='inline-block h-2 w-2 rounded-full shrink-0' style={{ backgroundColor: TYPE_DOT[project.project_type || 'interior'] }} />
+                                                    <span className="truncate max-w-[120px]" title={project.title}>{project.title}</span>
+                                                </div>
+                                                {project.quotes?.quote_number && <div className='text-[10px] text-zinc-400 font-mono shrink-0'>#{project.quotes.quote_number}</div>}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleProjectClick(project.quote_id) }}
+                                                    className="text-zinc-500 hover:text-zinc-200 transition-colors shrink-0"
+                                                    title="Voir la soumission"
                                                 >
-                                                    {project.status === 'completed' ? 'Complété' : isUnplanned ? 'Non planifié' : project.status === 'in_progress' ? 'En cours' : 'Planifié'}
-                                                </Badge>
+                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                </button>
                                             </div>
-                                            {!isUnplanned && (
-                                                <div className="flex items-center gap-2">
-                                                    {project.status !== 'completed' && (
+                                            
+                                            <div className="text-[11px] text-zinc-400 truncate">{project.clients?.full_name}</div>
+                                            
+                                            {/* Project history planned/completed display */}
+                                            {project.planned_months && project.planned_months.length > 0 && (
+                                                <div className="text-[10px] text-zinc-500 font-semibold">
+                                                    🗓️ Planifié : {project.planned_months.join(', ')}
+                                                </div>
+                                            )}
+                                            {project.completed_months && project.completed_months.length > 0 && (
+                                                <div className="text-[10px] text-zinc-500 font-semibold">
+                                                    ✅ Complété : {project.completed_months.join(', ')}
+                                                </div>
+                                            )}
+
+                                            {project.contractors?.full_name && <div className='text-[11px]' style={{ color: project.contractors.color }}>👷 {project.contractors.full_name}</div>}
+                                            
+                                            <div className="flex items-center justify-between gap-2 pt-1 border-t border-zinc-800/40 flex-wrap">
+                                                <div className="flex items-center gap-1">
+                                                    <Badge variant="secondary" className="bg-zinc-800/50 text-zinc-100 pointer-events-none text-[10px] py-0 px-1">
+                                                        {project.estimated_duration_days} j
+                                                    </Badge>
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className={`pointer-events-none text-[10px] py-0 px-1 ${
+                                                            project.status === 'completed' 
+                                                                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/40' 
+                                                                : project.status === 'deferred'
+                                                                    ? 'bg-rose-950 text-rose-300 border border-rose-800/40 font-semibold'
+                                                                    : project.status === 'cancelled'
+                                                                        ? 'bg-zinc-900 text-zinc-400 border border-zinc-800/40'
+                                                                        : project.status === 'in_progress' 
+                                                                            ? 'bg-blue-950 text-blue-300 border border-blue-800/40' 
+                                                                            : project.status === 'planned'
+                                                                                ? 'bg-yellow-950 text-yellow-300 border border-yellow-800/40'
+                                                                                : 'bg-zinc-800 text-zinc-300'
+                                                        }`}
+                                                    >
+                                                        {STATUS_LABELS[project.status || 'unplanned']}
+                                                    </Badge>
+                                                </div>
+                                                
+                                                {/* Actions */}
+                                                <div className="flex items-center gap-0.5">
+                                                    {/* Complete button */}
+                                                    {project.status !== 'completed' && project.status !== 'cancelled' && (
                                                         <button
-                                                            onClick={() => handleMarkCompleted(project.id)}
-                                                            className="text-zinc-500 hover:text-emerald-400 transition-colors"
+                                                            onClick={() => handleStatusChange(project.id, 'completed')}
+                                                            className="text-zinc-500 hover:text-emerald-400 transition-colors p-1"
                                                             title="Marquer comme complété"
                                                         >
                                                             <CheckCircle2 className="h-3.5 w-3.5" />
                                                         </button>
                                                     )}
-                                                    <button
-                                                        onClick={() => handleUnschedule(project.id)}
-                                                        className="text-zinc-500 hover:text-red-400 transition-colors"
-                                                        title="Retirer du calendrier"
-                                                    >
-                                                        <CalendarX className="h-3.5 w-3.5" />
-                                                    </button>
+
+                                                    {/* Defer button */}
+                                                    {project.status !== 'deferred' && project.status !== 'completed' && project.status !== 'cancelled' && (
+                                                        <button
+                                                            onClick={() => handleStatusChange(project.id, 'deferred')}
+                                                            className="text-zinc-500 hover:text-rose-400 transition-colors p-1"
+                                                            title="Reporter (Différer)"
+                                                        >
+                                                            <Clock className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    )}
+
+                                                    {/* Cancel button */}
+                                                    {project.status !== 'cancelled' && project.status !== 'completed' && (
+                                                        <button
+                                                            onClick={() => handleStatusChange(project.id, 'cancelled')}
+                                                            className="text-zinc-500 hover:text-red-400 transition-colors p-1"
+                                                            title="Annuler le projet"
+                                                        >
+                                                            <Ban className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    )}
+
+                                                    {/* Unschedule button */}
+                                                    {project.status !== 'unplanned' && project.status !== 'deferred' && project.status !== 'cancelled' && (
+                                                        <button
+                                                            onClick={() => handleStatusChange(project.id, 'unplanned')}
+                                                            className="text-zinc-500 hover:text-amber-400 transition-colors p-1"
+                                                            title="Retirer du calendrier"
+                                                        >
+                                                            <CalendarX className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    )}
+
+                                                    {/* Revert to unplanned button */}
+                                                    {(project.status === 'cancelled' || project.status === 'completed' || project.status === 'deferred') && (
+                                                        <button
+                                                            onClick={() => handleStatusChange(project.id, 'unplanned')}
+                                                            className="text-zinc-500 hover:text-cyan-400 transition-colors p-1"
+                                                            title="Rétablir en non planifié"
+                                                        >
+                                                            <RefreshCw className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    )}
                                                 </div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Main Content Area */}
+                {viewMode === 'calendar' ? (
+                    <Card className="flex-1 h-full border-zinc-800 bg-transparent p-4 relative overflow-hidden flex flex-col">
+                        <div className="fc-dark-theme-wrapper flex-1 min-h-0">
+                            <FullCalendar
+                                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                                initialView="dayGridMonth"
+                                headerToolbar={{
+                                    left: 'prev,next today',
+                                    center: 'title',
+                                    right: 'dayGridMonth,timeGridWeek'
+                                }}
+                                editable={true}
+                                droppable={true}
+                                events={events}
+                                eventReceive={handleEventReceive}
+                                eventDrop={handleEventDrop}
+                                eventResize={handleEventResize}
+                                eventClick={handleEventClick}
+                                dayMaxEvents={true}
+                                moreLinkClick={(info) => {
+                                    info.jsEvent.preventDefault()
+                                    setSelectedDate(info.date)
+                                    const evts = info.allSegs.map((seg: any) => seg.event)
+                                    setSelectedEvents(evts)
+                                    setIsMoreEventsOpen(true)
+                                }}
+                                eventDisplay="block"
+                                eventDidMount={(info) => {
+                                    const color = info.event.extendedProps.eventColor
+                                    if (color) {
+                                        info.el.style.backgroundColor = color
+                                        info.el.style.borderColor = color
+                                        info.el.style.opacity = '1'
+                                    }
+                                }}
+                                height="100%"
+                                locale="fr"
+                                firstDay={1}
+                                buttonText={{
+                                    today: "Aujourd'hui",
+                                    month: 'Mois',
+                                    week: 'Semaine',
+                                    day: 'Jour',
+                                }}
+                                eventContent={(arg) => (
+                                    <div className="overflow-hidden p-1 text-xs cursor-pointer group">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="font-semibold text-white truncate flex items-center gap-1.5"><span className='inline-block h-2 w-2 rounded-full shrink-0' style={{ backgroundColor: TYPE_DOT[arg.event.extendedProps.projectType || 'interior'] }} />{arg.event.title}{arg.event.extendedProps.quoteNumber ? ` · #${arg.event.extendedProps.quoteNumber}` : ''}</div>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => { e.stopPropagation(); handleUnschedule(String(arg.event.extendedProps.projectId || arg.event.id)) }}
+                                                className="opacity-0 group-hover:opacity-100 text-white/80 hover:text-red-300 transition-opacity"
+                                                title="Retirer du calendrier"
+                                            >
+                                                <CalendarX className="h-3.5 w-3.5" />
+                                            </button>
+                                        </div>
+                                        <div className="opacity-70 mt-0.5 truncate">{arg.event.extendedProps.client}</div>
+                                        <div className="opacity-0 group-hover:opacity-100 text-yellow-300 transition-opacity text-[10px] mt-0.5">Cliquer pour voir ↗</div>
+                                    </div>
+                                )}
+                            />
+                        </div>
+                    </Card>
+                ) : (
+                    <Card className="flex-1 h-full border-zinc-800 bg-transparent p-4 relative overflow-hidden flex flex-col">
+                        <div className="shrink-0 mb-4">
+                            <CardTitle className="text-zinc-100 text-base font-semibold flex items-center gap-2">
+                                <TrendingUp className="h-5 w-5 text-yellow-400" />
+                                <span>Tableau de Prévisions Annuelles (12 Mois)</span>
+                            </CardTitle>
+                            <p className="text-xs text-zinc-400 mt-1">
+                                Glissez-déposez les projets dans les colonnes des mois pour les planifier ou les replanifier.
+                            </p>
+                        </div>
+                        
+                        <div className="flex-1 min-h-0 overflow-x-auto flex gap-4 pb-2 scrollbar-thin">
+                            {months.map(month => {
+                                const monthProjects = getProjectsForMonth(month.key)
+                                const monthlySum = getMonthlySum(month.key)
+                                
+                                return (
+                                    <div
+                                        key={month.key}
+                                        onDragOver={handleDragOver}
+                                        onDrop={(e) => handleDropOnMonth(e, month.key, month.year, month.month)}
+                                        className="w-72 h-full bg-zinc-950/40 border border-zinc-850 rounded-xl flex flex-col shrink-0 overflow-hidden"
+                                    >
+                                        {/* Column Header */}
+                                        <div className="p-3 bg-zinc-900 border-b border-zinc-850 shrink-0 flex items-center justify-between">
+                                            <div className="min-w-0">
+                                                <h4 className="font-semibold text-zinc-100 text-xs truncate capitalize">
+                                                    {month.label}
+                                                </h4>
+                                                <p className="text-[10px] text-zinc-500 mt-0.5 font-mono">
+                                                    {monthProjects.length} projet{monthProjects.length > 1 ? 's' : ''}
+                                                </p>
+                                            </div>
+                                            <Badge className="bg-cyan-950/40 text-cyan-300 border border-cyan-800/30 text-xs font-semibold px-2 py-0.5 whitespace-nowrap">
+                                                {Math.round(monthlySum).toLocaleString('fr-CA')} $
+                                            </Badge>
+                                        </div>
+                                        
+                                        {/* Column Body / Drop Zone */}
+                                        <div className="flex-1 p-2 overflow-y-auto space-y-2 bg-zinc-900/10">
+                                            {monthProjects.length === 0 ? (
+                                                <div className="h-24 flex items-center justify-center border border-dashed border-zinc-800/60 rounded-lg text-zinc-600 text-[11px] italic">
+                                                    Déposer un projet ici
+                                                </div>
+                                            ) : (
+                                                monthProjects.map(project => {
+                                                    const contractorColor = String(project.contractors?.color || '').trim()
+                                                    const borderStyle = contractorColor ? { borderLeft: `3px solid ${contractorColor}` } : {}
+                                                    
+                                                    return (
+                                                        <div
+                                                            key={project.id}
+                                                            draggable={true}
+                                                            onDragStart={(e) => handleDragStart(e, project.id)}
+                                                            className="p-3 bg-zinc-900/80 border border-zinc-850 hover:border-zinc-750 hover:bg-zinc-900 rounded-lg transition-all shadow-sm cursor-grab active:cursor-grabbing flex flex-col gap-1.5"
+                                                            style={borderStyle}
+                                                        >
+                                                            <div className="flex items-start justify-between gap-2">
+                                                                <div className="font-semibold text-zinc-100 text-xs leading-tight flex items-center gap-1.5 min-w-0">
+                                                                    <span className="inline-block h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: TYPE_DOT[project.project_type || 'interior'] }} />
+                                                                    <span className="truncate" title={project.title}>{project.title}</span>
+                                                                </div>
+                                                                {project.quotes?.quote_number && (
+                                                                    <span className="text-[10px] text-zinc-500 font-mono shrink-0">#{project.quotes.quote_number}</span>
+                                                                )}
+                                                            </div>
+                                                            
+                                                            <div className="text-[10px] text-zinc-400 truncate">{project.clients?.full_name}</div>
+                                                            
+                                                            {project.contractors?.full_name && (
+                                                                <div className="text-[10px]" style={{ color: project.contractors.color }}>
+                                                                    👷 {project.contractors.full_name}
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {project.planned_months && project.planned_months.length > 0 && (
+                                                                <div className="text-[9px] text-zinc-500 font-semibold">
+                                                                    🗓️ Planifié : {project.planned_months.join(', ')}
+                                                                </div>
+                                                            )}
+                                                            
+                                                            <div className="flex items-center justify-between gap-2 pt-1 mt-1 border-t border-zinc-800/60">
+                                                                <span className="text-xs font-bold text-cyan-400">
+                                                                    {project.quotes?.total ? Math.round(project.quotes.total).toLocaleString('fr-CA') + ' $' : '0 $'}
+                                                                </span>
+                                                                
+                                                                <div className="flex items-center gap-0.5">
+                                                                    {/* Mark completed */}
+                                                                    {project.status !== 'completed' && (
+                                                                        <button
+                                                                            onClick={() => handleStatusChange(project.id, 'completed')}
+                                                                            className="text-zinc-500 hover:text-emerald-400 transition-colors p-1"
+                                                                            title="Marquer complété"
+                                                                        >
+                                                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                    )}
+                                                                    
+                                                                    {/* Defer */}
+                                                                    {project.status !== 'deferred' && (
+                                                                        <button
+                                                                            onClick={() => handleStatusChange(project.id, 'deferred')}
+                                                                            className="text-zinc-500 hover:text-rose-400 transition-colors p-1"
+                                                                            title="Reporter (Différer)"
+                                                                        >
+                                                                            <Clock className="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                    )}
+                                                                    
+                                                                    {/* Cancel */}
+                                                                    {project.status !== 'cancelled' && (
+                                                                        <button
+                                                                            onClick={() => handleStatusChange(project.id, 'cancelled')}
+                                                                            className="text-zinc-500 hover:text-red-400 transition-colors p-1"
+                                                                            title="Annuler le projet"
+                                                                        >
+                                                                            <Ban className="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                    )}
+                                                                    
+                                                                    {/* Unschedule */}
+                                                                    <button
+                                                                        onClick={() => handleStatusChange(project.id, 'unplanned')}
+                                                                        className="text-zinc-500 hover:text-amber-400 transition-colors p-1"
+                                                                        title="Mettre non planifié"
+                                                                    >
+                                                                        <CalendarX className="h-3.5 w-3.5" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })
                                             )}
                                         </div>
-                                        {project.start_date && (
-                                            <div className="mt-1.5 text-xs text-yellow-600 flex items-center gap-1">
-                                                <CalendarClock className="h-3 w-3" />
-                                                {formatProjectDate(project.start_date, Number(project.estimated_duration_days) < 1)}
-                                                {project.end_date && ` → ${formatProjectDate(project.end_date, Number(project.estimated_duration_days) < 1)}`}
-                                            </div>
-                                        )}
                                     </div>
                                 )
                             })}
                         </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* Calendar */}
-            <Card className="flex-1 h-full border-zinc-800 bg-transparent p-4 relative overflow-hidden">
-                <div className="fc-dark-theme-wrapper h-full">
-                    <FullCalendar
-                        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                        initialView="dayGridMonth"
-                        headerToolbar={{
-                            left: 'prev,next today',
-                            center: 'title',
-                            right: 'dayGridMonth,timeGridWeek'
-                        }}
-                        editable={true}
-                        droppable={true}
-                        events={events}
-                        eventReceive={handleEventReceive}
-                        eventDrop={handleEventDrop}
-                        eventResize={handleEventResize}
-                        eventClick={handleEventClick}
-                        dayMaxEvents={true}
-                        moreLinkClick={(info) => {
-                            info.jsEvent.preventDefault()
-                            setSelectedDate(info.date)
-                            const evts = info.allSegs.map((seg: any) => seg.event)
-                            setSelectedEvents(evts)
-                            setIsMoreEventsOpen(true)
-                        }}
-                        eventDisplay="block"
-                        eventDidMount={(info) => {
-                            const color = info.event.extendedProps.eventColor
-                            if (color) {
-                                info.el.style.backgroundColor = color
-                                info.el.style.borderColor = color
-                                info.el.style.opacity = '1'
-                            }
-                        }}
-                        height="100%"
-                        locale="fr"
-                        firstDay={1}
-                        buttonText={{
-                            today: "Aujourd'hui",
-                            month: 'Mois',
-                            week: 'Semaine',
-                            day: 'Jour',
-                        }}
-                        eventContent={(arg) => (
-                            <div className="overflow-hidden p-1 text-xs cursor-pointer group">
-                                <div className="flex items-start justify-between gap-2">
-                                    <div className="font-semibold text-white truncate flex items-center gap-1.5"><span className='inline-block h-2 w-2 rounded-full' style={{ backgroundColor: TYPE_DOT[arg.event.extendedProps.projectType || 'interior'] }} />{arg.event.title}{arg.event.extendedProps.quoteNumber ? ` · #${arg.event.extendedProps.quoteNumber}` : ''}</div>
-                                    <button
-                                        type="button"
-                                        onClick={(e) => { e.stopPropagation(); handleUnschedule(String(arg.event.extendedProps.projectId || arg.event.id)) }}
-                                        className="opacity-0 group-hover:opacity-100 text-white/80 hover:text-red-300 transition-opacity"
-                                        title="Retirer du calendrier"
-                                    >
-                                        <CalendarX className="h-3.5 w-3.5" />
-                                    </button>
-                                </div>
-                                <div className="opacity-70 mt-0.5 truncate">{arg.event.extendedProps.client}</div>
-                                <div className="opacity-0 group-hover:opacity-100 text-yellow-300 transition-opacity text-[10px] mt-0.5">Cliquer pour voir ↗</div>
-                            </div>
-                        )}
-                    />
-                </div>
-            </Card>
+                    </Card>
+                )}
+            </div>
 
             <Dialog open={isMoreEventsOpen} onOpenChange={setIsMoreEventsOpen}>
                 <DialogContent className="sm:max-w-md bg-[#103f75] border border-white/20 text-white max-h-[80vh] flex flex-col p-6 rounded-xl">
@@ -675,6 +1068,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         .fc-popover-close:hover {
             opacity: 1 !important;
             color: #ef4444 !important;
+            border-color: transparent !important;
         }
         .fc-popover-body {
             background-color: #18181b !important;

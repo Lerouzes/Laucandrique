@@ -4,9 +4,23 @@ import { NewAuditForm } from '@/components/features/team-management/NewAuditForm
 export default async function NewAuditPage() {
     const supabase = await createClient()
 
+    const { getActiveTeamContext, getFilteredManagers } = await import('@/utils/team-context')
+    const context = await getActiveTeamContext()
+    const teamManagers = await getFilteredManagers()
+    const managerIds = teamManagers.map(m => m.id)
+
     // Fetch active syndicates (clients)
+    let clientsQuery = supabase
+        .from('clients')
+        .select('*')
+        .eq('status', 'active')
+
+    if (context.teamId) {
+        clientsQuery = clientsQuery.in('manager_id', managerIds)
+    }
+
     const [clientsRes, configsRes] = await Promise.all([
-        supabase.from('clients').select('*').eq('status', 'active').order('company_name'),
+        clientsQuery.order('company_name'),
         supabase.from('audit_question_configs').select('*')
     ])
 

@@ -399,7 +399,7 @@ export function ManagerDashboard({
                                                     borderColor: '#27272a',
                                                     borderRadius: '12px',
                                                 }}
-                                                formatter={(v: number) => [`$${v.toLocaleString('fr-CA')}`, 'Revenu Signé']}
+                                                formatter={(v: any) => [`$${Number(v || 0).toLocaleString('fr-CA')}`, 'Revenu Signé']}
                                             />
                                             <Bar dataKey="revenue" radius={[4, 4, 0, 0]} maxBarSize={35}>
                                                 {allManagersStats.map((entry, index) => {

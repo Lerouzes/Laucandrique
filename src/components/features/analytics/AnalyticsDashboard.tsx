@@ -65,6 +65,21 @@ export function AnalyticsDashboard({
     const [period, setPeriod] = useState<'all' | 'this_year' | 'last_90_days' | 'next_90_days' | 'custom'>('this_year')
     const [customStart, setCustomStart] = useState<string>('')
     const [customEnd, setCustomEnd] = useState<string>('')
+    const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>('all')
+
+    // Generate list of the last 24 months for dropdown filter
+    const monthsList = useMemo(() => {
+        const list = []
+        const now = new Date()
+        for (let i = 0; i < 24; i++) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+            const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+            const label = d.toLocaleDateString('fr-CA', { month: 'long', year: 'numeric' })
+            const capitalizedLabel = label.charAt(0).toUpperCase() + label.slice(1)
+            list.push({ value, label: capitalizedLabel })
+        }
+        return list
+    }, [])
 
     // 2. Multiselect / Segmentation States
     const [selectedManagers, setSelectedManagers] = useState<string[]>([])
@@ -119,8 +134,17 @@ export function AnalyticsDashboard({
         return Array.from(set).filter(Boolean)
     }, [initialProjects, initialQuotes])
 
-    // Date Range calculation based on period selection
+    // Date Range calculation based on period selection or selected month filter
     const dateRange = useMemo(() => {
+        if (selectedMonthFilter !== 'all') {
+            const [yearStr, monthStr] = selectedMonthFilter.split('-')
+            const year = parseInt(yearStr, 10)
+            const month = parseInt(monthStr, 10)
+            const start = new Date(year, month - 1, 1)
+            const end = new Date(year, month, 0, 23, 59, 59, 999)
+            return { start, end }
+        }
+
         const now = new Date()
         if (period === 'this_year') {
             return {
@@ -145,7 +169,7 @@ export function AnalyticsDashboard({
             }
         }
         return { start: new Date(2020, 0, 1), end: new Date(2030, 11, 31) }
-    }, [period, customStart, customEnd])
+    }, [period, customStart, customEnd, selectedMonthFilter])
 
     // Helper: Determine a quote's projected/realized target date based on scheduling or approval
     const getQuoteTargetDate = (q: any) => {
@@ -317,6 +341,51 @@ export function AnalyticsDashboard({
         return statuses.filter(s => s.value > 0)
     }, [filteredQuotes, sentQuotes, approvedQuotes, deniedQuotes])
 
+    // 2b. Monthly counts of presented (sent) vs approved quotes
+    const monthlyCountsData = useMemo(() => {
+        const countsMap: Record<string, { month: string, sent: number, approved: number, sortKey: string }> = {}
+
+        // Populate months in range
+        const startYear = dateRange.start.getFullYear()
+        const startMonth = dateRange.start.getMonth()
+        const endYear = dateRange.end.getFullYear()
+        const endMonth = dateRange.end.getMonth()
+
+        let currY = startYear
+        let currM = startMonth
+        while (currY < endYear || (currY === endYear && currM <= endMonth)) {
+            const dummy = new Date(currY, currM, 1)
+            const label = dummy.toLocaleDateString('fr-CA', { month: 'short', year: '2-digit' })
+            const key = `${currY}-${String(currM + 1).padStart(2, '0')}`
+            countsMap[key] = { month: label, sent: 0, approved: 0, sortKey: key }
+            currM++
+            if (currM > 11) {
+                currM = 0
+                currY++
+            }
+        }
+
+        // Count quotes
+        filteredQuotes.forEach((q) => {
+            const d = getQuoteTargetDate(q)
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+            if (countsMap[key]) {
+                const isApproved = q.status === 'approved' || q.status === 'completed' || q.status === 'billed'
+                const isSent = q.status === 'sent'
+                const isDenied = q.status === 'denied'
+                
+                if (isApproved || isSent || isDenied) {
+                    countsMap[key].sent += 1
+                }
+                if (isApproved) {
+                    countsMap[key].approved += 1
+                }
+            }
+        })
+
+        return Object.values(countsMap).sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+    }, [dateRange, filteredQuotes])
+
     // 3. Manager Performance Segmentation
     const managerSegmentation = useMemo(() => {
         const stats: Record<string, { name: string, total: number, approved: number, denied: number, revenue: number, presented: number }> = {}
@@ -350,21 +419,59 @@ export function AnalyticsDashboard({
         return Object.values(stats).sort((a, b) => b.revenue - a.revenue)
     }, [filteredQuotes, pipelineMode])
 
-    // 4. Team Revenue Segmentation
-    const teamSegmentation = useMemo(() => {
-        const stats: Record<string, { team: string, value: number }> = {}
+    const managerApprovalData = useMemo(() => {
+        return managerSegmentation.map(mgr => {
+            const approvalRate = mgr.presented > 0 ? Math.round((mgr.approved / mgr.presented) * 100) : 0
+            return {
+                ...mgr,
+                approvalRate
+            }
+        }).sort((a, b) => b.approvalRate - a.approvalRate)
+    }, [managerSegmentation])
 
-        const targetQuotes = pipelineMode === 'all' ? [...approvedQuotes, ...sentQuotes] : approvedQuotes
-        targetQuotes.forEach((q: any) => {
+    // 4. Team Revenue / Performance Segmentation
+    const teamSegmentation = useMemo(() => {
+        const stats: Record<string, { team: string, total: number, approved: number, denied: number, revenue: number, presented: number, value: number }> = {}
+
+        filteredQuotes.forEach((q: any) => {
             const teamName = q.managers?.manager_teams?.name || 'Sans équipe'
             if (!stats[teamName]) {
-                stats[teamName] = { team: teamName, value: 0 }
+                stats[teamName] = { team: teamName, total: 0, approved: 0, denied: 0, revenue: 0, presented: 0, value: 0 }
             }
-            stats[teamName].value += q.total || 0
+            stats[teamName].total += 1
+            const isApproved = q.status === 'approved' || q.status === 'completed' || q.status === 'billed'
+            const isSent = q.status === 'sent'
+            const isDenied = q.status === 'denied'
+            const countsAsRevenue = isApproved || (pipelineMode === 'all' && isSent)
+
+            if (isApproved || isSent || isDenied) {
+                stats[teamName].presented += 1
+            }
+
+            if (isApproved) {
+                stats[teamName].approved += 1
+            } else if (isDenied) {
+                stats[teamName].denied += 1
+            }
+
+            if (countsAsRevenue) {
+                stats[teamName].revenue += q.total || 0
+                stats[teamName].value += q.total || 0
+            }
         })
 
-        return Object.values(stats).sort((a, b) => b.value - a.value)
-    }, [approvedQuotes, sentQuotes, pipelineMode])
+        return Object.values(stats).sort((a, b) => b.revenue - a.revenue)
+    }, [filteredQuotes, pipelineMode])
+
+    const teamApprovalData = useMemo(() => {
+        return teamSegmentation.map(t => {
+            const approvalRate = t.presented > 0 ? Math.round((t.approved / t.presented) * 100) : 0
+            return {
+                ...t,
+                approvalRate
+            }
+        }).sort((a, b) => b.approvalRate - a.approvalRate)
+    }, [teamSegmentation])
 
     // 5. Contractor Segmentation
     const contractorSegmentation = useMemo(() => {
@@ -385,6 +492,7 @@ export function AnalyticsDashboard({
     // --- RESET FILTERS ---
     const resetFilters = () => {
         setPeriod('this_year')
+        setSelectedMonthFilter('all')
         setSelectedManagers([])
         setSelectedTeams([])
         setSelectedContractors([])
@@ -434,7 +542,10 @@ export function AnalyticsDashboard({
                             <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Période</label>
                             <select
                                 value={period}
-                                onChange={(e: any) => setPeriod(e.target.value)}
+                                onChange={(e: any) => {
+                                    setPeriod(e.target.value)
+                                    setSelectedMonthFilter('all')
+                                }}
                                 className="w-full h-9 rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-cyan-500"
                             >
                                 <option value="this_year">Année en cours</option>
@@ -449,17 +560,35 @@ export function AnalyticsDashboard({
                                     <input
                                         type="date"
                                         value={customStart}
-                                        onChange={(e) => setCustomStart(e.target.value)}
+                                        onChange={(e) => {
+                                            setCustomStart(e.target.value)
+                                            setSelectedMonthFilter('all')
+                                        }}
                                         className="h-8 rounded border border-zinc-800 bg-zinc-900 px-2 text-xs text-zinc-100 focus:outline-none"
                                     />
                                     <input
                                         type="date"
                                         value={customEnd}
-                                        onChange={(e) => setCustomEnd(e.target.value)}
+                                        onChange={(e) => {
+                                            setCustomEnd(e.target.value)
+                                            setSelectedMonthFilter('all')
+                                        }}
                                         className="h-8 rounded border border-zinc-800 bg-zinc-900 px-2 text-xs text-zinc-100 focus:outline-none"
                                     />
                                 </div>
                             )}
+
+                            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider block mt-3">Mois Spécifique</label>
+                            <select
+                                value={selectedMonthFilter}
+                                onChange={(e: any) => setSelectedMonthFilter(e.target.value)}
+                                className="w-full h-9 rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                            >
+                                <option value="all">Tous les mois (Désactivé)</option>
+                                {monthsList.map((m) => (
+                                    <option key={m.value} value={m.value}>{m.label}</option>
+                                ))}
+                            </select>
                         </div>
 
                         {/* Visualisation Mode (Pipeline Mode) */}
@@ -718,8 +847,8 @@ export function AnalyticsDashboard({
                                                         backdropFilter: 'blur(8px)',
                                                         boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5)'
                                                     }}
-                                                    formatter={(v: number, name: string) => [
-                                                        `$${v.toLocaleString('fr-CA')}`,
+                                                    formatter={(v: any, name: any) => [
+                                                        `$${Number(v || 0).toLocaleString('fr-CA')}`,
                                                         name
                                                     ]}
                                                     labelStyle={{ color: '#a1a1aa', fontWeight: 'bold', fontSize: '12px' }}
@@ -728,6 +857,47 @@ export function AnalyticsDashboard({
                                                 <Area type="monotone" name={pipelineMode === 'all' ? 'Pipeline (Signé + Envoyé)' : 'Projeté (Signé)'} dataKey="projected" stroke={COLORS.cyan} strokeWidth={2.5} fillOpacity={1} fill="url(#colorProjected)" />
                                                 <Area type="monotone" name="Réel (Complété)" dataKey="realized" stroke={COLORS.emerald} strokeWidth={2.5} fillOpacity={1} fill="url(#colorRealized)" />
                                             </AreaChart>
+                                        </ResponsiveContainer>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {activeTab === 'revenues' && (
+                        <Card className="bg-zinc-950/40 border-zinc-800 p-6 rounded-2xl shadow-xl mt-6">
+                            <CardHeader className="px-0 pt-0">
+                                <CardTitle className="text-zinc-100 text-base">Volume de Projets Mensuels</CardTitle>
+                                <CardDescription className="text-zinc-400 text-xs">
+                                    Nombre de soumissions présentées (envoyées) vs approuvées par mois.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="px-0 pb-0">
+                                <div className="h-[300px] w-full mt-4">
+                                    {monthlyCountsData.length === 0 ? (
+                                        <div className="flex h-full items-center justify-center text-sm text-zinc-500">
+                                            Aucune donnée de volume sur la période sélectionnée.
+                                        </div>
+                                    ) : (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={monthlyCountsData} margin={{ left: -10, right: 10, top: 10, bottom: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f1f23" />
+                                                <XAxis dataKey="month" stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} />
+                                                <YAxis stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
+                                                <Tooltip
+                                                    contentStyle={{
+                                                        backgroundColor: 'rgba(9, 9, 11, 0.95)',
+                                                        borderColor: '#27272a',
+                                                        borderRadius: '12px',
+                                                        backdropFilter: 'blur(8px)',
+                                                        boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5)'
+                                                    }}
+                                                    labelStyle={{ color: '#a1a1aa', fontWeight: 'bold', fontSize: '12px' }}
+                                                />
+                                                <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }} />
+                                                <Bar name="Présentés" dataKey="sent" fill={COLORS.indigo} radius={[4, 4, 0, 0]} maxBarSize={45} />
+                                                <Bar name="Approuvés" dataKey="approved" fill={COLORS.emerald} radius={[4, 4, 0, 0]} maxBarSize={45} />
+                                            </BarChart>
                                         </ResponsiveContainer>
                                     )}
                                 </div>
@@ -845,10 +1015,10 @@ export function AnalyticsDashboard({
                                                         backdropFilter: 'blur(8px)',
                                                         boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5)'
                                                     }}
-                                                    formatter={(v: number, name: string) => {
+                                                    formatter={(v: any, name: any) => {
                                                         const isRevenue = name === 'Revenu Signé' || name === 'Pipeline (Signé + Envoyé)' || name === 'revenue';
                                                         return [
-                                                            isRevenue ? `$${v.toLocaleString('fr-CA')}` : v,
+                                                            isRevenue ? `$${Number(v || 0).toLocaleString('fr-CA')}` : v,
                                                             name
                                                         ];
                                                     }}
@@ -859,6 +1029,112 @@ export function AnalyticsDashboard({
                                             </BarChart>
                                         </ResponsiveContainer>
                                     )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {activeTab === 'managers' && (
+                        <Card className="bg-zinc-950/40 border-zinc-800 p-6 rounded-2xl shadow-xl mt-6">
+                            <CardHeader className="px-0 pt-0">
+                                <CardTitle className="text-zinc-100 text-base">Taux d'Approbation par Gestionnaire</CardTitle>
+                                <CardDescription className="text-zinc-400 text-xs">
+                                    Pourcentage de soumissions approuvées par rapport au nombre total de soumissions présentées (envoyées, approuvées ou refusées).
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="px-0 pb-0">
+                                <div className="h-[340px] w-full mt-4">
+                                    {managerApprovalData.length === 0 ? (
+                                        <div className="flex h-full items-center justify-center text-sm text-zinc-500">
+                                            Aucune donnée disponible.
+                                        </div>
+                                    ) : (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={managerApprovalData} margin={{ left: -10, right: 10, top: 10, bottom: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f1f23" />
+                                                <XAxis dataKey="name" stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} />
+                                                <YAxis stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
+                                                <Tooltip
+                                                    contentStyle={{
+                                                        backgroundColor: 'rgba(9, 9, 11, 0.95)',
+                                                        borderColor: '#27272a',
+                                                        borderRadius: '12px',
+                                                        backdropFilter: 'blur(8px)',
+                                                        boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5)'
+                                                    }}
+                                                    formatter={(v: any) => [`${v}%`, "Taux d'Approbation"]}
+                                                    labelStyle={{ color: '#a1a1aa', fontWeight: 'bold', fontSize: '12px' }}
+                                                />
+                                                <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }} />
+                                                <Bar name="Taux d'Approbation (%)" dataKey="approvalRate" radius={[4, 4, 0, 0]} maxBarSize={45}>
+                                                    {managerApprovalData.map((entry, index) => (
+                                                        <Cell 
+                                                            key={`cell-${index}`} 
+                                                            fill={entry.approvalRate >= 60 ? COLORS.emerald : entry.approvalRate >= 40 ? COLORS.amber : COLORS.rose} 
+                                                        />
+                                                    ))}
+                                                </Bar>
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {activeTab === 'managers' && (
+                        <Card className="bg-zinc-950/40 border-zinc-800 p-6 rounded-2xl shadow-xl mt-6">
+                            <CardHeader className="px-0 pt-0">
+                                <CardTitle className="text-zinc-100 text-base">Performances Détaillées des Gestionnaires</CardTitle>
+                                <CardDescription className="text-zinc-400 text-xs">
+                                    Statistiques complètes des soumissions et volumes financiers pour chaque gestionnaire.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="px-0 pb-0">
+                                <div className="overflow-x-auto mt-4">
+                                    <table className="w-full text-left border-collapse text-zinc-300">
+                                        <thead>
+                                            <tr className="border-b border-zinc-800 text-xxs uppercase tracking-wider text-zinc-500">
+                                                <th className="py-3 px-4 font-bold">Gestionnaire</th>
+                                                <th className="py-3 px-4 text-center font-bold">Présentées</th>
+                                                <th className="py-3 px-4 text-center font-bold">Approuvées</th>
+                                                <th className="py-3 px-4 text-center font-bold">Refusées</th>
+                                                <th className="py-3 px-4 text-center font-bold">Taux d'Approbation</th>
+                                                <th className="py-3 px-4 text-right font-bold">Revenu Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-zinc-900 text-xs">
+                                            {managerApprovalData.map((mgr) => (
+                                                <tr key={mgr.name} className="hover:bg-zinc-900/40 transition-colors">
+                                                    <td className="py-3 px-4 font-semibold text-zinc-100">{mgr.name}</td>
+                                                    <td className="py-3 px-4 text-center">{mgr.presented}</td>
+                                                    <td className="py-3 px-4 text-center text-emerald-400">{mgr.approved}</td>
+                                                    <td className="py-3 px-4 text-center text-rose-400">{mgr.denied}</td>
+                                                    <td className="py-3 px-4 text-center">
+                                                        <span className={`px-2 py-0.5 rounded-full text-xxs font-bold ${
+                                                            mgr.approvalRate >= 60
+                                                                ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-800'
+                                                                : mgr.approvalRate >= 40
+                                                                ? 'bg-amber-950/40 text-amber-300 border border-amber-800'
+                                                                : 'bg-rose-950/40 text-rose-300 border border-rose-800'
+                                                        }`}>
+                                                            {mgr.approvalRate}%
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-right font-bold text-cyan-400">
+                                                        ${Math.round(mgr.revenue).toLocaleString('fr-CA')}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {managerApprovalData.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={6} className="py-4 text-center text-zinc-500 italic">
+                                                        Aucune donnée disponible.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </CardContent>
                         </Card>
@@ -904,7 +1180,7 @@ export function AnalyticsDashboard({
                                                                 borderColor: '#27272a',
                                                                 borderRadius: '12px',
                                                             }}
-                                                            formatter={(v: number) => `$${v.toLocaleString('fr-CA')}`}
+                                                            formatter={(v: any) => `$${Number(v || 0).toLocaleString('fr-CA')}`}
                                                         />
                                                     </PieChart>
                                                 </ResponsiveContainer>
@@ -922,6 +1198,112 @@ export function AnalyticsDashboard({
                                             </div>
                                         </div>
                                     )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {activeTab === 'teams' && (
+                        <Card className="bg-zinc-950/40 border-zinc-800 p-6 rounded-2xl shadow-xl mt-6">
+                            <CardHeader className="px-0 pt-0">
+                                <CardTitle className="text-zinc-100 text-base">Taux d'Approbation par Équipe</CardTitle>
+                                <CardDescription className="text-zinc-400 text-xs">
+                                    Pourcentage de soumissions approuvées par rapport au nombre total de soumissions présentées (envoyées, approuvées ou refusées) par équipe.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="px-0 pb-0">
+                                <div className="h-[340px] w-full mt-4">
+                                    {teamApprovalData.length === 0 ? (
+                                        <div className="flex h-full items-center justify-center text-sm text-zinc-500">
+                                            Aucune donnée disponible.
+                                        </div>
+                                    ) : (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={teamApprovalData} margin={{ left: -10, right: 10, top: 10, bottom: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f1f23" />
+                                                <XAxis dataKey="team" stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} />
+                                                <YAxis stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
+                                                <Tooltip
+                                                    contentStyle={{
+                                                        backgroundColor: 'rgba(9, 9, 11, 0.95)',
+                                                        borderColor: '#27272a',
+                                                        borderRadius: '12px',
+                                                        backdropFilter: 'blur(8px)',
+                                                        boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5)'
+                                                    }}
+                                                    formatter={(v: any) => [`${v}%`, "Taux d'Approbation"]}
+                                                    labelStyle={{ color: '#a1a1aa', fontWeight: 'bold', fontSize: '12px' }}
+                                                />
+                                                <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }} />
+                                                <Bar name="Taux d'Approbation (%)" dataKey="approvalRate" radius={[4, 4, 0, 0]} maxBarSize={45}>
+                                                    {teamApprovalData.map((entry, index) => (
+                                                        <Cell 
+                                                            key={`cell-${index}`} 
+                                                            fill={entry.approvalRate >= 60 ? COLORS.emerald : entry.approvalRate >= 40 ? COLORS.amber : COLORS.rose} 
+                                                        />
+                                                    ))}
+                                                </Bar>
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {activeTab === 'teams' && (
+                        <Card className="bg-zinc-950/40 border-zinc-800 p-6 rounded-2xl shadow-xl mt-6">
+                            <CardHeader className="px-0 pt-0">
+                                <CardTitle className="text-zinc-100 text-base">Performances Détaillées des Équipes</CardTitle>
+                                <CardDescription className="text-zinc-400 text-xs">
+                                    Statistiques complètes des soumissions et volumes financiers pour chaque équipe.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="px-0 pb-0">
+                                <div className="overflow-x-auto mt-4">
+                                    <table className="w-full text-left border-collapse text-zinc-300">
+                                        <thead>
+                                            <tr className="border-b border-zinc-800 text-xxs uppercase tracking-wider text-zinc-500">
+                                                <th className="py-3 px-4 font-bold">Équipe</th>
+                                                <th className="py-3 px-4 text-center font-bold">Présentées</th>
+                                                <th className="py-3 px-4 text-center font-bold">Approuvées</th>
+                                                <th className="py-3 px-4 text-center font-bold">Refusées</th>
+                                                <th className="py-3 px-4 text-center font-bold">Taux d'Approbation</th>
+                                                <th className="py-3 px-4 text-right font-bold">Revenu Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-zinc-900 text-xs">
+                                            {teamApprovalData.map((item) => (
+                                                <tr key={item.team} className="hover:bg-zinc-900/40 transition-colors">
+                                                    <td className="py-3 px-4 font-semibold text-zinc-100">{item.team}</td>
+                                                    <td className="py-3 px-4 text-center">{item.presented}</td>
+                                                    <td className="py-3 px-4 text-center text-emerald-400">{item.approved}</td>
+                                                    <td className="py-3 px-4 text-center text-rose-400">{item.denied}</td>
+                                                    <td className="py-3 px-4 text-center">
+                                                        <span className={`px-2 py-0.5 rounded-full text-xxs font-bold ${
+                                                            item.approvalRate >= 60
+                                                                ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-800'
+                                                                : item.approvalRate >= 40
+                                                                ? 'bg-amber-950/40 text-amber-300 border border-amber-800'
+                                                                : 'bg-rose-950/40 text-rose-300 border border-rose-800'
+                                                        }`}>
+                                                            {item.approvalRate}%
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-right font-bold text-cyan-400">
+                                                        ${Math.round(item.revenue).toLocaleString('fr-CA')}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {teamApprovalData.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={6} className="py-4 text-center text-zinc-500 italic">
+                                                        Aucune donnée disponible.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </CardContent>
                         </Card>
@@ -953,8 +1335,8 @@ export function AnalyticsDashboard({
                                                         borderColor: '#27272a',
                                                         borderRadius: '12px',
                                                     }}
-                                                    formatter={(v: number, name: string) => [
-                                                        `$${v.toLocaleString('fr-CA')}`,
+                                                    formatter={(v: any, name: any) => [
+                                                        `$${Number(v || 0).toLocaleString('fr-CA')}`,
                                                         name
                                                     ]}
                                                 />

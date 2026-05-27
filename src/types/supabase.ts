@@ -1354,11 +1354,13 @@ export type Database = {
         Row: {
           client_id: string
           completed_at: string | null
+          completed_months: string[]
           contractor_id: string | null
           created_at: string | null
           end_date: string | null
           estimated_duration_days: number | null
           id: string
+          planned_months: string[]
           project_type: string
           quote_id: string
           start_date: string | null
@@ -1368,11 +1370,13 @@ export type Database = {
         Insert: {
           client_id: string
           completed_at?: string | null
+          completed_months?: string[]
           contractor_id?: string | null
           created_at?: string | null
           end_date?: string | null
           estimated_duration_days?: number | null
           id?: string
+          planned_months?: string[]
           project_type?: string
           quote_id: string
           start_date?: string | null
@@ -1382,11 +1386,13 @@ export type Database = {
         Update: {
           client_id?: string
           completed_at?: string | null
+          completed_months?: string[]
           contractor_id?: string | null
           created_at?: string | null
           end_date?: string | null
           estimated_duration_days?: number | null
           id?: string
+          planned_months?: string[]
           project_type?: string
           quote_id?: string
           start_date?: string | null
@@ -1861,7 +1867,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      project_status: "unplanned" | "planned" | "in_progress" | "completed"
+      project_status: "unplanned" | "planned" | "in_progress" | "completed" | "deferred" | "cancelled"
       quote_status:
         | "draft"
         | "sent"
@@ -1999,7 +2005,7 @@ export const Constants = {
   },
   public: {
     Enums: {
-      project_status: ["unplanned", "planned", "in_progress", "completed"],
+      project_status: ["unplanned", "planned", "in_progress", "completed", "deferred", "cancelled"],
       quote_status: [
         "draft",
         "sent",

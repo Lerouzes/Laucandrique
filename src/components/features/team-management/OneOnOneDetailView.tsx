@@ -880,11 +880,11 @@ export function OneOnOneDetailView({
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-zinc-500 text-[10px]">Appels Répondus</Label>
-                                <Input type="number" value={callsAnswered} onChange={(e) => setCallsAnswered(Number(e.target.value))} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                                <Input type="number" value={callsAnswered} readOnly disabled className="bg-zinc-950/60 border-zinc-800 text-xs text-zinc-400 cursor-not-allowed" />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-zinc-500 text-[10px]">Total Appels</Label>
-                                <Input type="number" value={callsTotal} onChange={(e) => setCallsTotal(Number(e.target.value))} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                                <Input type="number" value={callsTotal} readOnly disabled className="bg-zinc-950/60 border-zinc-800 text-xs text-zinc-400 cursor-not-allowed" />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-zinc-500 text-[10px]">Factures sans note &gt;7j</Label>

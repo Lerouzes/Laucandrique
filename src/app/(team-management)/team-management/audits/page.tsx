@@ -6,12 +6,26 @@ import { ClipboardCheck, PlusCircle, ArrowRight, Activity, Calendar } from 'luci
 
 export default async function AuditsListPage() {
     const supabase = await createClient()
+    const { getActiveTeamContext, getFilteredManagers } = await import('@/utils/team-context')
+    const context = await getActiveTeamContext()
+    const teamManagers = await getFilteredManagers()
+    const managerIds = teamManagers.map(m => m.id)
 
     // Fetch audits including client details
-    const { data: audits } = await supabase
+    let query = supabase
         .from('syndicate_audits')
         .select('*, clients(company_name, full_name, managers(first_name, last_name))')
-        .order('audit_date', { ascending: false })
+
+    if (context.teamId) {
+        const { data: teamClients } = await supabase
+            .from('clients')
+            .select('id')
+            .in('manager_id', managerIds)
+        const clientIds = (teamClients || []).map(c => c.id)
+        query = query.in('client_id', clientIds)
+    }
+
+    const { data: audits } = await query.order('audit_date', { ascending: false })
 
     const getHealthBadge = (score: number) => {
         if (score >= 90) return 'bg-emerald-500/20 text-emerald-400 border-emerald-800/40'

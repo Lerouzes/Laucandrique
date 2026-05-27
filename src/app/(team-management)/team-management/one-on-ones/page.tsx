@@ -6,12 +6,20 @@ import { Handshake, PlusCircle, ArrowRight, Calendar, User } from 'lucide-react'
 
 export default async function OneOnOnesListPage() {
     const supabase = await createClient()
+    const { getActiveTeamContext, getFilteredManagers } = await import('@/utils/team-context')
+    const context = await getActiveTeamContext()
+    const teamManagers = await getFilteredManagers()
+    const managerIds = teamManagers.map(m => m.id)
 
-    // Fetch all one-on-ones with manager details
-    const { data: oneOnOnes } = await supabase
+    let query = supabase
         .from('one_on_ones')
         .select('*, managers(first_name, last_name)')
-        .order('meeting_date', { ascending: false })
+
+    if (context.teamId) {
+        query = query.in('manager_id', managerIds)
+    }
+
+    const { data: oneOnOnes } = await query.order('meeting_date', { ascending: false })
 
     return (
         <div className="space-y-6 pb-12">

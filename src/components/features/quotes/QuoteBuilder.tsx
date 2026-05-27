@@ -1,6 +1,5 @@
-'use client'
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-nocheck
+'use client'
 
 import { useState, useEffect, useRef, useTransition } from 'react'
 import { useForm, useFieldArray, useWatch, Controller } from 'react-hook-form'

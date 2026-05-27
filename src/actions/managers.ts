@@ -33,10 +33,15 @@ function isMissingTableError(errorMessage: string, tableName: string) {
 
 export async function getManagers() {
   const supabase = await createClient()
+  const { getActiveTeamContext } = await import('@/utils/team-context')
+  const context = await getActiveTeamContext()
 
-  const { data: managers, error: managersError } = await supabase
-    .from('managers')
-    .select('*')
+  let query = supabase.from('managers').select('*')
+  if (context.teamId) {
+    query = query.eq('team_id', context.teamId)
+  }
+
+  const { data: managers, error: managersError } = await query
     .order('last_name')
 
   if (managersError) {
