@@ -697,14 +697,25 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                     <span className='inline-block h-2 w-2 rounded-full shrink-0' style={{ backgroundColor: TYPE_DOT[project.project_type || 'interior'] }} />
                                                     <span className="truncate max-w-[120px]" title={project.title}>{project.title}</span>
                                                 </div>
-                                                {project.quotes?.quote_number && <div className='text-[10px] text-zinc-400 font-mono shrink-0'>#{project.quotes.quote_number}</div>}
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); router.push(`/quotes/${project.quote_id}`) }}
-                                                    className="text-zinc-500 hover:text-zinc-200 transition-colors shrink-0"
-                                                    title="Voir la soumission"
-                                                >
-                                                    <ExternalLink className="h-3.5 w-3.5" />
-                                                </button>
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    {project.status !== 'completed' && project.status !== 'cancelled' && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleStatusChange(project.id, 'completed') }}
+                                                            className="text-zinc-500 hover:text-emerald-450 transition-colors p-0.5 rounded hover:bg-zinc-800"
+                                                            title="Marquer comme complété"
+                                                        >
+                                                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500/70 hover:text-emerald-450" />
+                                                        </button>
+                                                    )}
+                                                    {project.quotes?.quote_number && <div className='text-[10px] text-zinc-400 font-mono'>#{project.quotes.quote_number}</div>}
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); router.push(`/quotes/${project.quote_id}`) }}
+                                                        className="text-zinc-500 hover:text-zinc-200 transition-colors"
+                                                        title="Voir la soumission"
+                                                    >
+                                                        <ExternalLink className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
                                             </div>
                                             
                                             <div className="text-[11px] text-zinc-400 truncate">{project.clients?.full_name}</div>
@@ -863,21 +874,21 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                     <div className="overflow-hidden p-1 text-xs cursor-pointer group">
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="font-semibold text-white truncate flex items-center gap-1.5"><span className='inline-block h-2 w-2 rounded-full shrink-0' style={{ backgroundColor: TYPE_DOT[arg.event.extendedProps.projectType || 'interior'] }} />{arg.event.title}{arg.event.extendedProps.quoteNumber ? ` · #${arg.event.extendedProps.quoteNumber}` : ''}</div>
-                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                            <div className="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
                                                 {arg.event.extendedProps.status !== 'completed' && (
                                                     <button
                                                         type="button"
                                                         onClick={(e) => { e.stopPropagation(); handleMarkCompleted(String(arg.event.extendedProps.projectId || arg.event.id)) }}
-                                                        className="text-white hover:text-emerald-400 transition-colors"
+                                                        className="text-emerald-400 hover:text-emerald-300 transition-colors p-0.5 rounded hover:bg-black/20"
                                                         title="Marquer comme complété"
                                                     >
-                                                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                                                        <CheckCircle2 className="h-3.5 w-3.5" />
                                                     </button>
                                                 )}
                                                 <button
                                                     type="button"
                                                     onClick={(e) => { e.stopPropagation(); handleUnschedule(String(arg.event.extendedProps.projectId || arg.event.id)) }}
-                                                    className="text-white hover:text-red-300 transition-colors"
+                                                    className="text-zinc-300 hover:text-red-400 transition-colors p-0.5 rounded hover:bg-black/20"
                                                     title="Retirer du calendrier"
                                                 >
                                                     <CalendarX className="h-3.5 w-3.5" />
@@ -986,9 +997,20 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                                     <span className="inline-block h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: TYPE_DOT[project.project_type || 'interior'] }} />
                                                                     <span className="truncate" title={project.title}>{project.title}</span>
                                                                 </div>
-                                                                {project.quotes?.quote_number && (
-                                                                    <span className="text-[10px] text-zinc-500 font-mono shrink-0">#{project.quotes.quote_number}</span>
-                                                                )}
+                                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                                    {!isCompleted && project.status !== 'cancelled' && (
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleStatusChange(project.id, 'completed') }}
+                                                                            className="text-zinc-500 hover:text-emerald-450 transition-colors p-0.5 rounded hover:bg-zinc-800"
+                                                                            title="Marquer comme complété"
+                                                                        >
+                                                                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500/70 hover:text-emerald-450" />
+                                                                        </button>
+                                                                    )}
+                                                                    {project.quotes?.quote_number && (
+                                                                        <span className="text-[10px] text-zinc-500 font-mono">#{project.quotes.quote_number}</span>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                             
                                                             <div className="text-[10px] text-zinc-400 truncate">{project.clients?.full_name}</div>
@@ -1188,7 +1210,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             </Dialog>
 
             <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
-                <DialogContent className="max-w-4xl bg-zinc-950 border border-zinc-800 text-zinc-100 max-h-[90vh] overflow-y-auto p-0 rounded-2xl shadow-2xl">
+                <DialogContent className="max-w-6xl w-[90vw] bg-zinc-950 border border-zinc-800 text-zinc-100 max-h-[90vh] overflow-y-auto p-0 rounded-2xl shadow-2xl">
                     {loadingDetails ? (
                         <div className="flex flex-col items-center justify-center py-20 space-y-3">
                             <Loader2 className="h-8 w-8 text-cyan-500 animate-spin" />
