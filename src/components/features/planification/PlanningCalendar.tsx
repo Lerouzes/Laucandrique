@@ -158,7 +158,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     // Initialize draggable only ONCE on mount for FullCalendar external drag source
     useEffect(() => {
         let draggableInstance: Draggable | null = null
-        if (externalEventsRef.current) {
+        if (viewMode === 'calendar' && externalEventsRef.current) {
             draggableInstance = new Draggable(externalEventsRef.current, {
                 itemSelector: '.fc-event-external-draggable',
                 eventData: function (eventEl) {
