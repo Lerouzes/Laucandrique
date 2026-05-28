@@ -689,8 +689,10 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                         type="checkbox"
                                                         checked={isSelected}
                                                         onChange={(e) => {
-                                                            e.stopPropagation()
                                                             toggleProjectSelection(project.id)
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
                                                         }}
                                                         className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900 text-cyan-600 focus:ring-cyan-500 focus:ring-offset-0 shrink-0 cursor-pointer"
                                                     />
@@ -989,8 +991,10 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                                         type="checkbox"
                                                                         checked={isSelected}
                                                                         onChange={(e) => {
-                                                                            e.stopPropagation()
                                                                             toggleProjectSelection(project.id)
+                                                                        }}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation()
                                                                         }}
                                                                         className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900 text-cyan-600 focus:ring-cyan-500 focus:ring-offset-0 shrink-0 cursor-pointer"
                                                                     />
