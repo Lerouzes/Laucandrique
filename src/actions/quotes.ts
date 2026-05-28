@@ -260,6 +260,12 @@ export async function updateQuoteStatus(quoteId: string, status: 'approved' | 'd
     if (updateError) throw new Error(updateError.message)
 
     if (status === 'approved') {
+        const { data: existingProj } = await supabase
+            .from('projects')
+            .select('id, start_date')
+            .eq('quote_id', quoteId)
+            .maybeSingle()
+
         const { data: quoteMeta } = await supabase.from('quotes').select('contractor_id, project_type').eq('id', quoteId).single()
         const projectPayload: any = {
             quote_id: quoteId,
@@ -267,16 +273,26 @@ export async function updateQuoteStatus(quoteId: string, status: 'approved' | 'd
             contractor_id: quoteMeta?.contractor_id || null,
             project_type: quoteMeta?.project_type || 'interior',
             title: titleStr,
-            status: 'unplanned',
+            status: existingProj?.start_date ? 'planned' : 'unplanned',
             estimated_duration_days: durDays,
-        }
-        let inserted = await supabase.from('projects').insert(projectPayload)
-        if (inserted.error && inserted.error.message.includes('project_type')) {
-            delete projectPayload.project_type
-            inserted = await supabase.from('projects').insert(projectPayload)
+            completed_at: null,
+            completed_months: []
         }
 
-        if (inserted.error) throw new Error(inserted.error.message)
+        if (existingProj) {
+            const { error: projErr } = await supabase
+                .from('projects')
+                .update(projectPayload)
+                .eq('id', existingProj.id)
+            if (projErr) throw new Error(projErr.message)
+        } else {
+            let inserted = await supabase.from('projects').insert(projectPayload)
+            if (inserted.error && inserted.error.message.includes('project_type')) {
+                delete projectPayload.project_type
+                inserted = await supabase.from('projects').insert(projectPayload)
+            }
+            if (inserted.error) throw new Error(inserted.error.message)
+        }
     }
 
     revalidatePath('/quotes')
@@ -331,8 +347,22 @@ export async function revertQuoteToPending(quoteId: string) {
 
     if (quoteError) throw new Error(quoteError.message)
 
-    // Delete associated project
-    const { error: projectError } = await supabase.from('projects').delete().eq('quote_id', quoteId)
+    // Reset the associated project to unplanned instead of deleting it.
+    // Deleting forces a new INSERT on re-approval (new row ID), which causes
+    // phantom duplication in analytics and planning views. By keeping the row
+    // and resetting its fields we stay idempotent: re-approving finds the
+    // existing row and does an UPDATE, never a duplicate INSERT.
+    const { error: projectError } = await supabase
+        .from('projects')
+        .update({
+            status: 'unplanned',
+            start_date: null,
+            end_date: null,
+            completed_at: null,
+            completed_months: [],
+            planned_months: [],
+        })
+        .eq('quote_id', quoteId)
 
     if (projectError) throw new Error(projectError.message)
 
@@ -340,6 +370,7 @@ export async function revertQuoteToPending(quoteId: string) {
     revalidatePath(`/quotes/${quoteId}`)
     revalidatePath('/planification')
     revalidatePath('/dashboard')
+    revalidatePath('/analytics')
 
     return { success: true }
 }
@@ -680,17 +711,39 @@ export async function updateQuotesStatusAction(
         if (status === 'approved' || status === 'completed') {
             const { data: existingProject } = await supabase
                 .from('projects')
-                .select('id')
+                .select('id, start_date')
                 .eq('quote_id', quote.id)
                 .maybeSingle()
 
             if (existingProject) {
                 if (status === 'completed') {
+                    const now = new Date()
+                    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+                    const { data: projData } = await supabase
+                        .from('projects')
+                        .select('completed_months')
+                        .eq('id', existingProject.id)
+                        .single()
+                    const existingCompleted = projData?.completed_months || []
+                    const newCompleted = existingCompleted.includes(currentMonth)
+                        ? existingCompleted
+                        : [...existingCompleted, currentMonth]
+
                     await supabase
                         .from('projects')
                         .update({
                             status: 'completed',
-                            completed_at: new Date().toISOString()
+                            completed_at: now.toISOString(),
+                            completed_months: newCompleted
+                        })
+                        .eq('id', existingProject.id)
+                } else if (status === 'approved') {
+                    await supabase
+                        .from('projects')
+                        .update({
+                            status: existingProject.start_date ? 'planned' : 'unplanned',
+                            completed_at: null,
+                            completed_months: []
                         })
                         .eq('id', existingProject.id)
                 }
@@ -702,7 +755,8 @@ export async function updateQuotesStatusAction(
                     title: quote.title,
                     status: status === 'completed' ? 'completed' : 'unplanned',
                     estimated_duration_days: quote.estimated_duration_days || 1,
-                    completed_at: status === 'completed' ? new Date().toISOString() : null
+                    completed_at: status === 'completed' ? new Date().toISOString() : null,
+                    completed_months: status === 'completed' ? [`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`] : []
                 }
                 let inserted = await supabase.from('projects').insert(projectPayload)
                 if (inserted.error && inserted.error.message.includes('project_type')) {

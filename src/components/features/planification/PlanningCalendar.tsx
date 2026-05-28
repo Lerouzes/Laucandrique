@@ -326,9 +326,16 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     const getMonthlySum = (monthKey: string) => {
         return filteredProjects.reduce((sum, p) => {
             if (p.status === 'unplanned' || p.status === 'deferred' || p.status === 'cancelled') return sum
-            const pMonths = p.planned_months || []
-            const cMonths = p.completed_months || []
-            const isMatch = pMonths.includes(monthKey) || cMonths.includes(monthKey) || (p.start_date && p.start_date.slice(0, 7) === monthKey)
+            
+            let isMatch = false
+            if (p.status === 'completed') {
+                const cMonths = p.completed_months || []
+                isMatch = cMonths.length > 0 ? cMonths.includes(monthKey) : (p.completed_at && p.completed_at.slice(0, 7) === monthKey)
+            } else {
+                const pMonths = p.planned_months || []
+                isMatch = pMonths.length > 0 ? pMonths.includes(monthKey) : (p.start_date && p.start_date.slice(0, 7) === monthKey)
+            }
+            
             if (!isMatch) return sum
             return sum + getProjectMonthlyBudget(p, monthKey)
         }, 0)
@@ -339,12 +346,15 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             if (p.status === 'unplanned' || p.status === 'deferred' || p.status === 'cancelled') return false
             if (p.status === 'completed' && !showCompleted) return false
             
-            const pMonths = p.planned_months || []
-            const cMonths = p.completed_months || []
-            if (pMonths.length > 0 || cMonths.length > 0) {
-                return pMonths.includes(monthKey) || cMonths.includes(monthKey)
+            if (p.status === 'completed') {
+                const cMonths = p.completed_months || []
+                if (cMonths.length > 0) return cMonths.includes(monthKey)
+                return (p.completed_at && p.completed_at.slice(0, 7) === monthKey) || (p.start_date && p.start_date.slice(0, 7) === monthKey)
+            } else {
+                const pMonths = p.planned_months || []
+                if (pMonths.length > 0) return pMonths.includes(monthKey)
+                return p.start_date && p.start_date.slice(0, 7) === monthKey
             }
-            return p.start_date && p.start_date.slice(0, 7) === monthKey
         })
     }
 

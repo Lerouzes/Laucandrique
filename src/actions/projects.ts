@@ -78,16 +78,19 @@ export async function updateProjectStatus(
         updates.completed_at = new Date().toISOString()
     } else {
         updates.completed_at = null
+        updates.completed_months = []
     }
 
     if (status === 'unplanned') {
         updates.start_date = null
         updates.end_date = null
+        updates.planned_months = []
     }
 
     if (status === 'deferred') {
         updates.start_date = null
         updates.end_date = null
+        updates.planned_months = []
         updates.contractor_id = null
     }
 
@@ -126,6 +129,8 @@ export async function updateProjectStatus(
     }
 
     revalidatePath('/planification')
+    revalidatePath('/dashboard')
+    revalidatePath('/analytics')
     return { success: true }
 }
 
@@ -208,7 +213,9 @@ export async function scheduleProjectStartByQuote(quoteId: string, startDateIso:
             start_date: start.toISOString(),
             end_date: end.toISOString(),
             status: 'planned',
-            planned_months: plannedMonths
+            planned_months: plannedMonths,
+            completed_at: null,
+            completed_months: []
         })
         .eq('id', project.id)
 
