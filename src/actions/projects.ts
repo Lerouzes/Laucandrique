@@ -218,3 +218,30 @@ export async function scheduleProjectStartByQuote(quoteId: string, startDateIso:
     revalidatePath('/planification')
     return { success: true }
 }
+
+export async function getProjectDetails(projectId: string) {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+        .from('projects')
+        .select(`
+            *,
+            clients (*),
+            contractors (*),
+            quotes (
+                *,
+                quote_images (*),
+                quote_items (*)
+            )
+        `)
+        .eq('id', projectId)
+        .maybeSingle()
+
+    if (error) {
+        console.error('Error fetching project details:', error)
+        throw new Error(error.message)
+    }
+
+    return data
+}
+
