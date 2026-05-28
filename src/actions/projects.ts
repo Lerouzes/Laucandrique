@@ -26,7 +26,7 @@ export async function getProjects(query?: string) {
 
     const { data, error } = await supabase
         .from('projects')
-        .select('*, clients(full_name, address), contractors(full_name, color), quotes(quote_number, total, contractor_id, contractors(full_name, color))')
+        .select('*, clients(full_name, address), contractors(full_name, color), quotes(quote_number, total, contractor_id, approved_at, contractors(full_name, color))')
         .order('created_at', { ascending: false })
 
     if (error) {

@@ -20,7 +20,9 @@ import {
     RefreshCw, 
     Calendar as CalendarIcon, 
     TrendingUp,
-    Loader2
+    Loader2,
+    ArrowUpDown,
+    Filter
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import {
@@ -83,6 +85,23 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
     const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([])
     const [draggedProjectId, setDraggedProjectId] = useState<string | null>(null)
+    const [selectedContractorId, setSelectedContractorId] = useState<string>('')
+    const [selectedJobType, setSelectedJobType] = useState<string>('')
+    const [sidebarSortOrder, setSidebarSortOrder] = useState<'approved_asc' | 'approved_desc'>('approved_asc')
+
+    // Generate unique contractors list dynamically from projects array
+    const uniqueContractors = useMemo(() => {
+        const map = new Map<string, { id: string, name: string }>()
+        initialProjects.forEach(p => {
+            if (p.contractor_id && p.contractors?.full_name) {
+                map.set(p.contractor_id, { id: p.contractor_id, name: p.contractors.full_name })
+            }
+            if (p.quotes?.contractor_id && p.quotes?.contractors?.full_name) {
+                map.set(p.quotes.contractor_id, { id: p.quotes.contractor_id, name: p.quotes.contractors.full_name })
+            }
+        })
+        return Array.from(map.values())
+    }, [initialProjects])
 
     const toggleProjectSelection = (projectId: string) => {
         setSelectedProjectIds(prev =>
@@ -161,25 +180,66 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     // Memoize filtered projects to prevent CPU cycle wastes during render passes
     const filteredProjects = useMemo(() => {
         return projects.filter(p => {
-            if (!normalizedQuery) return true
-            const clientName = String(p.clients?.full_name || '').toLowerCase()
-            const address = String(p.clients?.address || '').toLowerCase()
-            const quoteNumber = String(p.quotes?.quote_number || '')
-            const title = String(p.title || '').toLowerCase()
-            return clientName.includes(normalizedQuery) || address.includes(normalizedQuery) || quoteNumber.includes(normalizedQuery) || title.includes(normalizedQuery)
+            if (normalizedQuery) {
+                const clientName = String(p.clients?.full_name || '').toLowerCase()
+                const address = String(p.clients?.address || '').toLowerCase()
+                const quoteNumber = String(p.quotes?.quote_number || '')
+                const title = String(p.title || '').toLowerCase()
+                const matchesText = clientName.includes(normalizedQuery) || address.includes(normalizedQuery) || quoteNumber.includes(normalizedQuery) || title.includes(normalizedQuery)
+                if (!matchesText) return false
+            }
+
+            // Contractor filter
+            if (selectedContractorId) {
+                if (selectedContractorId === 'unassigned') {
+                    const directContractor = p.contractor_id
+                    const quoteContractor = p.quotes?.contractor_id
+                    if (directContractor || quoteContractor) return false
+                } else {
+                    const directContractor = p.contractor_id
+                    const quoteContractor = p.quotes?.contractor_id
+                    if (directContractor !== selectedContractorId && quoteContractor !== selectedContractorId) return false
+                }
+            }
+
+            // Job Type filter
+            if (selectedJobType) {
+                const type = p.project_type || 'interior'
+                if (type !== selectedJobType) return false
+            }
+
+            return true
         })
-    }, [projects, normalizedQuery])
+    }, [projects, normalizedQuery, selectedContractorId, selectedJobType])
 
     // Memoize sidebar project list based on filter to completely avoid recalculation lags
     const sidebarProjects = useMemo(() => {
-        return filteredProjects.filter(p => {
+        const filtered = filteredProjects.filter(p => {
             if (filter === 'unscheduled') return p.status === 'unplanned' || p.status === 'deferred'
             if (filter === 'scheduled') return p.status === 'planned' || p.status === 'in_progress'
             if (filter === 'completed') return p.status === 'completed'
             if (filter === 'cancelled') return p.status === 'cancelled'
             return true // 'all'
         })
-    }, [filteredProjects, filter])
+
+        // Sort by approval date
+        filtered.sort((a, b) => {
+            const dateA = a.quotes?.approved_at ? new Date(a.quotes.approved_at).getTime() : 0
+            const dateB = b.quotes?.approved_at ? new Date(b.quotes.approved_at).getTime() : 0
+
+            if (sidebarSortOrder === 'approved_asc') {
+                if (dateA === 0 && dateB !== 0) return 1
+                if (dateB === 0 && dateA !== 0) return -1
+                return dateA - dateB
+            } else {
+                if (dateA === 0 && dateB !== 0) return 1
+                if (dateB === 0 && dateA !== 0) return -1
+                return dateB - dateA
+            }
+        })
+
+        return filtered
+    }, [filteredProjects, filter, sidebarSortOrder])
 
     // Memoize calendar events to ensure FullCalendar receives direct reference updates
     const events = useMemo(() => {
@@ -264,7 +324,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     }
 
     const getMonthlySum = (monthKey: string) => {
-        return projects.reduce((sum, p) => {
+        return filteredProjects.reduce((sum, p) => {
             if (p.status === 'unplanned' || p.status === 'deferred' || p.status === 'cancelled') return sum
             const pMonths = p.planned_months || []
             const cMonths = p.completed_months || []
@@ -275,7 +335,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     }
 
     const getProjectsForMonth = (monthKey: string) => {
-        return projects.filter(p => {
+        return filteredProjects.filter(p => {
             if (p.status === 'unplanned' || p.status === 'deferred' || p.status === 'cancelled') return false
             if (p.status === 'completed' && !showCompleted) return false
             
@@ -643,6 +703,47 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                     {f === 'unscheduled' ? 'Non plan./Reportés' : f === 'scheduled' ? 'Planifiés' : f === 'completed' ? 'Complétés' : f === 'cancelled' ? 'Annulés' : 'Tous'}
                                 </button>
                             ))}
+                        </div>
+
+                        {/* Extra filters and sorting */}
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                            <div className="flex flex-col gap-1">
+                                <label className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Sous-traitant</label>
+                                <select
+                                    value={selectedContractorId}
+                                    onChange={(e) => setSelectedContractorId(e.target.value)}
+                                    className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-[10px] text-zinc-300 focus:outline-none focus:border-cyan-500 w-full"
+                                >
+                                    <option value="">Tous</option>
+                                    <option value="unassigned">Non assignés</option>
+                                    {uniqueContractors.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Type de travaux</label>
+                                <select
+                                    value={selectedJobType}
+                                    onChange={(e) => setSelectedJobType(e.target.value)}
+                                    className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-[10px] text-zinc-300 focus:outline-none focus:border-cyan-500 w-full"
+                                >
+                                    <option value="">Tous</option>
+                                    <option value="interior">Intérieur</option>
+                                    <option value="exterior">Extérieur</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="mt-2.5 flex items-center justify-between border-t border-zinc-900 pt-2">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Tri par date d'approb.</span>
+                            <button
+                                type="button"
+                                onClick={() => setSidebarSortOrder(prev => prev === 'approved_asc' ? 'approved_desc' : 'approved_asc')}
+                                className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-medium transition-colors"
+                            >
+                                {sidebarSortOrder === 'approved_asc' ? 'Plus anciens → Récents' : 'Plus récents → Anciens'}
+                            </button>
                         </div>
                     </CardHeader>
                     
@@ -1305,6 +1406,41 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                             <div>
                                                 <span className="text-xxs text-zinc-500 block">Courriel</span>
                                                 <span className="text-xs text-zinc-300">{selectedProjectDetails.clients?.email || 'N/A'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Monthly history tracking */}
+                                    <div className="space-y-3">
+                                        <h3 className="text-xs font-bold text-zinc-450 uppercase tracking-wider border-b border-zinc-900 pb-1 text-zinc-450">Historique de Planification</h3>
+                                        <div className="bg-zinc-900/30 border border-zinc-850 p-4 rounded-xl space-y-2.5">
+                                            <div>
+                                                <span className="text-xxs text-zinc-500 block">Mois planifiés</span>
+                                                {selectedProjectDetails.planned_months && selectedProjectDetails.planned_months.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-1.5 mt-1">
+                                                        {selectedProjectDetails.planned_months.map((m: string) => (
+                                                            <span key={m} className="text-xxs font-mono px-2 py-0.5 bg-cyan-950 text-cyan-300 border border-cyan-800/40 rounded">
+                                                                {m}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xxs text-zinc-450 italic mt-0.5 block">Aucun mois planifié</span>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <span className="text-xxs text-zinc-500 block">Mois complétés (Historique)</span>
+                                                {selectedProjectDetails.completed_months && selectedProjectDetails.completed_months.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-1.5 mt-1">
+                                                        {selectedProjectDetails.completed_months.map((m: string) => (
+                                                            <span key={m} className="text-xxs font-mono px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800/40 rounded">
+                                                                {m}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xxs text-zinc-450 italic mt-0.5 block">Aucun mois de complétion enregistré</span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
