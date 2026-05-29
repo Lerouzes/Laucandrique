@@ -18,10 +18,12 @@ import {
     Activity,
     Phone,
     Mail,
-    PlusCircle
+    PlusCircle,
+    DollarSign
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CallsStatsPanel } from './CallsStatsPanel'
+import { toast } from 'sonner'
 
 export function ManagerProfileView({
     manager,
@@ -32,7 +34,8 @@ export function ManagerProfileView({
     oneOnOnes = [],
     monthlyWorkload = [],
     monthlyCalls = [],
-    audits = []
+    audits = [],
+    userRole = 'Operations'
 }: {
     manager: any
     stats: any
@@ -43,8 +46,12 @@ export function ManagerProfileView({
     monthlyWorkload: any[]
     monthlyCalls: any[]
     audits: any[]
+    userRole?: string
 }) {
     const [activeTab, setActiveTab] = useState('overview')
+    const [salaryVal, setSalaryVal] = useState(manager.salary?.toString() || '0')
+    const [directionNotesVal, setDirectionNotesVal] = useState(manager.direction_notes || '')
+    const [isSaving, setIsSaving] = useState(false)
 
     const tabs = [
         { id: 'overview', name: 'Aperçu', icon: User },
@@ -55,6 +62,34 @@ export function ManagerProfileView({
         { id: 'one-on-ones', name: 'Rencontres 1v1', icon: Handshake },
         { id: 'workload', name: 'Charge de travail', icon: Activity },
     ]
+
+    if (userRole === 'Master' || userRole === 'Direction') {
+        tabs.push({ id: 'sensitive', name: 'Informations Sensibles', icon: DollarSign })
+    }
+
+    const handleSaveSensitiveInfo = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setIsSaving(true)
+        try {
+            const formData = new FormData()
+            formData.set('salary', salaryVal)
+            formData.set('direction_notes', directionNotesVal)
+
+            const { updateManagerSensitiveInfoAction } = await import('@/actions/team-management')
+            const res = await updateManagerSensitiveInfoAction(manager.id, formData)
+            if (res && res.success) {
+                toast.success('Informations sensibles mises à jour avec succès')
+            } else {
+                toast.error('Erreur lors de la mise à jour')
+            }
+        } catch (err: any) {
+            console.error('Error saving sensitive info:', err)
+            toast.error(err.message || 'Erreur inattendue')
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
 
     return (
         <div className="space-y-6">
@@ -595,6 +630,152 @@ export function ManagerProfileView({
                             </div>
                         </CardContent>
                     </Card>
+                )}
+
+                {/* 8. SENSITIVE INFO TAB */}
+                {activeTab === 'sensitive' && (userRole === 'Master' || userRole === 'Direction') && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Financial calculations and profit margin */}
+                        <div className="lg:col-span-2 space-y-6">
+                            <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                                <CardHeader>
+                                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                                        <TrendingUp className="h-4 w-4 text-emerald-450 text-emerald-400" />
+                                        Rentabilité & Calcul de Marge
+                                    </CardTitle>
+                                    <CardDescription className="text-xxs text-zinc-400">
+                                        Analyse de la marge bénéficiaire générée par ce gestionnaire sur la base de ses contrats sous gestion et de son salaire.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    {/* Calculations metrics grid */}
+                                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+                                        <div className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                                            <span className="text-zinc-500 block uppercase font-bold text-[9px] tracking-wider">Revenu Annuel Sous Gestion</span>
+                                            <span className="text-lg font-bold text-zinc-100 mt-1 block">
+                                                ${(stats.mrr * 12).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
+                                            <span className="text-[10px] text-zinc-500 mt-1 block">MRR: ${stats.mrr.toLocaleString('fr-CA', { minimumFractionDigits: 2 })} / mois</span>
+                                        </div>
+
+                                        <div className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                                            <span className="text-zinc-500 block uppercase font-bold text-[9px] tracking-wider">Salaire Annuel</span>
+                                            <span className="text-lg font-bold text-zinc-100 mt-1 block">
+                                                ${parseFloat(salaryVal).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
+                                            <span className="text-[10px] text-zinc-500 mt-1 block">Coût direct du gestionnaire</span>
+                                        </div>
+
+                                        {(() => {
+                                            const annualValue = stats.mrr * 12
+                                            const salary = parseFloat(salaryVal) || 0
+                                            const profit = annualValue - salary
+                                            const marginPct = annualValue > 0 ? (profit / annualValue) * 100 : 0
+                                            const marginColor = marginPct >= 50 ? 'text-emerald-400' : marginPct >= 30 ? 'text-purple-400' : marginPct >= 10 ? 'text-amber-400' : 'text-rose-500'
+
+                                            return (
+                                                <div className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                                                    <span className="text-zinc-500 block uppercase font-bold text-[9px] tracking-wider">Marge Bénéficiaire</span>
+                                                    <span className={`text-lg font-bold ${marginColor} mt-1 block`}>
+                                                        {marginPct.toFixed(1)}%
+                                                    </span>
+                                                    <span className="text-[10px] text-zinc-500 mt-1 block">Profit net: ${profit.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                                                </div>
+                                            )
+                                        })()}
+                                    </div>
+
+                                    {/* Visual representation of margin */}
+                                    {(() => {
+                                        const annualValue = stats.mrr * 12
+                                        const salary = parseFloat(salaryVal) || 0
+                                        const profit = annualValue - salary
+                                        const marginPct = annualValue > 0 ? (profit / annualValue) * 100 : 0
+                                        const costPct = annualValue > 0 ? (salary / annualValue) * 100 : 0
+
+                                        return annualValue > 0 ? (
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between text-xxs font-medium">
+                                                    <span className="text-zinc-400">Répartition Revenus vs Salaire</span>
+                                                    <span className="text-zinc-400">Coût: {costPct.toFixed(0)}% | Marge: {marginPct.toFixed(0)}%</span>
+                                                </div>
+                                                <div className="h-4 w-full bg-zinc-950 rounded-full overflow-hidden border border-zinc-900 flex">
+                                                    <div 
+                                                        className="h-full bg-rose-600 rounded-l-full" 
+                                                        style={{ width: `${Math.min(100, Math.max(0, costPct))}%` }}
+                                                        title={`Salaire: ${costPct.toFixed(1)}%`}
+                                                    />
+                                                    <div 
+                                                        className="h-full bg-emerald-500 rounded-r-full" 
+                                                        style={{ width: `${Math.min(100, Math.max(0, marginPct))}%` }}
+                                                        title={`Marge: ${marginPct.toFixed(1)}%`}
+                                                    />
+                                                </div>
+                                                <div className="flex justify-between text-[9px] text-zinc-500">
+                                                    <span className="flex items-center gap-1"><span className="h-2 w-2 bg-rose-600 rounded-full inline-block"></span> Salaire du Gestionnaire</span>
+                                                    <span className="flex items-center gap-1"><span className="h-2 w-2 bg-emerald-500 rounded-full inline-block"></span> Marge Bénéficiaire</span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <p className="text-xxs text-zinc-500 italic">
+                                                Aucun contrat actif sous gestion. Impossible de calculer la marge bénéficiaire.
+                                            </p>
+                                        )
+                                    })()}
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {/* Settings / Edit form on the right */}
+                        <div className="space-y-6">
+                            <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                                <CardHeader>
+                                    <CardTitle className="text-sm font-bold text-white">Éditer les Informations Sensibles</CardTitle>
+                                    <CardDescription className="text-xxs text-zinc-400">
+                                        Mettre à jour le salaire du gestionnaire et les notes de direction.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <form onSubmit={handleSaveSensitiveInfo} className="space-y-4 text-xxs">
+                                        <div className="space-y-1.5">
+                                            <label className="text-zinc-400 font-bold block">Salaire Annuel ($ CAD)</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                value={salaryVal}
+                                                onChange={(e) => setSalaryVal(e.target.value)}
+                                                disabled={isSaving}
+                                                className="w-full bg-[#121318] border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 outline-none focus:border-purple-600 h-9"
+                                                placeholder="Ex: 65000"
+                                                required
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <label className="text-zinc-400 font-bold block">Notes de la Direction</label>
+                                            <textarea
+                                                value={directionNotesVal}
+                                                onChange={(e) => setDirectionNotesVal(e.target.value)}
+                                                disabled={isSaving}
+                                                rows={5}
+                                                className="w-full bg-[#121318] border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 outline-none focus:border-purple-650 resize-none leading-relaxed"
+                                                placeholder="Saisissez vos commentaires ou notes confidentielles ici..."
+                                            />
+                                        </div>
+
+                                        <Button
+                                            type="submit"
+                                            disabled={isSaving}
+                                            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold h-9 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer"
+                                        >
+                                            {isSaving ? "Enregistrement..." : "Enregistrer"}
+                                        </Button>
+                                    </form>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
                 )}
             </div>
         </div>

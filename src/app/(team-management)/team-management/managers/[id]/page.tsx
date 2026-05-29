@@ -2,6 +2,7 @@ import { getManagerStats } from '@/actions/team-management'
 import { createClient } from '@/utils/supabase/server'
 import { notFound } from 'next/navigation'
 import { ManagerProfileView } from '@/components/features/team-management/ManagerProfileView'
+import { getActiveTeamContext } from '@/utils/team-context'
 
 export default async function ManagerProfilePage({
     params
@@ -10,6 +11,7 @@ export default async function ManagerProfilePage({
 }) {
     const { id } = await params
     const supabase = await createClient()
+    const context = await getActiveTeamContext()
 
     // 1. Fetch manager details
     const { data: manager } = await supabase
@@ -103,6 +105,7 @@ export default async function ManagerProfilePage({
                 monthlyWorkload={monthlyWorkload || []}
                 monthlyCalls={monthlyCalls || []}
                 audits={audits}
+                userRole={context.role}
             />
         </div>
     )

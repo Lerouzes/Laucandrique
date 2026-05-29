@@ -846,29 +846,35 @@ export type Database = {
       managers: {
         Row: {
           created_at: string | null
+          direction_notes: string | null
           email: string | null
           first_name: string
           id: string
           last_name: string
           phone: string | null
+          salary: number
           team_id: string | null
         }
         Insert: {
           created_at?: string | null
+          direction_notes?: string | null
           email?: string | null
           first_name: string
           id?: string
           last_name: string
           phone?: string | null
+          salary?: number
           team_id?: string | null
         }
         Update: {
           created_at?: string | null
+          direction_notes?: string | null
           email?: string | null
           first_name?: string
           id?: string
           last_name?: string
           phone?: string | null
+          salary?: number
           team_id?: string | null
         }
         Relationships: [

@@ -5,9 +5,17 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Calendar, Filter, Loader2 } from 'lucide-react'
+import { Calendar, Filter, Loader2, Users } from 'lucide-react'
 
-export function DashboardFilterBar() {
+export function DashboardFilterBar({
+    teams = [],
+    currentTeamId = '',
+    isRestricted = false
+}: {
+    teams?: { id: string; name: string }[]
+    currentTeamId?: string
+    isRestricted?: boolean
+}) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const [isPending, startTransition] = useTransition()
@@ -19,6 +27,7 @@ export function DashboardFilterBar() {
     const [range, setRange] = useState(currentRange)
     const [fromMonth, setFromMonth] = useState(currentFrom)
     const [toMonth, setToMonth] = useState(currentTo)
+    const [teamId, setTeamId] = useState(currentTeamId)
 
     const handleApply = () => {
         const params = new URLSearchParams()
@@ -27,7 +36,26 @@ export function DashboardFilterBar() {
             if (fromMonth) params.set('from', fromMonth)
             if (toMonth) params.set('to', toMonth)
         }
+        if (teamId && teamId !== 'all') {
+            params.set('teamId', teamId)
+        }
 
+        startTransition(() => {
+            router.push(`/team-management/dashboard?${params.toString()}`)
+        })
+    }
+
+    const handleTeamChange = (newTeamId: string) => {
+        setTeamId(newTeamId)
+        const params = new URLSearchParams()
+        params.set('range', range)
+        if (range === 'custom') {
+            if (fromMonth) params.set('from', fromMonth)
+            if (toMonth) params.set('to', toMonth)
+        }
+        if (newTeamId && newTeamId !== 'all') {
+            params.set('teamId', newTeamId)
+        }
         startTransition(() => {
             router.push(`/team-management/dashboard?${params.toString()}`)
         })
@@ -50,6 +78,9 @@ export function DashboardFilterBar() {
                                 // Apply immediately if not custom
                                 const params = new URLSearchParams()
                                 params.set('range', e.target.value)
+                                if (teamId && teamId !== 'all') {
+                                    params.set('teamId', teamId)
+                                }
                                 startTransition(() => {
                                     router.push(`/team-management/dashboard?${params.toString()}`)
                                 })
@@ -65,6 +96,29 @@ export function DashboardFilterBar() {
                         <option value="custom">Période personnalisée</option>
                     </select>
                 </div>
+
+                {/* Team Select */}
+                {!isRestricted && (
+                    <div className="space-y-1.5 flex-1 max-w-[240px]">
+                        <Label className="text-zinc-400 font-semibold flex items-center gap-1.5 text-xxs uppercase tracking-wider">
+                            <Users className="h-3.5 w-3.5 text-purple-400" />
+                            Équipe
+                        </Label>
+                        <select
+                            value={teamId || 'all'}
+                            onChange={(e) => handleTeamChange(e.target.value)}
+                            disabled={isPending}
+                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg px-2.5 py-1.5 text-zinc-300 font-semibold outline-none focus:border-purple-650 focus:ring-1 focus:ring-purple-600/30 h-9 cursor-pointer"
+                        >
+                            <option value="all">Toutes les équipes</option>
+                            {teams.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                    {t.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
                 {/* Custom Month Inputs */}
                 {range === 'custom' && (

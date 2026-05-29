@@ -255,13 +255,28 @@ export async function getGlobalTeamStats(opts?: {
     range?: string
     fromMonth?: string
     toMonth?: string
+    teamId?: string | null
 }) {
     const supabase = await createClient()
-    const { getActiveTeamContext, getFilteredManagers } = await import('@/utils/team-context')
+    const { getActiveTeamContext } = await import('@/utils/team-context')
     const context = await getActiveTeamContext()
     
+    // Determine the target team ID to filter by
+    let targetTeamId = context.teamId
+    if (!context.isRestricted && opts && opts.teamId !== undefined) {
+        targetTeamId = opts.teamId === 'all' ? null : opts.teamId
+    }
+
     // Get managers in current team context
-    const teamManagers = await getFilteredManagers()
+    let query = supabase.from('managers').select('*')
+    if (targetTeamId) {
+        query = query.eq('team_id', targetTeamId)
+    }
+    const { data: managersData, error: managersError } = await query.order('last_name')
+    if (managersError) {
+        console.error('Error fetching managers for stats:', managersError)
+    }
+    const teamManagers = managersData || []
     const managerIds = teamManagers.map(m => m.id)
 
     const range = opts?.range || 'current-year'
@@ -319,7 +334,7 @@ export async function getGlobalTeamStats(opts?: {
         return isActiveStatus && notDepartedYet
     })
 
-    if (context.teamId) {
+    if (targetTeamId) {
         activeClients = activeClients.filter(c => c.manager_id && managerIds.includes(c.manager_id))
     }
 
@@ -366,7 +381,7 @@ export async function getGlobalTeamStats(opts?: {
         .gte('meeting_date', startDate)
         .lte('meeting_date', endDate)
 
-    if (context.teamId) {
+    if (targetTeamId) {
         meetingsQuery = meetingsQuery.in('manager_id', managerIds)
     }
     const { count: meetingsCount } = await meetingsQuery
@@ -379,7 +394,7 @@ export async function getGlobalTeamStats(opts?: {
         .gte('audit_date', startDate)
         .lte('audit_date', endDate)
 
-    if (context.teamId) {
+    if (targetTeamId) {
         auditsQuery = auditsQuery.in('client_id', activeClientIds)
     }
     const { data: audits } = await auditsQuery
@@ -405,7 +420,7 @@ export async function getGlobalTeamStats(opts?: {
         .gte('departure_date', startDate)
         .lte('departure_date', endDate)
 
-    if (context.teamId) {
+    if (targetTeamId) {
         lostQuery = lostQuery.in('manager_id', managerIds)
     }
     const { count: lostCount } = await lostQuery
@@ -417,7 +432,7 @@ export async function getGlobalTeamStats(opts?: {
         .gte('created_at', startDate)
         .lte('created_at', endDate)
 
-    if (context.teamId) {
+    if (targetTeamId) {
         newQuery = newQuery.in('manager_id', managerIds)
     }
     const { count: newCount } = await newQuery
@@ -429,7 +444,7 @@ export async function getGlobalTeamStats(opts?: {
         .gte('created_at', startDate)
         .lte('created_at', endDate)
 
-    if (context.teamId) {
+    if (targetTeamId) {
         quotesQuery = quotesQuery.in('manager_id', managerIds)
     }
     const { data: allQuotes } = await quotesQuery
@@ -447,7 +462,7 @@ export async function getGlobalTeamStats(opts?: {
         .gte('year_month', startMonth)
         .lte('year_month', endMonth)
 
-    if (context.teamId) {
+    if (targetTeamId) {
         callsQuery = callsQuery.in('manager_id', managerIds)
     }
     const { data: callsData } = await callsQuery
@@ -463,7 +478,7 @@ export async function getGlobalTeamStats(opts?: {
         .gte('year_month', startMonth)
         .lte('year_month', endMonth)
 
-    if (context.teamId) {
+    if (targetTeamId) {
         workloadQuery = workloadQuery.in('manager_id', managerIds)
     }
     const { data: workloadData } = await workloadQuery
@@ -2236,4 +2251,36 @@ export async function checkExistingStatsAction(managerId: string, yearMonth: str
         hasTasks: !!workloadRes.data && (workloadRes.data.open_tasks > 0 || workloadRes.data.closed_tasks > 0)
     }
 }
+
+export async function updateManagerSensitiveInfoAction(managerId: string, formData: FormData) {
+    const supabase = await createClient()
+    const { getActiveTeamContext } = await import('@/utils/team-context')
+    const context = await getActiveTeamContext()
+
+    if (context.role !== 'Master' && context.role !== 'Direction') {
+        throw new Error('Non autorisé à modifier les informations sensibles.')
+    }
+
+    const salaryRaw = formData.get('salary')
+    const salary = salaryRaw ? parseFloat(salaryRaw as string) : 0.00
+    const directionNotes = String(formData.get('direction_notes') || '').trim()
+
+    const { error } = await supabase
+        .from('managers')
+        .update({
+            salary: isNaN(salary) ? 0.00 : salary,
+            direction_notes: directionNotes || null
+        })
+        .eq('id', managerId)
+
+    if (error) {
+        console.error('Error updating manager sensitive info:', error)
+        throw new Error(error.message)
+    }
+
+    revalidatePath('/team-management/dashboard')
+    revalidatePath(`/team-management/managers/${managerId}`)
+    return { success: true }
+}
+
 

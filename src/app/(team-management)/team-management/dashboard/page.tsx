@@ -21,16 +21,21 @@ import {
     Activity
 } from 'lucide-react'
 
+import { getActiveTeamContext } from '@/utils/team-context'
+
 export default async function TeamManagementDashboard(props: {
-    searchParams: Promise<{ range?: string; from?: string; to?: string }>
+    searchParams: Promise<{ range?: string; from?: string; to?: string; teamId?: string }>
 }) {
     const searchParams = await props.searchParams
     const range = searchParams.range || 'current-year'
     const from = searchParams.from
     const to = searchParams.to
+    const teamId = searchParams.teamId || undefined
+
+    const context = await getActiveTeamContext()
 
     const [stats, managers, teams] = await Promise.all([
-        getGlobalTeamStats({ range, fromMonth: from, toMonth: to }),
+        getGlobalTeamStats({ range, fromMonth: from, toMonth: to, teamId }),
         getManagers(),
         getManagerTeams()
     ])
@@ -67,7 +72,11 @@ export default async function TeamManagementDashboard(props: {
             </div>
 
             {/* Filter Bar */}
-            <DashboardFilterBar />
+            <DashboardFilterBar 
+                teams={teams}
+                currentTeamId={teamId}
+                isRestricted={context.isRestricted}
+            />
 
             {/* Metrics cards grid */}
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
