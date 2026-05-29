@@ -2283,4 +2283,62 @@ export async function updateManagerSensitiveInfoAction(managerId: string, formDa
     return { success: true }
 }
 
+export async function getWorkloadHistoryAction(opts: {
+    managerId?: string   // if undefined => all managers
+    monthsBack?: number  // default 12
+    fromMonth?: string   // e.g. '2024-01'
+    toMonth?: string     // e.g. '2025-05'
+}) {
+    const supabase = await createClient()
+
+    let query = supabase
+        .from('manager_monthly_workload')
+        .select('manager_id, year_month, open_tasks, closed_tasks, communications_received, managers(first_name, last_name)')
+        .order('year_month', { ascending: false })
+
+    if (opts.managerId) {
+        query = query.eq('manager_id', opts.managerId)
+    }
+
+    if (opts.fromMonth) {
+        query = query.gte('year_month', opts.fromMonth)
+    } else if (!opts.toMonth) {
+        // default: last N months
+        const n = opts.monthsBack ?? 12
+        const d = new Date()
+        d.setMonth(d.getMonth() - n)
+        const from = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        query = query.gte('year_month', from)
+    }
+
+    if (opts.toMonth) {
+        query = query.lte('year_month', opts.toMonth)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+        console.error('Error fetching workload history:', error)
+        return []
+    }
+
+    return (data || []).map(row => {
+        const m = row.managers as any
+        const managerName = m ? `${m.first_name} ${m.last_name}` : 'Inconnu'
+        const pct = (row.open_tasks + row.closed_tasks) > 0
+            ? Math.round((row.closed_tasks / (row.open_tasks + row.closed_tasks)) * 100)
+            : null
+        return {
+            managerId: row.manager_id,
+            managerName,
+            yearMonth: row.year_month,
+            openTasks: row.open_tasks,
+            closedTasks: row.closed_tasks,
+            communicationsReceived: row.communications_received,
+            pct
+        }
+    })
+}
+
+
 

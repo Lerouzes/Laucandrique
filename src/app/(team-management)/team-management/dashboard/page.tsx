@@ -262,14 +262,14 @@ export default async function TeamManagementDashboard(props: {
                 </Card>
             </div>
 
-            {/* Calls Statistics Panel */}
+            {/* Activity History & Analytics Panel */}
             <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                 <CardHeader>
                     <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-                        Tableau des Appels — Tous les Gestionnaires
+                        Rapports d'Activité Historiques & Analytiques — Tous les Gestionnaires
                     </CardTitle>
                     <CardDescription className="text-xxs text-zinc-400">
-                        Naviguez par mois ou définissez une période personnalisée. Cliquez sur "Historique" pour voir l'évolution MoM par gestionnaire.
+                        Visualisez et comparez les performances d'appels et la complétion des tâches. Utilisez le mode graphique pour comparer les gestionnaires ou voir leur courbe de tendance d'historique.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
