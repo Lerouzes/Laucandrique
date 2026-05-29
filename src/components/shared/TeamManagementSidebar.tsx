@@ -38,6 +38,7 @@ const navItems = [
     { name: 'Plaintes', href: '/team-management/complaints', icon: AlertTriangle },
     { name: 'Performance', href: '/team-management/performance-reports', icon: BarChart3 },
     { name: 'Alertes', href: '/team-management/alerts', icon: BellRing },
+    { name: 'Approbations M365', href: '/team-management/change-approvals', icon: RefreshCw },
     { name: 'Configuration', href: '/team-management/settings', icon: Settings },
 ]
 
