@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { SearchableClientSelect } from './SearchableClientSelect'
 import { UsersRound, Save, HelpCircle, CheckCircle2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 const OPERATIONAL_CRITERIA = [
     { key: 'agenda_sent_on_time', text: 'Ordre du jour envoyé dans les délais' },
@@ -136,7 +137,7 @@ export function NewAssemblyEvaluationForm({
 
     const handleSave = async (targetStatus: 'partial' | 'completed') => {
         if (!clientId || !managerId) {
-            alert('Sélectionnez un syndicat et un gestionnaire.')
+            toast.error('Sélectionnez un syndicat et un gestionnaire.')
             return
         }
 
@@ -145,7 +146,19 @@ export function NewAssemblyEvaluationForm({
             const allCriteria = [...OPERATIONAL_CRITERIA, ...LEADERSHIP_CRITERIA, ...DOCUMENTATION_CRITERIA]
             const missing = allCriteria.filter(c => scores[c.key] === null || scores[c.key] === undefined)
             if (missing.length > 0) {
-                alert(`Veuillez évaluer tous les critères avant de finaliser l'évaluation. Critères manquants : \n${missing.map(m => `- ${m.text}`).join('\n')}`)
+                toast.error("Évaluation incomplète", {
+                    description: (
+                        <div className="mt-1 space-y-1 text-zinc-300">
+                            <p className="font-semibold text-white">Veuillez évaluer tous les critères avant de finaliser :</p>
+                            <ul className="list-disc pl-4 space-y-0.5 text-xxs">
+                                {missing.map((m, idx) => (
+                                    <li key={idx}>{m.text}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    ),
+                    duration: 6000
+                })
                 return
             }
         }
@@ -180,14 +193,18 @@ export function NewAssemblyEvaluationForm({
 
             if (initialEvaluation) {
                 await updateAssemblyEvaluationAction(initialEvaluation.id, payload)
+                toast.success("Évaluation d'assemblée mise à jour.")
             } else {
                 await createAssemblyEvaluationAction(payload)
+                toast.success("Évaluation d'assemblée enregistrée.")
             }
 
             router.push('/team-management/assemblies')
             router.refresh()
         } catch (err) {
-            alert('Erreur lors de l\'enregistrement de l\'évaluation : ' + (err as Error).message)
+            toast.error("Erreur lors de l'enregistrement", {
+                description: (err as Error).message
+            })
         } finally {
             setLoading(false)
         }
