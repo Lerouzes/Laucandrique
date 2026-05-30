@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { CallsStatsPanel } from '@/components/features/team-management/CallsStatsPanel'
 import { DashboardFilterBar } from '@/components/features/team-management/DashboardFilterBar'
 import { ManualStatsEntryCards } from '@/components/features/team-management/ManualStatsEntryCards'
+import { TeamTrendsCharts } from '@/components/features/team-management/TeamTrendsCharts'
 import { 
     Building2, 
     DoorOpen, 
@@ -208,6 +209,9 @@ export default async function TeamManagementDashboard(props: {
                 </Card>
             </div>
 
+            {/* Visual Trends Analytics Charts */}
+            <TeamTrendsCharts trends={stats.monthlyTrends || []} />
+
             {/* Split Content: Packages breakdown and Manual entry logs */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Manual stats entry split component */}
@@ -273,7 +277,12 @@ export default async function TeamManagementDashboard(props: {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <CallsStatsPanel />
+                    <CallsStatsPanel 
+                        range={range}
+                        fromMonth={from}
+                        toMonth={to}
+                        teamId={teamId}
+                    />
                 </CardContent>
             </Card>
         </div>

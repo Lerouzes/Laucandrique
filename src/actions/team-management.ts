@@ -458,7 +458,7 @@ export async function getGlobalTeamStats(opts?: {
     // Fetch phone call statistics
     let callsQuery = supabase
         .from('manager_monthly_calls')
-        .select('total_calls, answered_calls')
+        .select('year_month, total_calls, answered_calls')
         .gte('year_month', startMonth)
         .lte('year_month', endMonth)
 
@@ -474,7 +474,7 @@ export async function getGlobalTeamStats(opts?: {
     // Fetch workload statistics
     let workloadQuery = supabase
         .from('manager_monthly_workload')
-        .select('communications_received, open_tasks, closed_tasks')
+        .select('year_month, communications_received, open_tasks, closed_tasks')
         .gte('year_month', startMonth)
         .lte('year_month', endMonth)
 
@@ -491,6 +491,48 @@ export async function getGlobalTeamStats(opts?: {
         : 0
     const activeManagersCount = teamManagers.length
     const communicationsPerManager = activeManagersCount > 0 ? Math.round(totalCommunications / activeManagersCount) : 0
+
+    // Aggregate monthly trends
+    const callsByMonth: Record<string, { total: number; answered: number }> = {}
+    ;(callsData || []).forEach(c => {
+        if (!callsByMonth[c.year_month]) {
+            callsByMonth[c.year_month] = { total: 0, answered: 0 }
+        }
+        callsByMonth[c.year_month].total += (c.total_calls || 0)
+        callsByMonth[c.year_month].answered += (c.answered_calls || 0)
+    })
+
+    const workloadByMonth: Record<string, { comms: number; open: number; closed: number }> = {}
+    ;(workloadData || []).forEach(w => {
+        if (!workloadByMonth[w.year_month]) {
+            workloadByMonth[w.year_month] = { comms: 0, open: 0, closed: 0 }
+        }
+        workloadByMonth[w.year_month].comms += (w.communications_received || 0)
+        workloadByMonth[w.year_month].open += (w.open_tasks || 0)
+        workloadByMonth[w.year_month].closed += (w.closed_tasks || 0)
+    })
+
+    const allMonths = Array.from(new Set([
+        ...Object.keys(callsByMonth),
+        ...Object.keys(workloadByMonth)
+    ])).sort()
+
+    const monthlyTrends = allMonths.map(month => {
+        const c = callsByMonth[month] || { total: 0, answered: 0 }
+        const w = workloadByMonth[month] || { comms: 0, open: 0, closed: 0 }
+        const callRate = c.total > 0 ? Math.round((c.answered / c.total) * 100) : 0
+        const taskRate = (w.open + w.closed) > 0 ? Math.round((w.closed / (w.open + w.closed)) * 100) : 0
+        return {
+            month,
+            totalCalls: c.total,
+            answeredCalls: c.answered,
+            callRate,
+            communications: w.comms,
+            openTasks: w.open,
+            closedTasks: w.closed,
+            taskRate
+        }
+    })
 
     return {
         totalSyndicates: activeClients.length,
@@ -510,7 +552,8 @@ export async function getGlobalTeamStats(opts?: {
         communicationsPerManager,
         totalOpenTasks,
         totalClosedTasks,
-        taskCompletionRate
+        taskCompletionRate,
+        monthlyTrends
     }
 }
 
@@ -591,6 +634,7 @@ export async function getBatchMonthlyCallsAction(yearMonth: string) {
 
 export async function getCallsHistoryAction(opts: {
     managerId?: string   // if undefined => all managers
+    teamId?: string
     monthsBack?: number  // default 12
     fromMonth?: string   // e.g. '2024-01'
     toMonth?: string     // e.g. '2025-05'
@@ -604,6 +648,16 @@ export async function getCallsHistoryAction(opts: {
 
     if (opts.managerId) {
         query = query.eq('manager_id', opts.managerId)
+    }
+
+    if (opts.teamId && opts.teamId !== 'all') {
+        const { data: managers } = await supabase
+            .from('managers')
+            .select('id')
+            .eq('team_id', opts.teamId)
+        const managerIds = (managers || []).map(m => m.id)
+        if (managerIds.length === 0) return []
+        query = query.in('manager_id', managerIds)
     }
 
     if (opts.fromMonth) {
@@ -2420,6 +2474,7 @@ export async function updateManagerSensitiveInfoAction(managerId: string, formDa
 
 export async function getWorkloadHistoryAction(opts: {
     managerId?: string   // if undefined => all managers
+    teamId?: string
     monthsBack?: number  // default 12
     fromMonth?: string   // e.g. '2024-01'
     toMonth?: string     // e.g. '2025-05'
@@ -2433,6 +2488,16 @@ export async function getWorkloadHistoryAction(opts: {
 
     if (opts.managerId) {
         query = query.eq('manager_id', opts.managerId)
+    }
+
+    if (opts.teamId && opts.teamId !== 'all') {
+        const { data: managers } = await supabase
+            .from('managers')
+            .select('id')
+            .eq('team_id', opts.teamId)
+        const managerIds = (managers || []).map(m => m.id)
+        if (managerIds.length === 0) return []
+        query = query.in('manager_id', managerIds)
     }
 
     if (opts.fromMonth) {

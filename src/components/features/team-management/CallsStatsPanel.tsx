@@ -116,6 +116,11 @@ function ManagerHistoryModal({
 }) {
     const [rows, setRows] = useState<CallRow[]>([])
     const [loading, setLoading] = useState(false)
+    const [isMounted, setIsMounted] = useState(false)
+
+    useEffect(() => {
+        setIsMounted(true)
+    }, [])
 
     useEffect(() => {
         if (!open) return
@@ -175,8 +180,14 @@ function ManagerHistoryModal({
                                 <div className="space-y-1.5">
                                     <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Tendance de Progression</h4>
                                     <div className="h-44 w-full bg-zinc-900/30 border border-zinc-800/80 rounded-xl p-3">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={chartData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
+                                        {!isMounted ? (
+                                            <div className="h-full w-full flex items-center justify-center text-zinc-550 text-xs gap-2">
+                                                <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
+                                                Chargement...
+                                            </div>
+                                        ) : (
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <LineChart data={chartData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f1f23" />
                                                 <XAxis
                                                     dataKey="yearMonth"
@@ -218,6 +229,7 @@ function ManagerHistoryModal({
                                                 />
                                             </LineChart>
                                         </ResponsiveContainer>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -289,14 +301,30 @@ function ManagerHistoryModal({
 // ─── Main Panel ──────────────────────────────────────────────────────────────
 
 interface CallsStatsPanelProps {
+    /** Global range */
+    range?: string
+    /** Global fromMonth date range */
+    fromMonth?: string
+    /** Global toMonth date range */
+    toMonth?: string
+    /** Global teamId filter */
+    teamId?: string
     /** If given, filter to only this manager. Otherwise shows all managers. */
     managerId?: string
     /** Title override */
     title?: string
 }
 
-export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
+export function CallsStatsPanel({ 
+    range: globalRange,
+    fromMonth: globalFromMonth,
+    toMonth: globalToMonth,
+    teamId,
+    managerId, 
+    title 
+}: CallsStatsPanelProps) {
     const [isPending, startTransition] = useTransition()
+    const [isMounted, setIsMounted] = useState(false)
     const [currentMonth, setCurrentMonth] = useState(nowYearMonth())
     const [rows, setRows] = useState<CallRow[]>([])
 
@@ -316,11 +344,52 @@ export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
     // History drill-down
     const [historyModal, setHistoryModal] = useState<{ id: string; name: string } | null>(null)
 
+    // Mount check
+    useEffect(() => {
+        setIsMounted(true)
+    }, [])
+
+    // Sync with global filters
+    useEffect(() => {
+        if (globalRange === 'custom') {
+            if (globalFromMonth) setFromMonth(globalFromMonth)
+            if (globalToMonth) setToMonth(globalToMonth)
+            setUseRange(true)
+        } else if (globalRange) {
+            setUseRange(false)
+            const now = new Date()
+            const currentYear = now.getFullYear()
+            
+            if (globalRange === 'this-month') {
+                setCurrentMonth(`${currentYear}-${String(now.getMonth() + 1).padStart(2, '0')}`)
+            } else if (globalRange === 'last-month') {
+                let y = currentYear
+                let mVal = now.getMonth()
+                if (mVal === 0) {
+                    y = currentYear - 1
+                    mVal = 12
+                }
+                setCurrentMonth(`${y}-${String(mVal).padStart(2, '0')}`)
+            } else if (globalRange === 'current-quarter') {
+                setUseRange(true)
+                const q = Math.floor(now.getMonth() / 3)
+                const start = String(q * 3 + 1).padStart(2, '0')
+                const end = String(q * 3 + 3).padStart(2, '0')
+                setFromMonth(`${currentYear}-${start}`)
+                setToMonth(`${currentYear}-${end}`)
+            } else if (globalRange === 'current-year') {
+                setUseRange(true)
+                setFromMonth(`${currentYear}-01`)
+                setToMonth(`${currentYear}-12`)
+            }
+        }
+    }, [globalRange, globalFromMonth, globalToMonth])
+
     const load = useCallback(() => {
         startTransition(async () => {
             const opts = useRange
-                ? { managerId, fromMonth, toMonth }
-                : { managerId, fromMonth: currentMonth, toMonth: currentMonth }
+                ? { managerId, teamId, fromMonth, toMonth }
+                : { managerId, teamId, fromMonth: currentMonth, toMonth: currentMonth }
 
             const data = activityType === 'calls'
                 ? await getCallsHistoryAction(opts)
@@ -328,7 +397,7 @@ export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
 
             setRows(data as CallRow[])
         })
-    }, [managerId, useRange, currentMonth, fromMonth, toMonth, activityType])
+    }, [managerId, teamId, useRange, currentMonth, fromMonth, toMonth, activityType])
 
     useEffect(() => { load() }, [load])
 
@@ -570,8 +639,14 @@ export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
             ) : viewMode === 'chart' ? (
                 /* Recharts Bar Chart View */
                 <div className="h-[280px] w-full bg-zinc-950/40 border border-zinc-800 rounded-xl p-4">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={displayRows} margin={{ left: -25, right: 10, top: 10, bottom: 5 }}>
+                    {!isMounted ? (
+                        <div className="h-full w-full flex items-center justify-center text-zinc-550 text-xs gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
+                            Chargement...
+                        </div>
+                    ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={displayRows} margin={{ left: -25, right: 10, top: 10, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f1f23" />
                             <XAxis
                                 dataKey="managerName"
@@ -631,6 +706,7 @@ export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
                             </Bar>
                         </BarChart>
                     </ResponsiveContainer>
+                    )}
                 </div>
             ) : (
                 /* Table View */

@@ -21,13 +21,18 @@ export function DashboardFilterBar({
     const [isPending, startTransition] = useTransition()
 
     const currentRange = searchParams.get('range') || 'current-year'
-    const currentFrom = searchParams.get('from') || ''
-    const currentTo = searchParams.get('to') || ''
+    
+    const now = new Date()
+    const defaultFrom = `${now.getFullYear()}-01`
+    const defaultTo = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+    const currentFrom = searchParams.get('from') || defaultFrom
+    const currentTo = searchParams.get('to') || defaultTo
 
     const [range, setRange] = useState(currentRange)
     const [fromMonth, setFromMonth] = useState(currentFrom)
     const [toMonth, setToMonth] = useState(currentTo)
-    const [teamId, setTeamId] = useState(currentTeamId)
+    const [teamId, setTeamId] = useState(currentTeamId || 'all')
 
     const handleApply = () => {
         const params = new URLSearchParams()
