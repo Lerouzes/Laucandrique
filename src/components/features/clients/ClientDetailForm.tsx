@@ -18,6 +18,7 @@ import {
   FileText,
   CheckCircle,
   AlertCircle,
+  Activity,
 } from 'lucide-react'
 
 interface ClientDetailFormProps {
@@ -27,8 +28,14 @@ interface ClientDetailFormProps {
   clientQuotes: any[]
   contract: any
   doorsCount: number
+  workload: any[]
   saveAction: (prevState: any, formData: FormData) => Promise<any>
 }
+
+const MONTH_NAMES = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+]
 
 export function ClientDetailForm({
   clientId,
@@ -37,6 +44,7 @@ export function ClientDetailForm({
   clientQuotes,
   contract,
   doorsCount,
+  workload = [],
   saveAction,
 }: ClientDetailFormProps) {
   const router = useRouter()
@@ -247,6 +255,40 @@ export function ClientDetailForm({
                   </p>
                 </Link>
               ))
+            )}
+          </div>
+        </div>
+
+        {/* Workload Statistics Card */}
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 space-y-4 backdrop-blur-sm">
+          <h3 className="text-sm font-bold text-zinc-200 flex items-center gap-2 border-b border-zinc-800/80 pb-2">
+            <Activity className="h-4 w-4 text-cyan-400" />
+            Volume de Travail ({workload.length})
+          </h3>
+
+          <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+            {workload.length === 0 ? (
+              <p className="text-xs text-zinc-500 italic py-2">Aucun volume de travail enregistré.</p>
+            ) : (
+              workload.map((wl: any) => {
+                const monthName = wl.month ? MONTH_NAMES[wl.month - 1] : 'Annuel'
+                return (
+                  <div
+                    key={wl.id}
+                    className="p-2.5 rounded-lg border border-zinc-850/60 bg-zinc-950/40 text-xs flex justify-between items-center"
+                  >
+                    <div>
+                      <p className="font-semibold text-zinc-300 text-xs">
+                        {wl.year} <span className="text-zinc-550 font-normal text-[10px] ml-1">({monthName})</span>
+                      </p>
+                    </div>
+                    <div className="text-[10px] text-zinc-400 space-x-3">
+                      <span>Tâches: <strong className="text-purple-400 font-bold">{wl.tasks_count ?? '-'}</strong></span>
+                      <span>Comms: <strong className="text-cyan-400 font-bold">{wl.comms_count ?? '-'}</strong></span>
+                    </div>
+                  </div>
+                )
+              })
             )}
           </div>
         </div>

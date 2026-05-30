@@ -946,6 +946,8 @@ export async function createOneOnOneAction(data: {
     }>
 }) {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const conducted_by = user?.id || null
 
     // Insert 1v1
     const { data: meeting, error: err } = await supabase
@@ -954,6 +956,7 @@ export async function createOneOnOneAction(data: {
             manager_id: data.manager_id,
             meeting_date: data.meeting_date,
             status: data.status,
+            conducted_by,
             emails_over_48h: data.emails_over_48h,
             late_tasks: data.late_tasks,
             calls_total: data.calls_total,
@@ -1227,12 +1230,15 @@ export async function updateOneOnOneAction(id: string, data: {
     // Fetch manager_id for cache revalidation
     const { data: oldMeeting } = await supabase
         .from('one_on_ones')
-        .select('manager_id')
+        .select('manager_id, conducted_by')
         .eq('id', id)
         .single()
 
     if (!oldMeeting) throw new Error("One-on-One meeting not found")
     const managerId = oldMeeting.manager_id
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const conducted_by = user?.id || null
 
     // Update meeting
     const { error: err } = await supabase
@@ -1240,6 +1246,7 @@ export async function updateOneOnOneAction(id: string, data: {
         .update({
             meeting_date: data.meeting_date,
             status: data.status,
+            conducted_by: oldMeeting.conducted_by || conducted_by,
             emails_over_48h: data.emails_over_48h,
             late_tasks: data.late_tasks,
             calls_total: data.calls_total,
@@ -1475,6 +1482,8 @@ export async function createSyndicateAuditAction(data: {
     answers: Array<{ category: 'governance' | 'financial' | 'operations'; question_key: string; score: number; note?: string }>
 }) {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const audited_by = user?.id || null
 
     // Calculate overall health score dynamically
     const sum = data.answers.reduce((acc, a) => acc + a.score, 0)
@@ -1486,7 +1495,8 @@ export async function createSyndicateAuditAction(data: {
         .insert({
             client_id: data.client_id,
             health_score,
-            notes: data.notes || null
+            notes: data.notes || null,
+            audited_by
         })
         .select()
         .single()
@@ -2338,6 +2348,174 @@ export async function getWorkloadHistoryAction(opts: {
             pct
         }
     })
+}
+
+export async function updateSyndicateAuditAction(id: string, data: {
+    notes?: string
+    answers: Array<{ category: 'governance' | 'financial' | 'operations'; question_key: string; score: number; note?: string }>
+}) {
+    const supabase = await createClient()
+
+    // Enforce Master check
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error("Non authentifié")
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (profile?.role !== 'Master') {
+        throw new Error("Sécurité : Seul le rôle Master peut modifier un audit.")
+    }
+
+    // Calculate overall health score dynamically
+    const sum = data.answers.reduce((acc, a) => acc + a.score, 0)
+    const maxPoints = data.answers.length > 0 ? data.answers.length * 5 : 1
+    const health_score = Math.round((sum / maxPoints) * 100)
+
+    const { error: err } = await supabase
+        .from('syndicate_audits')
+        .update({
+            health_score,
+            notes: data.notes || null
+        })
+        .eq('id', id)
+
+    if (err) throw new Error(err.message)
+
+    // Delete existing answers and insert new ones
+    const { error: delErr } = await supabase.from('syndicate_audit_answers').delete().eq('audit_id', id)
+    if (delErr) throw new Error(delErr.message)
+
+    const answersToInsert = data.answers.map(a => ({
+        audit_id: id,
+        category: a.category,
+        question_key: a.question_key,
+        score: a.score,
+        note: a.note || null
+    }))
+
+    const { error: ansErr } = await supabase.from('syndicate_audit_answers').insert(answersToInsert)
+    if (ansErr) throw new Error(ansErr.message)
+
+    revalidatePath('/team-management/dashboard')
+    revalidatePath('/team-management/audits')
+    revalidatePath(`/team-management/audits/${id}`)
+    revalidatePath('/team-management/syndicates')
+}
+
+export async function deleteSyndicateAuditAction(id: string) {
+    const supabase = await createClient()
+
+    // Enforce Master check
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error("Non authentifié")
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (profile?.role !== 'Master') {
+        throw new Error("Sécurité : Seul le rôle Master peut supprimer un audit.")
+    }
+
+    const { error } = await supabase.from('syndicate_audits').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/team-management/dashboard')
+    revalidatePath('/team-management/audits')
+    revalidatePath('/team-management/syndicates')
+}
+
+export async function saveSyndicateWorkloadAction(data: {
+    client_id: string
+    year: number
+    month: number | null
+    tasks_count: number | null
+    comms_count: number | null
+}) {
+    const supabase = await createClient()
+
+    const payload = {
+        client_id: data.client_id,
+        year: data.year,
+        month: data.month,
+        tasks_count: data.tasks_count,
+        comms_count: data.comms_count,
+        updated_at: new Date().toISOString()
+    }
+
+    const { error } = await supabase
+        .from('syndicate_workload')
+        .upsert(payload, { onConflict: 'client_id, year, month' })
+
+    if (error) {
+        console.error("Upsert failed, trying manual fallback:", error.message)
+        let query = supabase
+            .from('syndicate_workload')
+            .select('id')
+            .eq('client_id', data.client_id)
+            .eq('year', data.year)
+
+        if (data.month === null) {
+            query = query.is('month', null)
+        } else {
+            query = query.eq('month', data.month)
+        }
+
+        const { data: existing } = await query.maybeSingle()
+
+        if (existing?.id) {
+            const { error: updErr } = await supabase
+                .from('syndicate_workload')
+                .update({
+                    tasks_count: data.tasks_count,
+                    comms_count: data.comms_count,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', existing.id)
+            if (updErr) throw new Error(updErr.message)
+        } else {
+            const { error: insErr } = await supabase
+                .from('syndicate_workload')
+                .insert(payload)
+            if (insErr) throw new Error(insErr.message)
+        }
+    }
+
+    revalidatePath('/clients')
+    revalidatePath(`/clients/${data.client_id}`)
+    return { success: true }
+}
+
+export async function getSyndicateWorkloadAction(clientId: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('syndicate_workload')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('year', { ascending: false })
+        .order('month', { ascending: true, nullsFirst: true })
+
+    if (error) {
+        console.error("Error fetching syndicate workload:", error.message)
+        return []
+    }
+    return data || []
+}
+
+export async function getClientHistoryAction(clientId: string) {
+    const supabase = await createClient()
+
+    const [complaintsRes, auditsRes] = await Promise.all([
+        supabase
+            .from('complaints')
+            .select('*')
+            .eq('client_id', clientId)
+            .order('received_date', { ascending: false }),
+        supabase
+            .from('syndicate_audits')
+            .select('*, profiles(full_name)')
+            .eq('client_id', clientId)
+            .order('audit_date', { ascending: false })
+    ])
+
+    return {
+        complaints: complaintsRes.data || [],
+        audits: auditsRes.data || []
+    }
 }
 
 

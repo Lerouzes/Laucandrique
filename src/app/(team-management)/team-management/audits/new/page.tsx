@@ -19,6 +19,9 @@ export default async function NewAuditPage() {
         clientsQuery = clientsQuery.in('manager_id', managerIds)
     }
 
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user?.id).single()
+
     const [clientsRes, configsRes] = await Promise.all([
         clientsQuery.order('company_name'),
         supabase.from('audit_question_configs').select('*')
@@ -36,7 +39,11 @@ export default async function NewAuditPage() {
                 </p>
             </div>
 
-            <NewAuditForm clients={clients || []} questionConfigs={configs || []} />
+            <NewAuditForm 
+                clients={clients || []} 
+                questionConfigs={configs || []} 
+                currentUser={profile || { full_name: 'Auditeur' }}
+            />
         </div>
     )
 }

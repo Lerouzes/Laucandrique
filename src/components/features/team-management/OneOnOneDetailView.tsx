@@ -727,7 +727,9 @@ export function OneOnOneDetailView({
                             {oneOnOne.status === 'completed' && <Lock className="h-3.5 w-3.5 text-zinc-500" />}
                         </h2>
                         <p className="text-[10px] text-zinc-400">
-                            Séance tenue le {new Date(oneOnOne.meeting_date).toLocaleDateString('fr-CA')} · Statut : 
+                            Séance tenue le {new Date(oneOnOne.meeting_date).toLocaleDateString('fr-CA')} · 
+                            Animé par : <strong className="text-zinc-300">{oneOnOne.profiles?.full_name || 'Évaluateur'}</strong> · 
+                            Statut : 
                             <span className={oneOnOne.status === 'completed' ? 'text-emerald-400 font-bold ml-1' : 'text-amber-400 font-bold ml-1'}>
                                 {oneOnOne.status === 'completed' ? 'Complétée (Verrouillée)' : 'Brouillon'}
                             </span>

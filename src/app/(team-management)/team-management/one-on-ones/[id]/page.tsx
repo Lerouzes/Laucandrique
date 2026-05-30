@@ -13,7 +13,7 @@ export default async function OneOnOneDetailPage({
     // 1. Fetch meeting
     const { data: oneOnOne } = await supabase
         .from('one_on_ones')
-        .select('*')
+        .select('*, profiles:conducted_by(full_name)')
         .eq('id', id)
         .single()
 

@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic'
 import { getClientById, updateClientAction, getContractForClient } from '@/actions/clients'
 import { getManagers } from '@/actions/managers'
 import { getQuotes } from '@/actions/quotes'
+import { getSyndicateWorkloadAction } from '@/actions/team-management'
 import { Badge } from '@/components/ui/badge'
 import { ClientDetailForm } from '@/components/features/clients/ClientDetailForm'
 import { ArrowLeft } from 'lucide-react'
@@ -14,11 +15,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const { id } = await params
 
   // Fetch client + contract separately (direct query avoids join caching issues)
-  const [client, managers, quotes, contractDirect] = await Promise.all([
+  const [client, managers, quotes, contractDirect, workload] = await Promise.all([
     getClientById(id),
     getManagers(),
     getQuotes(),
     getContractForClient(id),
+    getSyndicateWorkloadAction(id)
   ])
 
   if (!client) notFound()
@@ -58,6 +60,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         clientQuotes={clientQuotes}
         contract={contract}
         doorsCount={doorsCount}
+        workload={workload || []}
         saveAction={updateClientAction}
       />
     </div>

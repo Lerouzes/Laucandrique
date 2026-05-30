@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ClipboardCheck, Calendar, User, ArrowLeft, Star, FileText } from 'lucide-react'
+import { DeleteAuditButton } from '@/components/features/team-management/DeleteAuditButton'
 
 const QUESTION_LABELS: Record<string, string> = {
     registre_coproprietaires: 'Registre des documents complets',
@@ -20,7 +21,8 @@ const QUESTION_LABELS: Record<string, string> = {
     carnet_entretien: 'Carnet d\'entretien de l\'immeuble à jour',
     inspections_preventives: 'Inspections préventives complétées et consignées',
     sinistres_assurance: 'Suivi rigoureux des sinistres et réclamations',
-    appels_offres: 'Appels d\'offres conformes pour grands travaux'
+    appels_offres: 'Appels d\'offres conformes pour grands travaux',
+    qualite_budget_cree: 'Qualité du budget créé'
 }
 
 export default async function AuditDetailPage({
@@ -31,10 +33,15 @@ export default async function AuditDetailPage({
     const { id } = await params
     const supabase = await createClient()
 
-    // 1. Fetch audit details
+    // 1. Fetch current user context for role check
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
+    const isMaster = profile?.role === 'Master'
+
+    // 2. Fetch audit details
     const { data: audit } = await supabase
         .from('syndicate_audits')
-        .select('*, clients(id, company_name, full_name, managers(first_name, last_name))')
+        .select('*, clients(id, company_name, full_name, managers(first_name, last_name)), profiles:audited_by(full_name)')
         .eq('id', id)
         .single()
 
@@ -94,7 +101,8 @@ export default async function AuditDetailPage({
                         <h2 className="text-sm font-bold text-white uppercase">{clientName}</h2>
                         <p className="text-[10px] text-zinc-400">
                             Gestionnaire responsable : <strong className="text-zinc-300">{managerName}</strong> · 
-                            Audit du {audit.audit_date ? new Date(audit.audit_date).toLocaleDateString('fr-CA') : 'Inconnue'}
+                            Audit du {audit.audit_date ? new Date(audit.audit_date).toLocaleDateString('fr-CA') : 'Inconnue'} · 
+                            Auditeur : <strong className="text-purple-400">{audit.profiles?.full_name || 'Évaluateur'}</strong>
                         </p>
                     </div>
                 </div>
@@ -109,6 +117,18 @@ export default async function AuditDetailPage({
                             </Badge>
                         </div>
                     </div>
+                    
+                    {isMaster && (
+                        <div className="flex items-center gap-2 border-l border-zinc-800 pl-4">
+                            <Link
+                                href={`/team-management/audits/${id}/edit`}
+                                className="h-8 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xxs flex items-center justify-center px-4 shadow transition-all"
+                            >
+                                Modifier
+                            </Link>
+                            <DeleteAuditButton auditId={id} />
+                        </div>
+                    )}
                 </div>
             </div>
 

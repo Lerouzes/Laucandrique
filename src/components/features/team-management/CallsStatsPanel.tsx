@@ -109,7 +109,7 @@ function ManagerHistoryModal({
 }: {
     managerId: string
     managerName: string
-    activityType: 'calls' | 'tasks'
+    activityType: 'calls' | 'tasks' | 'emails'
     open: boolean
     onClose: () => void
 }) {
@@ -132,8 +132,14 @@ function ManagerHistoryModal({
     const withMoM = rows.map((r, i) => {
         const prev = rows[i + 1]
         let delta: number | null = null
-        if (prev && r.pct !== null && prev.pct !== null) {
-            delta = r.pct - prev.pct
+        if (prev) {
+            if (activityType === 'emails') {
+                if (r.communicationsReceived !== undefined && prev.communicationsReceived !== undefined) {
+                    delta = r.communicationsReceived - prev.communicationsReceived
+                }
+            } else if (r.pct !== null && prev.pct !== null) {
+                delta = r.pct - prev.pct
+            }
         }
         return { ...r, delta }
     })
@@ -147,7 +153,7 @@ function ManagerHistoryModal({
                 <DialogHeader className="p-5 border-b border-zinc-900 shrink-0">
                     <DialogTitle className="text-base font-bold flex items-center gap-2 text-white">
                         <History className="h-4 w-4 text-purple-400" />
-                        {activityType === 'calls' ? "Historique d'Appels" : "Historique de Complétion des Tâches"} — {managerName}
+                        {activityType === 'calls' ? "Historique d'Appels" : activityType === 'tasks' ? "Historique de Complétion des Tâches" : "Historique des Courriels"} — {managerName}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -188,8 +194,8 @@ function ManagerHistoryModal({
                                                     fontSize={9}
                                                     tickLine={false}
                                                     axisLine={false}
-                                                    domain={[0, 100]}
-                                                    tickFormatter={(v) => `${v}%`}
+                                                    domain={activityType === 'emails' ? ['auto', 'auto'] : [0, 100]}
+                                                    tickFormatter={(v) => activityType === 'emails' ? String(v) : `${v}%`}
                                                 />
                                                 <Tooltip
                                                     contentStyle={{
@@ -199,11 +205,11 @@ function ManagerHistoryModal({
                                                         fontSize: 10,
                                                         color: '#fff'
                                                     }}
-                                                    formatter={(v: any) => [`${v}%`, activityType === 'calls' ? "Taux de Réponse" : "Taux de Complétion"]}
+                                                    formatter={(v: any) => activityType === 'emails' ? [v, "Courriels Reçus"] : [`${v}%`, activityType === 'calls' ? "Taux de Réponse" : "Taux de Complétion"]}
                                                 />
                                                 <Line
                                                     type="monotone"
-                                                    dataKey="pct"
+                                                    dataKey={activityType === 'emails' ? 'communicationsReceived' : 'pct'}
                                                     stroke="#a855f7"
                                                     strokeWidth={2}
                                                     dot={{ r: 3, fill: '#a855f7' }}
@@ -222,49 +228,49 @@ function ManagerHistoryModal({
                                     <thead>
                                         <tr className="border-b border-zinc-800 text-zinc-400 uppercase text-[10px] font-bold tracking-wider">
                                             <th className="pb-2 text-left">Mois</th>
-                                            <th className="pb-2 text-center">{activityType === 'calls' ? "Total Appels" : "Total Tâches"}</th>
-                                            <th className="pb-2 text-center">{activityType === 'calls' ? "Répondus" : "Complétées"}</th>
-                                            <th className="pb-2 text-center">Taux</th>
+                                            <th className="pb-2 text-center">{activityType === 'calls' ? "Total Appels" : activityType === 'tasks' ? "Total Tâches" : "Courriels Reçus"}</th>
+                                            {activityType !== 'emails' && <th className="pb-2 text-center">{activityType === 'calls' ? "Répondus" : "Complétées"}</th>}
+                                            {activityType !== 'emails' && <th className="pb-2 text-center">Taux</th>}
                                             <th className="pb-2 text-center">MoM</th>
-                                            <th className="pb-2 text-right pr-2">Barre</th>
+                                            {activityType !== 'emails' && <th className="pb-2 text-right pr-2">Barre</th>}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-zinc-900">
                                         {withMoM.map((r) => {
-                                            const total = activityType === 'calls' ? r.totalCalls : ((r.openTasks ?? 0) + (r.closedTasks ?? 0))
+                                            const total = activityType === 'calls' ? r.totalCalls : activityType === 'tasks' ? ((r.openTasks ?? 0) + (r.closedTasks ?? 0)) : r.communicationsReceived
                                             const answered = activityType === 'calls' ? r.answeredCalls : r.closedTasks
 
                                             return (
                                                 <tr key={r.yearMonth} className="hover:bg-zinc-900/30 transition-colors">
                                                     <td className="py-2.5 font-mono text-zinc-300">{formatYearMonth(r.yearMonth)}</td>
                                                     <td className="py-2.5 text-center text-zinc-400">{total}</td>
-                                                    <td className="py-2.5 text-center text-zinc-400">{answered}</td>
-                                                    <td className={`py-2.5 text-center font-bold ${pctColor(r.pct)}`}>
+                                                    {activityType !== 'emails' && <td className="py-2.5 text-center text-zinc-400">{answered}</td>}
+                                                    {activityType !== 'emails' && <td className={`py-2.5 text-center font-bold ${pctColor(r.pct)}`}>
                                                         {r.pct !== null ? `${r.pct}%` : 'N/A'}
-                                                    </td>
+                                                    </td>}
                                                     <td className="py-2.5 text-center">
                                                         {r.delta === null ? (
                                                             <span className="text-zinc-600">—</span>
                                                         ) : r.delta > 0 ? (
-                                                            <span className="text-emerald-400 flex items-center justify-center gap-0.5 font-bold">
-                                                                <TrendingUp className="h-3 w-3" />+{r.delta}%
+                                                            <span className={`${activityType === 'emails' ? 'text-rose-400' : 'text-emerald-400'} flex items-center justify-center gap-0.5 font-bold`}>
+                                                                <TrendingUp className="h-3 w-3" />+{r.delta}{activityType === 'emails' ? '' : '%'}
                                                             </span>
                                                         ) : r.delta < 0 ? (
-                                                            <span className="text-rose-400 flex items-center justify-center gap-0.5 font-bold">
-                                                                <TrendingDown className="h-3 w-3" />{r.delta}%
+                                                            <span className={`${activityType === 'emails' ? 'text-emerald-400' : 'text-rose-400'} flex items-center justify-center gap-0.5 font-bold`}>
+                                                                <TrendingDown className="h-3 w-3" />{r.delta}{activityType === 'emails' ? '' : '%'}
                                                             </span>
                                                         ) : (
                                                             <span className="text-zinc-500 flex items-center justify-center"><Minus className="h-3 w-3" /></span>
                                                         )}
                                                     </td>
-                                                    <td className="py-2.5 pr-2">
+                                                    {activityType !== 'emails' && <td className="py-2.5 pr-2">
                                                         <div className="h-1.5 w-20 bg-zinc-800 rounded-full overflow-hidden ml-auto">
                                                             <div
                                                                 className={`h-full rounded-full transition-all ${pctBarColor(r.pct)}`}
                                                                 style={{ width: `${r.pct ?? 0}%` }}
                                                             />
                                                         </div>
-                                                    </td>
+                                                    </td>}
                                                 </tr>
                                             )
                                         })}
@@ -294,7 +300,7 @@ export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
     const [rows, setRows] = useState<CallRow[]>([])
 
     // Activity & View Modes
-    const [activityType, setActivityType] = useState<'calls' | 'tasks'>('calls')
+    const [activityType, setActivityType] = useState<'calls' | 'tasks' | 'emails'>('calls')
     const [viewMode, setViewMode] = useState<'table' | 'chart'>('table')
 
     // Custom date range mode
@@ -349,7 +355,7 @@ export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
                 map[r.managerId].count++
             })
             return Object.values(map).map(m => {
-                const pct = m.totalVal1 > 0 ? Math.round((m.totalVal2 / m.totalVal1) * 100) : null
+                const pct = activityType !== 'emails' ? (m.totalVal1 > 0 ? Math.round((m.totalVal2 / m.totalVal1) * 100) : null) : null
                 return {
                     managerId: m.managerId,
                     managerName: m.managerName,
@@ -357,16 +363,18 @@ export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
                     ...(activityType === 'calls' ? {
                         totalCalls: m.totalVal1,
                         answeredCalls: m.totalVal2,
-                    } : {
+                    } : activityType === 'tasks' ? {
                         openTasks: m.totalVal1 - m.totalVal2,
                         closedTasks: m.totalVal2,
+                    } : {
+                        communicationsReceived: m.totalVal1
                     }),
                     pct,
                     monthCount: m.count
                 }
-            }).sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1))
+            }).sort((a, b) => activityType === 'emails' ? (b.communicationsReceived ?? 0) - (a.communicationsReceived ?? 0) : ((b.pct ?? -1) - (a.pct ?? -1)))
         })()
-        : [...rows].sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1))
+        : [...rows].sort((a, b) => activityType === 'emails' ? (b.communicationsReceived ?? 0) - (a.communicationsReceived ?? 0) : ((b.pct ?? -1) - (a.pct ?? -1)))
 
     // Global stats summary values
     let totalAll = 0
@@ -374,11 +382,13 @@ export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
     if (activityType === 'calls') {
         totalAll = displayRows.reduce((s, r) => s + (r.totalCalls ?? 0), 0)
         answeredAll = displayRows.reduce((s, r) => s + (r.answeredCalls ?? 0), 0)
-    } else {
+    } else if (activityType === 'tasks') {
         totalAll = displayRows.reduce((s, r) => s + ((r.openTasks ?? 0) + (r.closedTasks ?? 0)), 0)
         answeredAll = displayRows.reduce((s, r) => s + (r.closedTasks ?? 0), 0)
+    } else if (activityType === 'emails') {
+        totalAll = displayRows.reduce((s, r) => s + (r.communicationsReceived ?? 0), 0)
     }
-    const globalPct = totalAll > 0 ? Math.round((answeredAll / totalAll) * 100) : null
+    const globalPct = activityType !== 'emails' ? (totalAll > 0 ? Math.round((answeredAll / totalAll) * 100) : null) : null
 
     return (
         <div className="space-y-4">
@@ -387,15 +397,22 @@ export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
                 <div className="flex items-center gap-2">
                     {activityType === 'calls' ? (
                         <Phone className="h-4 w-4 text-purple-400" />
-                    ) : (
+                    ) : activityType === 'tasks' ? (
                         <CheckSquare className="h-4 w-4 text-purple-400" />
+                    ) : (
+                        <Mail className="h-4 w-4 text-purple-400" />
                     )}
                     <h3 className="text-sm font-bold text-white">
-                        {title ?? (activityType === 'calls' ? "Statistiques d'Appels" : "Taux de Complétion des Tâches")}
+                        {title ?? (activityType === 'calls' ? "Statistiques d'Appels" : activityType === 'tasks' ? "Taux de Complétion des Tâches" : "Statistiques des Courriels")}
                     </h3>
-                    {globalPct !== null && (
+                    {activityType !== 'emails' && globalPct !== null && (
                         <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full border ${pctBgColor(globalPct)} ${pctColor(globalPct)}`}>
                             {globalPct}% global
+                        </span>
+                    )}
+                    {activityType === 'emails' && (
+                        <span className="text-xs font-extrabold px-2 py-0.5 rounded-full border bg-zinc-900 border-zinc-800 text-purple-400">
+                            {totalAll} global
                         </span>
                     )}
                 </div>
@@ -436,6 +453,17 @@ export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
                     >
                         <CheckSquare className="h-3 w-3" />
                         Gestion des Tâches
+                    </button>
+                    <button
+                        onClick={() => setActivityType('emails')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
+                            activityType === 'emails'
+                                ? 'bg-purple-600 text-white shadow-sm font-extrabold'
+                                : 'text-zinc-400 hover:text-zinc-200'
+                        }`}
+                    >
+                        <Mail className="h-3 w-3" />
+                        Courriels
                     </button>
                 </div>
 
@@ -522,11 +550,11 @@ export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
             )}
 
             {/* Legend */}
-            <div className="flex items-center gap-3 text-[10px] font-bold text-zinc-500">
+            {activityType !== 'emails' && <div className="flex items-center gap-3 text-[10px] font-bold text-zinc-500">
                 <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />≥ 80%</span>
                 <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500 inline-block" />55–79%</span>
                 <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500 inline-block" />{'< 55%'}</span>
-            </div>
+            </div>}
 
             {/* Content: Table OR Chart */}
             {isPending ? (
@@ -556,8 +584,8 @@ export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
                                 fontSize={10}
                                 tickLine={false}
                                 axisLine={false}
-                                domain={[0, 100]}
-                                tickFormatter={(v) => `${v}%`}
+                                domain={activityType === 'emails' ? ['auto', 'auto'] : [0, 100]}
+                                tickFormatter={(v) => activityType === 'emails' ? String(v) : `${v}%`}
                             />
                             <Tooltip
                                 cursor={{ fill: 'rgba(39, 39, 42, 0.2)' }}
@@ -573,26 +601,30 @@ export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
                                     return (
                                         <div className="bg-zinc-950 border border-zinc-805 p-3 rounded-lg text-xs space-y-1.5 shadow-2xl">
                                             <p className="font-bold text-white">{data.managerName}</p>
-                                            <p className="text-purple-400">
+                                            {activityType !== 'emails' && <p className="text-purple-400">
                                                 {activityType === 'calls' ? "Taux de Réponse" : "Taux de Complétion"} : <span className="font-extrabold">{rate}</span>
-                                            </p>
+                                            </p>}
                                             {activityType === 'calls' ? (
                                                 <p className="text-zinc-400">
                                                     Appels : <span className="text-zinc-200">{data.answeredCalls} répondus / {data.totalCalls} total</span>
                                                 </p>
-                                            ) : (
+                                            ) : activityType === 'tasks' ? (
                                                 <p className="text-zinc-400">
                                                     Tâches : <span className="text-zinc-200">{data.closedTasks} fermées / {((data.openTasks ?? 0) + (data.closedTasks ?? 0))} total</span>
+                                                </p>
+                                            ) : (
+                                                <p className="text-zinc-400">
+                                                    Courriels : <span className="text-zinc-200">{data.communicationsReceived} reçus</span>
                                                 </p>
                                             )}
                                         </div>
                                     )
                                 }}
                             />
-                            <Bar dataKey="pct" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                            <Bar dataKey={activityType === 'emails' ? 'communicationsReceived' : 'pct'} radius={[4, 4, 0, 0]} maxBarSize={40}>
                                 {displayRows.map((entry, index) => {
                                     const rate = entry.pct ?? 0
-                                    const color = rate >= 80 ? '#10b981' : rate > 55 ? '#f59e0b' : '#ef4444'
+                                    const color = activityType === 'emails' ? '#a855f7' : (rate >= 80 ? '#10b981' : rate > 55 ? '#f59e0b' : '#ef4444')
                                     return <Cell key={`cell-${index}`} fill={color} />
                                 })}
                             </Bar>
@@ -608,19 +640,19 @@ export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
                                 {!managerId && <th className="p-3">Gestionnaire</th>}
                                 {useRange && <th className="p-3 text-center">Mois</th>}
                                 <th className="p-3 text-center">
-                                    {activityType === 'calls' ? "Total Appels" : "Total Tâches"}
+                                    {activityType === 'calls' ? "Total Appels" : activityType === 'tasks' ? "Total Tâches" : "Courriels Reçus"}
                                 </th>
-                                <th className="p-3 text-center">
+                                {activityType !== 'emails' && <th className="p-3 text-center">
                                     {activityType === 'calls' ? "Répondus" : "Complétées"}
-                                </th>
-                                <th className="p-3 text-center">Taux</th>
-                                <th className="p-3">Progression</th>
+                                </th>}
+                                {activityType !== 'emails' && <th className="p-3 text-center">Taux</th>}
+                                {activityType !== 'emails' && <th className="p-3">Progression</th>}
                                 {!managerId && <th className="p-3 text-right">Historique</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-900">
                             {displayRows.map((r) => {
-                                const totalVal = activityType === 'calls' ? r.totalCalls : ((r.openTasks ?? 0) + (r.closedTasks ?? 0))
+                                const totalVal = activityType === 'calls' ? r.totalCalls : activityType === 'tasks' ? ((r.openTasks ?? 0) + (r.closedTasks ?? 0)) : r.communicationsReceived
                                 const answeredVal = activityType === 'calls' ? r.answeredCalls : r.closedTasks
 
                                 return (
@@ -634,13 +666,13 @@ export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
                                             </td>
                                         )}
                                         <td className="p-3 text-center text-zinc-400">{totalVal}</td>
-                                        <td className="p-3 text-center text-zinc-400">{answeredVal}</td>
-                                        <td className="p-3 text-center">
+                                        {activityType !== 'emails' && <td className="p-3 text-center text-zinc-400">{answeredVal}</td>}
+                                        {activityType !== 'emails' && <td className="p-3 text-center">
                                             <span className={`font-extrabold text-sm ${pctColor(r.pct)}`}>
                                                 {r.pct !== null ? `${r.pct}%` : 'N/A'}
                                             </span>
-                                        </td>
-                                        <td className="p-3">
+                                        </td>}
+                                        {activityType !== 'emails' && <td className="p-3">
                                             <div className={`flex items-center gap-2 px-2 py-1 rounded-lg border ${pctBgColor(r.pct)}`} style={{ minWidth: 140 }}>
                                                 <div className="h-1.5 flex-1 bg-zinc-900 rounded-full overflow-hidden">
                                                     <div
@@ -652,7 +684,7 @@ export function CallsStatsPanel({ managerId, title }: CallsStatsPanelProps) {
                                                     {r.pct !== null ? `${r.pct}%` : '—'}
                                                 </span>
                                             </div>
-                                        </td>
+                                        </td>}
                                         {!managerId && (
                                             <td className="p-3 text-right">
                                                 <button

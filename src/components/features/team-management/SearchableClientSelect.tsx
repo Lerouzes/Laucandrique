@@ -33,25 +33,18 @@ export function SearchableClientSelect({
     const [selectedName, setSelectedName] = useState(() => {
         if (defaultValue) {
             const found = clients.find(c => c.id === defaultValue)
-            if (found) return found.sdc ? `${found.name} (${found.sdc})` : found.name
+            if (found) return found.sdc && found.sdc !== found.name ? `${found.name} (${found.sdc})` : found.name
         }
         return ''
     })
 
-    useEffect(() => {
-        if (defaultValue) {
-            setSelectedId(defaultValue)
-            const found = clients.find(c => c.id === defaultValue)
-            if (found) {
-                setSelectedName(found.sdc ? `${found.name} (${found.sdc})` : found.name)
-            } else {
-                setSelectedName('')
-            }
-        } else {
-            setSelectedId('')
-            setSelectedName('')
-        }
-    }, [defaultValue, clients])
+    const [prevDefaultValue, setPrevDefaultValue] = useState(defaultValue)
+    if (defaultValue !== prevDefaultValue) {
+        setPrevDefaultValue(defaultValue)
+        setSelectedId(defaultValue || '')
+        const found = clients.find(c => c.id === defaultValue)
+        setSelectedName(found ? (found.sdc && found.sdc !== found.name ? `${found.name} (${found.sdc})` : found.name) : '')
+    }
     
     const containerRef = useRef<HTMLDivElement>(null)
 
@@ -133,7 +126,7 @@ export function SearchableClientSelect({
                         ) : (
                             filteredClients.map((client) => {
                                 const isSelected = selectedId === client.id
-                                const displayName = client.sdc ? `${client.name} (${client.sdc})` : client.name
+                                const displayName = client.sdc && client.sdc !== client.name ? `${client.name} (${client.sdc})` : client.name
                                 return (
                                     <button
                                         key={client.id}
@@ -146,7 +139,9 @@ export function SearchableClientSelect({
                                     >
                                         <span className="truncate pr-1">
                                             {client.name}
-                                            {client.sdc && <span className="text-zinc-500 font-mono text-[9px] ml-1.5">[{client.sdc}]</span>}
+                                            {client.sdc && client.sdc !== client.name && (
+                                                <span className="text-zinc-500 font-mono text-[9px] ml-1.5">[{client.sdc}]</span>
+                                            )}
                                         </span>
                                         {isSelected && <Check className="h-3 w-3 text-purple-400 shrink-0" />}
                                     </button>

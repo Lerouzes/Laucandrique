@@ -14,7 +14,7 @@ export default async function AuditsListPage() {
     // Fetch audits including client details
     let query = supabase
         .from('syndicate_audits')
-        .select('*, clients(company_name, full_name, managers(first_name, last_name))')
+        .select('*, clients(company_name, full_name, managers(first_name, last_name)), profiles:audited_by(full_name)')
 
     if (context.teamId) {
         const { data: teamClients } = await supabase
@@ -77,6 +77,7 @@ export default async function AuditsListPage() {
                             <tr>
                                 <th className="p-3">Copropriété</th>
                                 <th className="p-3">Gestionnaire</th>
+                                <th className="p-3">Audité par</th>
                                 <th className="p-3">Date de l'Audit</th>
                                 <th className="p-3 text-center">Score de Santé</th>
                                 <th className="p-3 text-center">Classement</th>
@@ -86,7 +87,7 @@ export default async function AuditsListPage() {
                         <tbody className="divide-y divide-zinc-850">
                             {(!audits || audits.length === 0) ? (
                                 <tr>
-                                    <td colSpan={6} className="p-4 text-center italic text-zinc-500">
+                                    <td colSpan={7} className="p-4 text-center italic text-zinc-500">
                                         Aucun audit enregistré dans le système.
                                     </td>
                                 </tr>
@@ -103,6 +104,9 @@ export default async function AuditsListPage() {
                                             </td>
                                             <td className="p-3 text-zinc-400">
                                                 {managerName}
+                                            </td>
+                                            <td className="p-3 text-zinc-400">
+                                                {a.profiles?.full_name || 'Évaluateur'}
                                             </td>
                                             <td className="p-3 text-zinc-300 font-mono">
                                                 {a.audit_date ? new Date(a.audit_date).toLocaleDateString('fr-CA') : 'Inconnue'}
