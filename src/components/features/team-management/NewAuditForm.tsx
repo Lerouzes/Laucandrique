@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { 
     createSyndicateAuditAction, 
     updateSyndicateAuditAction, 
@@ -30,7 +31,8 @@ import {
     User,
     ChevronDown,
     ChevronUp,
-    Trash2
+    Trash2,
+    ArrowLeft
 } from 'lucide-react'
 import { SearchableClientSelect } from './SearchableClientSelect'
 
@@ -267,6 +269,17 @@ export function NewAuditForm({
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6 w-full px-1">
+            {/* Back button */}
+            <div className="mb-2">
+                <Link
+                    href="/team-management/audits"
+                    className="text-xxs text-zinc-500 hover:text-zinc-300 font-bold flex items-center gap-1 w-fit transition-colors"
+                >
+                    <ArrowLeft className="h-3 w-3" />
+                    Retour aux Audits
+                </Link>
+            </div>
+
             {/* Header Control Panel */}
             <div className="flex flex-col sm:flex-row gap-4 p-6 bg-[#16171e]/70 border border-zinc-800/80 rounded-2xl shadow-xl justify-between items-start sm:items-center">
                 <div className="flex items-center gap-3">

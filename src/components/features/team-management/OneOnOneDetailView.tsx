@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { 
     updateOneOnOneAction, 
     getOneOnOneSnapshotAction, 
@@ -39,9 +40,11 @@ import {
     ShieldAlert,
     Lock,
     Unlock,
-    X
+    X,
+    ArrowLeft
 } from 'lucide-react'
 import { SearchableClientSelect } from './SearchableClientSelect'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { CallsStatsPanel } from './CallsStatsPanel'
 
 const AUDIT_LABELS: Record<string, string> = {
@@ -229,6 +232,98 @@ export function OneOnOneDetailView({
     const [newRiskClientId, setNewRiskClientId] = useState('')
     const [newRiskFutureActions, setNewRiskFutureActions] = useState('')
     const [newActionClientId, setNewActionClientId] = useState('')
+
+    // Dialog modal selection states for Audits & Risks
+    const [selectedAuditIdx, setSelectedAuditIdx] = useState<number | null>(null)
+    const [selectedRiskIdx, setSelectedRiskIdx] = useState<number | null>(null)
+
+    const [modalAuditTitle, setModalAuditTitle] = useState('')
+    const [modalAuditType, setModalAuditType] = useState<'task' | 'email'>('task')
+    const [modalAuditClientId, setModalAuditClientId] = useState('')
+    const [modalAuditFollowUp, setModalAuditFollowUp] = useState(false)
+    const [modalAuditDesc, setModalAuditDesc] = useState(false)
+    const [modalAuditActions, setModalAuditActions] = useState(false)
+    const [modalAuditCatSelected, setModalAuditCatSelected] = useState(false)
+    const [modalAuditCreatedDate, setModalAuditCreatedDate] = useState('')
+    const [modalAuditComplexity, setModalAuditComplexity] = useState<'low' | 'medium' | 'high'>('medium')
+    const [modalAuditNotes, setModalAuditNotes] = useState('')
+
+    const [modalRiskDesc, setModalRiskDesc] = useState('')
+    const [modalRiskSeverity, setModalRiskSeverity] = useState<'low' | 'medium' | 'high' | 'critical'>('medium')
+    const [modalRiskClientId, setModalRiskClientId] = useState('')
+    const [modalRiskFutureActions, setModalRiskFutureActions] = useState('')
+
+    const openTaskEmailAuditModal = (idx: number) => {
+        const audit = taskEmailAudits[idx]
+        if (!audit) return
+        setSelectedAuditIdx(idx)
+        setModalAuditTitle(audit.title || '')
+        setModalAuditType(audit.type || 'task')
+        setModalAuditClientId(audit.client_id || '')
+        setModalAuditFollowUp(!!audit.has_followup_date)
+        setModalAuditDesc(!!audit.has_good_description)
+        setModalAuditActions(!!audit.has_actions)
+        setModalAuditCatSelected(!!audit.has_category_selected)
+        setModalAuditCreatedDate(audit.task_created_date || '')
+        setModalAuditComplexity(audit.complexity || 'medium')
+        setModalAuditNotes(audit.review_notes || '')
+    }
+
+    const openRiskModal = (idx: number) => {
+        const risk = operationalRisks[idx]
+        if (!risk) return
+        setSelectedRiskIdx(idx)
+        setModalRiskDesc(risk.description || '')
+        setModalRiskSeverity(risk.severity || 'medium')
+        setModalRiskClientId(risk.client_id || '')
+        setModalRiskFutureActions(risk.future_actions || '')
+    }
+
+    const handleSaveModalAudit = () => {
+        if (selectedAuditIdx === null) return
+        const updated = [...taskEmailAudits]
+        updated[selectedAuditIdx] = {
+            ...updated[selectedAuditIdx],
+            title: modalAuditTitle.trim(),
+            type: modalAuditType,
+            client_id: modalAuditClientId || null,
+            has_followup_date: modalAuditFollowUp,
+            has_good_description: modalAuditDesc,
+            has_actions: modalAuditActions,
+            has_category_selected: modalAuditCatSelected,
+            task_created_date: modalAuditCreatedDate || null,
+            complexity: modalAuditType === 'task' ? modalAuditComplexity : null,
+            review_notes: modalAuditNotes.trim()
+        }
+        setTaskEmailAudits(updated)
+        setSelectedAuditIdx(null)
+    }
+
+    const handleSaveModalRisk = () => {
+        if (selectedRiskIdx === null) return
+        const updated = [...operationalRisks]
+        updated[selectedRiskIdx] = {
+            ...updated[selectedRiskIdx],
+            description: modalRiskDesc.trim(),
+            severity: modalRiskSeverity,
+            client_id: modalRiskClientId || null,
+            future_actions: modalRiskFutureActions.trim()
+        }
+        setOperationalRisks(updated)
+        setSelectedRiskIdx(null)
+    }
+
+    const handleDeleteModalAudit = () => {
+        if (selectedAuditIdx === null) return
+        setTaskEmailAudits(taskEmailAudits.filter((_, i) => i !== selectedAuditIdx))
+        setSelectedAuditIdx(null)
+    }
+
+    const handleDeleteModalRisk = () => {
+        if (selectedRiskIdx === null) return
+        setOperationalRisks(operationalRisks.filter((_, i) => i !== selectedRiskIdx))
+        setSelectedRiskIdx(null)
+    }
 
     const getClientName = (id: string) => {
         const found = clientsList.find(c => c.id === id)
@@ -829,6 +924,17 @@ export function OneOnOneDetailView({
 
     return (
         <div className="space-y-6 w-full max-w-[1600px] mx-auto px-4 md:px-8 pb-20">
+            {/* Back button */}
+            <div className="mb-2">
+                <Link
+                    href="/team-management/one-on-ones"
+                    className="text-xxs text-zinc-500 hover:text-zinc-300 font-bold flex items-center gap-1 w-fit transition-colors"
+                >
+                    <ArrowLeft className="h-3 w-3" />
+                    Retour aux 1-à-1
+                </Link>
+            </div>
+
             {/* Header Controls */}
             <div className="flex flex-col md:flex-row gap-4 p-6 bg-[#16171e]/70 border border-zinc-800 rounded-2xl shadow-xl justify-between items-start md:items-center">
                 <div className="flex items-center gap-3">
@@ -1185,12 +1291,12 @@ export function OneOnOneDetailView({
                                             )}
                                         </td>
                                         <td className="p-2">
-                                            <Input
+                                            <Textarea
                                                 placeholder="Notes explicatives..."
                                                 value={c.notes || ''}
                                                 onChange={(e) => handlePrevCommitmentChange(idx, 'notes', e.target.value)}
                                                 disabled={!isEditing}
-                                                className="bg-[#121318] border-zinc-850 h-7 text-xxs"
+                                                className="bg-[#121318] border-zinc-850 text-xxs min-h-[50px] resize-y py-1 px-2"
                                             />
                                         </td>
                                     </tr>
@@ -1562,12 +1668,19 @@ export function OneOnOneDetailView({
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                                 {taskEmailAudits.map((a, idx) => (
-                                    <div key={idx} className="p-3 bg-zinc-950/20 border border-zinc-800 rounded-xl relative space-y-2">
+                                    <div 
+                                        key={idx} 
+                                        onClick={() => openTaskEmailAuditModal(idx)}
+                                        className="p-3 bg-zinc-950/20 border border-zinc-800 rounded-xl relative space-y-2 cursor-pointer hover:border-purple-500/50 hover:bg-zinc-950/40 transition-all"
+                                    >
                                         {isEditing && (
                                             <Button 
-                                                onClick={() => handleRemoveTaskEmailAudit(idx)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleRemoveTaskEmailAudit(idx)
+                                                }}
                                                 variant="ghost" 
-                                                className="h-5 w-5 p-0 absolute top-2 right-2 text-zinc-500 hover:text-rose-500 hover:bg-transparent"
+                                                className="h-5 w-5 p-0 absolute top-2 right-2 text-zinc-500 hover:text-rose-500 hover:bg-transparent z-10"
                                             >
                                                 <X className="h-3 w-3" />
                                             </Button>
@@ -1596,7 +1709,7 @@ export function OneOnOneDetailView({
                                         )}
 
                                         {a.review_notes && (
-                                            <div className="bg-zinc-950/40 p-1.5 rounded text-[8px] text-zinc-400 border border-zinc-900 leading-normal">
+                                            <div className="bg-zinc-950/40 p-1.5 rounded text-[8px] text-zinc-400 border border-zinc-900 leading-normal whitespace-pre-wrap">
                                                 <strong>Notes:</strong> {a.review_notes}
                                             </div>
                                         )}
@@ -1705,28 +1818,42 @@ export function OneOnOneDetailView({
                                     'bg-zinc-900 text-zinc-400 border-zinc-800'
 
                                 return (
-                                    <div key={idx} className="p-3 bg-zinc-900/20 border border-zinc-850 rounded-xl flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant="outline" className={`text-[8px] px-1.5 ${sevBadge}`}>{r.severity}</Badge>
-                                                <span className={r.status === 'resolved' ? 'line-through text-zinc-500 text-xs font-semibold' : 'text-zinc-200 text-xs font-semibold'}>{r.description}</span>
+                                    <div 
+                                        key={idx} 
+                                        onClick={() => openRiskModal(idx)}
+                                        className="p-3 bg-zinc-900/20 border border-zinc-850 rounded-xl flex flex-col sm:flex-row justify-between sm:items-center gap-3 cursor-pointer hover:border-purple-500/50 hover:bg-zinc-900/40 transition-all"
+                                    >
+                                        <div className="space-y-1.5 flex-1">
+                                            <div className="flex items-start gap-2 flex-wrap">
+                                                <Badge variant="outline" className={`text-[8px] px-1.5 shrink-0 ${sevBadge}`}>{r.severity}</Badge>
+                                                <span className={`${r.status === 'resolved' ? 'line-through text-zinc-500' : 'text-zinc-200'} text-xs font-semibold whitespace-pre-wrap block`}>{r.description}</span>
+                                            </div>
+                                            <div className="flex gap-4 text-[9px] text-zinc-500 flex-wrap">
+                                                {r.client_id && (
+                                                    <span>Syndicat: <strong className="text-zinc-400">{getClientName(r.client_id)}</strong></span>
+                                                )}
+                                                {r.future_actions && (
+                                                    <span className="whitespace-pre-wrap block">Actions futures: <strong className="text-purple-400">{r.future_actions}</strong></span>
+                                                )}
                                             </div>
                                             {r.status === 'resolved' && r.resolution_notes && (
-                                                <div className="text-[9px] text-zinc-400 bg-zinc-950/40 p-1.5 rounded border border-zinc-900 max-w-2xl">
+                                                <div className="text-[9px] text-zinc-400 bg-zinc-950/40 p-1.5 rounded border border-zinc-900 max-w-2xl whitespace-pre-wrap">
                                                     <strong>Résolution:</strong> {r.resolution_notes} {r.resolved_date && `(${r.resolved_date})`}
                                                 </div>
                                             )}
                                         </div>
 
                                         {r.status === 'active' && isEditing ? (
-                                            <div className="flex gap-2 items-center">
+                                            <div className="flex gap-2 items-center shrink-0">
                                                 <Input 
                                                     id={`risk-res-input-${idx}`}
                                                     placeholder="Notes de résolution..." 
                                                     className="bg-[#121318] border-zinc-800 h-7 text-xxs w-40 text-white" 
+                                                    onClick={(e) => e.stopPropagation()}
                                                 />
                                                 <Button 
-                                                    onClick={() => {
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
                                                         const el = document.getElementById(`risk-res-input-${idx}`) as HTMLInputElement
                                                         handleResolveRisk(idx, el?.value || 'Résolu en 1v1')
                                                     }}
@@ -1736,7 +1863,7 @@ export function OneOnOneDetailView({
                                                 </Button>
                                             </div>
                                         ) : r.status === 'active' ? (
-                                            <Badge variant="outline" className="bg-amber-950/20 text-amber-400 border-amber-800/40 font-bold text-[8px] shrink-0">Risque Actif</Badge>
+                                            <Badge variant="outline" className="bg-amber-955/20 text-amber-400 border-amber-800/40 font-bold text-[8px] shrink-0">Risque Actif</Badge>
                                         ) : (
                                             <Badge variant="outline" className="bg-emerald-950/20 text-emerald-400 border-emerald-800/40 font-bold text-[8px] self-start sm:self-center shrink-0">Risque Résolu</Badge>
                                         )}
@@ -2391,19 +2518,383 @@ export function OneOnOneDetailView({
                             >
                                 {isEditing ? 'Annuler' : 'Fermer'}
                             </Button>
-                            {isEditing && (
-                                <Button 
-                                    type="button" 
-                                    onClick={handleSaveAssemblyChanges}
-                                    className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-9 px-4 font-bold rounded-lg shadow-lg"
-                                >
-                                    Enregistrer la revue
-                                </Button>
-                            )}
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* Audit Detail / Edit Modal */}
+            <Dialog open={selectedAuditIdx !== null} onOpenChange={(open) => { if (!open) setSelectedAuditIdx(null); }}>
+                <DialogContent className="max-w-2xl bg-[#16171e]/95 border border-zinc-800/80 backdrop-blur-md rounded-2xl shadow-2xl p-6 text-white overflow-hidden">
+                    <DialogHeader>
+                        <DialogTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                            <ClipboardList className="h-5 w-5 text-purple-400" />
+                            Détails de l'Audit de {modalAuditType === 'task' ? 'Tâche' : 'Courriel'}
+                        </DialogTitle>
+                    </DialogHeader>
+                    
+                    <div className="space-y-4 my-4 max-h-[70vh] overflow-y-auto pr-2 text-xxs">
+                        {isEditing ? (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-400">Titre / Sujet de l'audit</Label>
+                                        <Input 
+                                            value={modalAuditTitle} 
+                                            onChange={(e) => setModalAuditTitle(e.target.value)} 
+                                            className="bg-[#121318] border-zinc-800 text-xs text-white"
+                                            placeholder="Ex: Demande de soumission toiture"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-400">Type d'audit</Label>
+                                        <select
+                                            value={modalAuditType}
+                                            onChange={(e) => setModalAuditType(e.target.value as 'task' | 'email')}
+                                            className="bg-[#121318] border border-zinc-800 text-zinc-300 text-xs rounded-lg p-2.5 w-full outline-none"
+                                        >
+                                            <option value="task">Tâche</option>
+                                            <option value="email">Courriel</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-400">Copropriété (Optionnel)</Label>
+                                    <select
+                                        value={modalAuditClientId}
+                                        onChange={(e) => setModalAuditClientId(e.target.value)}
+                                        className="bg-[#121318] border border-zinc-800 text-zinc-300 text-xs rounded-lg p-2.5 w-full outline-none"
+                                    >
+                                        <option value="">Aucune copropriété</option>
+                                        {clientsList.map(c => (
+                                            <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-400">Date de création de la tâche</Label>
+                                        <Input 
+                                            type="date"
+                                            value={modalAuditCreatedDate}
+                                            onChange={(e) => setModalAuditCreatedDate(e.target.value)}
+                                            className="bg-[#121318] border-zinc-800 text-xs text-white"
+                                        />
+                                    </div>
+                                    {modalAuditType === 'task' && (
+                                        <div className="space-y-1">
+                                            <Label className="text-zinc-400">Complexité</Label>
+                                            <select
+                                                value={modalAuditComplexity}
+                                                onChange={(e) => setModalAuditComplexity(e.target.value as 'low' | 'medium' | 'high')}
+                                                className="bg-[#121318] border border-zinc-800 text-zinc-300 text-xs rounded-lg p-2.5 w-full outline-none"
+                                            >
+                                                <option value="low">Faible</option>
+                                                <option value="medium">Moyenne</option>
+                                                <option value="high">Élevée</option>
+                                            </select>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {modalAuditType === 'task' && (
+                                    <div className="p-3 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
+                                        <span className="font-bold text-[8px] uppercase tracking-wider text-zinc-400">Paramètres de conformité (Checklist)</span>
+                                        <div className="grid grid-cols-2 gap-2 text-xxs">
+                                            <label className="flex items-center gap-2 cursor-pointer text-zinc-300">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={modalAuditFollowUp} 
+                                                    onChange={(e) => setModalAuditFollowUp(e.target.checked)}
+                                                    className="rounded border-zinc-800 bg-[#121318]" 
+                                                />
+                                                Date de suivi indiquée
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer text-zinc-300">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={modalAuditDesc} 
+                                                    onChange={(e) => setModalAuditDesc(e.target.checked)}
+                                                    className="rounded border-zinc-800 bg-[#121318]" 
+                                                />
+                                                Bonne description du problème
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer text-zinc-300">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={modalAuditActions} 
+                                                    onChange={(e) => setModalAuditActions(e.target.checked)}
+                                                    className="rounded border-zinc-800 bg-[#121318]" 
+                                                />
+                                                Plan d'actions claires
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer text-zinc-300">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={modalAuditCatSelected} 
+                                                    onChange={(e) => setModalAuditCatSelected(e.target.checked)}
+                                                    className="rounded border-zinc-800 bg-[#121318]" 
+                                                />
+                                                Catégorie bien sélectionnée
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-400">Notes d'analyse / Rétroaction</Label>
+                                    <Textarea 
+                                        value={modalAuditNotes}
+                                        onChange={(e) => setModalAuditNotes(e.target.value)}
+                                        placeholder="Notes détaillées sur l'audit du courriel ou de la tâche..."
+                                        rows={4}
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white"
+                                    />
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4 text-xs">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <span className="text-zinc-500 text-[10px] block">Sujet de l'audit</span>
+                                        <strong className="text-zinc-200">{modalAuditTitle}</strong>
+                                    </div>
+                                    <div>
+                                        <span className="text-zinc-500 text-[10px] block">Copropriété</span>
+                                        <strong className="text-zinc-200">{getClientName(modalAuditClientId) || 'Non spécifié'}</strong>
+                                    </div>
+                                    <div>
+                                        <span className="text-zinc-500 text-[10px] block">Date de création</span>
+                                        <strong className="text-zinc-200">{modalAuditCreatedDate || 'Non spécifié'}</strong>
+                                    </div>
+                                    {modalAuditType === 'task' && (
+                                        <div>
+                                            <span className="text-zinc-500 text-[10px] block">Complexité</span>
+                                            <Badge variant="outline" className="bg-zinc-800 text-zinc-300 border-zinc-700 capitalize font-bold">{modalAuditComplexity}</Badge>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {modalAuditType === 'task' && (
+                                    <div className="p-3 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
+                                        <span className="font-bold text-[8px] uppercase tracking-wider text-zinc-400 block">Paramètres de conformité (Checklist)</span>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={modalAuditFollowUp ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                                                    {modalAuditFollowUp ? '✓' : '✗'}
+                                                </span>
+                                                <span className="text-zinc-300">Date de suivi indiquée</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={modalAuditDesc ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                                                    {modalAuditDesc ? '✓' : '✗'}
+                                                </span>
+                                                <span className="text-zinc-300">Bonne description du problème</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={modalAuditActions ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                                                    {modalAuditActions ? '✓' : '✗'}
+                                                </span>
+                                                <span className="text-zinc-300">Plan d'actions claires</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={modalAuditCatSelected ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                                                    {modalAuditCatSelected ? '✓' : '✗'}
+                                                </span>
+                                                <span className="text-zinc-300">Catégorie bien sélectionnée</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="space-y-1 bg-zinc-950/30 p-3 border border-zinc-900 rounded-xl">
+                                    <span className="text-zinc-500 text-[10px] block">Notes d'analyse / Rétroaction</span>
+                                    <p className="text-zinc-300 whitespace-pre-wrap leading-relaxed">{modalAuditNotes || "Aucune note saisie."}</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="mt-6 flex justify-between gap-3 border-t border-zinc-900/60 pt-4">
+                        {isEditing ? (
+                            <>
+                                <Button
+                                    type="button"
+                                    onClick={handleDeleteModalAudit}
+                                    className="bg-rose-950/20 hover:bg-rose-900/40 text-rose-400 border border-rose-900/50 text-xxs h-8 px-4 rounded-lg font-bold"
+                                >
+                                    Supprimer
+                                </Button>
+                                <div className="flex gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setSelectedAuditIdx(null)}
+                                        className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850 text-xxs h-8 px-4 rounded-lg font-semibold"
+                                    >
+                                        Annuler
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        onClick={handleSaveModalAudit}
+                                        disabled={!modalAuditTitle.trim()}
+                                        className="bg-purple-600 hover:bg-purple-700 text-white border border-purple-800 text-xxs h-8 px-4 rounded-lg font-bold"
+                                    >
+                                        Enregistrer
+                                    </Button>
+                                </div>
+                            </>
+                        ) : (
+                            <Button
+                                type="button"
+                                onClick={() => setSelectedAuditIdx(null)}
+                                className="bg-purple-600 hover:bg-purple-700 text-white border border-purple-800 text-xxs h-8 px-4 rounded-lg font-bold ml-auto"
+                            >
+                                Fermer
+                            </Button>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Operational Risk Detail / Edit Modal */}
+            <Dialog open={selectedRiskIdx !== null} onOpenChange={(open) => { if (!open) setSelectedRiskIdx(null); }}>
+                <DialogContent className="max-w-2xl bg-[#16171e]/95 border border-zinc-800/80 backdrop-blur-md rounded-2xl shadow-2xl p-6 text-white overflow-hidden">
+                    <DialogHeader>
+                        <DialogTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                            <ShieldAlert className="h-5 w-5 text-purple-400" />
+                            Détails du Risque Opérationnel
+                        </DialogTitle>
+                    </DialogHeader>
+                    
+                    <div className="space-y-4 my-4 max-h-[70vh] overflow-y-auto pr-2 text-xxs">
+                        {isEditing ? (
+                            <div className="space-y-4">
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-400">Description du risque</Label>
+                                    <Textarea 
+                                        value={modalRiskDesc} 
+                                        onChange={(e) => setModalRiskDesc(e.target.value)} 
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white"
+                                        placeholder="Décrivez le risque de façon détaillée..."
+                                        rows={4}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-400">Gravité / Sévérité</Label>
+                                        <select
+                                            value={modalRiskSeverity}
+                                            onChange={(e) => setModalRiskSeverity(e.target.value as any)}
+                                            className="bg-[#121318] border border-zinc-800 text-zinc-300 text-xs rounded-lg p-2.5 w-full outline-none"
+                                        >
+                                            <option value="low">Faible</option>
+                                            <option value="medium">Moyenne</option>
+                                            <option value="high">Élevée</option>
+                                            <option value="critical">Critique</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-400">Copropriété (Optionnel)</Label>
+                                        <select
+                                            value={modalRiskClientId}
+                                            onChange={(e) => setModalRiskClientId(e.target.value)}
+                                            className="bg-[#121318] border border-zinc-800 text-zinc-300 text-xs rounded-lg p-2.5 w-full outline-none"
+                                        >
+                                            <option value="">Aucune copropriété</option>
+                                            {clientsList.map(c => (
+                                                <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-400">Actions Futures (Mitigation)</Label>
+                                    <Textarea 
+                                        value={modalRiskFutureActions}
+                                        onChange={(e) => setModalRiskFutureActions(e.target.value)}
+                                        placeholder="Décrivez les actions futures recommandées..."
+                                        rows={3}
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white"
+                                    />
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4 text-xs">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <span className="text-zinc-500 text-[10px] block">Gravité / Sévérité</span>
+                                        <Badge variant="outline" className={`font-bold capitalize ${
+                                            modalRiskSeverity === 'critical' ? 'bg-rose-950/20 text-rose-400 border-rose-800/40' :
+                                            modalRiskSeverity === 'high' ? 'bg-orange-950/20 text-orange-400 border-orange-800/40' :
+                                            modalRiskSeverity === 'medium' ? 'bg-amber-950/20 text-amber-400 border-amber-800/40' :
+                                            'bg-zinc-800 text-zinc-300 border-zinc-700'
+                                        }`}>{modalRiskSeverity}</Badge>
+                                    </div>
+                                    <div>
+                                        <span className="text-zinc-500 text-[10px] block">Copropriété</span>
+                                        <strong className="text-zinc-200">{getClientName(modalRiskClientId) || 'Non spécifiée'}</strong>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1 bg-zinc-950/30 p-3 border border-zinc-900 rounded-xl">
+                                    <span className="text-zinc-500 text-[10px] block">Description du risque</span>
+                                    <p className="text-zinc-300 whitespace-pre-wrap leading-relaxed">{modalRiskDesc || "Aucune description."}</p>
+                                </div>
+
+                                <div className="space-y-1 bg-zinc-950/30 p-3 border border-zinc-900 rounded-xl">
+                                    <span className="text-zinc-500 text-[10px] block">Actions Futures (Mitigation)</span>
+                                    <p className="text-zinc-300 whitespace-pre-wrap leading-relaxed">{modalRiskFutureActions || "Aucune action future enregistrée."}</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="mt-6 flex justify-between gap-3 border-t border-zinc-900/60 pt-4">
+                        {isEditing ? (
+                            <>
+                                <Button
+                                    type="button"
+                                    onClick={handleDeleteModalRisk}
+                                    className="bg-rose-950/20 hover:bg-rose-900/40 text-rose-400 border border-rose-900/50 text-xxs h-8 px-4 rounded-lg font-bold"
+                                >
+                                    Supprimer
+                                </Button>
+                                <div className="flex gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setSelectedRiskIdx(null)}
+                                        className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850 text-xxs h-8 px-4 rounded-lg font-semibold"
+                                    >
+                                        Annuler
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        onClick={handleSaveModalRisk}
+                                        disabled={!modalRiskDesc.trim()}
+                                        className="bg-purple-600 hover:bg-purple-700 text-white border border-purple-800 text-xxs h-8 px-4 rounded-lg font-bold"
+                                    >
+                                        Enregistrer
+                                    </Button>
+                                </div>
+                            </>
+                        ) : (
+                            <Button
+                                type="button"
+                                onClick={() => setSelectedRiskIdx(null)}
+                                className="bg-purple-600 hover:bg-purple-700 text-white border border-purple-800 text-xxs h-8 px-4 rounded-lg font-bold ml-auto"
+                            >
+                                Fermer
+                            </Button>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

@@ -3,15 +3,14 @@ import { getManagerStats } from '@/actions/team-management'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { BarChart3, TrendingUp, AlertTriangle, ShieldAlert, Award, PhoneCall, CheckSquare } from 'lucide-react'
+import { getActiveTeamContext, getFilteredManagers } from '@/utils/team-context'
 
 export default async function PerformanceReportsPage() {
     const supabase = await createClient()
+    const context = await getActiveTeamContext()
 
     // 1. Fetch managers
-    const { data: managers } = await supabase
-        .from('managers')
-        .select('*, manager_teams(name)')
-        .order('first_name')
+    const managers = await getFilteredManagers()
 
     // 2. Fetch computed KPIs for each manager
     const managerKPIs = []
@@ -39,9 +38,17 @@ export default async function PerformanceReportsPage() {
     const avgWorkload = activeManagersCount > 0 ? Math.round(sumWorkloadIndex / activeManagersCount) : 0
 
     // 3. Fetch lost syndicates analysis
-    const { data: lostSyndicates } = await supabase
+    const managerIds = (managers || []).map(m => m.id)
+    let lostQuery = supabase
         .from('lost_syndicates')
         .select('*')
+    if (context.teamId && managerIds.length > 0) {
+        lostQuery = lostQuery.in('manager_id', managerIds)
+    } else if (context.teamId) {
+        // if team has no managers, return empty array for lost syndicates
+        lostQuery = lostQuery.eq('id', '00000000-0000-0000-0000-000000000000')
+    }
+    const { data: lostSyndicates } = await lostQuery
 
     const totalLost = lostSyndicates?.length || 0
     const preventableLost = lostSyndicates?.filter(l => l.preventable).length || 0
