@@ -5,6 +5,8 @@ import { Trash2, Check, Move, Plus, Ruler, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
+import { toast } from 'sonner'
 
 interface Point {
     x: number
@@ -81,6 +83,8 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
     const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null)
     const [editingSegmentIndex, setEditingSegmentIndex] = useState<number | null>(null)
     const [manualLengthValue, setManualLengthValue] = useState<string>('')
+    const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+    const [presetConfirmShape, setPresetConfirmShape] = useState<string | null>(null)
     
     // Snapping and features states
     const [orthoActive, setOrthoActive] = useState(false)
@@ -424,10 +428,14 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
     }
 
     const clearCanvas = () => {
-        if (confirm("Voulez-vous vraiment effacer tous les points de cette pièce ?")) {
-            onChange([])
-            setEditingSegmentIndex(null)
-        }
+        setClearConfirmOpen(true)
+    }
+
+    const executeClearCanvas = () => {
+        onChange([])
+        setEditingSegmentIndex(null)
+        toast.success("Canevas effacé.")
+        setClearConfirmOpen(false)
     }
 
     const updateSegmentLengthDirectly = (p1Idx: number, valFtStr: string) => {
@@ -484,11 +492,7 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
         setManualLengthValue('')
     }
 
-    const loadPresetShape = (shape: string) => {
-        if (points.length > 0 && !confirm("Cela va remplacer le tracé actuel de cette pièce. Continuer ?")) {
-            return
-        }
-        
+    const executeLoadPresetShape = (shape: string) => {
         const valInFt = (val: number) => {
             return unit === 'm' ? val / 0.3048 : val
         }
@@ -556,6 +560,16 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
         }
         onChange(newPts)
         setMode('edit')
+        toast.success("Forme prédéfinie chargée.")
+        setPresetConfirmShape(null)
+    }
+
+    const loadPresetShape = (shape: string) => {
+        if (points.length > 0) {
+            setPresetConfirmShape(shape)
+        } else {
+            executeLoadPresetShape(shape)
+        }
     }
 
     // Features operations (Doors & Windows)
@@ -1513,6 +1527,28 @@ export function PlanningCanvas({ points, onChange, roomName, scale = 20, unit = 
                     ))}
                 </div>
             )}
+
+            <ConfirmationDialog
+                open={clearConfirmOpen}
+                onOpenChange={setClearConfirmOpen}
+                title="Effacer le canevas"
+                description="Voulez-vous vraiment effacer tous les points de cette pièce ?"
+                confirmText="Effacer"
+                cancelText="Annuler"
+                onConfirm={executeClearCanvas}
+                variant="danger"
+            />
+
+            <ConfirmationDialog
+                open={!!presetConfirmShape}
+                onOpenChange={(open) => !open && setPresetConfirmShape(null)}
+                title="Remplacer le tracé"
+                description="Cela va remplacer le tracé actuel de cette pièce. Continuer ?"
+                confirmText="Remplacer"
+                cancelText="Annuler"
+                onConfirm={() => presetConfirmShape && executeLoadPresetShape(presetConfirmShape)}
+                variant="warning"
+            />
         </div>
     )
 }

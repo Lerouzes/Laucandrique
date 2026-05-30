@@ -46,6 +46,8 @@ import {
 import { SearchableClientSelect } from './SearchableClientSelect'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { CallsStatsPanel } from './CallsStatsPanel'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
+import { toast } from 'sonner'
 
 const AUDIT_LABELS: Record<string, string> = {
     registre_coproprietaires: 'Registre des documents complets',
@@ -105,6 +107,7 @@ export function OneOnOneDetailView({
     const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [isEditing, setIsEditing] = useState(oneOnOne.status === 'draft')
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
     
     // Collapsible coaching section
     const [coachingOpen, setCoachingOpen] = useState(false)
@@ -469,9 +472,19 @@ export function OneOnOneDetailView({
                 setDoorsCount(snapshot.doors_count)
                 setSyndicatesCount(snapshot.syndicates_count)
 
-                // Merge open items for review
-                setSyndicateAudits(snapshot.syndicateAudits || [])
-                setAssemblyEvaluations(snapshot.assemblyEvaluations || [])
+                // Merge open items for review and already reviewed audits/assemblies in this meeting
+                const snapshotAudits = snapshot.syndicateAudits || []
+                const currentReviewedAudits = (reviewedAudits || [])
+                    .map((ra: any) => ra.syndicate_audits)
+                    .filter((a: any) => a && !snapshotAudits.some((sa: any) => sa.id === a.id))
+                setSyndicateAudits([...snapshotAudits, ...currentReviewedAudits])
+
+                const snapshotAssemblies = snapshot.assemblyEvaluations || []
+                const currentReviewedAssemblies = (reviewedAssemblies || [])
+                    .map((ras: any) => ras.assembly_evaluations)
+                    .filter((a: any) => a && !snapshotAssemblies.some((sa: any) => sa.id === a.id))
+                setAssemblyEvaluations([...snapshotAssemblies, ...currentReviewedAssemblies])
+
                 setClientsList(snapshot.clientsList || [])
 
                 // Merge open complaints and discussed ones
@@ -785,23 +798,23 @@ export function OneOnOneDetailView({
             setIsEditing(true)
             router.refresh()
         } catch (err) {
-            alert('Erreur lors de la remise en brouillon : ' + (err as Error).message)
+            toast.error('Erreur lors de la remise en brouillon : ' + (err as Error).message)
         } finally {
             setLoading(false)
         }
     }
 
     const handleDeleteMeeting = async () => {
-        if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette rencontre ? Cette action est irréversible.")) {
-            return
-        }
         setLoading(true)
         try {
             await deleteOneOnOneAction(oneOnOne.id)
+            toast.success("Rencontre supprimée avec succès.")
             router.push('/team-management/one-on-ones')
         } catch (err) {
-            alert('Erreur lors de la suppression : ' + (err as Error).message)
+            toast.error('Erreur lors de la suppression : ' + (err as Error).message)
             setLoading(false)
+        } finally {
+            setDeleteConfirmOpen(false)
         }
     }
 
@@ -915,8 +928,9 @@ export function OneOnOneDetailView({
                 setIsEditing(false)
             }
             router.refresh()
+            toast.success("Modification enregistrée avec succès.")
         } catch (err) {
-            alert('Erreur lors de la modification: ' + (err as Error).message)
+            toast.error('Erreur lors de la modification : ' + (err as Error).message)
         } finally {
             setLoading(false)
         }
@@ -999,7 +1013,7 @@ export function OneOnOneDetailView({
                     )}
 
                     <Button 
-                        onClick={handleDeleteMeeting}
+                        onClick={() => setDeleteConfirmOpen(true)}
                         disabled={loading}
                         className="bg-rose-600 hover:bg-rose-700 text-white text-xs h-8 px-4 rounded-lg font-bold flex items-center gap-1.5"
                     >
@@ -2895,6 +2909,18 @@ export function OneOnOneDetailView({
                     </div>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmationDialog
+                open={deleteConfirmOpen}
+                onOpenChange={setDeleteConfirmOpen}
+                title="Supprimer la rencontre"
+                description="Êtes-vous sûr de vouloir supprimer cette rencontre ? Cette action est irréversible."
+                confirmText="Supprimer"
+                cancelText="Annuler"
+                onConfirm={handleDeleteMeeting}
+                loading={loading}
+                variant="danger"
+            />
         </div>
     )
 }

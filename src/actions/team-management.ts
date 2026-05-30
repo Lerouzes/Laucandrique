@@ -1966,25 +1966,68 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         openComplaintsPrev = count || 0
     }
 
+    // Fetch completed meetings for this manager to exclude already reviewed audits/assemblies
+    const { data: completedMeetings } = await supabase
+        .from('one_on_ones')
+        .select('id')
+        .eq('manager_id', managerId)
+        .eq('status', 'completed')
+    
+    const completedMeetingIds = (completedMeetings || []).map(m => m.id)
+
+    // Fetch reviewed syndicate audits for these meetings
+    let reviewedAuditIds: string[] = []
+    if (completedMeetingIds.length > 0) {
+        const { data: reviewed } = await supabase
+            .from('one_on_one_syndicate_audits')
+            .select('audit_id')
+            .eq('reviewed', true)
+            .in('one_on_one_id', completedMeetingIds)
+        reviewedAuditIds = Array.from(new Set((reviewed || []).map(r => r.audit_id)))
+    }
+
+    // Fetch reviewed assembly evaluations for these meetings
+    let reviewedAssemblyIds: string[] = []
+    if (completedMeetingIds.length > 0) {
+        const { data: reviewed } = await supabase
+            .from('one_on_one_assemblies')
+            .select('assembly_evaluation_id')
+            .eq('reviewed', true)
+            .in('one_on_one_id', completedMeetingIds)
+        reviewedAssemblyIds = Array.from(new Set((reviewed || []).map(r => r.assembly_evaluation_id)))
+    }
+
     // Fetch syndicate audits for manager's clients for review
     let syndicateAudits: any[] = []
     if (clientIds.length > 0) {
-        const { data: audits } = await supabase
+        let query = supabase
             .from('syndicate_audits')
             .select('*, clients(company_name, full_name)')
             .in('client_id', clientIds)
             .order('audit_date', { ascending: false })
             .limit(5)
+        
+        if (reviewedAuditIds.length > 0) {
+            query = query.not('id', 'in', `(${reviewedAuditIds.join(',')})`)
+        }
+        
+        const { data: audits } = await query
         syndicateAudits = audits || []
     }
 
     // Fetch assembly evaluations for review
-    const { data: assemblies } = await supabase
+    let assembliesQuery = supabase
         .from('assembly_evaluations')
         .select('*, clients(company_name, full_name)')
         .eq('manager_id', managerId)
         .order('assembly_date', { ascending: false })
         .limit(5)
+    
+    if (reviewedAssemblyIds.length > 0) {
+        assembliesQuery = assembliesQuery.not('id', 'in', `(${reviewedAssemblyIds.join(',')})`)
+    }
+    
+    const { data: assemblies } = await assembliesQuery
 
     // Fetch operational risks for manager
     const { data: risks } = await supabase

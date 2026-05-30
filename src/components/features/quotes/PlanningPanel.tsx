@@ -5,6 +5,8 @@ import { Plus, Trash2, Layers, Home } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PlanningCanvas } from './PlanningCanvas'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
+import { toast } from 'sonner'
 
 export interface Point {
     x: number
@@ -168,16 +170,20 @@ export function PlanningPanel({ sections, onChange }: PlanningPanelProps) {
         setNewSectionName('')
     }
 
-    const handleDeleteSection = (secId: string) => {
-        if (confirm("Voulez-vous vraiment supprimer cette section et toutes ses pièces ?")) {
-            const updated = sections.filter(s => s.id !== secId)
-            onChange(updated)
-            if (selectedSectionId === secId) {
-                const nextSec = updated[0] || null
-                setSelectedSectionId(nextSec ? nextSec.id : null)
-                setSelectedRoomId(nextSec && nextSec.rooms.length > 0 ? nextSec.rooms[0].id : null)
-            }
+    const [sectionToDelete, setSectionToDelete] = useState<string | null>(null)
+    const [roomToDelete, setRoomToDelete] = useState<{ secId: string, rmId: string } | null>(null)
+
+    const executeDeleteSection = () => {
+        if (!sectionToDelete) return
+        const updated = sections.filter(s => s.id !== sectionToDelete)
+        onChange(updated)
+        if (selectedSectionId === sectionToDelete) {
+            const nextSec = updated[0] || null
+            setSelectedSectionId(nextSec ? nextSec.id : null)
+            setSelectedRoomId(nextSec && nextSec.rooms.length > 0 ? nextSec.rooms[0].id : null)
         }
+        toast.success("Section supprimée avec succès.")
+        setSectionToDelete(null)
     }
 
     const handleAddRoom = () => {
@@ -203,24 +209,26 @@ export function PlanningPanel({ sections, onChange }: PlanningPanelProps) {
         setNewRoomName('')
     }
 
-    const handleDeleteRoom = (secId: string, rmId: string) => {
-        if (confirm("Voulez-vous vraiment supprimer cette pièce ?")) {
-            const updated = sections.map(sec => {
-                if (sec.id === secId) {
-                    return {
-                        ...sec,
-                        rooms: sec.rooms.filter(r => r.id !== rmId)
-                    }
+    const executeDeleteRoom = () => {
+        if (!roomToDelete) return
+        const { secId, rmId } = roomToDelete
+        const updated = sections.map(sec => {
+            if (sec.id === secId) {
+                return {
+                    ...sec,
+                    rooms: sec.rooms.filter(r => r.id !== rmId)
                 }
-                return sec
-            })
-            onChange(updated)
-            if (selectedRoomId === rmId) {
-                const currentSec = updated.find(s => s.id === secId)
-                const nextRm = currentSec?.rooms[0] || null
-                setSelectedRoomId(nextRm ? nextRm.id : null)
             }
+            return sec
+        })
+        onChange(updated)
+        if (selectedRoomId === rmId) {
+            const currentSec = updated.find(s => s.id === secId)
+            const nextRm = currentSec?.rooms[0] || null
+            setSelectedRoomId(nextRm ? nextRm.id : null)
         }
+        toast.success("Pièce supprimée avec succès.")
+        setRoomToDelete(null)
     }
 
     const handleUpdateRoomMeta = (field: keyof Omit<Room, 'id' | 'points'>, value: any) => {
@@ -323,7 +331,7 @@ export function PlanningPanel({ sections, onChange }: PlanningPanelProps) {
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => handleDeleteSection(sec.id)}
+                                                onClick={() => setSectionToDelete(sec.id)}
                                                 className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 p-1 transition-all"
                                             >
                                                 <Trash2 className="h-3.5 w-3.5" />
@@ -347,7 +355,7 @@ export function PlanningPanel({ sections, onChange }: PlanningPanelProps) {
                                                             </button>
                                                             <button
                                                                 type="button"
-                                                                onClick={() => handleDeleteRoom(sec.id, rm.id)}
+                                                                onClick={() => setRoomToDelete({ secId: sec.id, rmId: rm.id })}
                                                                 className="opacity-0 group-hover/rm:opacity-100 text-zinc-600 hover:text-red-400 p-0.5 transition-all"
                                                             >
                                                                 <Trash2 className="h-3 w-3" />
@@ -507,6 +515,28 @@ export function PlanningPanel({ sections, onChange }: PlanningPanelProps) {
                     </div>
                 )}
             </div>
+
+            <ConfirmationDialog
+                open={!!sectionToDelete}
+                onOpenChange={(open) => !open && setSectionToDelete(null)}
+                title="Supprimer la section"
+                description="Voulez-vous vraiment supprimer cette section et toutes ses pièces ?"
+                confirmText="Supprimer"
+                cancelText="Annuler"
+                onConfirm={executeDeleteSection}
+                variant="danger"
+            />
+
+            <ConfirmationDialog
+                open={!!roomToDelete}
+                onOpenChange={(open) => !open && setRoomToDelete(null)}
+                title="Supprimer la pièce"
+                description="Voulez-vous vraiment supprimer cette pièce ?"
+                confirmText="Supprimer"
+                cancelText="Annuler"
+                onConfirm={executeDeleteRoom}
+                variant="danger"
+            />
         </div>
     )
 }

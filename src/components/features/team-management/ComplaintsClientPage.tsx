@@ -1,7 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -78,12 +81,30 @@ export function ComplaintsClientPage({
     managers,
     categories
 }: ComplaintsClientPageProps) {
+    const router = useRouter()
     // Search and Filter states
     const [searchTerm, setSearchTerm] = useState('')
     const [statusFilter, setStatusFilter] = useState('all')
     const [severityFilter, setSeverityFilter] = useState('all')
     const [categoryFilter, setCategoryFilter] = useState('all')
     const [managerFilter, setManagerFilter] = useState('all')
+    const [complaintToDelete, setComplaintToDelete] = useState<string | null>(null)
+    const [deletingComplaint, setDeletingComplaint] = useState(false)
+
+    const handleDeleteComplaint = async () => {
+        if (!complaintToDelete) return
+        setDeletingComplaint(true)
+        try {
+            await deleteComplaintAction(complaintToDelete)
+            toast.success("Plainte supprimée avec succès.")
+            router.refresh()
+        } catch (err) {
+            toast.error("Erreur lors de la suppression : " + (err as Error).message)
+        } finally {
+            setDeletingComplaint(false)
+            setComplaintToDelete(null)
+        }
+    }
 
     // Prepare client options for dropdown
     const clientOptions = clients.map(c => ({
@@ -359,19 +380,14 @@ export function ComplaintsClientPage({
                                                             </Button>
                                                         </form>
                                                         
-                                                        <form action={async () => {
-                                                            if (confirm("Voulez-vous vraiment supprimer cette plainte ? Elle sera définitivement effacée.")) {
-                                                                await deleteComplaintAction(c.id)
-                                                            }
-                                                        }}>
-                                                            <Button 
-                                                                type="submit" 
-                                                                size="sm" 
-                                                                className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-[9px] px-2.5 h-6 rounded flex items-center gap-0.5 shadow-md animate-fade-in"
-                                                            >
-                                                                Supprimer
-                                                            </Button>
-                                                        </form>
+                                                        <Button 
+                                                            type="button" 
+                                                            onClick={() => setComplaintToDelete(c.id)}
+                                                            size="sm" 
+                                                            className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-[9px] px-2.5 h-6 rounded flex items-center gap-0.5 shadow-md animate-fade-in"
+                                                        >
+                                                            Supprimer
+                                                        </Button>
                                                     </div>
                                                 )}
                                             </div>
@@ -447,6 +463,18 @@ export function ComplaintsClientPage({
                     </Card>
                 </div>
             </div>
+
+            <ConfirmationDialog
+                open={!!complaintToDelete}
+                onOpenChange={(open) => !open && setComplaintToDelete(null)}
+                title="Supprimer la plainte"
+                description="Voulez-vous vraiment supprimer cette plainte ? Elle sera définitivement effacée."
+                confirmText="Supprimer"
+                cancelText="Annuler"
+                onConfirm={handleDeleteComplaint}
+                loading={deletingComplaint}
+                variant="danger"
+            />
         </div>
     )
 }

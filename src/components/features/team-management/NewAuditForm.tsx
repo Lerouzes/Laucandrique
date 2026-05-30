@@ -35,6 +35,8 @@ import {
     ArrowLeft
 } from 'lucide-react'
 import { SearchableClientSelect } from './SearchableClientSelect'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
+import { toast } from 'sonner'
 
 const QUESTIONS = [
     { key: 'registre_coproprietaires', category: 'governance', text: 'Registre des documents complets' },
@@ -141,6 +143,7 @@ export function NewAuditForm({
     const [commsCount, setCommsCount] = useState<string>('')
     const [savingWorkload, setSavingWorkload] = useState(false)
     const [showWorkloadForm, setShowWorkloadForm] = useState(false)
+    const [workloadToDelete, setWorkloadToDelete] = useState<string | null>(null)
 
     // Fetch complaints, past audits, and workload details on client change
     useEffect(() => {
@@ -187,7 +190,7 @@ export function NewAuditForm({
 
     const handleSaveWorkload = async () => {
         if (!clientId) {
-            alert('Veuillez sélectionner un syndicat.')
+            toast.error('Veuillez sélectionner un syndicat.')
             return
         }
         setSavingWorkload(true)
@@ -204,33 +207,35 @@ export function NewAuditForm({
             setSavedWorkloads(workloads || [])
             setTasksCount('')
             setCommsCount('')
-            alert('Volume de travail enregistré avec succès.')
+            toast.success('Volume de travail enregistré avec succès.')
         } catch (err) {
-            alert('Erreur lors de l\'enregistrement du volume de travail : ' + (err as Error).message)
+            toast.error('Erreur lors de l\'enregistrement du volume de travail : ' + (err as Error).message)
         } finally {
             setSavingWorkload(false)
         }
     }
 
-    const handleDeleteWorkload = async (workloadId: string) => {
-        if (!window.confirm('Voulez-vous vraiment supprimer cette saisie de volume de travail ?')) {
-            return
-        }
+    const handleDeleteWorkload = async () => {
+        if (!workloadToDelete) return
+        setSavingWorkload(true)
         try {
-            await deleteSyndicateWorkloadAction(workloadId)
+            await deleteSyndicateWorkloadAction(workloadToDelete)
             // Refresh saved workloads list
             const workloads = await getSyndicateWorkloadAction(clientId)
             setSavedWorkloads(workloads || [])
-            alert('Volume de travail supprimé avec succès.')
+            toast.success('Volume de travail supprimé avec succès.')
         } catch (err) {
-            alert('Erreur lors de la suppression : ' + (err as Error).message)
+            toast.error('Erreur lors de la suppression : ' + (err as Error).message)
+        } finally {
+            setSavingWorkload(false)
+            setWorkloadToDelete(null)
         }
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!clientId) {
-            alert('Sélectionnez un syndicat.')
+            toast.error('Sélectionnez un syndicat.')
             return
         }
 
@@ -248,7 +253,7 @@ export function NewAuditForm({
                     notes,
                     answers
                 })
-                alert('Audit mis à jour avec succès.')
+                toast.success('Audit mis à jour avec succès.')
                 router.push(`/team-management/audits/${initialAudit.id}`)
             } else {
                 await createSyndicateAuditAction({
@@ -256,12 +261,12 @@ export function NewAuditForm({
                     notes,
                     answers
                 })
-                alert('Audit créé avec succès.')
+                toast.success('Audit créé avec succès.')
                 router.push('/team-management/audits')
             }
             router.refresh()
         } catch (err) {
-            alert('Erreur lors de l\'enregistrement de l\'audit : ' + (err as Error).message)
+            toast.error('Erreur lors de l\'enregistrement de l\'audit : ' + (err as Error).message)
         } finally {
             setLoading(false)
         }
@@ -539,7 +544,7 @@ export function NewAuditForm({
                                                         type="button"
                                                         variant="ghost"
                                                         size="icon"
-                                                        onClick={() => handleDeleteWorkload(wl.id)}
+                                                        onClick={() => setWorkloadToDelete(wl.id)}
                                                         className="h-6 w-6 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
                                                     >
                                                         <Trash2 className="h-3.5 w-3.5" />
@@ -699,6 +704,18 @@ export function NewAuditForm({
                     </div>
                 </div>
             )}
+
+            <ConfirmationDialog
+                open={!!workloadToDelete}
+                onOpenChange={(open) => !open && setWorkloadToDelete(null)}
+                title="Supprimer la saisie de volume"
+                description="Voulez-vous vraiment supprimer cette saisie de volume de travail ?"
+                confirmText="Supprimer"
+                cancelText="Annuler"
+                onConfirm={handleDeleteWorkload}
+                loading={savingWorkload}
+                variant="danger"
+            />
         </form>
     )
 }
