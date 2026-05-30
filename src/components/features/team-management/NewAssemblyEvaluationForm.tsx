@@ -243,7 +243,7 @@ export function NewAssemblyEvaluationForm({
             </div>
 
             {/* General Info Card */}
-            <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+            <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md !overflow-visible">
                 <CardHeader>
                     <CardTitle className="text-xs font-bold text-white">Informations Générales</CardTitle>
                 </CardHeader>

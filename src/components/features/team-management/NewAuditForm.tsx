@@ -309,7 +309,7 @@ export function NewAuditForm({
                 {/* Main Audit Entry (Left 2 Columns) */}
                 <div className="lg:col-span-2 space-y-6">
                     {/* Selector Card */}
-                    <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                    <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md !overflow-visible">
                         <CardHeader>
                             <CardTitle className="text-xs font-bold text-white">Sélection du Dossier & Notes Globales</CardTitle>
                         </CardHeader>
