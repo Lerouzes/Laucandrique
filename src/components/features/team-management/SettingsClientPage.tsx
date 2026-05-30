@@ -29,6 +29,7 @@ import {
     updateComplaintCategoryAction, 
     deleteComplaintCategoryAction, 
     updateAuditQuestionConfigAction,
+    updateAssemblyQuestionConfigAction,
     createGustavAccountAction,
     getGustavUsersAction,
     updateUserRoleAction,
@@ -46,9 +47,15 @@ interface AuditConfig {
     description: string
 }
 
+interface AssemblyConfig {
+    key: string
+    description: string
+}
+
 interface SettingsClientPageProps {
     initialCategories: ComplaintCategory[]
     initialAuditConfigs: AuditConfig[]
+    initialAssemblyConfigs: AssemblyConfig[]
     userRole: string
     currentUserId: string
     initialUsers: any[]
@@ -72,14 +79,49 @@ const DEFAULT_DESCRIPTIONS: Record<string, string> = {
     fonds_prevoyance: 'S\'assurer de la conformité de l\'étude du fonds de prévoyance et du versement régulier des cotisations.'
 }
 
+const ASSEMBLY_QUESTIONS = [
+    { key: 'agenda_sent_on_time', category: 'Préparation', label: 'Ordre du jour envoyé à temps' },
+    { key: 'quorum_respected', category: 'Préparation', label: 'Quorum respecté' },
+    { key: 'voting_controlled', category: 'Déroulement', label: 'Contrôle des votes / procurations' },
+    { key: 'duration_reasonable', category: 'Déroulement', label: 'Durée raisonnable' },
+    { key: 'manager_controlled_room', category: 'Déroulement', label: 'Contrôle de la salle par le gestionnaire' },
+    { key: 'discussions_on_track', category: 'Déroulement', label: 'Discussions sur la bonne voie' },
+    { key: 'conflict_handled_professionally', category: 'Déroulement', label: 'Conflits gérés professionnellement' },
+    { key: 'answers_clear_confident', category: 'Déroulement', label: 'Réponses claires et confiantes' },
+    { key: 'board_confidence_level', category: 'CA / Relations', label: 'Niveau de confiance du conseil' },
+    { key: 'financial_statement_quality', category: 'Déroulement', label: 'Qualité de la présentation des états financiers' },
+    { key: 'pv_drafted_quickly', category: 'Documentation & Suivis', label: 'PV rédigé rapidement' },
+    { key: 'templates_respected', category: 'Documentation & Suivis', label: 'Modèles respectés' },
+    { key: 'resolutions_clear', category: 'Documentation & Suivis', label: 'Résolutions claires' },
+    { key: 'followup_tasks_created', category: 'Documentation & Suivis', label: 'Tâches de suivi créées' }
+]
+
+const DEFAULT_ASSEMBLY_DESCRIPTIONS: Record<string, string> = {
+    agenda_sent_on_time: "Vérifier que les convocations et l'ordre du jour ont été transmis aux copropriétaires dans les délais légaux (ex. 10 à 15 jours avant la séance).",
+    quorum_respected: "Vérifier que les feuilles de présence sont complétées et que les conditions de quorum sont formellement validées avant d'ouvrir la séance.",
+    voting_controlled: "Contrôler la validité des procurations et s'assurer que la saisie et le calcul des voix (tantièmes) sont gérés avec rigueur durant les votes.",
+    duration_reasonable: "S'assurer que le déroulement de l'assemblée respecte le temps imparti et évite les débats improductifs.",
+    manager_controlled_room: "Évaluer l'autorité naturelle de l'animateur, sa capacité à maintenir le calme et à distribuer équitablement la parole.",
+    discussions_on_track: "S'assurer que les interventions restent concentrées sur les points de l'ordre du jour sans s'égarer dans des cas particuliers.",
+    conflict_handled_professionally: "Observer la diplomatie et le professionnalisme de l'animateur face aux tensions, critiques ou comportements agressifs.",
+    answers_clear_confident: "S'assurer que les réponses fournies par le gestionnaire sont claires, appuyées sur les faits et juridiquement ou techniquement justes.",
+    board_confidence_level: "Mesurer la relation de confiance et le soutien manifesté par les membres du CA envers le travail du gestionnaire.",
+    financial_statement_quality: "Évaluer la clarté des explications du budget et des états financiers présentés aux copropriétaires.",
+    pv_drafted_quickly: "Rédiger et valider le projet de procès-verbal de l'assemblée dans un délai optimal (ex. 5 à 10 jours après la séance).",
+    templates_respected: "S'assurer de l'utilisation rigoureuse des modèles officiels et de la charte graphique de Laucandrique.",
+    resolutions_clear: "Valider que la formulation et le libellé des résolutions votées sont précis, sans ambiguïté juridique.",
+    followup_tasks_created: "Vérifier que toutes les décisions nécessitant des actions (travaux, courriers, etc.) ont fait l'objet de tâches de suivi créées dans le système."
+}
+
 export function SettingsClientPage({
     initialCategories,
     initialAuditConfigs,
+    initialAssemblyConfigs,
     userRole,
     currentUserId,
     initialUsers
 }: SettingsClientPageProps) {
-    const [activeTab, setActiveTab] = useState<'categories' | 'audits' | 'accounts'>('categories')
+    const [activeTab, setActiveTab] = useState<'categories' | 'audits' | 'accounts' | 'assemblies'>('categories')
     
     // Categories states
     const [categories, setCategories] = useState<ComplaintCategory[]>(initialCategories)
@@ -94,6 +136,15 @@ export function SettingsClientPage({
     const [auditConfigs, setAuditConfigs] = useState<Record<string, string>>(() => {
         const lookup: Record<string, string> = { ...DEFAULT_DESCRIPTIONS }
         initialAuditConfigs.forEach(c => {
+            lookup[c.key] = c.description
+        })
+        return lookup
+    })
+
+    // Assembly descriptions states
+    const [assemblyConfigs, setAssemblyConfigs] = useState<Record<string, string>>(() => {
+        const lookup: Record<string, string> = { ...DEFAULT_ASSEMBLY_DESCRIPTIONS }
+        initialAssemblyConfigs.forEach(c => {
             lookup[c.key] = c.description
         })
         return lookup
@@ -320,6 +371,20 @@ export function SettingsClientPage({
         }
     }
 
+    // Update assembly question description handler
+    const handleSaveAssemblyDesc = async (key: string) => {
+        const desc = assemblyConfigs[key] || ''
+        setSavingKeys(prev => ({ ...prev, [key]: true }))
+        try {
+            await updateAssemblyQuestionConfigAction(key, desc)
+            triggerAlert('Description de l\'assemblée mise à jour !')
+        } catch (err: any) {
+            triggerAlert(err.message || 'Erreur lors de l\'enregistrement', 'error')
+        } finally {
+            setSavingKeys(prev => ({ ...prev, [key]: false }))
+        }
+    }
+
     return (
         <div className="space-y-6">
             {/* Status notification banner */}
@@ -363,19 +428,34 @@ export function SettingsClientPage({
                     )}
                 </button>
                 {userRole === 'Master' && (
-                    <button
-                        onClick={() => setActiveTab('accounts')}
-                        className={`pb-2.5 text-sm font-bold transition-all relative ${
-                            activeTab === 'accounts' 
-                                ? 'text-purple-400 font-extrabold' 
-                                : 'text-zinc-400 hover:text-zinc-200'
-                        }`}
-                    >
-                        Gestion des Comptes
-                        {activeTab === 'accounts' && (
-                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500" />
-                        )}
-                    </button>
+                    <>
+                        <button
+                            onClick={() => setActiveTab('assemblies')}
+                            className={`pb-2.5 text-sm font-bold transition-all relative ${
+                                activeTab === 'assemblies' 
+                                    ? 'text-purple-400 font-extrabold' 
+                                    : 'text-zinc-400 hover:text-zinc-200'
+                            }`}
+                        >
+                            Descriptions d'Assemblées
+                            {activeTab === 'assemblies' && (
+                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500" />
+                            )}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('accounts')}
+                            className={`pb-2.5 text-sm font-bold transition-all relative ${
+                                activeTab === 'accounts' 
+                                    ? 'text-purple-400 font-extrabold' 
+                                    : 'text-zinc-400 hover:text-zinc-200'
+                            }`}
+                        >
+                            Gestion des Comptes
+                            {activeTab === 'accounts' && (
+                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500" />
+                            )}
+                        </button>
+                    </>
                 )}
             </div>
 
@@ -589,6 +669,69 @@ export function SettingsClientPage({
                                             onChange={(e) => {
                                                 const val = e.target.value
                                                 setAuditConfigs(prev => ({ ...prev, [q.key]: val }))
+                                            }}
+                                            placeholder="Saisir la description à afficher pour cette question..."
+                                            rows={2}
+                                            className="bg-[#121318] border-zinc-800 text-zinc-300 text-[16px] md:text-xs leading-relaxed"
+                                        />
+                                    </div>
+                                )
+                            })}
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* Tab: Assemblies */}
+            {activeTab === 'assemblies' && userRole === 'Master' && (
+                <div className="space-y-4">
+                    <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                        <CardHeader>
+                            <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+                                <ClipboardCheck className="h-4 w-4 text-purple-400" />
+                                Infobulles d'Évaluations d'Assemblées
+                            </CardTitle>
+                            <CardDescription className="text-xs text-zinc-400">
+                                Personnalisez les explications qui s'affichent au survol des critères dans le formulaire d'évaluation des assemblées.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {ASSEMBLY_QUESTIONS.map((q) => {
+                                const value = assemblyConfigs[q.key] || ''
+                                const isSaving = savingKeys[q.key] || false
+
+                                return (
+                                    <div 
+                                        key={q.key} 
+                                        className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-2 text-xs"
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div className="space-y-0.5">
+                                                <span className="font-bold text-zinc-200">{q.label}</span>
+                                                <div className="flex gap-2">
+                                                    <Badge variant="outline" className="text-[8px] font-bold bg-zinc-950 text-zinc-400 border-zinc-850">{q.category}</Badge>
+                                                    <span className="font-mono text-[8px] text-zinc-550">Clé: {q.key}</span>
+                                                </div>
+                                            </div>
+                                            <Button 
+                                                size="sm"
+                                                onClick={() => handleSaveAssemblyDesc(q.key)}
+                                                disabled={isSaving}
+                                                className="bg-purple-600 hover:bg-purple-700 text-white text-[9px] h-7 px-3 rounded flex items-center gap-1 shrink-0 font-bold"
+                                            >
+                                                {isSaving ? (
+                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                ) : (
+                                                    <Save className="h-3 w-3" />
+                                                )}
+                                                Enregistrer
+                                            </Button>
+                                        </div>
+                                        <Textarea 
+                                            value={value}
+                                            onChange={(e) => {
+                                                const val = e.target.value
+                                                setAssemblyConfigs(prev => ({ ...prev, [q.key]: val }))
                                             }}
                                             placeholder="Saisir la description à afficher pour cette question..."
                                             rows={2}

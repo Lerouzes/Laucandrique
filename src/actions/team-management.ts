@@ -1529,21 +1529,23 @@ export async function createAssemblyEvaluationAction(data: {
     client_id: string
     manager_id: string
     assembly_date: string
-    agenda_sent_on_time: number
-    quorum_respected: number
-    voting_controlled: number
-    duration_reasonable: number
-    technical_prep_complete: number
-    manager_controlled_room: number
-    discussions_on_track: number
-    conflict_handled_professionally: number
-    answers_clear_confident: number
-    board_confidence_level: number
-    financial_statement_quality: number
-    pv_drafted_quickly: number
-    templates_respected: number
-    resolutions_clear: number
-    followup_tasks_created: number
+    assembly_type?: string
+    status?: string
+    agenda_sent_on_time: number | null
+    quorum_respected: number | null
+    voting_controlled: number | null
+    duration_reasonable: number | null
+    technical_prep_complete?: number | null
+    manager_controlled_room: number | null
+    discussions_on_track: number | null
+    conflict_handled_professionally: number | null
+    answers_clear_confident: number | null
+    board_confidence_level: number | null
+    financial_statement_quality: number | null
+    pv_drafted_quickly?: number | null
+    templates_respected?: number | null
+    resolutions_clear?: number | null
+    followup_tasks_created?: number | null
     notes?: string
     recommendations?: string
     item_notes?: Record<string, string>
@@ -1556,6 +1558,72 @@ export async function createAssemblyEvaluationAction(data: {
             client_id: data.client_id,
             manager_id: data.manager_id,
             assembly_date: data.assembly_date,
+            assembly_type: data.assembly_type || 'annual',
+            status: data.status || 'completed',
+            agenda_sent_on_time: data.agenda_sent_on_time,
+            quorum_respected: data.quorum_respected,
+            voting_controlled: data.voting_controlled,
+            duration_reasonable: data.duration_reasonable,
+            technical_prep_complete: data.technical_prep_complete ?? null,
+            manager_controlled_room: data.manager_controlled_room,
+            discussions_on_track: data.discussions_on_track,
+            conflict_handled_professionally: data.conflict_handled_professionally,
+            answers_clear_confident: data.answers_clear_confident,
+            board_confidence_level: data.board_confidence_level,
+            financial_statement_quality: data.financial_statement_quality,
+            pv_drafted_quickly: data.pv_drafted_quickly ?? null,
+            templates_respected: data.templates_respected ?? null,
+            resolutions_clear: data.resolutions_clear ?? null,
+            followup_tasks_created: data.followup_tasks_created ?? null,
+            notes: data.notes || null,
+            recommendations: data.recommendations || null,
+            item_notes: data.item_notes || {}
+        })
+        .select()
+        .single()
+
+    if (err) throw new Error(err.message)
+
+    revalidatePath('/team-management/assemblies')
+    revalidatePath(`/team-management/managers/${data.manager_id}`)
+    return evalData
+}
+
+export async function updateAssemblyEvaluationAction(id: string, data: {
+    client_id?: string
+    manager_id?: string
+    assembly_date?: string
+    assembly_type?: string
+    status?: string
+    agenda_sent_on_time?: number | null
+    quorum_respected?: number | null
+    voting_controlled?: number | null
+    duration_reasonable?: number | null
+    technical_prep_complete?: number | null
+    manager_controlled_room?: number | null
+    discussions_on_track?: number | null
+    conflict_handled_professionally?: number | null
+    answers_clear_confident?: number | null
+    board_confidence_level?: number | null
+    financial_statement_quality?: number | null
+    pv_drafted_quickly?: number | null
+    templates_respected?: number | null
+    resolutions_clear?: number | null
+    followup_tasks_created?: number | null
+    notes?: string
+    recommendations?: string
+    item_notes?: Record<string, string>
+}) {
+    const supabase = await createClient()
+
+    const { data: evalData, error: err } = await supabase
+        .from('assembly_evaluations')
+        .update({
+            client_id: data.client_id,
+            manager_id: data.manager_id,
+            assembly_date: data.assembly_date,
+            assembly_type: data.assembly_type,
+            status: data.status,
             agenda_sent_on_time: data.agenda_sent_on_time,
             quorum_respected: data.quorum_respected,
             voting_controlled: data.voting_controlled,
@@ -1571,18 +1639,75 @@ export async function createAssemblyEvaluationAction(data: {
             templates_respected: data.templates_respected,
             resolutions_clear: data.resolutions_clear,
             followup_tasks_created: data.followup_tasks_created,
-            notes: data.notes || null,
-            recommendations: data.recommendations || null,
-            item_notes: data.item_notes || {}
+            notes: data.notes,
+            recommendations: data.recommendations,
+            item_notes: data.item_notes
         })
+        .eq('id', id)
         .select()
         .single()
 
     if (err) throw new Error(err.message)
 
     revalidatePath('/team-management/assemblies')
-    revalidatePath(`/team-management/managers/${data.manager_id}`)
+    if (data.manager_id) {
+        revalidatePath(`/team-management/managers/${data.manager_id}`)
+    }
     return evalData
+}
+
+export async function deleteAssemblyEvaluationAction(id: string) {
+    const supabase = await createClient()
+
+    // Enforce role security: only Master or Direction can delete evaluations
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    if (!currentUser) throw new Error('Non authentifié.')
+
+    const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', currentUser.id)
+        .single()
+
+    if (currentProfile?.role !== 'Master' && currentProfile?.role !== 'Direction') {
+        throw new Error('Sécurité : Seul le rôle Master ou Direction peut supprimer des évaluations d\'assemblées.')
+    }
+
+    const { error: err } = await supabase
+        .from('assembly_evaluations')
+        .delete()
+        .eq('id', id)
+
+    if (err) throw new Error(err.message)
+
+    revalidatePath('/team-management/assemblies')
+    return { success: true }
+}
+
+export async function updateAssemblyQuestionConfigAction(key: string, description: string) {
+    const supabase = await createClient()
+
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    if (!currentUser) throw new Error('Non authentifié.')
+
+    const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', currentUser.id)
+        .single()
+
+    if (currentProfile?.role !== 'Master') {
+        throw new Error('Accès refusé.')
+    }
+
+    const { data, error } = await supabase
+        .from('assembly_question_configs')
+        .upsert({ key, description })
+        .select()
+        .single()
+
+    if (error) throw new Error(error.message)
+    return data
 }
 
 // ==========================================

@@ -21,6 +21,11 @@ export default async function NewAssemblyPage() {
 
     const { data: clients } = await clientsQuery.order('company_name')
 
+    // Fetch assembly question tooltips config
+    const { data: questionConfigs } = await supabase
+        .from('assembly_question_configs')
+        .select('*')
+
     // Fetch managers
     const managers = teamManagers
 
@@ -33,7 +38,11 @@ export default async function NewAssemblyPage() {
                 </p>
             </div>
 
-            <NewAssemblyEvaluationForm clients={clients || []} managers={managers || []} />
+            <NewAssemblyEvaluationForm 
+                clients={clients || []} 
+                managers={managers || []} 
+                questionConfigs={questionConfigs || []}
+            />
         </div>
     )
 }

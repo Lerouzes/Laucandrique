@@ -5,16 +5,23 @@ import { getGustavUsersAction } from '@/actions/team-management'
 export default async function SettingsPage() {
     const supabase = await createClient()
 
-    // Fetch complaint categories
-    const { data: categories } = await supabase
-        .from('complaint_categories')
-        .select('*')
-        .order('name')
+    // Fetch data concurrently
+    const [categoriesRes, auditConfigsRes, assemblyConfigsRes] = await Promise.all([
+        supabase
+            .from('complaint_categories')
+            .select('*')
+            .order('name'),
+        supabase
+            .from('audit_question_configs')
+            .select('*'),
+        supabase
+            .from('assembly_question_configs')
+            .select('*')
+    ])
 
-    // Fetch audit configurations
-    const { data: auditConfigs } = await supabase
-        .from('audit_question_configs')
-        .select('*')
+    const categories = categoriesRes.data
+    const auditConfigs = auditConfigsRes.data
+    const assemblyConfigs = assemblyConfigsRes.data
 
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profile } = user
@@ -51,6 +58,7 @@ export default async function SettingsPage() {
             <SettingsClientPage 
                 initialCategories={categories || []} 
                 initialAuditConfigs={auditConfigs || []} 
+                initialAssemblyConfigs={assemblyConfigs || []}
                 userRole={userRole}
                 currentUserId={user?.id || ''}
                 initialUsers={platformUsers}
