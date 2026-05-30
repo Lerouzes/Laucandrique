@@ -7,7 +7,8 @@ import {
     updateSyndicateAuditAction, 
     saveSyndicateWorkloadAction, 
     getSyndicateWorkloadAction, 
-    getClientHistoryAction 
+    getClientHistoryAction,
+    deleteSyndicateWorkloadAction
 } from '@/actions/team-management'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -28,7 +29,8 @@ import {
     AlertCircle,
     User,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    Trash2
 } from 'lucide-react'
 import { SearchableClientSelect } from './SearchableClientSelect'
 
@@ -205,6 +207,21 @@ export function NewAuditForm({
             alert('Erreur lors de l\'enregistrement du volume de travail : ' + (err as Error).message)
         } finally {
             setSavingWorkload(false)
+        }
+    }
+
+    const handleDeleteWorkload = async (workloadId: string) => {
+        if (!window.confirm('Voulez-vous vraiment supprimer cette saisie de volume de travail ?')) {
+            return
+        }
+        try {
+            await deleteSyndicateWorkloadAction(workloadId)
+            // Refresh saved workloads list
+            const workloads = await getSyndicateWorkloadAction(clientId)
+            setSavedWorkloads(workloads || [])
+            alert('Volume de travail supprimé avec succès.')
+        } catch (err) {
+            alert('Erreur lors de la suppression : ' + (err as Error).message)
         }
     }
 
@@ -492,17 +509,28 @@ export function NewAuditForm({
                                         <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-wider block">Saisies existantes</span>
                                         <div className="space-y-1.5 text-[10px]">
                                             {savedWorkloads.map((wl) => (
-                                                <div key={wl.id} className="flex justify-between items-center bg-zinc-950/40 p-2 border border-zinc-900 rounded-lg">
-                                                    <div>
-                                                        <strong className="text-zinc-300">{wl.year}</strong>
-                                                        <span className="text-zinc-500 text-[9px] ml-1">
-                                                            {wl.month ? `(${MONTHS.find(m => m.value === wl.month)?.label})` : '(Annuel)'}
-                                                        </span>
+                                                <div key={wl.id} className="flex justify-between items-center bg-zinc-950/40 p-2 border border-zinc-900 rounded-lg group/item">
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-1">
+                                                            <strong className="text-zinc-300">{wl.year}</strong>
+                                                            <span className="text-zinc-500 text-[9px]">
+                                                                {wl.month ? `(${MONTHS.find(m => m.value === wl.month)?.label})` : '(Annuel)'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-[9px] text-zinc-400 flex gap-2.5 mt-0.5">
+                                                            <span>Tâches: <strong className="text-purple-400 font-bold">{wl.tasks_count ?? '-'}</strong></span>
+                                                            <span>Comms: <strong className="text-cyan-400 font-bold">{wl.comms_count ?? '-'}</strong></span>
+                                                        </div>
                                                     </div>
-                                                    <div className="text-[9px] text-zinc-400 flex gap-2">
-                                                        <span>Tâches: <strong className="text-purple-400">{wl.tasks_count ?? '-'}</strong></span>
-                                                        <span>Comms: <strong className="text-cyan-400">{wl.comms_count ?? '-'}</strong></span>
-                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => handleDeleteWorkload(wl.id)}
+                                                        className="h-6 w-6 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
                                                 </div>
                                             ))}
                                         </div>

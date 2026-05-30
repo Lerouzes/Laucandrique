@@ -2496,6 +2496,22 @@ export async function getSyndicateWorkloadAction(clientId: string) {
     return data || []
 }
 
+export async function deleteSyndicateWorkloadAction(id: string) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('syndicate_workload')
+        .delete()
+        .eq('id', id)
+
+    if (error) {
+        console.error("Error deleting syndicate workload:", error.message)
+        throw new Error(error.message)
+    }
+
+    revalidatePath('/clients')
+    return { success: true }
+}
+
 export async function getClientHistoryAction(clientId: string) {
     const supabase = await createClient()
 
