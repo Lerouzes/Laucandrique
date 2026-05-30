@@ -418,9 +418,11 @@ export function CallsStatsPanel({
                 if (activityType === 'calls') {
                     map[r.managerId].totalVal1 += (r.totalCalls ?? 0)
                     map[r.managerId].totalVal2 += (r.answeredCalls ?? 0)
-                } else {
+                } else if (activityType === 'tasks') {
                     map[r.managerId].totalVal1 += ((r.openTasks ?? 0) + (r.closedTasks ?? 0))
                     map[r.managerId].totalVal2 += (r.closedTasks ?? 0)
+                } else if (activityType === 'emails') {
+                    map[r.managerId].totalVal1 += (r.communicationsReceived ?? 0)
                 }
                 map[r.managerId].count++
             })
