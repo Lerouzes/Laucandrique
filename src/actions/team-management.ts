@@ -2112,7 +2112,7 @@ export async function getGustavUsersAction() {
 
     const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('id, full_name, email, role, created_at, updated_at')
+        .select('id, full_name, email, role, created_at')
         .order('created_at', { ascending: false })
 
     if (error) throw new Error(error.message)
@@ -2567,6 +2567,43 @@ export async function getAssemblyEvaluationDetailsAction(assemblyId: string) {
         return null
     }
     return data
+}
+
+export async function resetUserPasswordAction(userId: string, newPassword: string) {
+    const supabase = await createClient()
+
+    // 1. Enforce Master role security check
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    if (!currentUser) {
+        throw new Error('Non authentifié. Veuillez vous connecter.')
+    }
+
+    const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', currentUser.id)
+        .single()
+
+    if (currentProfile?.role !== 'Master') {
+        throw new Error('Sécurité : Seul le rôle Master est autorisé à réinitialiser les mots de passe.')
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+        throw new Error('Le mot de passe doit contenir au moins 6 caractères.')
+    }
+
+    // Call the SECURITY DEFINER RPC function to update password in auth.users
+    const { error } = await supabase
+        .rpc('admin_reset_user_password', {
+            target_user_id: userId,
+            new_password: newPassword
+        })
+
+    if (error) {
+        throw new Error(`Erreur lors de la réinitialisation du mot de passe : ${error.message}`)
+    }
+
+    return { success: true }
 }
 
 

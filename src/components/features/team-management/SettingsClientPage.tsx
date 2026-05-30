@@ -21,7 +21,8 @@ import {
     UserPlus,
     Shield,
     Users,
-    RefreshCw
+    RefreshCw,
+    Key
 } from 'lucide-react'
 import { 
     createComplaintCategoryAction, 
@@ -30,7 +31,8 @@ import {
     updateAuditQuestionConfigAction,
     createGustavAccountAction,
     getGustavUsersAction,
-    updateUserRoleAction
+    updateUserRoleAction,
+    resetUserPasswordAction
 } from '@/actions/team-management'
 
 interface ComplaintCategory {
@@ -118,6 +120,26 @@ export function SettingsClientPage({
     const [isRefreshingUsers, setIsRefreshingUsers] = useState(false)
     const [savingRoleId, setSavingRoleId] = useState<string | null>(null)
     const [roleChanges, setRoleChanges] = useState<Record<string, string>>({})
+
+    // Reset password states
+    const [resetPasswordUser, setResetPasswordUser] = useState<any | null>(null)
+    const [newPasswordVal, setNewPasswordVal] = useState('')
+    const [isResettingPassword, setIsResettingPassword] = useState(false)
+
+    const handleResetPassword = async () => {
+        if (!resetPasswordUser || newPasswordVal.length < 6) return
+        setIsResettingPassword(true)
+        try {
+            await resetUserPasswordAction(resetPasswordUser.id, newPasswordVal)
+            triggerAlert(`Le mot de passe de ${resetPasswordUser.full_name} a été réinitialisé !`, 'success')
+            setResetPasswordUser(null)
+            setNewPasswordVal('')
+        } catch (err: any) {
+            triggerAlert(err.message || 'Erreur lors de la réinitialisation du mot de passe.', 'error')
+        } finally {
+            setIsResettingPassword(false)
+        }
+    }
 
     const refreshUsers = async () => {
         setIsRefreshingUsers(true)
@@ -818,6 +840,16 @@ export function SettingsClientPage({
                                                                             <Check className="h-3.5 w-3.5 text-emerald-400" />
                                                                         )}
                                                                     </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        disabled={isCurrentUser}
+                                                                        onClick={() => setResetPasswordUser(user)}
+                                                                        className="h-7 w-7 p-0 border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-amber-400"
+                                                                        title="Modifier le mot de passe"
+                                                                    >
+                                                                        <Key className="h-3.5 w-3.5" />
+                                                                    </Button>
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -829,6 +861,69 @@ export function SettingsClientPage({
                                 </div>
                             </CardContent>
                         </Card>
+                    </div>
+                </div>
+            )}
+
+            {/* Password Reset Modal */}
+            {resetPasswordUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#16171e]/90 border border-zinc-800/80 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4 text-white overflow-hidden backdrop-blur-md">
+                        <div className="flex justify-between items-center pb-2 border-b border-zinc-800">
+                            <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                                <Key className="h-4 w-4 text-amber-400" />
+                                Réinitialiser le mot de passe
+                            </h3>
+                            <button 
+                                onClick={() => { setResetPasswordUser(null); setNewPasswordVal(''); }}
+                                className="p-1 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-3 text-xs">
+                            <p className="text-zinc-400">
+                                Saisissez le nouveau mot de passe pour l'utilisateur <strong className="text-zinc-200">{resetPasswordUser.full_name}</strong> ({resetPasswordUser.email}).
+                            </p>
+                            
+                            <div className="space-y-1">
+                                <Label className="text-zinc-400 font-medium">Nouveau mot de passe</Label>
+                                <Input 
+                                    type="password" 
+                                    value={newPasswordVal}
+                                    onChange={(e) => setNewPasswordVal(e.target.value)}
+                                    required 
+                                    placeholder="••••••••" 
+                                    className="bg-[#121318] border-zinc-800 h-9 text-white text-[16px] md:text-xs" 
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 border-t border-zinc-800 pt-4">
+                            <Button 
+                                type="button" 
+                                variant="outline" 
+                                onClick={() => { setResetPasswordUser(null); setNewPasswordVal(''); }}
+                                className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850 text-xs h-9 px-4 font-bold rounded-lg"
+                            >
+                                Annuler
+                            </Button>
+                            <Button 
+                                type="button" 
+                                onClick={handleResetPassword}
+                                disabled={isResettingPassword || newPasswordVal.length < 6}
+                                className="bg-amber-650 hover:bg-amber-700 text-white text-xs h-9 px-4 font-bold rounded-lg shadow-lg flex items-center gap-1.5"
+                            >
+                                {isResettingPassword ? (
+                                    <Loader2 className="h-4.5 w-4.5 animate-spin" />
+                                ) : (
+                                    <Key className="h-4 w-4" />
+                                )}
+                                Réinitialiser
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}
