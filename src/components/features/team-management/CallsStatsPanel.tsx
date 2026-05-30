@@ -24,7 +24,8 @@ import {
     Calendar,
     History,
     X,
-    CheckSquare
+    CheckSquare,
+    Mail
 } from 'lucide-react'
 import {
     BarChart,
