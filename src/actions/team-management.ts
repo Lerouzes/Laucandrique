@@ -2534,5 +2534,40 @@ export async function getClientHistoryAction(clientId: string) {
     }
 }
 
+export async function getSyndicateAuditDetailsAction(auditId: string) {
+    const supabase = await createClient()
+    const [auditRes, answersRes] = await Promise.all([
+        supabase
+            .from('syndicate_audits')
+            .select('*, clients(id, company_name, full_name, managers(first_name, last_name)), profiles:audited_by(full_name)')
+            .eq('id', auditId)
+            .single(),
+        supabase
+            .from('syndicate_audit_answers')
+            .select('*')
+            .eq('audit_id', auditId)
+    ])
+    
+    return {
+        audit: auditRes.data || null,
+        answers: answersRes.data || []
+    }
+}
+
+export async function getAssemblyEvaluationDetailsAction(assemblyId: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('assembly_evaluations')
+        .select('*, clients(id, company_name, full_name, managers(first_name, last_name))')
+        .eq('id', assemblyId)
+        .single()
+
+    if (error) {
+        console.error("Error fetching assembly evaluation details:", error.message)
+        return null
+    }
+    return data
+}
+
 
 

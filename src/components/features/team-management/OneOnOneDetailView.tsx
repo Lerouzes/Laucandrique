@@ -6,7 +6,9 @@ import {
     updateOneOnOneAction, 
     getOneOnOneSnapshotAction, 
     deleteOneOnOneAction,
-    getCategoryComplaintHistoryAction
+    getCategoryComplaintHistoryAction,
+    getSyndicateAuditDetailsAction,
+    getAssemblyEvaluationDetailsAction
 } from '@/actions/team-management'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -41,6 +43,40 @@ import {
 } from 'lucide-react'
 import { SearchableClientSelect } from './SearchableClientSelect'
 import { CallsStatsPanel } from './CallsStatsPanel'
+
+const AUDIT_LABELS: Record<string, string> = {
+    registre_coproprietaires: 'Registre des documents complets',
+    convocations_assemblee: 'Convocations d\'assemblées conformes',
+    reglement_immeuble: 'Règlements de l\'immeuble respectés',
+    proces_verbaux: 'Procès-verbaux rédigés et archivés',
+    contrats_fournisseurs: 'Contrats de fournisseurs signés et classés',
+    budget_annuel: 'Budget annuel voté et respecté',
+    fonds_prevoyance: 'Fonds de prévoyance (étude + cotisations) conforme',
+    conciliation_bancaire: 'Conciliations bancaires mensuelles complétées',
+    perception_charges: 'Perception des charges et gestion des retards',
+    etats_financiers: 'États financiers de fin d\'année à jour',
+    carnet_entretien: 'Carnet d\'entretien de l\'immeuble à jour',
+    inspections_preventives: 'Inspections préventives complétées et consignées',
+    sinistres_assurance: 'Suivi rigoureux des sinistres et réclamations',
+    appels_offres: 'Appels d\'offres conformes pour grands travaux',
+    qualite_budget_cree: 'Qualité du budget créé'
+}
+
+const ASSEMBLY_LABELS: Record<string, string> = {
+    agenda_sent_on_time: "Ordre du jour envoyé dans les délais",
+    quorum_respected: "Quorum respecté",
+    voting_controlled: "Contrôle des votes efficace",
+    duration_reasonable: "Durée raisonnable",
+    technical_prep_complete: "Préparation technique complète",
+    manager_controlled_room: "Maîtrise de la salle par le gestionnaire",
+    discussions_on_track: "Discussions cadrées et sur les rails",
+    conflict_handled_professionally: "Gestion professionnelle des conflits",
+    answers_clear_confident: "Réponses claires et affirmées",
+    pv_drafted_quickly: "PV rédigé rapidement",
+    templates_respected: "Gabarits / Templates respectés",
+    resolutions_clear: "Résolutions claires",
+    followup_tasks_created: "Tâches de suivi créées"
+}
 
 export function OneOnOneDetailView({ 
     oneOnOne, 
@@ -176,6 +212,20 @@ export function OneOnOneDetailView({
     const [editingComplaintManagerNotes, setEditingComplaintManagerNotes] = useState('')
     const [editingComplaintStatus, setEditingComplaintStatus] = useState<'not_discussed' | 'postponed' | 'resolved'>('not_discussed')
 
+    const [activeAudit, setActiveAudit] = useState<any | null>(null)
+    const [activeAuditDetails, setActiveAuditDetails] = useState<any | null>(null)
+    const [loadingAuditDetails, setLoadingAuditDetails] = useState(false)
+    const [auditMyNotes, setAuditMyNotes] = useState('')
+    const [auditManagerNotes, setAuditManagerNotes] = useState('')
+    const [auditReviewed, setAuditReviewed] = useState(false)
+
+    const [activeAssembly, setActiveAssembly] = useState<any | null>(null)
+    const [activeAssemblyDetails, setActiveAssemblyDetails] = useState<any | null>(null)
+    const [loadingAssemblyDetails, setLoadingAssemblyDetails] = useState(false)
+    const [assemblyMyNotes, setAssemblyMyNotes] = useState('')
+    const [assemblyManagerNotes, setAssemblyManagerNotes] = useState('')
+    const [assemblyReviewed, setAssemblyReviewed] = useState(false)
+
     const [newRiskClientId, setNewRiskClientId] = useState('')
     const [newRiskFutureActions, setNewRiskFutureActions] = useState('')
     const [newActionClientId, setNewActionClientId] = useState('')
@@ -238,6 +288,70 @@ export function OneOnOneDetailView({
         }))
 
         setActiveEditingComplaint(null)
+    }
+
+    const openAuditModal = async (audit: any) => {
+        setActiveAudit(audit)
+        setLoadingAuditDetails(true)
+        const state = reviewedAuditsState[audit.id] || { checked: false, my_notes: '', manager_notes: '' }
+        setAuditMyNotes(state.my_notes || '')
+        setAuditManagerNotes(state.manager_notes || '')
+        setAuditReviewed(state.checked || false)
+
+        try {
+            const data = await getSyndicateAuditDetailsAction(audit.id)
+            setActiveAuditDetails(data)
+        } catch (err) {
+            console.error("Error loading audit details:", err)
+        } finally {
+            setLoadingAuditDetails(false)
+        }
+    }
+
+    const handleSaveAuditChanges = () => {
+        if (!activeAudit) return
+        setReviewedAuditsState(prev => ({
+            ...prev,
+            [activeAudit.id]: {
+                checked: auditReviewed,
+                my_notes: auditMyNotes,
+                manager_notes: auditManagerNotes
+            }
+        }))
+        setActiveAudit(null)
+        setActiveAuditDetails(null)
+    }
+
+    const openAssemblyModal = async (assembly: any) => {
+        setActiveAssembly(assembly)
+        setLoadingAssemblyDetails(true)
+        const state = reviewedAssembliesState[assembly.id] || { checked: false, my_notes: '', manager_notes: '' }
+        setAssemblyMyNotes(state.my_notes || '')
+        setAssemblyManagerNotes(state.manager_notes || '')
+        setAssemblyReviewed(state.checked || false)
+
+        try {
+            const data = await getAssemblyEvaluationDetailsAction(assembly.id)
+            setActiveAssemblyDetails(data)
+        } catch (err) {
+            console.error("Error loading assembly details:", err)
+        } finally {
+            setLoadingAssemblyDetails(false)
+        }
+    }
+
+    const handleSaveAssemblyChanges = () => {
+        if (!activeAssembly) return
+        setReviewedAssembliesState(prev => ({
+            ...prev,
+            [activeAssembly.id]: {
+                checked: assemblyReviewed,
+                my_notes: assemblyMyNotes,
+                manager_notes: assemblyManagerNotes
+            }
+        }))
+        setActiveAssembly(null)
+        setActiveAssemblyDetails(null)
     }
 
     // Load initial states for edit/draft views from DB snapshot
@@ -1107,7 +1221,11 @@ export function OneOnOneDetailView({
                                     {syndicateAudits.map(a => {
                                         const isChecked = !!reviewedAuditsState[a.id]?.checked
                                         return (
-                                            <div key={a.id} className="p-2.5 bg-zinc-950/20 border border-zinc-850 rounded-lg space-y-2">
+                                            <div 
+                                                key={a.id} 
+                                                onClick={() => openAuditModal(a)}
+                                                className={`p-2.5 bg-zinc-955 border border-zinc-850 rounded-lg space-y-2 cursor-pointer hover:border-purple-500/50 transition-all ${isChecked ? 'bg-purple-950/5 border-purple-900/30' : ''}`}
+                                            >
                                                 <div className="flex justify-between items-start">
                                                     <div>
                                                         <span className="font-bold text-zinc-300 block">{a.clients?.company_name || a.clients?.full_name || 'Syndicat'}</span>
@@ -1120,6 +1238,7 @@ export function OneOnOneDetailView({
                                                         <input 
                                                             type="checkbox"
                                                             checked={isChecked}
+                                                            onClick={(e) => e.stopPropagation()}
                                                             onChange={(e) => {
                                                                 if (!isEditing) return
                                                                 const checked = e.target.checked
@@ -1144,6 +1263,7 @@ export function OneOnOneDetailView({
                                                             <Label className="text-zinc-500 text-[8px]">Ce que j'ai dit (Notes Direction)</Label>
                                                             <Input 
                                                                 value={reviewedAuditsState[a.id]?.my_notes || ''} 
+                                                                onClick={(e) => e.stopPropagation()}
                                                                 onChange={(e) => setReviewedAuditsState(prev => ({ ...prev, [a.id]: { ...prev[a.id], my_notes: e.target.value } }))} 
                                                                 disabled={!isEditing}
                                                                 className="bg-[#121318] border-zinc-850 h-7 text-xxs" 
@@ -1153,6 +1273,7 @@ export function OneOnOneDetailView({
                                                             <Label className="text-zinc-500 text-[8px]">Ce que le gestionnaire a dit</Label>
                                                             <Input 
                                                                 value={reviewedAuditsState[a.id]?.manager_notes || ''} 
+                                                                onClick={(e) => e.stopPropagation()}
                                                                 onChange={(e) => setReviewedAuditsState(prev => ({ ...prev, [a.id]: { ...prev[a.id], manager_notes: e.target.value } }))} 
                                                                 disabled={!isEditing}
                                                                 className="bg-[#121318] border-zinc-850 h-7 text-xxs" 
@@ -1177,7 +1298,11 @@ export function OneOnOneDetailView({
                                     {assemblyEvaluations.map(ae => {
                                         const isChecked = !!reviewedAssembliesState[ae.id]?.checked
                                         return (
-                                            <div key={ae.id} className="p-2.5 bg-zinc-950/20 border border-zinc-850 rounded-lg space-y-2">
+                                            <div 
+                                                key={ae.id} 
+                                                onClick={() => openAssemblyModal(ae)}
+                                                className={`p-2.5 bg-zinc-955 border border-zinc-850 rounded-lg space-y-2 cursor-pointer hover:border-purple-500/50 transition-all ${isChecked ? 'bg-purple-950/5 border-purple-900/30' : ''}`}
+                                            >
                                                 <div className="flex justify-between items-start">
                                                     <div>
                                                         <span className="font-bold text-zinc-300 block">{ae.clients?.company_name || ae.clients?.full_name || 'Syndicat'}</span>
@@ -1187,6 +1312,7 @@ export function OneOnOneDetailView({
                                                         <input 
                                                             type="checkbox"
                                                             checked={isChecked}
+                                                            onClick={(e) => e.stopPropagation()}
                                                             onChange={(e) => {
                                                                 if (!isEditing) return
                                                                 const checked = e.target.checked
@@ -1211,6 +1337,7 @@ export function OneOnOneDetailView({
                                                             <Label className="text-zinc-500 text-[8px]">Ce que j'ai dit (Notes Direction)</Label>
                                                             <Input 
                                                                 value={reviewedAssembliesState[ae.id]?.my_notes || ''} 
+                                                                onClick={(e) => e.stopPropagation()}
                                                                 onChange={(e) => setReviewedAssembliesState(prev => ({ ...prev, [ae.id]: { ...prev[ae.id], my_notes: e.target.value } }))} 
                                                                 disabled={!isEditing}
                                                                 className="bg-[#121318] border-zinc-850 h-7 text-xxs" 
@@ -1220,6 +1347,7 @@ export function OneOnOneDetailView({
                                                             <Label className="text-zinc-500 text-[8px]">Ce que le gestionnaire a dit</Label>
                                                             <Input 
                                                                 value={reviewedAssembliesState[ae.id]?.manager_notes || ''} 
+                                                                onClick={(e) => e.stopPropagation()}
                                                                 onChange={(e) => setReviewedAssembliesState(prev => ({ ...prev, [ae.id]: { ...prev[ae.id], manager_notes: e.target.value } }))} 
                                                                 disabled={!isEditing}
                                                                 className="bg-[#121318] border-zinc-850 h-7 text-xxs" 
@@ -2010,6 +2138,266 @@ export function OneOnOneDetailView({
                                     className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-9 px-4"
                                 >
                                     Enregistrer les modifications
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Audit Detail / Review Modal */}
+            {activeAudit && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#16171e] border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6 text-xs text-zinc-300">
+                        {/* Modal Header */}
+                        <div className="flex justify-between items-start border-b border-zinc-800 pb-4">
+                            <div>
+                                <span className="text-purple-400 uppercase font-black text-[9px] tracking-widest block mb-1">Détails de l'Audit de Syndicat</span>
+                                <h3 className="text-sm font-bold text-white uppercase">
+                                    {activeAudit.clients?.company_name || activeAudit.clients?.full_name || 'Syndicat'}
+                                </h3>
+                            </div>
+                            <button 
+                                type="button"
+                                onClick={() => { setActiveAudit(null); setActiveAuditDetails(null); }} 
+                                className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {/* Audit Details */}
+                        {loadingAuditDetails ? (
+                            <p className="italic text-zinc-500 py-6 text-center text-xxs">Chargement des détails de l'audit...</p>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4 p-3 bg-zinc-950/40 border border-zinc-900 rounded-xl text-xxs">
+                                    <div>Date d'Audit: <strong className="text-zinc-300">{new Date(activeAudit.audit_date).toLocaleDateString('fr-CA')}</strong></div>
+                                    <div>Indice de Santé: <strong className="text-purple-400 font-bold">{activeAudit.health_score}%</strong></div>
+                                    <div className="col-span-2 mt-1">
+                                        Auditeur: <strong className="text-zinc-300">{activeAuditDetails?.audit?.profiles?.full_name || 'Évaluateur'}</strong>
+                                    </div>
+                                    {activeAuditDetails?.audit?.notes && (
+                                        <div className="col-span-2 border-t border-zinc-905 pt-2 mt-2">
+                                            <span className="text-zinc-500 block mb-0.5 font-bold uppercase tracking-wider text-[8px]">Observations Globales:</span>
+                                            <p className="text-zinc-300 text-[10px] leading-relaxed whitespace-pre-wrap font-medium">{activeAuditDetails.audit.notes}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Answers Section */}
+                                {activeAuditDetails?.answers && activeAuditDetails.answers.length > 0 && (
+                                    <div className="space-y-2.5">
+                                        <span className="text-[9px] uppercase font-bold text-zinc-500 block border-b border-zinc-900 pb-1">Évaluation des Critères</span>
+                                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                            {activeAuditDetails.answers.map((ans: any) => {
+                                                const label = AUDIT_LABELS[ans.question_key] || ans.question_key
+                                                return (
+                                                    <div key={ans.id} className="p-2 bg-zinc-950/20 border border-zinc-900 rounded-lg text-xxs flex justify-between items-start gap-3">
+                                                        <div className="flex-1">
+                                                            <span className="font-semibold text-zinc-300 block">{label}</span>
+                                                            {ans.note && <span className="text-zinc-550 italic text-[9px] block mt-0.5 font-medium">{ans.note}</span>}
+                                                        </div>
+                                                        <span className="text-purple-400 font-bold shrink-0">{ans.score}/5</span>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Review Inputs inside Modal */}
+                        <div className="space-y-4 pt-4 border-t border-zinc-850">
+                            <h4 className="font-bold text-white text-xs">Alignement & Rétroaction en Rencontre</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Notes de la Direction (Ce que j'ai dit)</Label>
+                                    <Textarea 
+                                        value={auditMyNotes}
+                                        onChange={(e) => setAuditMyNotes(e.target.value)}
+                                        disabled={!isEditing}
+                                        placeholder="Indiquer vos notes ou directives..."
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white"
+                                        rows={3}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Notes du Gestionnaire (Ce que le gestionnaire a dit)</Label>
+                                    <Textarea 
+                                        value={auditManagerNotes}
+                                        onChange={(e) => setAuditManagerNotes(e.target.value)}
+                                        disabled={!isEditing}
+                                        placeholder="Indiquer la rétroaction du gestionnaire..."
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white"
+                                        rows={3}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-between items-center bg-zinc-950/40 p-3 border border-zinc-900 rounded-xl">
+                                <div className="space-y-0.5">
+                                    <Label className="text-zinc-300 font-bold text-xs">Revue complétée</Label>
+                                    <span className="text-zinc-550 block text-[10px]">Cochez pour marquer cet audit comme traité dans cette réunion</span>
+                                </div>
+                                <input 
+                                    type="checkbox"
+                                    checked={auditReviewed}
+                                    onChange={(e) => setAuditReviewed(e.target.checked)}
+                                    disabled={!isEditing}
+                                    className="rounded border-zinc-800 text-purple-600 h-5 w-5 cursor-pointer"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Modal Actions */}
+                        <div className="flex justify-end gap-2 border-t border-zinc-800 pt-4">
+                            <Button 
+                                type="button" 
+                                variant="outline" 
+                                onClick={() => { setActiveAudit(null); setActiveAuditDetails(null); }}
+                                className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850 text-xs h-9 px-4 font-bold rounded-lg"
+                            >
+                                {isEditing ? 'Annuler' : 'Fermer'}
+                            </Button>
+                            {isEditing && (
+                                <Button 
+                                    type="button" 
+                                    onClick={handleSaveAuditChanges}
+                                    className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-9 px-4 font-bold rounded-lg shadow-lg"
+                                >
+                                    Enregistrer la revue
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Assembly Detail / Review Modal */}
+            {activeAssembly && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#16171e] border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6 text-xs text-zinc-300">
+                        {/* Modal Header */}
+                        <div className="flex justify-between items-start border-b border-zinc-800 pb-4">
+                            <div>
+                                <span className="text-purple-400 uppercase font-black text-[9px] tracking-widest block mb-1">Détails Évaluation d'Assemblée</span>
+                                <h3 className="text-sm font-bold text-white uppercase">
+                                    {activeAssembly.clients?.company_name || activeAssembly.clients?.full_name || 'Syndicat'}
+                                </h3>
+                            </div>
+                            <button 
+                                type="button"
+                                onClick={() => { setActiveAssembly(null); setActiveAssemblyDetails(null); }} 
+                                className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {/* Assembly Details */}
+                        {loadingAssemblyDetails ? (
+                            <p className="italic text-zinc-500 py-6 text-center text-xxs">Chargement des détails de l'assemblée...</p>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="p-3 bg-zinc-950/40 border border-zinc-900 rounded-xl text-xxs grid grid-cols-2 gap-4">
+                                    <div>Date AGA: <strong className="text-zinc-300">{new Date(activeAssembly.assembly_date).toLocaleDateString('fr-CA')}</strong></div>
+                                    <div className="col-span-2 border-t border-zinc-900 pt-2 mt-2">
+                                        <span className="text-zinc-550 block mb-0.5 font-bold uppercase tracking-wider text-[8px]">Observations Globales:</span>
+                                        <p className="text-zinc-300 text-[10px] leading-relaxed whitespace-pre-wrap font-medium">{activeAssemblyDetails?.notes || 'Aucune note globale.'}</p>
+                                    </div>
+                                    {activeAssemblyDetails?.recommendations && (
+                                        <div className="col-span-2 border-t border-zinc-900 pt-2 mt-1">
+                                            <span className="text-zinc-550 block mb-0.5 font-bold uppercase tracking-wider text-[8px]">Recommandations direction:</span>
+                                            <p className="text-zinc-300 text-[10px] leading-relaxed whitespace-pre-wrap font-medium">{activeAssemblyDetails.recommendations}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Checklist Grid */}
+                                <div className="space-y-2.5">
+                                    <span className="text-[9px] uppercase font-bold text-zinc-500 block border-b border-zinc-900 pb-1">Critères Évalués</span>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 max-h-48 overflow-y-auto pr-1">
+                                        {Object.entries(ASSEMBLY_LABELS).map(([key, label]) => {
+                                            const val = activeAssemblyDetails?.[key]
+                                            const displayVal = typeof val === 'boolean' 
+                                                ? (val ? 'Oui' : 'Non') 
+                                                : typeof val === 'number'
+                                                    ? `${val}/5`
+                                                    : val ? String(val) : 'N/A'
+                                            return (
+                                                <div key={key} className="flex justify-between items-center py-1.5 border-b border-zinc-900/60 last:border-0 text-xxs">
+                                                    <span className="text-zinc-400">{label}</span>
+                                                    <strong className="text-purple-400 font-bold">{displayVal}</strong>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Review Inputs inside Modal */}
+                        <div className="space-y-4 pt-4 border-t border-zinc-850">
+                            <h4 className="font-bold text-white text-xs">Alignement & Rétroaction en Rencontre</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Notes de la Direction (Ce que j'ai dit)</Label>
+                                    <Textarea 
+                                        value={assemblyMyNotes}
+                                        onChange={(e) => setAssemblyMyNotes(e.target.value)}
+                                        disabled={!isEditing}
+                                        placeholder="Indiquer vos notes ou directives..."
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white"
+                                        rows={3}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Notes du Gestionnaire (Ce que le gestionnaire a dit)</Label>
+                                    <Textarea 
+                                        value={assemblyManagerNotes}
+                                        onChange={(e) => setAssemblyManagerNotes(e.target.value)}
+                                        disabled={!isEditing}
+                                        placeholder="Indiquer la rétroaction du gestionnaire..."
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white"
+                                        rows={3}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-between items-center bg-zinc-950/40 p-3 border border-zinc-900 rounded-xl">
+                                <div className="space-y-0.5">
+                                    <Label className="text-zinc-300 font-bold text-xs">Revue complétée</Label>
+                                    <span className="text-zinc-550 block text-[10px]">Cochez pour marquer cette évaluation d'assemblée comme traitée dans cette réunion</span>
+                                </div>
+                                <input 
+                                    type="checkbox"
+                                    checked={assemblyReviewed}
+                                    onChange={(e) => setAssemblyReviewed(e.target.checked)}
+                                    disabled={!isEditing}
+                                    className="rounded border-zinc-800 text-purple-600 h-5 w-5 cursor-pointer"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Modal Actions */}
+                        <div className="flex justify-end gap-2 border-t border-zinc-800 pt-4">
+                            <Button 
+                                type="button" 
+                                variant="outline" 
+                                onClick={() => { setActiveAssembly(null); setActiveAssemblyDetails(null); }}
+                                className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850 text-xs h-9 px-4 font-bold rounded-lg"
+                            >
+                                {isEditing ? 'Annuler' : 'Fermer'}
+                            </Button>
+                            {isEditing && (
+                                <Button 
+                                    type="button" 
+                                    onClick={handleSaveAssemblyChanges}
+                                    className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-9 px-4 font-bold rounded-lg shadow-lg"
+                                >
+                                    Enregistrer la revue
                                 </Button>
                             )}
                         </div>
