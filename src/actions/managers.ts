@@ -88,12 +88,30 @@ export async function createManagerTeamAction(formData: FormData) {
 
 export async function createManagerAction(formData: FormData) {
   const supabase = await createClient()
+  const first_name = String(formData.get('first_name') || '').trim()
+  const last_name = String(formData.get('last_name') || '').trim()
+  const email = String(formData.get('email') || '') || null
+  const phone = String(formData.get('phone') || '') || null
+  const team_id = String(formData.get('team_id') || '') || null
+
+  // Check if a manager with this exact name already exists
+  const { data: existing } = await supabase
+    .from('managers')
+    .select('id')
+    .ilike('first_name', first_name)
+    .ilike('last_name', last_name)
+    .limit(1)
+
+  if (existing && existing.length > 0) {
+    throw new Error(`Un gestionnaire nommé "${first_name} ${last_name}" existe déjà.`)
+  }
+
   const payload: any = {
-    first_name: String(formData.get('first_name') || '').trim(),
-    last_name: String(formData.get('last_name') || '').trim(),
-    email: String(formData.get('email') || '') || null,
-    phone: String(formData.get('phone') || '') || null,
-    team_id: String(formData.get('team_id') || '') || null,
+    first_name,
+    last_name,
+    email,
+    phone,
+    team_id,
   }
 
   let result = await supabase.from('managers').insert(payload).select('*').single()
@@ -151,5 +169,17 @@ export async function updateManagerAction(id: string, formData: FormData) {
   revalidatePath('/settings')
   revalidatePath('/clients')
   revalidatePath(`/managers/${id}`)
+  return { success: true }
+}
+
+export async function deleteManagerAction(id: string) {
+  const supabase = await createClient()
+  
+  const { error } = await supabase.from('managers').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+  
+  revalidatePath('/settings')
+  revalidatePath('/managers')
+  revalidatePath('/clients')
   return { success: true }
 }

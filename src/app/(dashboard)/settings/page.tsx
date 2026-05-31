@@ -3,7 +3,7 @@
 import { useTransition, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
-import { Save, Users, Layers, UserCheck, Wrench } from 'lucide-react'
+import { Save, Users, Layers, UserCheck, Wrench, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,6 +49,8 @@ export default function SettingsPage() {
     const [managerTeams, setManagerTeams] = useState<any[]>([])
     const [templatePreview, setTemplatePreview] = useState<string>('')
     const [templateBlobUrl, setTemplateBlobUrl] = useState<string>('')
+    const [isCreatingManager, setIsCreatingManager] = useState(false)
+    const [isDeletingManagerId, setIsDeletingManagerId] = useState<string | null>(null)
 
     const form = useForm({
         defaultValues: {
@@ -166,7 +168,10 @@ export default function SettingsPage() {
 
     const handleCreateManager = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
-        const fd = new FormData(e.currentTarget)
+        if (isCreatingManager) return
+        setIsCreatingManager(true)
+        const formEl = e.currentTarget
+        const fd = new FormData(formEl)
         try {
             const result = await createManagerAction(fd)
             const createdManager = result?.manager
@@ -177,10 +182,31 @@ export default function SettingsPage() {
             } else {
                 setManagers(await getManagers())
             }
-            toast.success('Gestionnaire ajouté.')
-            e.currentTarget.reset()
-        } catch (e: any) {
-            toast.error('Erreur', { description: e.message || "Impossible d'ajouter le gestionnaire." })
+            toast.success('Gestionnaire ajouté avec succès!')
+            formEl.reset()
+        } catch (err: any) {
+            toast.error('Erreur', { description: err.message || "Impossible d'ajouter le gestionnaire." })
+        } finally {
+            setIsCreatingManager(false)
+        }
+    }
+
+    const handleDeleteManager = async (id: string, name: string) => {
+        if (!window.confirm(`Êtes-vous sûr de vouloir supprimer le gestionnaire "${name}" ? Cette action est irréversible et retirera son assignation des syndicats et soumissions.`)) {
+            return
+        }
+        setIsDeletingManagerId(id)
+        try {
+            const { deleteManagerAction } = await import('@/actions/managers')
+            const res = await deleteManagerAction(id)
+            if (res && res.success) {
+                setManagers(prev => prev.filter(m => m.id !== id))
+                toast.success(`Le gestionnaire "${name}" a été supprimé avec succès.`)
+            }
+        } catch (err: any) {
+            toast.error('Erreur', { description: err.message || "Impossible de supprimer le gestionnaire." })
+        } finally {
+            setIsDeletingManagerId(null)
         }
     }
 
@@ -422,8 +448,8 @@ export default function SettingsPage() {
                                         </option>
                                     ))}
                                 </select>
-                                <Button type="submit" className="bg-cyan-600 text-white hover:bg-cyan-700">
-                                    Ajouter le gestionnaire
+                                <Button type="submit" disabled={isCreatingManager} className="bg-cyan-600 text-white hover:bg-cyan-700">
+                                    {isCreatingManager ? 'Ajout...' : 'Ajouter le gestionnaire'}
                                 </Button>
                             </form>
 
@@ -432,22 +458,35 @@ export default function SettingsPage() {
                                     <p className="text-xs text-zinc-500 italic">Aucun gestionnaire configuré.</p>
                                 ) : (
                                     managers.map((m: any) => (
-                                        <Link
+                                        <div
                                             key={m.id}
-                                            href={`/managers/${m.id}`}
-                                            className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 rounded-xl border border-zinc-800 bg-zinc-950/40 hover:bg-zinc-900/50 hover:border-zinc-700 transition-all gap-2"
+                                            className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 rounded-xl border border-zinc-800 bg-zinc-950/40 hover:border-zinc-750 transition-all gap-2"
                                         >
-                                            <div className="space-y-0.5">
-                                                <p className="text-sm font-semibold text-zinc-200">{m.first_name} {m.last_name}</p>
+                                            <Link
+                                                href={`/managers/${m.id}`}
+                                                className="flex-1 space-y-0.5"
+                                            >
+                                                <p className="text-sm font-semibold text-zinc-200 hover:text-purple-400 transition-colors">{m.first_name} {m.last_name}</p>
                                                 <p className="text-xs text-zinc-500">
                                                     {m.email && <span className="mr-3">{m.email}</span>}
                                                     {m.phone && <span>{m.phone}</span>}
                                                 </p>
+                                            </Link>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <Badge variant="outline" className={`text-xxs px-2 py-0.5 ${m.manager_teams?.name ? 'bg-cyan-950/40 text-cyan-300 border-cyan-800' : 'bg-zinc-950 text-zinc-400 border-zinc-800'}`}>
+                                                    {m.manager_teams?.name || 'Individuel'}
+                                                </Badge>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    disabled={isDeletingManagerId === m.id}
+                                                    onClick={() => handleDeleteManager(m.id, `${m.first_name} ${m.last_name}`)}
+                                                    className="h-8 w-8 p-0 text-zinc-500 hover:text-rose-450 hover:text-rose-400 hover:bg-rose-950/20 rounded-lg transition-all"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
                                             </div>
-                                            <Badge variant="outline" className={`text-xxs px-2 py-0.5 shrink-0 ${m.manager_teams?.name ? 'bg-cyan-950/40 text-cyan-300 border-cyan-800' : 'bg-zinc-950 text-zinc-400 border-zinc-800'}`}>
-                                                {m.manager_teams?.name || 'Individuel'}
-                                            </Badge>
-                                        </Link>
+                                        </div>
                                     ))
                                 )}
                             </div>
