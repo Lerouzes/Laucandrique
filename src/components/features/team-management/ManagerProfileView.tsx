@@ -189,11 +189,20 @@ export function ManagerProfileView({
                                     </span>
                                 </div>
                                 <div className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl border-purple-900/30">
-                                    <span className="text-purple-400 block uppercase font-bold text-[9px] tracking-wider">Projets Approuvés</span>
+                                    <span className="text-purple-400 block uppercase font-bold text-[9px] tracking-wider">Rapports d'opération (80%)</span>
                                     <span className="text-lg font-bold text-zinc-100 mt-1 block">
-                                        {stats.quoteApprovalRate ?? 0}%
-                                        <span className="text-xxs font-normal text-zinc-500 ml-1.5">
-                                            ({stats.approvedQuotesCount ?? 0}/{(stats.approvedQuotesCount ?? 0) + (stats.deniedQuotesCount ?? 0) + (stats.sentQuotesCount ?? 0)})
+                                        {stats.reportQuoteApprovalRate ?? 0}%
+                                        <span className="text-xxs font-normal text-zinc-500 ml-1.5 font-mono">
+                                            ({stats.reportQuotesAccepted ?? 0}/{stats.reportQuotesSent ?? 0})
+                                        </span>
+                                    </span>
+                                </div>
+                                <div className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl border-emerald-900/30">
+                                    <span className="text-emerald-450 text-emerald-400 block uppercase font-bold text-[9px] tracking-wider">Demandes additionnelles</span>
+                                    <span className="text-lg font-bold text-zinc-100 mt-1 block">
+                                        ${(stats.additionalQuotesAcceptedValue ?? 0).toLocaleString('fr-CA')}
+                                        <span className="text-xxs font-normal text-zinc-500 ml-1.5 font-mono">
+                                            ({stats.additionalQuoteApprovalRate ?? 0}%)
                                         </span>
                                     </span>
                                 </div>
@@ -307,6 +316,84 @@ export function ManagerProfileView({
                                         managerId={manager.id}
                                         title="Historique des Appels"
                                     />
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                            <CardHeader>
+                                <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                                    <FileText className="h-4 w-4 text-purple-400" />
+                                    Performance de Maintenance
+                                </CardTitle>
+                                <CardDescription className="text-xxs text-zinc-400">
+                                    Suivi de l'origine des soumissions et de leur taux d'acceptation par les copropriétés.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Report Quotes stats */}
+                                    <div className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-4">
+                                        <div className="flex justify-between items-start">
+                                            <h4 className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Suivi des Rapports d'Opérations</h4>
+                                            <Badge variant="outline" className="text-[8px] font-bold bg-purple-950/20 text-purple-300 border-purple-800/40">
+                                                Cible: 80%
+                                            </Badge>
+                                        </div>
+                                        <div className="flex items-baseline justify-between">
+                                            <span className={cn(
+                                                "text-2xl font-extrabold",
+                                                (stats.reportQuoteApprovalRate ?? 0) >= 80 ? "text-emerald-400" : "text-amber-400"
+                                            )}>
+                                                {stats.reportQuoteApprovalRate ?? 0}%
+                                            </span>
+                                            <span className="text-xxs text-zinc-500 font-mono">
+                                                {stats.reportQuotesAccepted ?? 0} acc. / {stats.reportQuotesSent ?? 0} env.
+                                            </span>
+                                        </div>
+                                        <div className="h-3 w-full bg-zinc-950 rounded-full overflow-hidden">
+                                            <div 
+                                                className="h-full bg-purple-600 rounded-full" 
+                                                style={{ width: `${Math.min(stats.reportQuoteApprovalRate ?? 0, 100)}%` }} 
+                                            />
+                                        </div>
+                                        <div className="text-[10px] text-zinc-500 flex justify-between font-mono">
+                                            <span>Rapports envoyés: {stats.reportQuotesSent ?? 0}</span>
+                                            <span>Rapports refusés: {stats.reportQuotesRejected ?? 0}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Additional Requests stats */}
+                                    <div className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-4">
+                                        <h4 className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Demandes Additionnelles Proactives</h4>
+                                        <div className="flex items-baseline justify-between">
+                                            <span className="text-2xl font-extrabold text-white">
+                                                {stats.additionalQuoteApprovalRate ?? 0}%
+                                            </span>
+                                            <span className="text-xxs text-zinc-500 font-mono">
+                                                {stats.additionalQuotesAccepted ?? 0} acc. / {stats.additionalQuotesSent ?? 0} env.
+                                            </span>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-zinc-850">
+                                            <div>
+                                                <span className="text-[9px] text-zinc-500 uppercase block font-bold">Volume Généré</span>
+                                                <span className="text-sm font-bold text-zinc-300">
+                                                    ${(stats.additionalQuotesGeneratedValue ?? 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className="text-[9px] text-zinc-500 uppercase block font-bold text-emerald-450">Volume Accepté</span>
+                                                <span className="text-sm font-bold text-emerald-400">
+                                                    ${(stats.additionalQuotesAcceptedValue ?? 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="text-[10px] text-zinc-500 flex justify-between font-mono">
+                                            <span>Demandes envoyées: {stats.additionalQuotesSent ?? 0}</span>
+                                            <span>Demandes refusées: {stats.additionalQuotesRejected ?? 0}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>

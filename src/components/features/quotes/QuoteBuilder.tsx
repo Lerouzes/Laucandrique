@@ -78,6 +78,7 @@ const quoteItemSchema = z.object({
 const quoteSchema = z.object({
     client_id: z.string().min(1, 'Client requis'),
     project_type: z.enum(['interior','exterior']).default('interior'),
+    quote_origin: z.enum(['operations_report', 'additional_manager_request']).default('operations_report'),
     contractor_id: z.string().optional(),
     title: z.string().min(1, 'Titre requis'),
     description: z.string().optional(),
@@ -241,6 +242,7 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
             client_id: initialQuote?.client_id || '',
             contractor_id: initialQuote?.contractor_id || 'none',
             project_type: initialQuote?.project_type || 'interior',
+            quote_origin: initialQuote?.quote_origin || 'operations_report',
             title: initialQuote?.title || '',
             description: initialQuote?.description || '',
             internal_notes: initialQuote?.internal_notes || '',
@@ -508,6 +510,7 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                         ? Number(data.duration_value) / 24
                         : Number(data.duration_value),
                     project_type: data.project_type,
+                    quote_origin: data.quote_origin,
                     admin_percentage: data.admin_percentage,
                     profit_percentage: data.profit_percentage,
                     work_types: data.work_types,
@@ -803,26 +806,49 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                     )}
                                 />
 
-                                <FormField
-                                    control={form.control}
-                                    name="project_type"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-zinc-300">Type de projet</FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value || 'interior'}>
-                                                <FormControl>
-                                                    <SelectTrigger className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600 text-zinc-100">
-                                                        <SelectValue placeholder="Type" />
-                                                    </SelectTrigger>
-                                                </FormControl>
-                                                <SelectContent className="bg-zinc-900 border-zinc-800">
-                                                    <SelectItem value="interior">Intérieur</SelectItem>
-                                                    <SelectItem value="exterior">Extérieur</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </FormItem>
-                                    )}
-                                />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="project_type"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-zinc-300">Type de projet</FormLabel>
+                                                <Select onValueChange={field.onChange} value={field.value || 'interior'}>
+                                                    <FormControl>
+                                                        <SelectTrigger className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600 text-zinc-100">
+                                                            <SelectValue placeholder="Type" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent className="bg-zinc-900 border-zinc-800">
+                                                        <SelectItem value="interior">Intérieur</SelectItem>
+                                                        <SelectItem value="exterior">Extérieur</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={form.control}
+                                        name="quote_origin"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-zinc-300">Origine de la soumission</FormLabel>
+                                                <Select onValueChange={field.onChange} value={field.value || 'operations_report'}>
+                                                    <FormControl>
+                                                        <SelectTrigger className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600 text-zinc-100">
+                                                            <SelectValue placeholder="Origine" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent className="bg-zinc-900 border-zinc-800">
+                                                        <SelectItem value="operations_report">Rapport d'opération</SelectItem>
+                                                        <SelectItem value="additional_manager_request">Demande additionnelle du gestionnaire</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
 
                                 <FormField
                                     control={form.control}

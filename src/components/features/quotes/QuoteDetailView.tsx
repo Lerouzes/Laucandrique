@@ -335,6 +335,7 @@ export function QuoteDetailView({ quote, settings }: { quote: any, settings: any
                         <div className="text-sm text-zinc-600">
                             <p>Date: {format(new Date(quote.created_at), 'dd MMMM yyyy', { locale: frCA })}</p>
                             {durationLabel && !quote.hide_duration && <p>Durée estimée: {durationLabel}</p>}
+                            <p>Origine: {quote.quote_origin === 'additional_manager_request' ? "Demande additionnelle du gestionnaire" : "Rapport d'opération"}</p>
                             {quote.sent_at && <p>Envoyée le: {format(new Date(quote.sent_at), 'dd MMMM yyyy, HH:mm', { locale: frCA })}</p>}
                         </div>
                     </div>

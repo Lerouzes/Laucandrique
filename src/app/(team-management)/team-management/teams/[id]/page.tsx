@@ -38,6 +38,14 @@ export default async function TeamDetailPage({
     let totalApprovedQuotes = 0
     let totalDeniedQuotes = 0
     let totalSentQuotes = 0
+    let teamReportQuotesSent = 0
+    let teamReportQuotesAccepted = 0
+    let teamReportQuotesRejected = 0
+    let teamAdditionalQuotesSent = 0
+    let teamAdditionalQuotesAccepted = 0
+    let teamAdditionalQuotesRejected = 0
+    let teamAdditionalQuotesGeneratedValue = 0
+    let teamAdditionalQuotesAcceptedValue = 0
     const allAlerts: string[] = []
 
     if (managers && managers.length > 0) {
@@ -63,6 +71,16 @@ export default async function TeamDetailPage({
                 totalApprovedQuotes += stats.approvedQuotesCount || 0
                 totalDeniedQuotes += stats.deniedQuotesCount || 0
                 totalSentQuotes += stats.sentQuotesCount || 0
+                
+                teamReportQuotesSent += stats.reportQuotesSent || 0
+                teamReportQuotesAccepted += stats.reportQuotesAccepted || 0
+                teamReportQuotesRejected += stats.reportQuotesRejected || 0
+                teamAdditionalQuotesSent += stats.additionalQuotesSent || 0
+                teamAdditionalQuotesAccepted += stats.additionalQuotesAccepted || 0
+                teamAdditionalQuotesRejected += stats.additionalQuotesRejected || 0
+                teamAdditionalQuotesGeneratedValue += stats.additionalQuotesGeneratedValue || 0
+                teamAdditionalQuotesAcceptedValue += stats.additionalQuotesAcceptedValue || 0
+
                 stats.alerts?.forEach(a => allAlerts.push(`${m.first_name} ${m.last_name}: ${a}`))
                 managerStats.push({
                     manager: m,
@@ -76,6 +94,9 @@ export default async function TeamDetailPage({
     const avgPerformance = managerStats.length > 0 ? Math.round(sumPerformanceScore / managerStats.length) : 0
     const totalPresentedQuotes = totalApprovedQuotes + totalDeniedQuotes + totalSentQuotes
     const teamQuoteApprovalRate = totalPresentedQuotes > 0 ? Math.round((totalApprovedQuotes / totalPresentedQuotes) * 100) : 0
+    
+    const teamReportQuoteApprovalRate = teamReportQuotesSent > 0 ? Math.round((teamReportQuotesAccepted / teamReportQuotesSent) * 100) : 0
+    const teamAdditionalQuoteApprovalRate = teamAdditionalQuotesSent > 0 ? Math.round((teamAdditionalQuotesAccepted / teamAdditionalQuotesSent) * 100) : 0
 
     return (
         <div className="space-y-6">
@@ -94,7 +115,7 @@ export default async function TeamDetailPage({
             </div>
 
             {/* Metrics cards */}
-            <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-6">
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardHeader className="pb-2">
                         <CardDescription className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Syndicats Actifs</CardDescription>
@@ -137,17 +158,31 @@ export default async function TeamDetailPage({
 
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 border-purple-900/30 shadow-md">
                     <CardHeader className="pb-2">
-                        <CardDescription className="text-xxs font-bold text-purple-450 uppercase tracking-wider text-purple-400">Projets Approuvés</CardDescription>
+                        <CardDescription className="text-xxs font-bold text-purple-400 uppercase tracking-wider">Rapports d'opération</CardDescription>
                     </CardHeader>
                     <CardContent className="flex items-baseline justify-between">
                         <div>
-                            <div className="text-xl font-extrabold text-white">{teamQuoteApprovalRate}%</div>
-                            <span className="text-[9px] text-zinc-500 font-normal">({totalApprovedQuotes}/{totalPresentedQuotes})</span>
+                            <div className="text-xl font-extrabold text-white">{teamReportQuoteApprovalRate}%</div>
+                            <span className="text-[9px] text-zinc-500 font-normal">({teamReportQuotesAccepted}/{teamReportQuotesSent})</span>
                         </div>
                         <BarChart3 className="h-4 w-4 text-purple-400" />
                     </CardContent>
                 </Card>
+
+                <Card className="bg-[#16171e]/70 border-zinc-800/80 border-emerald-900/30 shadow-md">
+                    <CardHeader className="pb-2">
+                        <CardDescription className="text-xxs font-bold text-emerald-450 uppercase tracking-wider text-emerald-450">Demandes additionnelles</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col justify-between h-full">
+                        <div>
+                            <div className="text-base font-extrabold text-white">${teamAdditionalQuotesAcceptedValue.toLocaleString('fr-CA')}</div>
+                            <span className="text-[9px] text-zinc-500 font-normal block">Généré: ${teamAdditionalQuotesGeneratedValue.toLocaleString('fr-CA')}</span>
+                            <span className="text-[9px] text-zinc-450 font-normal text-zinc-400">({teamAdditionalQuotesAccepted}/{teamAdditionalQuotesSent} acc. · {teamAdditionalQuoteApprovalRate}%)</span>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
+
 
             {/* Split Content: Managers and Alerts */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -191,8 +226,12 @@ export default async function TeamDetailPage({
                                                         <span className="text-zinc-300 font-bold mt-0.5 block">{stats.workloadIndex}</span>
                                                     </div>
                                                     <div className="px-2.5 py-1 bg-zinc-900 border border-zinc-850 rounded-lg border-purple-900/20">
-                                                        <span className="text-purple-400 block uppercase font-bold text-[8px]">Projets Approuvés</span>
-                                                        <span className="text-zinc-355 font-bold mt-0.5 block">{stats.quoteApprovalRate ?? 0}%</span>
+                                                        <span className="text-purple-400 block uppercase font-bold text-[8px]">Rapports (Conv.)</span>
+                                                        <span className="text-zinc-300 font-bold mt-0.5 block">{stats.reportQuoteApprovalRate ?? 0}%</span>
+                                                    </div>
+                                                    <div className="px-2.5 py-1 bg-zinc-900 border border-zinc-850 rounded-lg border-emerald-900/20">
+                                                        <span className="text-emerald-400 block uppercase font-bold text-[8px]">Demandes ($)</span>
+                                                        <span className="text-emerald-400 font-bold mt-0.5 block">${stats.additionalQuotesAcceptedValue?.toLocaleString('fr-CA')}</span>
                                                     </div>
                                                     <div className="px-2.5 py-1 bg-zinc-900 border border-zinc-850 rounded-lg">
                                                         <span className="text-zinc-500 block uppercase font-bold text-[8px]">Performance</span>

@@ -172,6 +172,11 @@ function QuoteRow({
                     {statusMap[quote.status]?.label || quote.status}
                 </Badge>
             </TableCell>
+            <TableCell>
+                <Badge variant="outline" className={quote.quote_origin === 'additional_manager_request' ? 'bg-blue-950 text-blue-300 border-blue-800' : 'bg-zinc-800 text-zinc-300 border-zinc-700'}>
+                    {quote.quote_origin === 'additional_manager_request' ? "Demande" : "Rapport"}
+                </Badge>
+            </TableCell>
             <TableCell className="text-zinc-100">${quote.total?.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
             <TableCell className="text-zinc-300">
                 {format(new Date(quote.created_at), 'dd MMM yyyy', { locale: frCA })}
@@ -540,6 +545,7 @@ export function QuotesTable({ data }: { data: any[] }) {
                             {renderHeader('Titre', 'title', 'whitespace-normal min-w-[150px] max-w-[250px]')}
                             {renderHeader('Client', 'client', 'whitespace-normal min-w-[150px] max-w-[200px]')}
                             {renderHeader('Statut', 'status')}
+                            {renderHeader('Origine', 'quote_origin')}
                             {renderHeader('Montant Total', 'total')}
                             {renderHeader('Créée le', 'created_at')}
                             <TableHead className="text-zinc-300 font-medium text-right">Actions</TableHead>
@@ -548,7 +554,7 @@ export function QuotesTable({ data }: { data: any[] }) {
                     <TableBody>
                         {sortedData.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={8} className="h-24 text-center text-zinc-300">
+                                <TableCell colSpan={9} className="h-24 text-center text-zinc-300">
                                     Aucune soumission trouvée.
                                 </TableCell>
                             </TableRow>

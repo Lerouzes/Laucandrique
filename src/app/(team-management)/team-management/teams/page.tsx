@@ -56,6 +56,14 @@ export default async function TeamsListPage() {
         let totalApprovedQuotes = 0
         let totalDeniedQuotes = 0
         let totalSentQuotes = 0
+        let teamReportQuotesSent = 0
+        let teamReportQuotesAccepted = 0
+        let teamReportQuotesRejected = 0
+        let teamAdditionalQuotesSent = 0
+        let teamAdditionalQuotesAccepted = 0
+        let teamAdditionalQuotesRejected = 0
+        let teamAdditionalQuotesAcceptedValue = 0
+        let teamAdditionalQuotesGeneratedValue = 0
 
         const managerDetails = []
 
@@ -70,6 +78,16 @@ export default async function TeamsListPage() {
                 totalApprovedQuotes += stats.approvedQuotesCount || 0
                 totalDeniedQuotes += stats.deniedQuotesCount || 0
                 totalSentQuotes += stats.sentQuotesCount || 0
+                
+                teamReportQuotesSent += stats.reportQuotesSent || 0
+                teamReportQuotesAccepted += stats.reportQuotesAccepted || 0
+                teamReportQuotesRejected += stats.reportQuotesRejected || 0
+                teamAdditionalQuotesSent += stats.additionalQuotesSent || 0
+                teamAdditionalQuotesAccepted += stats.additionalQuotesAccepted || 0
+                teamAdditionalQuotesRejected += stats.additionalQuotesRejected || 0
+                teamAdditionalQuotesAcceptedValue += stats.additionalQuotesAcceptedValue || 0
+                teamAdditionalQuotesGeneratedValue += stats.additionalQuotesGeneratedValue || 0
+
                 if (stats.riskLevel === 'Critique' || stats.riskLevel === 'Élevé') {
                     riskCount++
                 }
@@ -86,6 +104,9 @@ export default async function TeamsListPage() {
         const avgPerformance = managersWithStats > 0 ? Math.round(sumPerformanceScore / managersWithStats) : 0
         const totalPresentedQuotes = totalApprovedQuotes + totalDeniedQuotes + totalSentQuotes
         const teamQuoteApprovalRate = totalPresentedQuotes > 0 ? Math.round((totalApprovedQuotes / totalPresentedQuotes) * 100) : 0
+        
+        const teamReportQuoteApprovalRate = teamReportQuotesSent > 0 ? Math.round((teamReportQuotesAccepted / teamReportQuotesSent) * 100) : 0
+        const teamAdditionalQuoteApprovalRate = teamAdditionalQuotesSent > 0 ? Math.round((teamAdditionalQuotesAccepted / teamAdditionalQuotesSent) * 100) : 0
 
         teamStatsList.push({
             team,
@@ -99,7 +120,17 @@ export default async function TeamsListPage() {
             teamManagersList: managerDetails,
             quoteApprovalRate: teamQuoteApprovalRate,
             totalApprovedQuotes,
-            totalPresentedQuotes
+            totalPresentedQuotes,
+            teamReportQuotesSent,
+            teamReportQuotesAccepted,
+            teamReportQuotesRejected,
+            teamReportQuoteApprovalRate,
+            teamAdditionalQuotesSent,
+            teamAdditionalQuotesAccepted,
+            teamAdditionalQuotesRejected,
+            teamAdditionalQuoteApprovalRate,
+            teamAdditionalQuotesAcceptedValue,
+            teamAdditionalQuotesGeneratedValue
         })
     }
 
@@ -115,7 +146,7 @@ export default async function TeamsListPage() {
 
             {/* Teams Grid */}
             <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-                {teamStatsList.map(({ team, managersCount, totalSyndicates, totalDoors, totalMrr, avgWorkload, avgPerformance, riskCount, teamManagersList, quoteApprovalRate, totalApprovedQuotes, totalPresentedQuotes }) => {
+                {teamStatsList.map(({ team, managersCount, totalSyndicates, totalDoors, totalMrr, avgWorkload, avgPerformance, riskCount, teamManagersList, quoteApprovalRate, totalApprovedQuotes, totalPresentedQuotes, teamReportQuotesSent, teamReportQuotesAccepted, teamReportQuoteApprovalRate, teamAdditionalQuotesSent, teamAdditionalQuotesAccepted, teamAdditionalQuoteApprovalRate, teamAdditionalQuotesAcceptedValue, teamAdditionalQuotesGeneratedValue }) => {
                     const workloadColor = 
                         avgWorkload > 120 ? 'text-rose-400' :
                         avgWorkload > 80 ? 'text-amber-400' : 'text-emerald-400'
@@ -169,10 +200,16 @@ export default async function TeamsListPage() {
                                             {avgWorkload}
                                         </span>
                                     </div>
-                                    <div className="p-2.5 bg-zinc-900/40 border border-zinc-850 rounded-xl col-span-2 border-purple-900/20">
-                                        <span className="text-purple-400 block uppercase tracking-wider font-bold">Projets Approuvés Équipe</span>
+                                    <div className="p-2.5 bg-zinc-900/40 border border-zinc-850 rounded-xl border-purple-900/20">
+                                        <span className="text-purple-400 block uppercase tracking-wider font-bold text-purple-400">Rapports d'opération</span>
                                         <span className="text-xs font-bold text-zinc-200 mt-1 block">
-                                            {quoteApprovalRate}% <span className="text-[10px] font-normal text-zinc-500 ml-1">({totalApprovedQuotes} acceptés / {totalPresentedQuotes} présentés)</span>
+                                            {teamReportQuoteApprovalRate}% <span className="text-[10px] font-normal text-zinc-500 ml-1">({teamReportQuotesAccepted}/{teamReportQuotesSent})</span>
+                                        </span>
+                                    </div>
+                                    <div className="p-2.5 bg-zinc-900/40 border border-zinc-850 rounded-xl border-emerald-900/20">
+                                        <span className="text-emerald-400 block uppercase tracking-wider font-bold text-emerald-400">Demandes additionnelles</span>
+                                        <span className="text-xs font-bold text-zinc-200 mt-1 block">
+                                            ${teamAdditionalQuotesAcceptedValue.toLocaleString('fr-CA')} <span className="text-[10px] font-normal text-zinc-500 ml-1">({teamAdditionalQuoteApprovalRate}%)</span>
                                         </span>
                                     </div>
                                 </div>
@@ -201,7 +238,7 @@ export default async function TeamsListPage() {
                                                     className="p-2 bg-zinc-950/30 border border-zinc-850/80 rounded-lg hover:border-purple-800/40 hover:bg-zinc-950/60 transition-all flex items-center justify-between text-xxs"
                                                 >
                                                     <span className="text-zinc-300 truncate font-semibold">
-                                                        {mgr.name} <span className="text-purple-400 ml-1 font-mono">({mgr.stats?.quoteApprovalRate ?? 0}%)</span>
+                                                        {mgr.name} <span className="text-purple-400 ml-1 font-mono">({mgr.stats?.reportQuoteApprovalRate ?? 0}%)</span>
                                                     </span>
                                                     <span className={cn(
                                                         "h-1.5 w-1.5 rounded-full shrink-0",

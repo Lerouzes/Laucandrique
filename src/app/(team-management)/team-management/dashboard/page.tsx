@@ -209,6 +209,88 @@ export default async function TeamManagementDashboard(props: {
                 </Card>
             </div>
 
+            {/* Quote Maintenance Performance Section */}
+            <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                            <Activity className="h-4 w-4 text-purple-400" />
+                            Statistiques des Soumissions (Rapports d'opération)
+                        </CardTitle>
+                        <CardDescription className="text-xxs text-zinc-400">
+                            Performances globales sur le suivi des rapports d'opérations.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                            <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                                <span className="text-[10px] text-zinc-500 uppercase font-bold block">Total Envoyé</span>
+                                <span className="text-lg font-bold text-zinc-200 mt-1 block">{stats.reportQuotesSent}</span>
+                            </div>
+                            <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                                <span className="text-[10px] text-zinc-500 uppercase font-bold block">Total Accepté</span>
+                                <span className="text-lg font-bold text-emerald-400 mt-1 block">{stats.reportQuotesAccepted}</span>
+                            </div>
+                            <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl border-purple-900/30">
+                                <span className="text-[10px] text-purple-400 uppercase font-bold block">Taux d'approbation</span>
+                                <span className="text-lg font-bold text-zinc-150 mt-1 block">{stats.reportQuoteApprovalRate}%</span>
+                            </div>
+                        </div>
+                        <div className="space-y-1">
+                            <div className="flex justify-between text-xxs font-medium text-zinc-400">
+                                <span>Taux de conversion global (Cible 80%)</span>
+                                <span>{stats.reportQuoteApprovalRate}%</span>
+                            </div>
+                            <div className="h-2 w-full bg-zinc-950 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-purple-600 rounded-full" 
+                                    style={{ 
+                                        width: `${stats.reportQuoteApprovalRate}%`,
+                                        backgroundColor: stats.reportQuoteApprovalRate >= 80 ? '#10b981' : '#f43f5e' 
+                                    }} 
+                                />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                            <DollarSign className="h-4 w-4 text-emerald-400" />
+                            Statistiques des Soumissions (Demandes additionnelles)
+                        </CardTitle>
+                        <CardDescription className="text-xxs text-zinc-400">
+                            Génération proactive de maintenance par les gestionnaires.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-4 gap-2 text-center text-xxs">
+                            <div className="p-2.5 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                                <span className="text-[9px] text-zinc-500 uppercase font-bold block">Total Envoyé</span>
+                                <span className="text-xs font-bold text-zinc-200 mt-1 block">{stats.additionalQuotesSent}</span>
+                            </div>
+                            <div className="p-2.5 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                                <span className="text-[9px] text-zinc-500 uppercase font-bold block">Total Accepté</span>
+                                <span className="text-xs font-bold text-emerald-400 mt-1 block">{stats.additionalQuotesAccepted}</span>
+                            </div>
+                            <div className="p-2.5 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                                <span className="text-[9px] text-zinc-500 uppercase font-bold block">Taux d'approbation</span>
+                                <span className="text-xs font-bold text-zinc-150 mt-1 block">{stats.additionalQuoteApprovalRate}%</span>
+                            </div>
+                            <div className="p-2.5 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                                <span className="text-[9px] text-zinc-500 uppercase font-bold block">Revenu Généré</span>
+                                <span className="text-xs font-bold text-zinc-300 mt-1 block">${stats.additionalQuotesGeneratedValue.toLocaleString('fr-CA')}</span>
+                            </div>
+                        </div>
+                        <div className="p-3 bg-emerald-950/20 border border-emerald-900/30 rounded-xl flex justify-between items-center text-xxs">
+                            <span className="font-bold text-zinc-300 uppercase tracking-wider">Revenu Total Accepté</span>
+                            <span className="text-sm font-extrabold text-emerald-400">${stats.additionalQuotesAcceptedValue.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
             {/* Visual Trends Analytics Charts */}
             <TeamTrendsCharts trends={stats.monthlyTrends || []} />
 

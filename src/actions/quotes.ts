@@ -413,16 +413,16 @@ export async function confirmBulkQuoteImportAction(rows: {
     // Load existing clients to pre-populate the cache
     const { data: existingClients, error: clientsError } = await supabase
         .from('clients')
-        .select('id, full_name')
+        .select('id, full_name, manager_id')
     if (clientsError) {
         console.error('Error fetching clients for cache:', clientsError)
         return { success: false, error: clientsError.message }
     }
 
-    const sdcToClientIdMap = new Map<string, string>()
+    const sdcToClientMap = new Map<string, { id: string, manager_id: string | null }>()
     for (const ec of existingClients || []) {
         if (ec.full_name) {
-            sdcToClientIdMap.set(ec.full_name.trim().toLowerCase(), ec.id)
+            sdcToClientMap.set(ec.full_name.trim().toLowerCase(), { id: ec.id, manager_id: ec.manager_id })
         }
     }
 
@@ -441,7 +441,9 @@ export async function confirmBulkQuoteImportAction(rows: {
         // 1. Resolve or Create Client
         const sdcClean = row.sdc_num.trim()
         const sdcLower = sdcClean.toLowerCase()
-        let clientId = sdcToClientIdMap.get(sdcLower)
+        const cachedClient = sdcToClientMap.get(sdcLower)
+        let clientId = cachedClient?.id
+        let resolvedManagerId = row.manager_id || cachedClient?.manager_id || null
 
         if (!clientId) {
             const newClientPayload = {
@@ -453,7 +455,7 @@ export async function confirmBulkQuoteImportAction(rows: {
             const { data: newClient, error: clientErr } = await supabase
                 .from('clients')
                 .insert(newClientPayload)
-                .select('id')
+                .select('id, manager_id')
                 .single()
 
             if (clientErr || !newClient) {
@@ -462,7 +464,8 @@ export async function confirmBulkQuoteImportAction(rows: {
                 continue
             }
             clientId = newClient.id
-            sdcToClientIdMap.set(sdcLower, clientId)
+            resolvedManagerId = row.manager_id || newClient.manager_id || null
+            sdcToClientMap.set(sdcLower, { id: clientId, manager_id: resolvedManagerId })
             clientsCreated++
         }
 
@@ -481,7 +484,8 @@ export async function confirmBulkQuoteImportAction(rows: {
             client_id: clientId,
             title: row.title.trim(),
             status: row.status,
-            manager_id: row.manager_id || null,
+            manager_id: resolvedManagerId,
+            quote_origin: 'operations_report',
             contractor_id: row.contractor_id || null,
             subtotal: subtotal,
             admin_percentage: defaultAdminPerc,

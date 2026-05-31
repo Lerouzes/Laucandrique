@@ -216,7 +216,7 @@ export async function getManagerStats(managerId: string) {
     // 13. Operation Tab Quotes / Projects stats
     const { data: managerQuotes } = await supabase
         .from('quotes')
-        .select('status')
+        .select('status, quote_origin, total')
         .eq('manager_id', managerId)
 
     const approvedQuotesCount = (managerQuotes || []).filter(q => ['approved', 'completed', 'billed'].includes(q.status || '')).length
@@ -224,6 +224,29 @@ export async function getManagerStats(managerId: string) {
     const sentQuotesCount = (managerQuotes || []).filter(q => q.status === 'sent').length
     const quotesTotalPresented = approvedQuotesCount + deniedQuotesCount + sentQuotesCount
     const quoteApprovalRate = quotesTotalPresented > 0 ? Math.round((approvedQuotesCount / quotesTotalPresented) * 100) : 0
+
+    const reportQuotes = (managerQuotes || []).filter(q => q.quote_origin === 'operations_report' || !q.quote_origin)
+    const additionalQuotes = (managerQuotes || []).filter(q => q.quote_origin === 'additional_manager_request')
+
+    // Report quotes stats
+    const reportQuotesSent = reportQuotes.filter(q => ['sent', 'approved', 'completed', 'billed', 'denied'].includes(q.status || '')).length
+    const reportQuotesAccepted = reportQuotes.filter(q => ['approved', 'completed', 'billed'].includes(q.status || '')).length
+    const reportQuotesRejected = reportQuotes.filter(q => q.status === 'denied').length
+    const reportQuoteApprovalRate = reportQuotesSent > 0 ? Math.round((reportQuotesAccepted / reportQuotesSent) * 100) : 0
+
+    // Additional requests stats
+    const additionalQuotesSent = additionalQuotes.filter(q => ['sent', 'approved', 'completed', 'billed', 'denied'].includes(q.status || '')).length
+    const additionalQuotesAccepted = additionalQuotes.filter(q => ['approved', 'completed', 'billed'].includes(q.status || '')).length
+    const additionalQuotesRejected = additionalQuotes.filter(q => q.status === 'denied').length
+    const additionalQuoteApprovalRate = additionalQuotesSent > 0 ? Math.round((additionalQuotesAccepted / additionalQuotesSent) * 100) : 0
+
+    const additionalQuotesAcceptedValue = additionalQuotes
+        .filter(q => ['approved', 'completed', 'billed'].includes(q.status || ''))
+        .reduce((sum, q) => sum + Number(q.total || 0), 0)
+
+    const additionalQuotesGeneratedValue = additionalQuotes
+        .filter(q => ['sent', 'approved', 'completed', 'billed', 'denied'].includes(q.status || ''))
+        .reduce((sum, q) => sum + Number(q.total || 0), 0)
 
     return {
         manager,
@@ -247,7 +270,17 @@ export async function getManagerStats(managerId: string) {
         quoteApprovalRate,
         approvedQuotesCount,
         deniedQuotesCount,
-        sentQuotesCount
+        sentQuotesCount,
+        reportQuotesSent,
+        reportQuotesAccepted,
+        reportQuotesRejected,
+        reportQuoteApprovalRate,
+        additionalQuotesSent,
+        additionalQuotesAccepted,
+        additionalQuotesRejected,
+        additionalQuoteApprovalRate,
+        additionalQuotesAcceptedValue,
+        additionalQuotesGeneratedValue
     }
 }
 
@@ -440,7 +473,7 @@ export async function getGlobalTeamStats(opts?: {
     // Global quote stats
     let quotesQuery = supabase
         .from('quotes')
-        .select('status')
+        .select('status, quote_origin, total')
         .gte('created_at', startDate)
         .lte('created_at', endDate)
 
@@ -454,6 +487,29 @@ export async function getGlobalTeamStats(opts?: {
     const globalSent = (allQuotes || []).filter(q => q.status === 'sent').length
     const globalTotalPresented = globalApproved + globalDenied + globalSent
     const quoteApprovalRate = globalTotalPresented > 0 ? Math.round((globalApproved / globalTotalPresented) * 100) : 0
+
+    const reportQuotes = (allQuotes || []).filter(q => q.quote_origin === 'operations_report' || !q.quote_origin)
+    const additionalQuotes = (allQuotes || []).filter(q => q.quote_origin === 'additional_manager_request')
+
+    // Report quotes stats
+    const reportQuotesSent = reportQuotes.filter(q => ['sent', 'approved', 'completed', 'billed', 'denied'].includes(q.status || '')).length
+    const reportQuotesAccepted = reportQuotes.filter(q => ['approved', 'completed', 'billed'].includes(q.status || '')).length
+    const reportQuotesRejected = reportQuotes.filter(q => q.status === 'denied').length
+    const reportQuoteApprovalRate = reportQuotesSent > 0 ? Math.round((reportQuotesAccepted / reportQuotesSent) * 100) : 0
+
+    // Additional requests stats
+    const additionalQuotesSent = additionalQuotes.filter(q => ['sent', 'approved', 'completed', 'billed', 'denied'].includes(q.status || '')).length
+    const additionalQuotesAccepted = additionalQuotes.filter(q => ['approved', 'completed', 'billed'].includes(q.status || '')).length
+    const additionalQuotesRejected = additionalQuotes.filter(q => q.status === 'denied').length
+    const additionalQuoteApprovalRate = additionalQuotesSent > 0 ? Math.round((additionalQuotesAccepted / additionalQuotesSent) * 100) : 0
+
+    const additionalQuotesAcceptedValue = additionalQuotes
+        .filter(q => ['approved', 'completed', 'billed'].includes(q.status || ''))
+        .reduce((sum, q) => sum + Number(q.total || 0), 0)
+
+    const additionalQuotesGeneratedValue = additionalQuotes
+        .filter(q => ['sent', 'approved', 'completed', 'billed', 'denied'].includes(q.status || ''))
+        .reduce((sum, q) => sum + Number(q.total || 0), 0)
 
     // Fetch phone call statistics
     let callsQuery = supabase
@@ -545,6 +601,16 @@ export async function getGlobalTeamStats(opts?: {
         lostYtd: lostCount || 0,
         newYtd: newCount || 0,
         quoteApprovalRate,
+        reportQuotesSent,
+        reportQuotesAccepted,
+        reportQuotesRejected,
+        reportQuoteApprovalRate,
+        additionalQuotesSent,
+        additionalQuotesAccepted,
+        additionalQuotesRejected,
+        additionalQuoteApprovalRate,
+        additionalQuotesAcceptedValue,
+        additionalQuotesGeneratedValue,
         totalCalls,
         answeredCalls,
         callsAnsweredPct,
