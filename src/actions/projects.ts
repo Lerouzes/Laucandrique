@@ -238,7 +238,11 @@ export async function getProjectDetails(projectId: string) {
             quotes (
                 *,
                 quote_images (*),
-                quote_items (*)
+                quote_items (*),
+                quote_planning_sections (
+                    *,
+                    quote_planning_rooms (*)
+                )
             )
         `)
         .eq('id', projectId)

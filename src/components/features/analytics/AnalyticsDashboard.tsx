@@ -66,6 +66,7 @@ export function AnalyticsDashboard({
     const [customStart, setCustomStart] = useState<string>('')
     const [customEnd, setCustomEnd] = useState<string>('')
     const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>('all')
+    const [projectStatusFilter, setProjectStatusFilter] = useState<'all' | 'sent' | 'accepted' | 'completed' | 'billed'>('all')
 
     // Generate list of the last 24 months for dropdown filter
     const monthsList = useMemo(() => {
@@ -198,9 +199,16 @@ export function AnalyticsDashboard({
             const contractorName = q.contractors?.full_name || 'Sans contracteur'
             const contractorMatch = selectedContractors.length === 0 || selectedContractors.includes(contractorName)
 
+            if (projectStatusFilter !== 'all') {
+                if (projectStatusFilter === 'sent' && q.status !== 'sent') return false
+                if (projectStatusFilter === 'accepted' && q.status !== 'approved') return false
+                if (projectStatusFilter === 'completed' && q.status !== 'completed') return false
+                if (projectStatusFilter === 'billed' && q.status !== 'billed') return false
+            }
+
             return dateMatch && managerMatch && teamMatch && contractorMatch
         })
-    }, [initialQuotes, dateRange, selectedManagers, selectedTeams, selectedContractors])
+    }, [initialQuotes, dateRange, selectedManagers, selectedTeams, selectedContractors, projectStatusFilter])
 
     const filteredProjects = useMemo(() => {
         return initialProjects.filter((p: any) => {
@@ -217,9 +225,17 @@ export function AnalyticsDashboard({
             const contractorName = p.contractors?.full_name || p.quotes?.contractors?.full_name || 'Sans contracteur'
             const contractorMatch = selectedContractors.length === 0 || selectedContractors.includes(contractorName)
 
+            if (projectStatusFilter !== 'all') {
+                const qStatus = p.quotes?.status || ''
+                if (projectStatusFilter === 'sent' && qStatus !== 'sent') return false
+                if (projectStatusFilter === 'accepted' && qStatus !== 'approved' && p.status !== 'planned' && p.status !== 'in_progress') return false
+                if (projectStatusFilter === 'completed' && p.status !== 'completed' && qStatus !== 'completed') return false
+                if (projectStatusFilter === 'billed' && qStatus !== 'billed') return false
+            }
+
             return dateMatch && managerMatch && teamMatch && contractorMatch
         })
-    }, [initialProjects, dateRange, selectedManagers, selectedTeams, selectedContractors])
+    }, [initialProjects, dateRange, selectedManagers, selectedTeams, selectedContractors, projectStatusFilter])
 
     // --- METRIC CALCULATIONS ---
     const approvedQuotes = useMemo(() => filteredQuotes.filter((q: any) => q.status === 'approved' || q.status === 'completed' || q.status === 'billed'), [filteredQuotes])
@@ -228,6 +244,9 @@ export function AnalyticsDashboard({
     const sentQuotes = useMemo(() => filteredQuotes.filter((q: any) => q.status === 'sent'), [filteredQuotes])
 
     const filteredBills = useMemo(() => {
+        if (projectStatusFilter !== 'all' && projectStatusFilter !== 'billed') {
+            return []
+        }
         return (initialBills || []).filter((b: any) => {
             const d = new Date(b.bill_date)
             const dateMatch = d >= dateRange.start && d <= dateRange.end
@@ -242,7 +261,7 @@ export function AnalyticsDashboard({
 
             return dateMatch && managerMatch && teamMatch && contractorMatch
         })
-    }, [initialBills, dateRange, selectedManagers, selectedTeams, selectedContractors])
+    }, [initialBills, dateRange, selectedManagers, selectedTeams, selectedContractors, projectStatusFilter])
 
     const totalSentRevenue = useMemo(() => {
         return sentQuotes.reduce((acc, q) => acc + (q.total || 0), 0)
@@ -250,11 +269,26 @@ export function AnalyticsDashboard({
 
     const totalProjectedRevenue = useMemo(() => {
         const approvedSum = approvedQuotes.reduce((acc, q) => acc + (q.total || 0), 0)
+        const sentSum = sentQuotes.reduce((acc, q) => acc + (q.total || 0), 0)
+        
+        if (projectStatusFilter === 'sent') {
+            return sentSum
+        }
+        if (projectStatusFilter === 'accepted') {
+            return approvedSum
+        }
+        if (projectStatusFilter === 'completed') {
+            return approvedQuotes.reduce((acc, q) => acc + (q.total || 0), 0)
+        }
+        if (projectStatusFilter === 'billed') {
+            return approvedQuotes.reduce((acc, q) => acc + (q.total || 0), 0)
+        }
+        
         if (pipelineMode === 'all') {
-            return approvedSum + totalSentRevenue
+            return approvedSum + sentSum
         }
         return approvedSum
-    }, [approvedQuotes, totalSentRevenue, pipelineMode])
+    }, [approvedQuotes, sentQuotes, projectStatusFilter, pipelineMode])
 
     const totalRealizedRevenue = useMemo(() => {
         return filteredBills.reduce((acc, b) => acc + Number(b.total || 0), 0)
@@ -475,19 +509,53 @@ export function AnalyticsDashboard({
 
     // 5. Contractor Segmentation
     const contractorSegmentation = useMemo(() => {
-        const stats: Record<string, { name: string, jobs: number, revenue: number }> = {}
+        const stats: Record<string, { name: string, jobs: number, revenue: number, projected: number, completed: number }> = {}
 
+        // Initialize from all available contractors so we always show them
+        availableContractors.forEach(name => {
+            stats[name] = { name, jobs: 0, revenue: 0, projected: 0, completed: 0 }
+        })
+
+        // 1. Sum up projected revenue from filteredQuotes
+        filteredQuotes.forEach((q: any) => {
+            const name = q.contractors?.full_name || 'Sans contracteur'
+            if (q.status === 'approved' || q.status === 'completed' || q.status === 'billed') {
+                if (!stats[name]) {
+                    stats[name] = { name, jobs: 0, revenue: 0, projected: 0, completed: 0 }
+                }
+                stats[name].projected += q.total || 0
+            }
+        })
+
+        // 2. Sum up completed revenue from filteredProjects
+        filteredProjects.forEach((p: any) => {
+            const name = p.contractors?.full_name || p.quotes?.contractors?.full_name || 'Sans contracteur'
+            if (p.status === 'completed') {
+                if (!stats[name]) {
+                    stats[name] = { name, jobs: 0, revenue: 0, projected: 0, completed: 0 }
+                }
+                stats[name].completed += p.quotes?.total || 0
+            }
+        })
+
+        // 3. Sum up billed revenue from filteredBills
         filteredBills.forEach((b: any) => {
             const name = b.contractors?.full_name || 'Sans contracteur'
             if (!stats[name]) {
-                stats[name] = { name, jobs: 0, revenue: 0 }
+                stats[name] = { name, jobs: 0, revenue: 0, projected: 0, completed: 0 }
             }
             stats[name].jobs += 1
             stats[name].revenue += Number(b.total || 0)
         })
 
-        return Object.values(stats).sort((a, b) => b.revenue - a.revenue)
-    }, [filteredBills])
+        return Object.values(stats)
+            .filter(c => {
+                const hasData = c.projected > 0 || c.completed > 0 || c.revenue > 0
+                const matchesSelection = selectedContractors.length === 0 || selectedContractors.includes(c.name)
+                return hasData && matchesSelection
+            })
+            .sort((a, b) => b.projected - a.projected)
+    }, [filteredQuotes, filteredProjects, filteredBills, availableContractors, selectedContractors])
 
     // --- RESET FILTERS ---
     const resetFilters = () => {
@@ -497,6 +565,7 @@ export function AnalyticsDashboard({
         setSelectedTeams([])
         setSelectedContractors([])
         setPipelineMode('approved')
+        setProjectStatusFilter('all')
     }
 
     const toggleManager = (id: string) => {
@@ -591,16 +660,19 @@ export function AnalyticsDashboard({
                             </select>
                         </div>
 
-                        {/* Visualisation Mode (Pipeline Mode) */}
+                        {/* Statut du Projet */}
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Visualisation</label>
+                            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Statut du Projet</label>
                             <select
-                                value={pipelineMode}
-                                onChange={(e: any) => setPipelineMode(e.target.value as 'approved' | 'all')}
+                                value={projectStatusFilter}
+                                onChange={(e: any) => setProjectStatusFilter(e.target.value as any)}
                                 className="w-full h-9 rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-cyan-500"
                             >
-                                <option value="approved">Signé uniquement</option>
-                                <option value="all">Pipeline complet (Signé + Envoyé)</option>
+                                <option value="all">Tous les projets</option>
+                                <option value="sent">Projets envoyés</option>
+                                <option value="accepted">Projets acceptés / en cours</option>
+                                <option value="completed">Projets complétés</option>
+                                <option value="billed">Facturés</option>
                             </select>
                         </div>
 
@@ -1312,9 +1384,9 @@ export function AnalyticsDashboard({
                     {activeTab === 'contractors' && (
                         <Card className="bg-zinc-950/40 border-zinc-800 p-6 rounded-2xl shadow-xl">
                             <CardHeader className="px-0 pt-0">
-                                <CardTitle className="text-zinc-100 text-base">Revenus générés par Contracteur</CardTitle>
+                                <CardTitle className="text-zinc-100 text-base">Revenus par Contracteur</CardTitle>
                                 <CardDescription className="text-zinc-400 text-xs">
-                                    Somme des revenus réels (projets complétés) par contracteur sur la période.
+                                    Somme des revenus projetés, complétés et facturés par contracteur sur la période.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="px-0 pb-0">
@@ -1341,7 +1413,9 @@ export function AnalyticsDashboard({
                                                     ]}
                                                 />
                                                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }} />
-                                                <Bar name="Revenu Réalisé" dataKey="revenue" fill={COLORS.amber} radius={[0, 4, 4, 0]} maxBarSize={30} />
+                                                <Bar name="Projeté (Signé)" dataKey="projected" fill={COLORS.cyan} radius={[0, 4, 4, 0]} maxBarSize={12} />
+                                                <Bar name="Réel (Complété)" dataKey="completed" fill={COLORS.emerald} radius={[0, 4, 4, 0]} maxBarSize={12} />
+                                                <Bar name="Facturé" dataKey="revenue" fill={COLORS.amber} radius={[0, 4, 4, 0]} maxBarSize={12} />
                                             </BarChart>
                                         </ResponsiveContainer>
                                     )}
@@ -1472,9 +1546,13 @@ export function AnalyticsDashboard({
                                             <div key={c.name} className="flex items-center justify-between border-b border-zinc-900 pb-2 text-xs">
                                                 <div className="space-y-0.5">
                                                     <p className="font-semibold text-zinc-200">{c.name}</p>
-                                                    <p className="text-xxs text-zinc-500">{c.jobs} projets complétés</p>
+                                                    <p className="text-xxs text-zinc-500">{c.jobs} facture(s) émise(s)</p>
                                                 </div>
-                                                <span className="font-bold text-amber-400">${Math.round(c.revenue).toLocaleString('fr-CA')}</span>
+                                                <div className="text-right flex flex-col items-end font-sans">
+                                                    <span className="font-bold text-amber-400 block">${Math.round(c.revenue).toLocaleString('fr-CA')} <span className="text-[9px] text-zinc-500 font-normal">(Facturé)</span></span>
+                                                    <span className="text-[10px] text-zinc-350 text-zinc-300 block mt-0.5">${Math.round(c.completed).toLocaleString('fr-CA')} <span className="text-[9px] text-zinc-500 font-normal">(Réel/Complété)</span></span>
+                                                    <span className="text-[10px] text-zinc-450 text-zinc-450 block mt-0.5">${Math.round(c.projected).toLocaleString('fr-CA')} <span className="text-[9px] text-zinc-500 font-normal">(Projeté)</span></span>
+                                                </div>
                                             </div>
                                         ))}
                                     </>

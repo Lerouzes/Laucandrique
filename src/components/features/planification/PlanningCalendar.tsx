@@ -22,7 +22,10 @@ import {
     TrendingUp,
     Loader2,
     ArrowUpDown,
-    Filter
+    Filter,
+    ChevronLeft,
+    ChevronRight,
+    ArrowRight
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import {
@@ -31,6 +34,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
+import { renderRoomToDataURL, calculatePerimeter, calculateFloorArea, calculateWallSurface } from '@/utils/pdf'
 
 type StatusFilter = 'unscheduled' | 'scheduled' | 'completed' | 'cancelled' | 'all'
 
@@ -88,6 +93,22 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
     const [selectedContractorId, setSelectedContractorId] = useState<string>('')
     const [selectedJobType, setSelectedJobType] = useState<string>('')
     const [sidebarSortOrder, setSidebarSortOrder] = useState<'approved_asc' | 'approved_desc'>('approved_asc')
+    const [monthOffset, setMonthOffset] = useState<number>(0)
+    const [pushDialogState, setPushDialogState] = useState<{
+        open: boolean
+        monthKey: string
+        monthLabel: string
+        year: number
+        monthIdx: number
+        projectsToPush: any[]
+    }>({
+        open: false,
+        monthKey: '',
+        monthLabel: '',
+        year: 0,
+        monthIdx: 0,
+        projectsToPush: []
+    })
 
     // Generate unique contractors list dynamically from projects array
     const uniqueContractors = useMemo(() => {
@@ -140,12 +161,12 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         setProjects(initialProjects)
     }, [initialProjects])
 
-    // Generate list of the next 12 months starting from the current month
+    // Generate list of the next 12 months starting from the current month + offset
     const months = useMemo(() => {
         const list = []
         const now = new Date()
         for (let i = 0; i < 12; i++) {
-            const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+            const d = new Date(now.getFullYear(), now.getMonth() + monthOffset + i, 1)
             const year = d.getFullYear()
             const month = d.getMonth()
             const key = `${year}-${String(month + 1).padStart(2, '0')}`
@@ -153,7 +174,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             list.push({ key, label, year, month })
         }
         return list
-    }, [])
+    }, [monthOffset])
 
     // Initialize draggable only ONCE on mount for FullCalendar external drag source
     useEffect(() => {
@@ -468,6 +489,9 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             }
             if (newStatus === 'completed') {
                 updated.completed_at = new Date().toISOString()
+            } else {
+                updated.completed_at = null
+                updated.completed_months = []
             }
             return updated
         }))
@@ -564,6 +588,65 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
         })
     }
 
+    const handlePushUnrealizedToNextMonth = (projectsToPush: any[], currentYear: number, currentMonthIdx: number) => {
+        if (projectsToPush.length === 0) return
+
+        let targetYear = currentYear
+        let targetMonthIdx = currentMonthIdx + 1
+        if (targetMonthIdx > 11) {
+            targetMonthIdx = 0
+            targetYear += 1
+        }
+        const targetMonthKey = `${targetYear}-${String(targetMonthIdx + 1).padStart(2, '0')}`
+
+        setProjects(prev => prev.map(p => {
+            const match = projectsToPush.find(tp => tp.id === p.id)
+            if (!match) return p
+            
+            const durationDays = Number(p.estimated_duration_days || 1)
+            const start = new Date(Date.UTC(targetYear, targetMonthIdx, 1, 8, 0, 0))
+            const end = new Date(start.getTime())
+            const dur = Math.max(0.01, durationDays)
+            if (dur < 1) {
+                const durationMinutes = Math.max(15, Math.round(dur * 24 * 60))
+                end.setTime(start.getTime() + durationMinutes * 60 * 1000)
+            } else {
+                end.setDate(end.getDate() + (Math.ceil(dur) - 1))
+                end.setUTCHours(17, 0, 0, 0)
+            }
+            return {
+                ...p,
+                status: 'planned',
+                start_date: start.toISOString(),
+                end_date: end.toISOString(),
+                planned_months: [targetMonthKey]
+            }
+        }))
+
+        startTransition(async () => {
+            try {
+                await Promise.all(projectsToPush.map(async (p) => {
+                    const durationDays = Number(p.estimated_duration_days || 1)
+                    const start = new Date(Date.UTC(targetYear, targetMonthIdx, 1, 8, 0, 0))
+                    const end = new Date(start.getTime())
+                    const dur = Math.max(0.01, durationDays)
+                    if (dur < 1) {
+                        const durationMinutes = Math.max(15, Math.round(dur * 24 * 60))
+                        end.setTime(start.getTime() + durationMinutes * 60 * 1000)
+                    } else {
+                        end.setDate(end.getDate() + (Math.ceil(dur) - 1))
+                        end.setUTCHours(17, 0, 0, 0)
+                    }
+                    await updateProjectDates(p.id, start.toISOString(), end.toISOString())
+                }))
+                const nextMonthLabel = new Date(targetYear, targetMonthIdx, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+                toast.success(`${projectsToPush.length} projet(s) repoussé(s) vers ${nextMonthLabel}`)
+            } catch (err: any) {
+                toast.error("Erreur lors du déplacement", { description: err.message })
+            }
+        })
+    }
+
     const handleBulkStatusChange = (newStatus: 'unplanned' | 'planned' | 'in_progress' | 'completed' | 'deferred' | 'cancelled') => {
         if (selectedProjectIds.length === 0) return
 
@@ -580,6 +663,9 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
             }
             if (newStatus === 'completed') {
                 updated.completed_at = new Date().toISOString()
+            } else {
+                updated.completed_at = null
+                updated.completed_months = []
             }
             return updated
         }))
@@ -1032,10 +1118,38 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                 ) : (
                     <Card className="flex-1 h-full border-zinc-800 bg-transparent p-4 relative overflow-hidden flex flex-col">
                         <div className="shrink-0 mb-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                            <div>
-                                <CardTitle className="text-zinc-100 text-base font-semibold flex items-center gap-2">
-                                    <TrendingUp className="h-5 w-5 text-yellow-400" />
-                                    <span>Tableau de Prévisions Annuelles (12 Mois)</span>
+                            <div className="flex-1">
+                                <CardTitle className="text-zinc-100 text-base font-semibold flex items-center justify-between w-full">
+                                    <div className="flex items-center gap-2">
+                                        <TrendingUp className="h-5 w-5 text-yellow-400" />
+                                        <span>Tableau de Prévisions Annuelles (12 Mois)</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 bg-zinc-950/60 border border-zinc-850 rounded-xl p-1 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => setMonthOffset(prev => prev - 1)}
+                                            className="h-6 w-6 rounded-lg border border-zinc-800 bg-zinc-900 flex items-center justify-center text-zinc-350 hover:bg-zinc-850 hover:text-zinc-100 transition-all"
+                                            title="Mois précédents"
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setMonthOffset(0)}
+                                            className="px-2 text-[10px] font-bold text-zinc-400 hover:text-zinc-200 transition-colors"
+                                            title="Retour à aujourd'hui"
+                                        >
+                                            Courant
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setMonthOffset(prev => prev + 1)}
+                                            className="h-6 w-6 rounded-lg border border-zinc-800 bg-zinc-900 flex items-center justify-center text-zinc-350 hover:bg-zinc-850 hover:text-zinc-100 transition-all"
+                                            title="Mois suivants"
+                                        >
+                                            <ChevronRight className="h-4 w-4" />
+                                        </button>
+                                    </div>
                                 </CardTitle>
                                 <p className="text-xs text-zinc-400 mt-1">
                                     Glissez-déposez les projets dans les colonnes des mois pour les planifier ou les replanifier.
@@ -1072,9 +1186,34 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                 <h4 className="font-semibold text-zinc-100 text-xs truncate capitalize">
                                                     {month.label}
                                                 </h4>
-                                                <p className="text-[10px] text-zinc-500 mt-0.5 font-mono">
-                                                    {monthProjects.length} projet{monthProjects.length > 1 ? 's' : ''}
-                                                </p>
+                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                    <span className="text-[10px] text-zinc-500 font-mono leading-none">
+                                                        {monthProjects.length} projet{monthProjects.length > 1 ? 's' : ''}
+                                                    </span>
+                                                    {(() => {
+                                                        const unrealizedProjects = monthProjects.filter(p => p.status !== 'completed' && p.status !== 'cancelled')
+                                                        if (unrealizedProjects.length === 0) return null
+                                                        return (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setPushDialogState({
+                                                                        open: true,
+                                                                        monthKey: month.key,
+                                                                        monthLabel: month.label,
+                                                                        year: month.year,
+                                                                        monthIdx: month.month,
+                                                                        projectsToPush: unrealizedProjects
+                                                                    })
+                                                                }}
+                                                                className="text-zinc-500 hover:text-cyan-400 p-0.5 rounded hover:bg-zinc-800 transition-colors inline-flex items-center"
+                                                                title={`Repousser ${unrealizedProjects.length} projet(s) non-réalisé(s) au mois suivant`}
+                                                            >
+                                                                <ArrowRight className="h-3 w-3" />
+                                                            </button>
+                                                        )
+                                                    })()}
+                                                </div>
                                             </div>
                                             <Badge className="bg-cyan-950/40 text-cyan-300 border border-cyan-800/30 text-xs font-semibold px-2 py-0.5 whitespace-nowrap">
                                                 {Math.round(monthlySum).toLocaleString('fr-CA')} $
@@ -1480,7 +1619,9 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                         const pid = selectedProjectDetails.id
                                                         handleStatusChange(pid, 'completed')
                                                         // update local state
-                                                        setSelectedProjectDetails((prev: any) => prev ? { ...prev, status: 'completed' } : null)
+                                                        const nowStr = new Date().toISOString()
+                                                        const curMonth = nowStr.slice(0, 7)
+                                                        setSelectedProjectDetails((prev: any) => prev ? { ...prev, status: 'completed', completed_at: nowStr, completed_months: Array.from(new Set([...(prev.completed_months || []), curMonth])) } : null)
                                                         toast.success("Projet complété avec succès!")
                                                     }}
                                                     className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-10 rounded-xl flex items-center justify-center gap-1.5"
@@ -1494,7 +1635,7 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                                         const pid = selectedProjectDetails.id
                                                         handleStatusChange(pid, 'planned')
                                                         // update local state
-                                                        setSelectedProjectDetails((prev: any) => prev ? { ...prev, status: 'planned' } : null)
+                                                        setSelectedProjectDetails((prev: any) => prev ? { ...prev, status: 'planned', completed_at: null, completed_months: [] } : null)
                                                         toast.success("Rétabli en planification.")
                                                     }}
                                                     className="flex-1 bg-zinc-805 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xs h-10 rounded-xl flex items-center justify-center gap-1.5 border border-zinc-750"
@@ -1574,6 +1715,63 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                                             )}
                                         </div>
                                     </div>
+
+                                    {/* Plans et Tracés */}
+                                    {selectedProjectDetails.quotes?.quote_planning_sections && selectedProjectDetails.quotes.quote_planning_sections.length > 0 && (
+                                        <div className="space-y-3 mt-4">
+                                            <h3 className="text-xs font-bold text-zinc-450 uppercase tracking-wider border-b border-zinc-900 pb-1 text-zinc-450">Plans & Tracés (Mesures)</h3>
+                                            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+                                                {selectedProjectDetails.quotes.quote_planning_sections.map((sec: any) => {
+                                                    const rooms = sec.quote_planning_rooms || []
+                                                    if (rooms.length === 0) return null
+                                                    return (
+                                                        <div key={sec.id} className="space-y-2">
+                                                            <div className="text-xxs font-bold text-cyan-400 uppercase tracking-wider">{sec.name}</div>
+                                                            <div className="grid grid-cols-1 gap-2">
+                                                                {rooms.map((room: any) => {
+                                                                    const hasDrawing = room.points && room.points.length >= 3
+                                                                    const rendered = hasDrawing ? renderRoomToDataURL(room.points, room.name) : null
+                                                                    const perimeter = hasDrawing ? calculatePerimeter(room.points) : 0
+                                                                    const area = hasDrawing ? calculateFloorArea(room.points) : 0
+                                                                    const wallSurface = hasDrawing ? calculateWallSurface(room.points, room.height) : 0
+                                                                    
+                                                                    return (
+                                                                        <div key={room.id} className="bg-zinc-900/30 border border-zinc-850 rounded-xl p-3 flex flex-col gap-2 shadow-sm">
+                                                                            <div className="flex justify-between items-center border-b border-zinc-800/60 pb-1.5">
+                                                                                <span className="text-xs font-semibold text-zinc-200">{room.name}</span>
+                                                                                <span className="text-[10px] text-zinc-400">Hauteur: {room.height || 8.0} pi</span>
+                                                                            </div>
+                                                                            <div className="flex gap-3">
+                                                                                {rendered && (
+                                                                                    <div className="h-16 w-16 bg-zinc-950 border border-zinc-800 rounded flex items-center justify-center shrink-0">
+                                                                                        <img src={rendered.dataUrl} alt={room.name} className="h-full w-full object-contain" />
+                                                                                    </div>
+                                                                                )}
+                                                                                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-zinc-300">
+                                                                                    <div className="flex flex-col">
+                                                                                        <span className="text-[9px] text-zinc-500">Périmètre</span>
+                                                                                        <span className="font-semibold font-mono">{perimeter.toFixed(1)} pi</span>
+                                                                                    </div>
+                                                                                    <div className="flex flex-col">
+                                                                                        <span className="text-[9px] text-zinc-500">Aire</span>
+                                                                                        <span className="font-semibold font-mono">{area.toFixed(1)} pi²</span>
+                                                                                    </div>
+                                                                                    <div className="flex flex-col col-span-2">
+                                                                                        <span className="text-[9px] text-zinc-500">Surf. Murs</span>
+                                                                                        <span className="font-semibold font-mono">{wallSurface.toFixed(1)} pi²</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -1582,6 +1780,24 @@ export function PlanningCalendar({ initialProjects, query = "" }: { initialProje
                     )}
                 </DialogContent>
             </Dialog>
+
+            <ConfirmationDialog
+                open={pushDialogState.open}
+                onOpenChange={(open) => setPushDialogState(prev => ({ ...prev, open }))}
+                title="Repousser les projets"
+                description={`Voulez-vous repousser les ${pushDialogState.projectsToPush.length} projet(s) non-réalisé(s) du mois de ${pushDialogState.monthLabel} au mois suivant ?`}
+                confirmText="Repousser"
+                cancelText="Annuler"
+                onConfirm={() => {
+                    handlePushUnrealizedToNextMonth(
+                        pushDialogState.projectsToPush,
+                        pushDialogState.year,
+                        pushDialogState.monthIdx
+                    )
+                    setPushDialogState(prev => ({ ...prev, open: false }))
+                }}
+                variant="info"
+            />
 
             {selectedProjectIds.length > 0 && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-950/95 border border-zinc-800/80 rounded-2xl px-5 py-3 shadow-2xl flex items-center gap-4 text-xs font-semibold backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 duration-300">
