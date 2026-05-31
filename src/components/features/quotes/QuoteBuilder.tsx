@@ -773,7 +773,9 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                             />
                                             <Select value={form.watch('duration_unit') || 'days'} onValueChange={(v) => form.setValue('duration_unit', v as any, { shouldValidate: true })}>
                                                 <SelectTrigger className="w-32 bg-zinc-950 border-zinc-800 text-zinc-100">
-                                                    <SelectValue />
+                                                    <SelectValue>
+                                                        {form.watch('duration_unit') === 'hours' ? 'Heures' : 'Jours'}
+                                                    </SelectValue>
                                                 </SelectTrigger>
                                                 <SelectContent className="bg-zinc-900 border-zinc-800">
                                                     <SelectItem value="days">Jours</SelectItem>
@@ -816,7 +818,9 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                                 <Select onValueChange={field.onChange} value={field.value || 'interior'}>
                                                     <FormControl>
                                                         <SelectTrigger className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600 text-zinc-100">
-                                                            <SelectValue placeholder="Type" />
+                                                            <SelectValue placeholder="Type">
+                                                                {field.value === 'exterior' ? 'Extérieur' : 'Intérieur'}
+                                                            </SelectValue>
                                                         </SelectTrigger>
                                                     </FormControl>
                                                     <SelectContent className="bg-zinc-900 border-zinc-800">
@@ -837,7 +841,9 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                                 <Select onValueChange={field.onChange} value={field.value || 'operations_report'}>
                                                     <FormControl>
                                                         <SelectTrigger className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-600 text-zinc-100">
-                                                            <SelectValue placeholder="Origine" />
+                                                            <SelectValue placeholder="Origine">
+                                                                {field.value === 'additional_manager_request' ? 'Demande additionnelle du gestionnaire' : 'Rapport d\'opération'}
+                                                            </SelectValue>
                                                         </SelectTrigger>
                                                     </FormControl>
                                                     <SelectContent className="bg-zinc-900 border-zinc-800">
@@ -1066,7 +1072,9 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                                                         value={field.value || 'none'}
                                                                     >
                                                                         <SelectTrigger className="bg-zinc-950 border-zinc-800 text-zinc-200 focus-visible:ring-zinc-700 h-9 text-xs">
-                                                                            <SelectValue placeholder="Choisir une pièce" />
+                                                                            <SelectValue placeholder="Choisir une pièce">
+                                                                                {field.value ? (sections.flatMap(s => s.rooms).find(r => r.id === field.value)?.name || 'Aucune (saisie manuelle)') : 'Choisir une pièce'}
+                                                                            </SelectValue>
                                                                         </SelectTrigger>
                                                                         <SelectContent className="bg-zinc-900 border-zinc-800">
                                                                             <SelectItem value="none">Aucune (saisie manuelle)</SelectItem>
@@ -1108,7 +1116,14 @@ export function QuoteBuilder({ clients, contractors, settings, initialQuote }: {
                                                                             value={field.value || 'wall_surface'}
                                                                         >
                                                                             <SelectTrigger className="bg-zinc-950 border-zinc-800 text-zinc-200 focus-visible:ring-zinc-700 h-9 text-xs">
-                                                                                <SelectValue placeholder="Choisir une mesure" />
+                                                                                <SelectValue placeholder="Choisir une mesure">
+                                                                                    {field.value === 'perimeter' ? 'Périmètre (pi)' :
+                                                                                     field.value === 'area' ? 'Aire au sol (pi²)' :
+                                                                                     field.value === 'wall_surface' ? 'Surface des murs (pi²)' :
+                                                                                     field.value === 'selected_walls_linear' ? 'Murs spécifiques (linéaire - pi)' :
+                                                                                     field.value === 'selected_walls_surface' ? 'Murs spécifiques (surface - pi²)' :
+                                                                                     'Surface des murs (pi²)'}
+                                                                                </SelectValue>
                                                                             </SelectTrigger>
                                                                             <SelectContent className="bg-zinc-900 border-zinc-800">
                                                                                 <SelectItem value="perimeter" className="text-xs">Périmètre (pi)</SelectItem>

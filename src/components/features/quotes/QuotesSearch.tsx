@@ -47,7 +47,15 @@ export function QuotesSearch({ initialQuery, initialStatus }: { initialQuery: st
             </div>
             <Select value={status} onValueChange={(next) => { setStatus(next || 'all'); }}>
                 <SelectTrigger className="w-[180px] bg-white border-zinc-200 text-zinc-900">
-                    <SelectValue placeholder="Statut" />
+                    <SelectValue placeholder="Statut">
+                        {status === 'draft' ? 'Brouillon' :
+                         status === 'sent' ? 'Envoyée' :
+                         status === 'approved' ? 'Approuvée' :
+                         status === 'completed' ? 'Complétée' :
+                         status === 'billed' ? 'Facturée' :
+                         status === 'denied' ? 'Refusée' :
+                         'Tous les statuts'}
+                    </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="bg-white border-zinc-200 text-zinc-900">
                     <SelectItem value="all" className="hover:bg-zinc-800 focus:bg-zinc-800 focus:text-zinc-900">Tous les statuts</SelectItem>
