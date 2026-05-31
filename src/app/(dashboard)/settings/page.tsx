@@ -14,6 +14,7 @@ import Link from 'next/link'
 import { getManagers, createManagerAction, getManagerTeams, createManagerTeamAction } from '@/actions/managers'
 import { fixExistingImportedQuotesAction } from '@/actions/quotes'
 import { createClient } from '@/utils/supabase/client'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 
 async function loadTemplateAsBlobUrl(url: string): Promise<string> {
     if (!url) return ''
@@ -51,6 +52,7 @@ export default function SettingsPage() {
     const [templateBlobUrl, setTemplateBlobUrl] = useState<string>('')
     const [isCreatingManager, setIsCreatingManager] = useState(false)
     const [isDeletingManagerId, setIsDeletingManagerId] = useState<string | null>(null)
+    const [managerToDelete, setManagerToDelete] = useState<{ id: string, name: string } | null>(null)
 
     const form = useForm({
         defaultValues: {
@@ -192,9 +194,6 @@ export default function SettingsPage() {
     }
 
     const handleDeleteManager = async (id: string, name: string) => {
-        if (!window.confirm(`Êtes-vous sûr de vouloir supprimer le gestionnaire "${name}" ? Cette action est irréversible et retirera son assignation des syndicats et soumissions.`)) {
-            return
-        }
         setIsDeletingManagerId(id)
         try {
             const { deleteManagerAction } = await import('@/actions/managers')
@@ -207,6 +206,7 @@ export default function SettingsPage() {
             toast.error('Erreur', { description: err.message || "Impossible de supprimer le gestionnaire." })
         } finally {
             setIsDeletingManagerId(null)
+            setManagerToDelete(null)
         }
     }
 
@@ -479,8 +479,8 @@ export default function SettingsPage() {
                                                 <Button
                                                     type="button"
                                                     variant="ghost"
-                                                    disabled={isDeletingManagerId === m.id}
-                                                    onClick={() => handleDeleteManager(m.id, `${m.first_name} ${m.last_name}`)}
+                                                    disabled={isDeletingManagerId === m.id || !!managerToDelete}
+                                                    onClick={() => setManagerToDelete({ id: m.id, name: `${m.first_name} ${m.last_name}` })}
                                                     className="h-8 w-8 p-0 text-zinc-500 hover:text-rose-450 hover:text-rose-400 hover:bg-rose-950/20 rounded-lg transition-all"
                                                 >
                                                     <Trash2 className="h-4 w-4" />
@@ -495,6 +495,21 @@ export default function SettingsPage() {
                 </Card>
             </div>
 
+            <ConfirmationDialog
+                open={!!managerToDelete}
+                onOpenChange={(open) => !open && setManagerToDelete(null)}
+                title="Supprimer le gestionnaire"
+                description={managerToDelete ? `Êtes-vous sûr de vouloir supprimer le gestionnaire "${managerToDelete.name}" ? Cette action est irréversible et retirera son assignation des syndicats et soumissions.` : ''}
+                confirmText="Supprimer"
+                cancelText="Annuler"
+                variant="danger"
+                loading={isDeletingManagerId !== null}
+                onConfirm={() => {
+                    if (managerToDelete) {
+                        handleDeleteManager(managerToDelete.id, managerToDelete.name)
+                    }
+                }}
+            />
         </div>
     )
 }
