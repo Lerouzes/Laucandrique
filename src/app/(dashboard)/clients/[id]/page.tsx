@@ -17,7 +17,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   // Fetch client + contract separately (direct query avoids join caching issues)
   const [client, managers, quotes, contractDirect, workload] = await Promise.all([
     getClientById(id),
-    getManagers(),
+    getManagers(true),
     getQuotes(),
     getContractForClient(id),
     getSyndicateWorkloadAction(id)

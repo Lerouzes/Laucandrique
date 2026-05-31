@@ -100,7 +100,7 @@ export default function SettingsPage() {
     }, [form])
 
     useEffect(() => {
-        getManagers().then(setManagers)
+        getManagers(true).then(setManagers)
         getManagerTeams().then(setManagerTeams)
     }, [])
 
@@ -180,7 +180,7 @@ export default function SettingsPage() {
                 const selectedTeam = selectedTeamId ? managerTeams.find((t: any) => String(t.id) === selectedTeamId) : null
                 setManagers(prev => [{ ...createdManager, manager_teams: selectedTeam || null }, ...prev])
             } else {
-                setManagers(await getManagers())
+                setManagers(await getManagers(true))
             }
             toast.success('Gestionnaire ajouté avec succès!')
             formEl.reset()

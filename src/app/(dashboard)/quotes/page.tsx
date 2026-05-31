@@ -23,7 +23,7 @@ export default async function QuotesPage({
     
     // Fetch all entities for the import manager, contractor dropdowns, and duplicate checks
     const [managers, contractors, allQuotes] = await Promise.all([
-        getManagers(),
+        getManagers(true),
         getContractors(),
         getQuotes()
     ])

@@ -31,14 +31,16 @@ function isMissingTableError(errorMessage: string, tableName: string) {
   return normalized.includes('could not find the table') && normalized.includes(tableName.toLowerCase())
 }
 
-export async function getManagers() {
+export async function getManagers(ignoreContext = false) {
   const supabase = await createClient()
-  const { getActiveTeamContext } = await import('@/utils/team-context')
-  const context = await getActiveTeamContext()
 
   let query = supabase.from('managers').select('*')
-  if (context.teamId) {
-    query = query.eq('team_id', context.teamId)
+  if (!ignoreContext) {
+    const { getActiveTeamContext } = await import('@/utils/team-context')
+    const context = await getActiveTeamContext()
+    if (context.teamId) {
+      query = query.eq('team_id', context.teamId)
+    }
   }
 
   const { data: managers, error: managersError } = await query

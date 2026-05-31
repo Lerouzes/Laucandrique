@@ -20,7 +20,7 @@ export default async function ClientsPage({
     let clients: any[] = []
     let managers: any[] = []
     try {
-        ;[clients, managers] = await Promise.all([getClients(query), getManagers()])
+        ;[clients, managers] = await Promise.all([getClients(query), getManagers(true)])
     } catch (err) {
         console.error('ClientsPage data fetch error:', err)
     }

@@ -9,7 +9,7 @@ export default async function AnalyticsPage() {
     const quotes = await getQuotes()
     const projects = await getProjects()
     const settings = await getSettings()
-    const managers = await getManagers()
+    const managers = await getManagers(true)
     const teams = await getManagerTeams()
     const bills = await getBills()
 

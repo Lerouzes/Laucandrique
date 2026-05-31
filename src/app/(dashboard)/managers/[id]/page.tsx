@@ -9,7 +9,7 @@ export default async function ManagerDetailPage({ params }: { params: Promise<{ 
   const [manager, quotes, managers, managerTeams] = await Promise.all([
     getManagerById(id), 
     getQuotes(), 
-    getManagers(),
+    getManagers(true),
     getManagerTeams()
   ])
   
