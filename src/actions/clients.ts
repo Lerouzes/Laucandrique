@@ -171,6 +171,10 @@ export async function updateClientAction(clientIdOrPrev: any, formData: FormData
         manager_id: String(formData.get('manager_id') || '') || null,
         notes: String(formData.get('notes') || '') || null,
         status: String(formData.get('status') || 'active') as 'active' | 'inactive',
+        fiscal_year_end: formData.get('fiscal_year_end') ? String(formData.get('fiscal_year_end')) : null,
+        aga_planned_date: formData.get('aga_planned_date') ? String(formData.get('aga_planned_date')) : null,
+        aga_completed_date: formData.get('aga_completed_date') ? String(formData.get('aga_completed_date')) : null,
+        aga_status: formData.get('aga_status') ? String(formData.get('aga_status')) : 'pending',
     }
 
     const { error } = await supabase.from('clients').update(payload).eq('id', clientId)
@@ -570,6 +574,46 @@ export async function deleteClientAction(clientId: string) {
         return { success: false, error: error.message }
     }
 
+    revalidatePath('/clients')
+    return { success: true }
+}
+
+export async function updateClientAgaAction(
+    clientId: string,
+    data: {
+        fiscal_year_end?: string | null
+        aga_planned_date?: string | null
+        aga_completed_date?: string | null
+        aga_status?: string
+    }
+) {
+    const supabase = await createClient()
+
+    let status = data.aga_status
+    if (!status) {
+        if (data.aga_completed_date) {
+            status = 'completed'
+        } else if (data.aga_planned_date) {
+            status = 'scheduled'
+        } else {
+            status = 'pending'
+        }
+    }
+
+    const { error } = await supabase
+        .from('clients')
+        .update({
+            fiscal_year_end: data.fiscal_year_end || null,
+            aga_planned_date: data.aga_planned_date || null,
+            aga_completed_date: data.aga_completed_date || null,
+            aga_status: status
+        })
+        .eq('id', clientId)
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/team-management/assemblies')
+    revalidatePath(`/clients/${clientId}`)
     revalidatePath('/clients')
     return { success: true }
 }

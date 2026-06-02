@@ -13,8 +13,10 @@ import {
     saveMonthlyCallsAction, 
     saveMonthlyCommunicationsAction, 
     saveMonthlyTasksAction, 
-    checkExistingStatsAction 
+    checkExistingStatsAction,
+    deleteMonthlyStatsAction
 } from '@/actions/team-management'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { BatchCallStatsModal } from './BatchCallStatsModal'
 
 interface Manager {
@@ -62,6 +64,10 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
     const [hasTasks, setHasTasks] = useState(false)
     const [loadingTasksCheck, setLoadingTasksCheck] = useState(false)
     const [isPendingTasks, startTransitionTasks] = useTransition()
+
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [deleteType, setDeleteType] = useState<'calls' | 'comms' | 'tasks'>('calls')
+    const [deleting, setDeleting] = useState(false)
 
     // Effect for Calls check
     useEffect(() => {
@@ -169,6 +175,38 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
                 toast.error("Erreur", { description: err.message })
             }
         })
+    }
+
+    const handleDeleteStats = async () => {
+        setDeleting(true)
+        try {
+            let mId = ''
+            let mMonth = ''
+            if (deleteType === 'calls') {
+                mId = callManagerId
+                mMonth = callMonth
+            } else if (deleteType === 'comms') {
+                mId = commManagerId
+                mMonth = commMonth
+            } else {
+                mId = taskManagerId
+                mMonth = taskMonth
+            }
+
+            await deleteMonthlyStatsAction(mId, mMonth, deleteType)
+            toast.success("Données supprimées avec succès.")
+            
+            if (deleteType === 'calls') setHasCalls(false)
+            else if (deleteType === 'comms') setHasComms(false)
+            else setHasTasks(false)
+
+            router.refresh()
+        } catch (err: any) {
+            toast.error("Erreur lors de la suppression", { description: err.message })
+        } finally {
+            setDeleting(false)
+            setDeleteDialogOpen(false)
+        }
     }
 
     if (managers.length === 0) {
@@ -332,11 +370,24 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
                                 </div>
                             </div>
 
-                            <div className="flex justify-end pt-4 border-t border-zinc-850/50">
+                            <div className="flex justify-between items-center pt-4 border-t border-zinc-850/50">
+                                {hasCalls ? (
+                                    <Button
+                                        type="button"
+                                        onClick={() => {
+                                            setDeleteType('calls')
+                                            setDeleteDialogOpen(true)
+                                        }}
+                                        variant="outline"
+                                        className="border-rose-900/50 hover:border-rose-800 text-rose-400 hover:text-rose-300 bg-rose-950/20 hover:bg-rose-950/40 text-xs h-10 px-4 rounded-xl font-bold transition-all"
+                                    >
+                                        Supprimer les données
+                                    </Button>
+                                ) : <div />}
                                 <Button 
                                     type="submit" 
                                     disabled={isPendingCalls}
-                                    className="bg-purple-650 hover:bg-purple-750 text-white font-semibold text-xs h-10 px-6 rounded-xl flex items-center justify-center gap-1.5 shadow-md w-full sm:w-auto"
+                                    className="bg-purple-650 hover:bg-purple-750 text-white font-semibold text-xs h-10 px-6 rounded-xl flex items-center justify-center gap-1.5 shadow-md w-full sm:w-auto font-bold"
                                 >
                                     {isPendingCalls && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                                     {hasCalls ? "Mettre à jour les Appels" : "Enregistrer les Appels"}
@@ -392,11 +443,24 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
                                 </div>
                             </div>
 
-                            <div className="flex justify-end pt-4 border-t border-zinc-850/50">
+                            <div className="flex justify-between items-center pt-4 border-t border-zinc-850/50">
+                                {hasComms ? (
+                                    <Button
+                                        type="button"
+                                        onClick={() => {
+                                            setDeleteType('comms')
+                                            setDeleteDialogOpen(true)
+                                        }}
+                                        variant="outline"
+                                        className="border-rose-900/50 hover:border-rose-800 text-rose-400 hover:text-rose-300 bg-rose-950/20 hover:bg-rose-950/40 text-xs h-10 px-4 rounded-xl font-bold transition-all"
+                                    >
+                                        Supprimer les données
+                                    </Button>
+                                ) : <div />}
                                 <Button 
                                     type="submit" 
                                     disabled={isPendingComms}
-                                    className="bg-purple-650 hover:bg-purple-750 text-white font-semibold text-xs h-10 px-6 rounded-xl flex items-center justify-center gap-1.5 shadow-md w-full sm:w-auto"
+                                    className="bg-purple-650 hover:bg-purple-750 text-white font-semibold text-xs h-10 px-6 rounded-xl flex items-center justify-center gap-1.5 shadow-md w-full sm:w-auto font-bold"
                                 >
                                     {isPendingComms && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                                     {hasComms ? "Mettre à jour Communications" : "Enregistrer la Charge"}
@@ -463,11 +527,24 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
                                 </div>
                             </div>
 
-                            <div className="flex justify-end pt-4 border-t border-zinc-850/50">
+                            <div className="flex justify-between items-center pt-4 border-t border-zinc-850/50">
+                                {hasTasks ? (
+                                    <Button
+                                        type="button"
+                                        onClick={() => {
+                                            setDeleteType('tasks')
+                                            setDeleteDialogOpen(true)
+                                        }}
+                                        variant="outline"
+                                        className="border-rose-900/50 hover:border-rose-800 text-rose-400 hover:text-rose-300 bg-rose-950/20 hover:bg-rose-950/40 text-xs h-10 px-4 rounded-xl font-bold transition-all"
+                                    >
+                                        Supprimer les données
+                                    </Button>
+                                ) : <div />}
                                 <Button 
                                     type="submit" 
                                     disabled={isPendingTasks}
-                                    className="bg-purple-650 hover:bg-purple-750 text-white font-semibold text-xs h-10 px-6 rounded-xl flex items-center justify-center gap-1.5 shadow-md w-full sm:w-auto"
+                                    className="bg-purple-650 hover:bg-purple-750 text-white font-semibold text-xs h-10 px-6 rounded-xl flex items-center justify-center gap-1.5 shadow-md w-full sm:w-auto font-bold"
                                 >
                                     {isPendingTasks && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                                     {hasTasks ? "Mettre à jour les Tâches" : "Enregistrer les Tâches"}
@@ -477,6 +554,20 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
                     )}
                 </CardContent>
             </Card>
+
+            <ConfirmationDialog
+                open={deleteDialogOpen}
+                onOpenChange={setDeleteDialogOpen}
+                title="Supprimer les statistiques"
+                description={`Êtes-vous sûr de vouloir supprimer définitivement les données de ${
+                    deleteType === 'calls' ? 'téléphonie' : deleteType === 'comms' ? 'communications' : 'tâches'
+                } pour ce mois ? Cette action est irréversible.`}
+                confirmText="Supprimer"
+                cancelText="Annuler"
+                onConfirm={handleDeleteStats}
+                loading={deleting}
+                variant="danger"
+            />
         </div>
     )
 }

@@ -207,6 +207,7 @@ export function OneOnOneDetailView({
     const [newActionOwner, setNewActionOwner] = useState('Manager')
     const [newActionDueDate, setNewActionDueDate] = useState('')
     const [newActionNextReview, setNewActionNextReview] = useState(true)
+    const [section6DialogOpen, setSection6DialogOpen] = useState(false)
 
     // Additional custom states for dropdowns and interactive cards/modal
     const [clientsList, setClientsList] = useState<any[]>([])
@@ -555,7 +556,7 @@ export function OneOnOneDetailView({
     }, [oneOnOne?.id])
 
     // Dynamic Scoring Engine
-    const callsPct = callsTotal > 0 ? (callsAnswered / callsTotal) * 100 : 100
+    const callsPct = callsTotal > 0 ? (callsAnswered / callsTotal) * 100 : 0
     const prevCallsPct = callsTotalPrev > 0 ? (callsAnsweredPrev / callsTotalPrev) * 100 : 0
     
     const taskHygiene = Math.max(0, 100 - lateTasks * 5)
@@ -1076,7 +1077,7 @@ export function OneOnOneDetailView({
                                     Math.round(callsPct) >= 80 ? 'text-emerald-400' :
                                     Math.round(callsPct) > 55 ? 'text-amber-400' :
                                     'text-rose-500'
-                                }`}>{callsTotal > 0 ? `${Math.round(callsPct)}%` : '100%'}</span>
+                                }`}>{callsTotal > 0 ? `${Math.round(callsPct)}%` : 'N/A'}</span>
                             </div>
                             <div className="p-2 bg-zinc-900/20 border border-zinc-850 rounded-lg space-y-0.5">
                                 <span className="text-zinc-500 text-[8px] uppercase font-bold">Hygiène Tâches</span>
@@ -1172,7 +1173,7 @@ export function OneOnOneDetailView({
                                             Math.round(callsPct) >= 80 ? 'text-emerald-400' :
                                             Math.round(callsPct) > 55 ? 'text-amber-400' :
                                             'text-rose-500'
-                                        }`}>{callsTotal > 0 ? `${Math.round(callsPct)}%` : '100%'}</span>
+                                        }`}>{callsTotal > 0 ? `${Math.round(callsPct)}%` : 'N/A'}</span>
                                     </td>
                                     <td className="p-2 text-center text-zinc-500">{callsTotalPrev > 0 ? `${Math.round(prevCallsPct)}%` : 'N/A'}</td>
                                     <td className="p-2 text-center">
@@ -1934,136 +1935,36 @@ export function OneOnOneDetailView({
                 )}
             </Card>
 
-            {/* SECTION 6: Agreed Actions Section */}
-            <Card className="bg-[#16171e]/70 border-zinc-800 shadow-md">
+                        {/* SECTION 6: Agreed Actions Section */}
+            <Card 
+                className="bg-[#16171e]/70 border-zinc-800 shadow-md cursor-pointer hover:border-purple-500/50 transition-all duration-200"
+                onClick={() => setSection6DialogOpen(true)}
+            >
                 <CardHeader>
-                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-                        <CheckCircle2 className="h-4.5 w-4.5 text-purple-400" />
-                        6. Plan d'Action & Engagements Réciproques (Moteur d'Alignement)
+                    <CardTitle className="text-sm font-bold text-white flex items-center justify-between">
+                        <span className="flex items-center gap-2">
+                            <CheckCircle2 className="h-4.5 w-4.5 text-purple-400" />
+                            6. Plan d'Action & Engagements Réciproques (Moteur d'Alignement)
+                        </span>
+                        <Badge className="bg-purple-900/30 border border-purple-500/30 text-purple-300 font-bold hover:bg-purple-900/50">
+                            {newAgreedActions.length} engagement{newAgreedActions.length > 1 ? 's' : ''}
+                        </Badge>
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4 text-xxs">
-                    {/* Add action row */}
-                    {isEditing && (
-                        <div className="p-4 bg-zinc-950/50 border border-zinc-850 rounded-xl space-y-4 animate-in slide-in-from-top-1 duration-200">
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div className="md:col-span-3 space-y-1">
-                                    <Label className="text-zinc-500">Nouvel Engagement / Action</Label>
-                                    <Textarea 
-                                        placeholder="ex: Contacter le syndicat pour la mise à jour du budget..." 
-                                        value={newActionText} 
-                                        onChange={(e) => setNewActionText(e.target.value)} 
-                                        className="bg-[#121318] border-zinc-800 text-xs text-white" 
-                                        rows={3}
-                                    />
-                                </div>
-                                <div className="space-y-3 flex flex-col justify-between">
-                                    <div className="space-y-1">
-                                        <Label className="text-zinc-500">Propriétaire</Label>
-                                        <select 
-                                            value={newActionOwner} 
-                                            onChange={(e) => setNewActionOwner(e.target.value)}
-                                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-xs"
-                                        >
-                                            <option value="Manager">Gestionnaire (Manager)</option>
-                                            <option value="Direction">Direction (Director)</option>
-                                            <option value="Gustav">Gustav Admin</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-zinc-500">Copropriété (Syndicat associé)</Label>
-                                        <SearchableClientSelect
-                                            clients={clientsList.map(c => ({
-                                                id: c.id,
-                                                name: c.company_name || c.full_name,
-                                                sdc: c.full_name
-                                            }))}
-                                            name="action_client_id"
-                                            placeholder="Aucun (Général / Interne)"
-                                            defaultValue={newActionClientId}
-                                            onChange={(val) => setNewActionClientId(val)}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                                <div className="md:col-span-2 flex flex-col justify-end">
-                                    <div className="flex items-center gap-1.5 mb-1.5">
-                                        <input 
-                                            type="checkbox" 
-                                            id="next-rev-check"
-                                            checked={newActionNextReview} 
-                                            onChange={(e) => setNewActionNextReview(e.target.checked)} 
-                                            className="rounded border-zinc-800 text-purple-600 h-3.5 w-3.5 cursor-pointer" 
-                                        />
-                                        <label htmlFor="next-rev-check" className="text-zinc-400 font-semibold cursor-pointer select-none">
-                                            À revoir à la prochaine rencontre
-                                        </label>
-                                    </div>
-                                    
-                                    {!newActionNextReview && (
-                                        <Input 
-                                            type="date"
-                                            value={newActionDueDate} 
-                                            onChange={(e) => setNewActionDueDate(e.target.value)} 
-                                            className="bg-[#121318] border-zinc-800 h-8 text-xs text-white" 
-                                        />
-                                    )}
-                                </div>
-                                
-                                {!newActionNextReview && (
-                                    <div className="md:col-span-1 flex justify-end">
-                                        <Button 
-                                            onClick={handleAddAgreedAction}
-                                            disabled={!newActionText.trim() || (!newActionDueDate && !newActionNextReview)}
-                                            className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold h-8 rounded-lg w-full"
-                                        >
-                                            Créer l'Action
-                                        </Button>
-                                    </div>
-                                )}
-
-                                {newActionNextReview && (
-                                    <div className="md:col-span-1 flex justify-end">
-                                        <Button 
-                                            onClick={handleAddAgreedAction}
-                                            disabled={!newActionText.trim()}
-                                            className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold h-8 rounded-lg w-full"
-                                        >
-                                            Créer l'Action
-                                        </Button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Actions list */}
+                <CardContent className="text-xxs">
                     {newAgreedActions.length === 0 ? (
-                        <p className="text-zinc-500 italic text-center py-2">Aucun nouvel engagement acté.</p>
+                        <p className="text-zinc-500 italic text-center py-2">Aucun nouvel engagement acté. Cliquez pour en ajouter un.</p>
                     ) : (
-                        <div className="space-y-2">
-                            {newAgreedActions.map((a, idx) => (
-                                <div key={idx} className="p-3 bg-zinc-900/20 border border-zinc-850 rounded-xl flex justify-between items-center gap-3">
-                                    <div className="space-y-0.5">
-                                        <span className="text-zinc-200 text-xs font-semibold block">{a.commitment_text}</span>
-                                        <div className="flex gap-2 text-[8px] text-zinc-500">
-                                            <span>Propriétaire: <strong className="text-zinc-400">{a.owner}</strong></span>
-                                            <span>Échéance: <strong className="text-purple-400">{a.due_next_review ? 'Prochaine rencontre' : a.due_date}</strong></span>
-                                        </div>
-                                    </div>
-                                    {isEditing && (
-                                        <Button 
-                                            onClick={() => handleRemoveAgreedAction(idx)}
-                                            variant="ghost" 
-                                            className="h-6 w-6 p-0 text-zinc-500 hover:text-rose-500 hover:bg-transparent"
-                                        >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                        </Button>
-                                    )}
+                        <div className="space-y-1.5 text-left">
+                            {newAgreedActions.slice(0, 3).map((a, idx) => (
+                                <div key={idx} className="flex justify-between items-center text-[10px] text-zinc-300 bg-zinc-900/10 p-1.5 rounded border border-zinc-850">
+                                    <span className="truncate max-w-[70%] font-semibold text-left">{a.commitment_text}</span>
+                                    <span className="text-[9px] text-purple-400 font-medium">{a.owner} - {a.due_next_review ? 'Prochaine rencontre' : a.due_date}</span>
                                 </div>
                             ))}
+                            {newAgreedActions.length > 3 && (
+                                <p className="text-[9px] text-zinc-400 text-right font-semibold">+ {newAgreedActions.length - 3} autres engagements...</p>
+                            )}
                         </div>
                     )}
                 </CardContent>
@@ -2921,6 +2822,164 @@ export function OneOnOneDetailView({
                 loading={loading}
                 variant="danger"
             />
+
+            {/* SECTION 6: Dialog Modal */}
+            <Dialog open={section6DialogOpen} onOpenChange={setSection6DialogOpen}>
+                <DialogContent className="max-w-4xl bg-[#16171e]/95 border border-zinc-800/80 backdrop-blur-md rounded-2xl shadow-2xl p-6 text-white overflow-hidden max-h-[85vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                            <CheckCircle2 className="h-4.5 w-4.5 text-purple-400" />
+                            6. Plan d'Action & Engagements Réciproques (Moteur d'Alignement)
+                        </DialogTitle>
+                        <DialogDescription className="text-[10px] text-zinc-400">
+                            Définissez des actions précises à accomplir. Si "Prochaine rencontre" est cochée, l'engagement est reporté automatiquement si non complété.
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="flex-1 overflow-y-auto pr-1 space-y-4 py-2 text-xxs">
+                        {/* Add action row */}
+                        {isEditing && (
+                            <div className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-4 text-left animate-in slide-in-from-top-1 duration-200">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div className="md:col-span-3 space-y-1">
+                                        <Label className="text-zinc-500 text-left block">Nouvel Engagement / Action</Label>
+                                        <Textarea 
+                                            placeholder="ex: Contacter le syndicat pour la mise à jour du budget..." 
+                                            value={newActionText} 
+                                            onChange={(e) => setNewActionText(e.target.value)} 
+                                            className="bg-[#121318] border-zinc-800 text-xs text-white" 
+                                            rows={3}
+                                        />
+                                    </div>
+                                    <div className="space-y-3 flex flex-col justify-between">
+                                        <div className="space-y-1">
+                                            <Label className="text-zinc-500 text-left block">Propriétaire</Label>
+                                            <select 
+                                                value={newActionOwner} 
+                                                onChange={(e) => setNewActionOwner(e.target.value)}
+                                                className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-xs"
+                                            >
+                                                <option value="Manager">Gestionnaire (Manager)</option>
+                                                <option value="Direction">Direction (Director)</option>
+                                                <option value="Gustav">Gustav Admin</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-zinc-500 text-left block">Copropriété (Syndicat associé)</Label>
+                                            <SearchableClientSelect
+                                                clients={clientsList.map(c => ({
+                                                    id: c.id,
+                                                    name: c.company_name || c.full_name,
+                                                    sdc: c.full_name
+                                                }))}
+                                                name="action_client_id"
+                                                placeholder="Aucun (Général / Interne)"
+                                                defaultValue={newActionClientId}
+                                                onChange={(val) => setNewActionClientId(val)}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                                    <div className="md:col-span-2 flex flex-col justify-end">
+                                        <div className="flex items-center gap-1.5 mb-1.5">
+                                            <input 
+                                                type="checkbox" 
+                                                id="next-rev-check"
+                                                checked={newActionNextReview} 
+                                                onChange={(e) => setNewActionNextReview(e.target.checked)} 
+                                                className="rounded border-zinc-800 text-purple-600 h-3.5 w-3.5 cursor-pointer" 
+                                            />
+                                            <label htmlFor="next-rev-check" className="text-zinc-400 font-semibold cursor-pointer select-none text-[10px]">
+                                                À revoir à la prochaine rencontre
+                                            </label>
+                                        </div>
+                                        
+                                        {!newActionNextReview && (
+                                            <div className="space-y-1 text-left">
+                                                <Input 
+                                                    type="date"
+                                                    value={newActionDueDate} 
+                                                    onChange={(e) => setNewActionDueDate(e.target.value)} 
+                                                    className="bg-[#121318] border-zinc-800 h-9 text-xs text-white" 
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {!newActionNextReview && (
+                                        <div className="md:col-span-1 flex justify-end">
+                                            <Button 
+                                                onClick={handleAddAgreedAction}
+                                                disabled={!newActionText.trim() || (!newActionDueDate && !newActionNextReview)}
+                                                className="bg-purple-600 hover:bg-purple-750 text-white text-xs font-bold h-9 rounded-lg w-full"
+                                            >
+                                                Créer l'Action
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    {newActionNextReview && (
+                                        <div className="md:col-span-1 flex justify-end">
+                                            <Button 
+                                                onClick={handleAddAgreedAction}
+                                                disabled={!newActionText.trim()}
+                                                className="bg-purple-600 hover:bg-purple-750 text-white text-xs font-bold h-9 rounded-lg w-full"
+                                            >
+                                                Créer l'Action
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* List of actions */}
+                        <div className="space-y-2 text-left">
+                            <span className="text-zinc-400 font-bold block mb-1">Actions actées pour cette rencontre :</span>
+                            {newAgreedActions.length === 0 ? (
+                                <p className="text-zinc-500 italic text-center py-4 bg-zinc-900/10 border border-zinc-850 rounded-xl">Aucun engagement acté.</p>
+                            ) : (
+                                <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+                                    {newAgreedActions.map((a, idx) => (
+                                        <div key={idx} className="p-3 bg-zinc-900/20 border border-zinc-850 rounded-xl flex justify-between items-center gap-3">
+                                            <div className="space-y-1 flex-1 text-left">
+                                                <span className="text-zinc-200 text-xs font-semibold block">{a.commitment_text}</span>
+                                                <div className="flex gap-3 text-[8px] text-zinc-500 flex-wrap">
+                                                    <span>Propriétaire: <strong className="text-zinc-400">{a.owner}</strong></span>
+                                                    <span>Échéance: <strong className="text-purple-400">{a.due_next_review ? 'Prochaine rencontre' : a.due_date}</strong></span>
+                                                    {a.client_id && (
+                                                        <span>Syndicat: <strong className="text-zinc-400">{getClientName(a.client_id)}</strong></span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {isEditing && (
+                                                <Button 
+                                                    onClick={(e) => { e.stopPropagation(); handleRemoveAgreedAction(idx); }}
+                                                    variant="ghost" 
+                                                    className="h-6 w-6 p-0 text-zinc-500 hover:text-rose-500 hover:bg-transparent shrink-0"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <DialogFooter className="mt-4 border-t border-zinc-900/60 pt-4">
+                        <Button
+                            onClick={() => setSection6DialogOpen(false)}
+                            className="bg-purple-600 hover:bg-purple-750 text-white text-xs h-8 px-4 rounded-lg font-bold"
+                        >
+                            Fermer
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

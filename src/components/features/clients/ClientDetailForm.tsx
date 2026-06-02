@@ -225,6 +225,43 @@ export function ClientDetailForm({
           </div>
         </div>
 
+        {/* AGA Tracking Card */}
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 space-y-4 backdrop-blur-sm">
+          <h3 className="text-sm font-bold text-zinc-200 flex items-center gap-2 border-b border-zinc-800/80 pb-2">
+            <Calendar className="h-4 w-4 text-cyan-400" />
+            Suivi de l'AGA (Assemblée Générale Annuelle)
+          </h3>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="fiscal_year_end" className="text-xs text-zinc-400 font-semibold">Date de fin d'exercice financier</Label>
+            <Input id="fiscal_year_end" type="date" name="fiscal_year_end" defaultValue={client.fiscal_year_end || ''} className="bg-zinc-950 border-zinc-850 h-9 text-xs focus-visible:ring-zinc-800 text-white" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="aga_planned_date" className="text-xs text-zinc-400 font-semibold">Date de l'AGA planifiée</Label>
+            <Input id="aga_planned_date" type="date" name="aga_planned_date" defaultValue={client.aga_planned_date || ''} className="bg-zinc-950 border-zinc-850 h-9 text-xs focus-visible:ring-zinc-800 text-white" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="aga_completed_date" className="text-xs text-zinc-400 font-semibold">Date de l'AGA complétée</Label>
+            <Input id="aga_completed_date" type="date" name="aga_completed_date" defaultValue={client.aga_completed_date || ''} className="bg-zinc-950 border-zinc-850 h-9 text-xs focus-visible:ring-zinc-800 text-white" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="aga_status" className="text-xs text-zinc-400 font-semibold">Statut de l'AGA</Label>
+            <select
+              id="aga_status"
+              name="aga_status"
+              defaultValue={client.aga_status || 'pending'}
+              className="w-full h-9 rounded-md border border-zinc-800 bg-zinc-950 px-3 text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            >
+              <option value="pending">En attente (Pending)</option>
+              <option value="scheduled">Planifiée (Scheduled)</option>
+              <option value="completed">Complétée (Completed)</option>
+            </select>
+          </div>
+        </div>
+
         {/* Quote history card */}
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 space-y-4 backdrop-blur-sm">
           <h3 className="text-sm font-bold text-zinc-200 flex items-center gap-2 border-b border-zinc-800/80 pb-2">

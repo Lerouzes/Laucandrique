@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { UsersRound, PlusCircle, ArrowRight, Calendar, AlertCircle } from 'lucide-react'
+import { AgaTrackingSection } from '@/components/features/team-management/AgaTrackingSection'
 
 export default async function AssembliesListPage({
     searchParams
@@ -34,6 +35,19 @@ export default async function AssembliesListPage({
     }
 
     const { data: evals } = await query.order('assembly_date', { ascending: false })
+
+    // Fetch active syndicates/clients (with manager information)
+    let clientsQuery = supabase
+        .from('clients')
+        .select('*, managers(first_name, last_name)')
+        .eq('status', 'active')
+        .order('company_name')
+
+    if (context.teamId) {
+        clientsQuery = clientsQuery.in('manager_id', managerIds)
+    }
+
+    const { data: clientsData } = await clientsQuery
 
     const getFollowupRange = (dateStr: string) => {
         const date = new Date(dateStr)
@@ -236,6 +250,11 @@ export default async function AssembliesListPage({
                     </table>
                 </CardContent>
             </Card>
+
+            {/* Section Suivi des AGA */}
+            <div className="mt-8">
+                <AgaTrackingSection clients={(clientsData || []) as any} />
+            </div>
         </div>
     )
 }

@@ -1906,19 +1906,21 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         .eq('status', 'active')
         .order('company_name')
 
-    // Fetch monthly calls history
+    // Fetch monthly calls history (only months containing call data)
     const { data: callsHistory } = await supabase
         .from('manager_monthly_calls')
         .select('*')
         .eq('manager_id', managerId)
+        .gt('total_calls', 0)
         .order('year_month', { ascending: false })
         .limit(2)
 
-    // Fetch monthly workload history
+    // Fetch monthly workload history (only months containing workload/task data)
     const { data: workloadHistory } = await supabase
         .from('manager_monthly_workload')
         .select('*')
         .eq('manager_id', managerId)
+        .or('communications_received.gt.0,open_tasks.gt.0,closed_tasks.gt.0')
         .order('year_month', { ascending: false })
         .limit(2)
 
@@ -2103,12 +2105,12 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         .order('created_at', { ascending: false })
 
     return {
-        // Current metrics
-        calls_total: callsHistory?.[0]?.total_calls || stats?.totalCalls || 0,
-        calls_answered: callsHistory?.[0]?.answered_calls || stats?.answeredCalls || 0,
-        late_tasks: workloadHistory?.[0]?.open_tasks || stats?.openTasks || 0,
-        op_reports_closed: workloadHistory?.[0]?.closed_tasks || stats?.closedTasks || 0,
-        emails_received: workloadHistory?.[0]?.communications_received || stats?.communicationsReceived || 0,
+        // Current metrics (fall back to 0 if history is empty)
+        calls_total: callsHistory?.[0]?.total_calls ?? 0,
+        calls_answered: callsHistory?.[0]?.answered_calls ?? 0,
+        late_tasks: workloadHistory?.[0]?.open_tasks ?? 0,
+        op_reports_closed: workloadHistory?.[0]?.closed_tasks ?? 0,
+        emails_received: workloadHistory?.[0]?.communications_received ?? 0,
         bills_no_notes: billsNoNotesCount,
         open_complaints_count: openComplaints?.length || 0,
 
@@ -2548,6 +2550,69 @@ export async function checkExistingStatsAction(managerId: string, yearMonth: str
         hasCommunications: !!workloadRes.data && workloadRes.data.communications_received > 0,
         hasTasks: !!workloadRes.data && (workloadRes.data.open_tasks > 0 || workloadRes.data.closed_tasks > 0)
     }
+}
+
+export async function deleteMonthlyStatsAction(managerId: string, yearMonth: string, type: 'calls' | 'comms' | 'tasks') {
+    const supabase = await createClient()
+
+    if (type === 'calls') {
+        const { error } = await supabase
+            .from('manager_monthly_calls')
+            .delete()
+            .eq('manager_id', managerId)
+            .eq('year_month', yearMonth)
+
+        if (error) throw new Error(error.message)
+    } else if (type === 'comms') {
+        const { data: existing } = await supabase
+            .from('manager_monthly_workload')
+            .select('*')
+            .eq('manager_id', managerId)
+            .eq('year_month', yearMonth)
+            .maybeSingle()
+
+        if (existing) {
+            if (existing.open_tasks === 0 && existing.closed_tasks === 0) {
+                const { error } = await supabase
+                    .from('manager_monthly_workload')
+                    .delete()
+                    .eq('id', existing.id)
+                if (error) throw new Error(error.message)
+            } else {
+                const { error } = await supabase
+                    .from('manager_monthly_workload')
+                    .update({ communications_received: 0 })
+                    .eq('id', existing.id)
+                if (error) throw new Error(error.message)
+            }
+        }
+    } else if (type === 'tasks') {
+        const { data: existing } = await supabase
+            .from('manager_monthly_workload')
+            .select('*')
+            .eq('manager_id', managerId)
+            .eq('year_month', yearMonth)
+            .maybeSingle()
+
+        if (existing) {
+            if (existing.communications_received === 0) {
+                const { error } = await supabase
+                    .from('manager_monthly_workload')
+                    .delete()
+                    .eq('id', existing.id)
+                if (error) throw new Error(error.message)
+            } else {
+                const { error } = await supabase
+                    .from('manager_monthly_workload')
+                    .update({ open_tasks: 0, closed_tasks: 0 })
+                    .eq('id', existing.id)
+                if (error) throw new Error(error.message)
+            }
+        }
+    }
+
+    revalidatePath('/team-management/dashboard')
+    revalidatePath(`/team-management/managers/${managerId}`)
 }
 
 export async function updateManagerSensitiveInfoAction(managerId: string, formData: FormData) {
