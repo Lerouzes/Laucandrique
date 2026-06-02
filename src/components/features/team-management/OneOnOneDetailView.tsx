@@ -599,10 +599,11 @@ export function OneOnOneDetailView({
     const commitmentResolutionPct = totalPrevCommsCount > 0 ? (resolvedPrevCommsCount / totalPrevCommsCount) * 100 : 100
 
     const computedScore = Math.round(
-        (callsPct * 0.3) +
-        (taskHygiene * 0.3) +
+        (callsPct * 0.25) +
+        (taskHygiene * 0.25) +
         (emailHygiene * 0.2) +
         (billHygiene * 0.1) +
+        ((quoteApprovalRate ?? 100) * 0.1) +
         (commitmentResolutionPct * 0.1)
     )
 
