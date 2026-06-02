@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -41,7 +41,8 @@ import {
     Lock,
     Unlock,
     X,
-    ArrowLeft
+    ArrowLeft,
+    RefreshCw
 } from 'lucide-react'
 import { SearchableClientSelect } from './SearchableClientSelect'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -472,110 +473,116 @@ export function OneOnOneDetailView({
         setActiveAssemblyDetails(null)
     }
 
-    // Load initial states for edit/draft views from DB snapshot
-    useEffect(() => {
+    const [loadingSnapshot, setLoadingSnapshot] = useState(false)
+
+    // Load initial states for edit/draft views from DB snapshot — extracted as callback for manual refresh
+    const fetchSnapshot = useCallback(async () => {
         if (!oneOnOne?.manager_id) return
-        async function fetchSnapshot() {
-            try {
-                const snapshot = await getOneOnOneSnapshotAction(oneOnOne.manager_id)
-                // Set comparison previous values
-                setCallsTotalPrev(snapshot.calls_total_prev)
-                setCallsAnsweredPrev(snapshot.calls_answered_prev)
-                setLateTasksPrev(snapshot.late_tasks_prev)
-                setEmailsReceived(snapshot.emails_received)
-                setEmailsReceivedPrev(snapshot.emails_received_prev)
-                setBillsNoNotesPrev(snapshot.bills_no_notes_prev)
-                setOpenComplaintsPrev(snapshot.open_complaints_count_prev)
+        setLoadingSnapshot(true)
+        try {
+            const snapshot = await getOneOnOneSnapshotAction(oneOnOne.manager_id)
+            // Set comparison previous values
+            setCallsTotalPrev(snapshot.calls_total_prev)
+            setCallsAnsweredPrev(snapshot.calls_answered_prev)
+            setLateTasksPrev(snapshot.late_tasks_prev)
+            setEmailsReceived(snapshot.emails_received)
+            setEmailsReceivedPrev(snapshot.emails_received_prev)
+            setBillsNoNotesPrev(snapshot.bills_no_notes_prev)
+            setOpenComplaintsPrev(snapshot.open_complaints_count_prev)
 
-                setCallsMonthCurrent(snapshot.calls_month_current)
-                setCallsMonthPrev(snapshot.calls_month_prev)
-                setWorkloadMonthCurrent(snapshot.workload_month_current)
-                setWorkloadMonthPrev(snapshot.workload_month_prev)
+            setCallsMonthCurrent(snapshot.calls_month_current)
+            setCallsMonthPrev(snapshot.calls_month_prev)
+            setWorkloadMonthCurrent(snapshot.workload_month_current)
+            setWorkloadMonthPrev(snapshot.workload_month_prev)
 
-                // Global stats
-                setQuoteApprovalRate(snapshot.quote_approval_rate)
-                setDoorsCount(snapshot.doors_count)
-                setSyndicatesCount(snapshot.syndicates_count)
+            // Global stats
+            setQuoteApprovalRate(snapshot.quote_approval_rate)
+            setDoorsCount(snapshot.doors_count)
+            setSyndicatesCount(snapshot.syndicates_count)
 
-                // Merge open items for review and already reviewed audits/assemblies in this meeting
-                const snapshotAudits = snapshot.syndicateAudits || []
-                const currentReviewedAudits = (reviewedAudits || [])
-                    .map((ra: any) => ra.syndicate_audits)
-                    .filter((a: any) => a && !snapshotAudits.some((sa: any) => sa.id === a.id))
-                setSyndicateAudits([...snapshotAudits, ...currentReviewedAudits])
+            // Merge open items for review and already reviewed audits/assemblies in this meeting
+            const snapshotAudits = snapshot.syndicateAudits || []
+            const currentReviewedAudits = (reviewedAudits || [])
+                .map((ra: any) => ra.syndicate_audits)
+                .filter((a: any) => a && !snapshotAudits.some((sa: any) => sa.id === a.id))
+            setSyndicateAudits([...snapshotAudits, ...currentReviewedAudits])
 
-                const snapshotAssemblies = snapshot.assemblyEvaluations || []
-                const currentReviewedAssemblies = (reviewedAssemblies || [])
-                    .map((ras: any) => ras.assembly_evaluations)
-                    .filter((a: any) => a && !snapshotAssemblies.some((sa: any) => sa.id === a.id))
-                setAssemblyEvaluations([...snapshotAssemblies, ...currentReviewedAssemblies])
+            const snapshotAssemblies = snapshot.assemblyEvaluations || []
+            const currentReviewedAssemblies = (reviewedAssemblies || [])
+                .map((ras: any) => ras.assembly_evaluations)
+                .filter((a: any) => a && !snapshotAssemblies.some((sa: any) => sa.id === a.id))
+            setAssemblyEvaluations([...snapshotAssemblies, ...currentReviewedAssemblies])
 
-                setClientsList(snapshot.clientsList || [])
+            setClientsList(snapshot.clientsList || [])
 
-                // Merge open complaints and discussed ones
-                const open = snapshot.openComplaints || []
-                const activeAndDiscussed = [...open]
-                discussedComplaints.forEach(dc => {
-                    if (dc.complaints && !activeAndDiscussed.some(oc => oc.id === dc.complaint_id)) {
-                        activeAndDiscussed.push({
-                            ...dc.complaints,
-                            id: dc.complaint_id
-                        })
-                    }
-                })
-                setManagerComplaints(activeAndDiscussed)
+            // Merge open complaints and discussed ones
+            const open = snapshot.openComplaints || []
+            const activeAndDiscussed = [...open]
+            discussedComplaints.forEach(dc => {
+                if (dc.complaints && !activeAndDiscussed.some(oc => oc.id === dc.complaint_id)) {
+                    activeAndDiscussed.push({
+                        ...dc.complaints,
+                        id: dc.complaint_id
+                    })
+                }
+            })
+            setManagerComplaints(activeAndDiscussed)
 
-                // Map reviewed audits already saved for this meeting
-                const audLookup: Record<string, any> = {}
-                reviewedAudits.forEach(ra => {
-                    audLookup[ra.audit_id] = {
-                        checked: ra.reviewed,
-                        my_notes: ra.my_notes || '',
-                        manager_notes: ra.manager_notes || ''
-                    }
-                })
-                setReviewedAuditsState(audLookup)
+            // Map reviewed audits already saved for this meeting
+            const audLookup: Record<string, any> = {}
+            reviewedAudits.forEach(ra => {
+                audLookup[ra.audit_id] = {
+                    checked: ra.reviewed,
+                    my_notes: ra.my_notes || '',
+                    manager_notes: ra.manager_notes || ''
+                }
+            })
+            setReviewedAuditsState(audLookup)
 
-                // Map reviewed assemblies
-                const assLookup: Record<string, any> = {}
-                reviewedAssemblies.forEach(ras => {
-                    assLookup[ras.assembly_evaluation_id] = {
-                        checked: ras.reviewed,
-                        my_notes: ras.my_notes || '',
-                        manager_notes: ras.manager_notes || ''
-                    }
-                })
-                setReviewedAssembliesState(assLookup)
+            // Map reviewed assemblies
+            const assLookup: Record<string, any> = {}
+            reviewedAssemblies.forEach(ras => {
+                assLookup[ras.assembly_evaluation_id] = {
+                    checked: ras.reviewed,
+                    my_notes: ras.my_notes || '',
+                    manager_notes: ras.manager_notes || ''
+                }
+            })
+            setReviewedAssembliesState(assLookup)
 
-                // Map reviewed complaints
-                const compLookup: Record<string, any> = {}
-                discussedComplaints.forEach(dc => {
-                    compLookup[dc.complaint_id] = {
-                        checked: dc.reviewed,
-                        my_notes: dc.my_notes || dc.discussion_notes || '',
-                        manager_notes: dc.manager_notes || dc.resolution_plan || '',
-                        resolved_in_meeting: dc.resolved_in_meeting || false,
-                        title: dc.title || dc.complaints?.title || '',
-                        description: dc.description || dc.complaints?.description || '',
-                        severity: dc.severity || dc.complaints?.severity || 'medium',
-                        category_id: dc.complaints?.category_id
-                    }
-                })
-                setReviewedComplaintsState(compLookup)
+            // Map reviewed complaints
+            const compLookup: Record<string, any> = {}
+            discussedComplaints.forEach(dc => {
+                compLookup[dc.complaint_id] = {
+                    checked: dc.reviewed,
+                    my_notes: dc.my_notes || dc.discussion_notes || '',
+                    manager_notes: dc.manager_notes || dc.resolution_plan || '',
+                    resolved_in_meeting: dc.resolved_in_meeting || false,
+                    title: dc.title || dc.complaints?.title || '',
+                    description: dc.description || dc.complaints?.description || '',
+                    severity: dc.severity || dc.complaints?.severity || 'medium',
+                    category_id: dc.complaints?.category_id
+                }
+            })
+            setReviewedComplaintsState(compLookup)
 
-                // Map commitments from this meeting
-                // Previous meeting commitments carried over
-                const prevMeetingComms = commitments.filter(c => c.carried_forward)
-                setPreviousCommitments(prevMeetingComms)
+            // Map commitments from this meeting
+            // Previous meeting commitments carried over
+            const prevMeetingComms = commitments.filter(c => c.carried_forward)
+            setPreviousCommitments(prevMeetingComms)
 
-                // New commitments created in this meeting
-                const newComms = commitments.filter(c => !c.carried_forward)
-                setNewAgreedActions(newComms)
+            // New commitments created in this meeting
+            const newComms = commitments.filter(c => !c.carried_forward)
+            setNewAgreedActions(newComms)
 
-            } catch (err) {
-                console.error("Error loading snapshot data in details view:", err)
-            }
+        } catch (err) {
+            console.error("Error loading snapshot data in details view:", err)
+        } finally {
+            setLoadingSnapshot(false)
         }
+    }, [oneOnOne?.manager_id, oneOnOne?.id, reviewedAudits, reviewedAssemblies, discussedComplaints, commitments])
+
+    useEffect(() => {
         fetchSnapshot()
     }, [oneOnOne?.id])
 
@@ -1123,10 +1130,22 @@ export function OneOnOneDetailView({
             {/* SECTION 1: Snapshot / Compare Section */}
             <Card className="bg-[#16171e]/70 border-zinc-800 shadow-md">
                 <CardHeader>
-                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-purple-400" />
-                        1. Instantané Métriques (Revue & Comparaison)
-                    </CardTitle>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-purple-400" />
+                            1. Instantané Métriques (Revue &amp; Comparaison)
+                        </CardTitle>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => fetchSnapshot()}
+                            disabled={loadingSnapshot}
+                            className="h-7 px-3 text-[10px] font-semibold bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white flex items-center gap-1.5 rounded-lg transition-all"
+                        >
+                            <RefreshCw className={`h-3 w-3 ${loadingSnapshot ? 'animate-spin' : ''}`} />
+                            {loadingSnapshot ? 'Actualisation...' : 'Actualiser les données'}
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {isEditing && (
