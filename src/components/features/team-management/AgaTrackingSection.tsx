@@ -14,7 +14,7 @@ interface Client {
     id: string
     company_name: string | null
     full_name: string
-    fiscal_year_end: string | null
+    contracts?: { start_date: string | null } | { start_date: string | null }[] | null
     aga_planned_date: string | null
     aga_completed_date: string | null
     aga_status: string | null
@@ -32,6 +32,16 @@ interface AgaTrackingSectionProps {
 export function AgaTrackingSection({ clients = [] }: AgaTrackingSectionProps) {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
+
+    const getClientFiscalYearEnd = (c: Client) => {
+        if (c.contracts) {
+            if (Array.isArray(c.contracts)) {
+                return c.contracts[0]?.start_date || null
+            }
+            return c.contracts.start_date || null
+        }
+        return null
+    }
     const [editingClientId, setEditingClientId] = useState<string | null>(null)
 
     // Editing states for the selected row
@@ -50,7 +60,7 @@ export function AgaTrackingSection({ clients = [] }: AgaTrackingSectionProps) {
 
     const checkIsLate = (client: Client) => {
         if (client.aga_completed_date || client.aga_status === 'completed') return false
-        const dueDate = getDueDate(client.fiscal_year_end)
+        const dueDate = getDueDate(getClientFiscalYearEnd(client))
         if (!dueDate) return false
         const today = new Date()
         today.setHours(0, 0, 0, 0)
@@ -60,7 +70,7 @@ export function AgaTrackingSection({ clients = [] }: AgaTrackingSectionProps) {
 
     const handleStartEdit = (client: Client) => {
         setEditingClientId(client.id)
-        setEditFiscalYearEnd(client.fiscal_year_end || '')
+        setEditFiscalYearEnd(getClientFiscalYearEnd(client) || '')
         setEditPlannedDate(client.aga_planned_date || '')
         setEditCompletedDate(client.aga_completed_date || '')
         setEditStatus(client.aga_status || 'pending')
@@ -84,7 +94,7 @@ export function AgaTrackingSection({ clients = [] }: AgaTrackingSectionProps) {
                 }
 
                 await updateClientAgaAction(clientId, {
-                    fiscal_year_end: editFiscalYearEnd || null,
+                    financial_year: editFiscalYearEnd || null,
                     aga_planned_date: editPlannedDate || null,
                     aga_completed_date: editCompletedDate || null,
                     aga_status: finalStatus
@@ -136,7 +146,8 @@ export function AgaTrackingSection({ clients = [] }: AgaTrackingSectionProps) {
                                 const clientName = c.company_name || c.full_name
                                 const managerName = c.managers ? `${c.managers.first_name} ${c.managers.last_name}` : 'Non assigné'
                                 const isEditing = editingClientId === c.id
-                                const dueDate = getDueDate(c.fiscal_year_end)
+                                const fyEnd = getClientFiscalYearEnd(c)
+                                const dueDate = getDueDate(fyEnd)
                                 const isLate = checkIsLate(c)
 
                                 return (
@@ -153,8 +164,8 @@ export function AgaTrackingSection({ clients = [] }: AgaTrackingSectionProps) {
                                                     onChange={(e) => setEditFiscalYearEnd(e.target.value)}
                                                     className="bg-zinc-950 border-zinc-850 h-7 text-[10px] w-28 text-white px-2 rounded"
                                                 />
-                                            ) : c.fiscal_year_end ? (
-                                                new Date(c.fiscal_year_end).toLocaleDateString('fr-CA')
+                                            ) : fyEnd ? (
+                                                new Date(fyEnd).toLocaleDateString('fr-CA')
                                             ) : (
                                                 <span className="text-zinc-650 italic">Non définie</span>
                                             )}

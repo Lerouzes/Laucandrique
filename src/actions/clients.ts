@@ -171,7 +171,6 @@ export async function updateClientAction(clientIdOrPrev: any, formData: FormData
         manager_id: String(formData.get('manager_id') || '') || null,
         notes: String(formData.get('notes') || '') || null,
         status: String(formData.get('status') || 'active') as 'active' | 'inactive',
-        fiscal_year_end: formData.get('fiscal_year_end') ? String(formData.get('fiscal_year_end')) : null,
         aga_planned_date: formData.get('aga_planned_date') ? String(formData.get('aga_planned_date')) : null,
         aga_completed_date: formData.get('aga_completed_date') ? String(formData.get('aga_completed_date')) : null,
         aga_status: formData.get('aga_status') ? String(formData.get('aga_status')) : 'pending',
@@ -581,7 +580,7 @@ export async function deleteClientAction(clientId: string) {
 export async function updateClientAgaAction(
     clientId: string,
     data: {
-        fiscal_year_end?: string | null
+        financial_year?: string | null
         aga_planned_date?: string | null
         aga_completed_date?: string | null
         aga_status?: string
@@ -600,10 +599,19 @@ export async function updateClientAgaAction(
         }
     }
 
+    if (data.financial_year !== undefined) {
+        const { error: contractErr } = await supabase
+            .from('contracts')
+            .upsert(
+                { client_id: clientId, start_date: data.financial_year || null },
+                { onConflict: 'client_id' }
+            )
+        if (contractErr) throw new Error(contractErr.message)
+    }
+
     const { error } = await supabase
         .from('clients')
         .update({
-            fiscal_year_end: data.fiscal_year_end || null,
             aga_planned_date: data.aga_planned_date || null,
             aga_completed_date: data.aga_completed_date || null,
             aga_status: status

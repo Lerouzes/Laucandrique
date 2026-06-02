@@ -108,7 +108,7 @@ export function NewAuditForm({
     
     // Scores and individual notes for the questions
     const [scores, setScores] = useState<Record<string, number>>(() => {
-        const base = QUESTIONS.reduce((acc, q) => ({ ...acc, [q.key]: 3 }), {})
+        const base: Record<string, number> = QUESTIONS.reduce((acc, q) => ({ ...acc, [q.key]: 3 }), {})
         if (initialAnswers && initialAnswers.length > 0) {
             initialAnswers.forEach(ans => {
                 base[ans.question_key] = ans.score
@@ -117,7 +117,7 @@ export function NewAuditForm({
         return base
     })
     const [qNotes, setQNotes] = useState<Record<string, string>>(() => {
-        const base = QUESTIONS.reduce((acc, q) => ({ ...acc, [q.key]: '' }), {})
+        const base: Record<string, string> = QUESTIONS.reduce((acc, q) => ({ ...acc, [q.key]: '' }), {})
         if (initialAnswers && initialAnswers.length > 0) {
             initialAnswers.forEach(ans => {
                 base[ans.question_key] = ans.note || ''

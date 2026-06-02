@@ -232,10 +232,7 @@ export function ClientDetailForm({
             Suivi de l'AGA (Assemblée Générale Annuelle)
           </h3>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="fiscal_year_end" className="text-xs text-zinc-400 font-semibold">Date de fin d'exercice financier</Label>
-            <Input id="fiscal_year_end" type="date" name="fiscal_year_end" defaultValue={client.fiscal_year_end || ''} className="bg-zinc-950 border-zinc-850 h-9 text-xs focus-visible:ring-zinc-800 text-white" />
-          </div>
+
 
           <div className="space-y-1.5">
             <Label htmlFor="aga_planned_date" className="text-xs text-zinc-400 font-semibold">Date de l'AGA planifiée</Label>

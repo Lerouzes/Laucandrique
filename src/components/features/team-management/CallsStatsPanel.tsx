@@ -444,9 +444,9 @@ export function CallsStatsPanel({
                     pct,
                     monthCount: m.count
                 }
-            }).sort((a, b) => activityType === 'emails' ? (b.communicationsReceived ?? 0) - (a.communicationsReceived ?? 0) : ((b.pct ?? -1) - (a.pct ?? -1)))
+            }).sort((a: any, b: any) => activityType === 'emails' ? (b.communicationsReceived ?? 0) - (a.communicationsReceived ?? 0) : ((b.pct ?? -1) - (a.pct ?? -1)))
         })()
-        : [...rows].sort((a, b) => activityType === 'emails' ? (b.communicationsReceived ?? 0) - (a.communicationsReceived ?? 0) : ((b.pct ?? -1) - (a.pct ?? -1)))
+        : [...rows].sort((a: any, b: any) => activityType === 'emails' ? (b.communicationsReceived ?? 0) - (a.communicationsReceived ?? 0) : ((b.pct ?? -1) - (a.pct ?? -1)))
 
     // Global stats summary values
     let totalAll = 0

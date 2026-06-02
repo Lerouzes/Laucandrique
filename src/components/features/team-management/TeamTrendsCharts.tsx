@@ -38,8 +38,8 @@ export function TeamTrendsCharts({ trends = [] }: TeamTrendsChartsProps) {
         setIsMounted(true)
     }, [])
 
-    const formatMonthLabel = (ym: string) => {
-        if (!ym) return ''
+    const formatMonthLabel = (ym: any) => {
+        if (!ym || typeof ym !== 'string') return ''
         const [y, m] = ym.split('-').map(Number)
         const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc']
         return `${months[m - 1]} ${y}`

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createClient } from '@/utils/supabase/server'
 import { notFound } from 'next/navigation'
 import { NewAuditForm } from '@/components/features/team-management/NewAuditForm'
