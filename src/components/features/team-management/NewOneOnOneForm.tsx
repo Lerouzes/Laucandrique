@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -38,7 +38,8 @@ import {
     ChevronUp,
     ShieldAlert,
     X,
-    ArrowLeft
+    ArrowLeft,
+    RefreshCw
 } from 'lucide-react'
 import { SearchableClientSelect } from './SearchableClientSelect'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -445,59 +446,67 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
         setActiveAssemblyDetails(null)
     }
 
+    const [loadingSnapshot, setLoadingSnapshot] = useState(false)
+
+    // Fetch snapshot metrics — extracted as a callback so it can be triggered manually (refresh)
+    const loadManagerData = useCallback(async (id: string) => {
+        if (!id) return
+        setLoadingSnapshot(true)
+        try {
+            const snapshot = await getOneOnOneSnapshotAction(id)
+            // Set current values
+            setCallsTotal(snapshot.calls_total)
+            setCallsAnswered(snapshot.calls_answered)
+            setLateTasks(snapshot.late_tasks)
+            setBillsNoNotes(snapshot.bills_no_notes)
+            
+            // Set comparison previous values
+            setCallsTotalPrev(snapshot.calls_total_prev)
+            setCallsAnsweredPrev(snapshot.calls_answered_prev)
+            setLateTasksPrev(snapshot.late_tasks_prev)
+            setEmailsReceived(snapshot.emails_received)
+            setEmailsReceivedPrev(snapshot.emails_received_prev)
+            setBillsNoNotesPrev(snapshot.bills_no_notes_prev)
+            setOpenComplaintsPrev(snapshot.open_complaints_count_prev)
+
+            setCallsMonthCurrent(snapshot.calls_month_current)
+            setCallsMonthPrev(snapshot.calls_month_prev)
+            setWorkloadMonthCurrent(snapshot.workload_month_current)
+            setWorkloadMonthPrev(snapshot.workload_month_prev)
+
+            // Global Stats
+            setQuoteApprovalRate(snapshot.quote_approval_rate)
+            setDoorsCount(snapshot.doors_count)
+            setSyndicatesCount(snapshot.syndicates_count)
+
+            // Set pending commitments to carry forward
+            setPreviousCommitments(snapshot.pendingCommitments || [])
+
+            // Review items
+            setSyndicateAudits(snapshot.syndicateAudits || [])
+            setAssemblyEvaluations(snapshot.assemblyEvaluations || [])
+            setManagerComplaints(snapshot.openComplaints || [])
+            setOperationalRisks(snapshot.operationalRisks || [])
+            setClientsList(snapshot.clientsList || [])
+
+            // Reset review states
+            setReviewedAuditsState({})
+            setReviewedAssembliesState({})
+            setReviewedComplaintsState({})
+            setTaskEmailAudits([])
+            setNewAgreedActions([])
+        } catch (err) {
+            console.error("Error loading snapshot data:", err)
+        } finally {
+            setLoadingSnapshot(false)
+        }
+    }, [])
+
     // Fetch snapshot metrics when managerId changes
     useEffect(() => {
         if (!managerId) return
-        async function loadManagerData() {
-            try {
-                const snapshot = await getOneOnOneSnapshotAction(managerId)
-                // Set current values
-                setCallsTotal(snapshot.calls_total)
-                setCallsAnswered(snapshot.calls_answered)
-                setLateTasks(snapshot.late_tasks)
-                setBillsNoNotes(snapshot.bills_no_notes)
-                
-                // Set comparison previous values
-                setCallsTotalPrev(snapshot.calls_total_prev)
-                setCallsAnsweredPrev(snapshot.calls_answered_prev)
-                setLateTasksPrev(snapshot.late_tasks_prev)
-                setEmailsReceived(snapshot.emails_received)
-                setEmailsReceivedPrev(snapshot.emails_received_prev)
-                setBillsNoNotesPrev(snapshot.bills_no_notes_prev)
-                setOpenComplaintsPrev(snapshot.open_complaints_count_prev)
-
-                setCallsMonthCurrent(snapshot.calls_month_current)
-                setCallsMonthPrev(snapshot.calls_month_prev)
-                setWorkloadMonthCurrent(snapshot.workload_month_current)
-                setWorkloadMonthPrev(snapshot.workload_month_prev)
-
-                // Global Stats
-                setQuoteApprovalRate(snapshot.quote_approval_rate)
-                setDoorsCount(snapshot.doors_count)
-                setSyndicatesCount(snapshot.syndicates_count)
-
-                // Set pending commitments to carry forward
-                setPreviousCommitments(snapshot.pendingCommitments || [])
-
-                // Review items
-                setSyndicateAudits(snapshot.syndicateAudits || [])
-                setAssemblyEvaluations(snapshot.assemblyEvaluations || [])
-                setManagerComplaints(snapshot.openComplaints || [])
-                setOperationalRisks(snapshot.operationalRisks || [])
-                setClientsList(snapshot.clientsList || [])
-
-                // Reset review states
-                setReviewedAuditsState({})
-                setReviewedAssembliesState({})
-                setReviewedComplaintsState({})
-                setTaskEmailAudits([])
-                setNewAgreedActions([])
-            } catch (err) {
-                console.error("Error loading snapshot data:", err)
-            }
-        }
-        loadManagerData()
-    }, [managerId])
+        loadManagerData(managerId)
+    }, [managerId, loadManagerData])
 
     // Dynamic Scoring Engine
     const callsPct = callsTotal > 0 ? (callsAnswered / callsTotal) * 100 : 0
@@ -890,6 +899,18 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                             <TrendingUp className="h-4 w-4 text-purple-400" />
                             1. Instantané Métriques (Date de Rencontre)
                         </CardTitle>
+                        {managerId && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => loadManagerData(managerId)}
+                                disabled={loadingSnapshot}
+                                className="h-7 px-3 text-[10px] font-semibold bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white flex items-center gap-1.5 rounded-lg transition-all"
+                            >
+                                <RefreshCw className={`h-3 w-3 ${loadingSnapshot ? 'animate-spin' : ''}`} />
+                                {loadingSnapshot ? 'Actualisation...' : 'Actualiser les données'}
+                            </Button>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
