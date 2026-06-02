@@ -2025,7 +2025,7 @@ export function OneOnOneDetailView({
             {/* Complaint History Popup Modal */}
             {historyPopupComplaint && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <Card className="bg-[#16171e] border-zinc-800 shadow-2xl max-w-xl w-full text-xxs text-zinc-300">
+                    <Card className="bg-[#16171e] border-zinc-800 shadow-2xl w-full max-w-[90vw] md:max-w-[80vw] lg:max-w-[70vw] xl:max-w-[60vw] text-xxs text-zinc-300">
                         <CardHeader className="border-b border-zinc-900/60 pb-3">
                             <CardTitle className="text-sm font-bold text-white flex items-center justify-between">
                                 Historique par catégorie : {historyPopupComplaint.complaint_categories?.name}
@@ -2069,7 +2069,7 @@ export function OneOnOneDetailView({
             {/* Complaint Edit Modal */}
             {activeEditingComplaint && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-[#16171e] border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6 text-xs text-zinc-300">
+                    <div className="bg-[#16171e] border border-zinc-800 rounded-2xl w-full max-w-[95vw] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-[75vw] max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6 text-xs text-zinc-300">
                         {/* Modal Header */}
                         <div className="flex justify-between items-start border-b border-zinc-800 pb-4">
                             <div>
@@ -2242,7 +2242,7 @@ export function OneOnOneDetailView({
             {/* Audit Detail / Review Modal */}
             {activeAudit && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-[#16171e] border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6 text-xs text-zinc-300">
+                    <div className="bg-[#16171e] border border-zinc-800 rounded-2xl w-full max-w-[95vw] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-[75vw] max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6 text-xs text-zinc-300">
                         {/* Modal Header */}
                         <div className="flex justify-between items-start border-b border-zinc-800 pb-4">
                             <div>
@@ -2372,7 +2372,7 @@ export function OneOnOneDetailView({
             {/* Assembly Detail / Review Modal */}
             {activeAssembly && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-[#16171e] border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6 text-xs text-zinc-300">
+                    <div className="bg-[#16171e] border border-zinc-800 rounded-2xl w-full max-w-[95vw] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-[75vw] max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6 text-xs text-zinc-300">
                         {/* Modal Header */}
                         <div className="flex justify-between items-start border-b border-zinc-800 pb-4">
                             <div>
@@ -2492,7 +2492,7 @@ export function OneOnOneDetailView({
 
             {/* Audit Detail / Edit Modal */}
             <Dialog open={selectedAuditIdx !== null} onOpenChange={(open) => { if (!open) setSelectedAuditIdx(null); }}>
-                <DialogContent className="max-w-2xl bg-[#16171e]/95 border border-zinc-800/80 backdrop-blur-md rounded-2xl shadow-2xl p-6 text-white overflow-hidden">
+                <DialogContent className="max-w-[95vw] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-[75vw] w-full bg-[#16171e]/95 border border-zinc-800/80 backdrop-blur-md rounded-2xl shadow-2xl p-6 text-white overflow-hidden">
                     <DialogHeader>
                         <DialogTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                             <ClipboardList className="h-5 w-5 text-purple-400" />
@@ -2728,7 +2728,7 @@ export function OneOnOneDetailView({
 
             {/* Operational Risk Detail / Edit Modal */}
             <Dialog open={selectedRiskIdx !== null} onOpenChange={(open) => { if (!open) setSelectedRiskIdx(null); }}>
-                <DialogContent className="max-w-2xl bg-[#16171e]/95 border border-zinc-800/80 backdrop-blur-md rounded-2xl shadow-2xl p-6 text-white overflow-hidden">
+                <DialogContent className="max-w-[95vw] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-[75vw] w-full bg-[#16171e]/95 border border-zinc-800/80 backdrop-blur-md rounded-2xl shadow-2xl p-6 text-white overflow-hidden">
                     <DialogHeader>
                         <DialogTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                             <ShieldAlert className="h-5 w-5 text-purple-400" />
@@ -2877,7 +2877,7 @@ export function OneOnOneDetailView({
 
             {/* SECTION 6: Dialog Modal */}
             <Dialog open={section6DialogOpen} onOpenChange={setSection6DialogOpen}>
-                <DialogContent className="max-w-4xl bg-[#16171e]/95 border border-zinc-800/80 backdrop-blur-md rounded-2xl shadow-2xl p-6 text-white overflow-hidden max-h-[85vh] flex flex-col">
+                <DialogContent className="max-w-[95vw] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-[80vw] w-full bg-[#16171e]/95 border border-zinc-800/80 backdrop-blur-md rounded-2xl shadow-2xl p-6 text-white overflow-hidden max-h-[85vh] flex flex-col">
                     <DialogHeader>
                         <DialogTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                             <CheckCircle2 className="h-4.5 w-4.5 text-purple-400" />

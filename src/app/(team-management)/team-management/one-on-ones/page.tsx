@@ -84,39 +84,55 @@ export default async function OneOnOnesListPage() {
                                             : 'bg-amber-500/20 text-amber-400 border-amber-800/40'
 
                                     return (
-                                        <tr key={o.id} className="hover:bg-zinc-900/30 transition-colors">
-                                            <td className="p-3 font-semibold text-zinc-200 flex items-center gap-2">
-                                                <User className="h-3.5 w-3.5 text-purple-400 shrink-0" />
-                                                {managerName}
+                                        <tr key={o.id} className="hover:bg-zinc-900/30 transition-colors cursor-pointer text-xxs">
+                                            <td className="p-0 font-semibold text-zinc-200">
+                                                <Link href={`/team-management/one-on-ones/${o.id}`} className="p-3 flex items-center gap-2 hover:text-purple-400 transition-colors w-full h-full">
+                                                    <User className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                                                    {managerName}
+                                                </Link>
                                             </td>
-                                            <td className="p-3 text-zinc-300 font-mono">
-                                                {new Date(o.meeting_date).toLocaleDateString('fr-CA')}
+                                            <td className="p-0 text-zinc-300 font-mono">
+                                                <Link href={`/team-management/one-on-ones/${o.id}`} className="p-3 hover:text-purple-400 transition-colors block w-full h-full">
+                                                    {new Date(o.meeting_date).toLocaleDateString('fr-CA')}
+                                                </Link>
                                             </td>
-                                            <td className="p-3 text-center font-semibold text-zinc-300">{o.late_tasks}</td>
-                                            <td className="p-3 text-center">
-                                                {callsTotal > 0 ? (
-                                                    <span className={`font-bold text-xs ${
-                                                        callsPct >= 80 ? 'text-emerald-400' :
-                                                        callsPct > 55 ? 'text-amber-400' :
-                                                        'text-rose-500'
-                                                    }`}>
-                                                        {callsPct}%
-                                                        <span className="text-zinc-500 font-normal ml-1 text-[10px]">({callsAnswered}/{callsTotal})</span>
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-zinc-500 italic text-[10px]">N/A</span>
-                                                )}
+                                            <td className="p-0 text-center font-semibold text-zinc-300">
+                                                <Link href={`/team-management/one-on-ones/${o.id}`} className="p-3 hover:text-purple-400 transition-colors block w-full h-full">
+                                                    {o.late_tasks}
+                                                </Link>
                                             </td>
-                                            <td className="p-3 text-center text-zinc-300">{o.emails_over_48h}</td>
-                                            <td className="p-3 text-center">
-                                                <Badge variant="outline" className={`text-[8px] font-bold px-2 py-0.5 ${statusBadge}`}>
-                                                    {o.status === 'completed' ? 'Complétée' : 'Brouillon'}
-                                                </Badge>
+                                            <td className="p-0 text-center">
+                                                <Link href={`/team-management/one-on-ones/${o.id}`} className="p-3 hover:text-purple-400 transition-colors block w-full h-full">
+                                                    {callsTotal > 0 ? (
+                                                        <span className={`font-bold text-xs ${
+                                                            callsPct >= 80 ? 'text-emerald-400' :
+                                                            callsPct > 55 ? 'text-amber-400' :
+                                                            'text-rose-500'
+                                                        }`}>
+                                                            {callsPct}%
+                                                            <span className="text-zinc-500 font-normal ml-1 text-[10px]">({callsAnswered}/{callsTotal})</span>
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-zinc-500 italic text-[10px]">N/A</span>
+                                                    )}
+                                                </Link>
                                             </td>
-                                            <td className="p-3 text-right">
+                                            <td className="p-0 text-center text-zinc-300">
+                                                <Link href={`/team-management/one-on-ones/${o.id}`} className="p-3 hover:text-purple-400 transition-colors block w-full h-full">
+                                                    {o.emails_over_48h}
+                                                </Link>
+                                            </td>
+                                            <td className="p-0 text-center">
+                                                <Link href={`/team-management/one-on-ones/${o.id}`} className="p-3 hover:text-purple-400 transition-colors block w-full h-full">
+                                                    <Badge variant="outline" className={`text-[8px] font-bold px-2 py-0.5 ${statusBadge}`}>
+                                                        {o.status === 'completed' ? 'Complétée' : 'Brouillon'}
+                                                    </Badge>
+                                                </Link>
+                                            </td>
+                                            <td className="p-0 text-right">
                                                 <Link
                                                     href={`/team-management/one-on-ones/${o.id}`}
-                                                    className="text-purple-400 hover:text-purple-300 font-bold hover:underline inline-flex items-center gap-1"
+                                                    className="p-3 text-purple-400 hover:text-purple-300 font-bold hover:underline flex justify-end items-center gap-1 w-full h-full"
                                                 >
                                                     Ouvrir
                                                     <ArrowRight className="h-3 w-3" />
