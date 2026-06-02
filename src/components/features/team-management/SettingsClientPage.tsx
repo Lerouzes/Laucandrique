@@ -33,7 +33,8 @@ import {
     createGustavAccountAction,
     getGustavUsersAction,
     updateUserRoleAction,
-    resetUserPasswordAction
+    resetUserPasswordAction,
+    deleteUserAction
 } from '@/actions/team-management'
 
 interface ComplaintCategory {
@@ -177,6 +178,10 @@ export function SettingsClientPage({
     const [newPasswordVal, setNewPasswordVal] = useState('')
     const [isResettingPassword, setIsResettingPassword] = useState(false)
 
+    // Delete user states
+    const [userToDelete, setUserToDelete] = useState<any | null>(null)
+    const [isDeletingUser, setIsDeletingUser] = useState(false)
+
     const handleResetPassword = async () => {
         if (!resetPasswordUser || newPasswordVal.length < 6) return
         setIsResettingPassword(true)
@@ -189,6 +194,21 @@ export function SettingsClientPage({
             triggerAlert(err.message || 'Erreur lors de la réinitialisation du mot de passe.', 'error')
         } finally {
             setIsResettingPassword(false)
+        }
+    }
+
+    const handleDeleteUser = async () => {
+        if (!userToDelete) return
+        setIsDeletingUser(true)
+        try {
+            await deleteUserAction(userToDelete.id)
+            setUsers(prev => prev.filter(u => u.id !== userToDelete.id))
+            triggerAlert(`Le compte de ${userToDelete.full_name} a été supprimé.`, 'success')
+            setUserToDelete(null)
+        } catch (err: any) {
+            triggerAlert(err.message || 'Erreur lors de la suppression du compte.', 'error')
+        } finally {
+            setIsDeletingUser(false)
         }
     }
 
@@ -993,6 +1013,16 @@ export function SettingsClientPage({
                                                                     >
                                                                         <Key className="h-3.5 w-3.5" />
                                                                     </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        disabled={isCurrentUser}
+                                                                        onClick={() => setUserToDelete(user)}
+                                                                        className="h-7 w-7 p-0 border-zinc-800 hover:bg-rose-950/30 hover:border-rose-900 text-zinc-400 hover:text-rose-400"
+                                                                        title="Supprimer le compte"
+                                                                    >
+                                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                                    </Button>
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -1027,7 +1057,7 @@ export function SettingsClientPage({
                         
                         <div className="space-y-3 text-xs">
                             <p className="text-zinc-400">
-                                Saisissez le nouveau mot de passe pour l'utilisateur <strong className="text-zinc-200">{resetPasswordUser.full_name}</strong> ({resetPasswordUser.email}).
+                                Saisissez le nouveau mot de passe pour l&apos;utilisateur <strong className="text-zinc-200">{resetPasswordUser.full_name}</strong> ({resetPasswordUser.email}).
                             </p>
                             
                             <div className="space-y-1">
@@ -1065,6 +1095,65 @@ export function SettingsClientPage({
                                     <Key className="h-4 w-4" />
                                 )}
                                 Réinitialiser
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete User Confirmation Modal */}
+            {userToDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#16171e]/95 border border-rose-900/60 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4 text-white overflow-hidden backdrop-blur-md">
+                        <div className="flex justify-between items-center pb-2 border-b border-zinc-800">
+                            <h3 className="font-bold text-sm text-rose-400 flex items-center gap-2">
+                                <Trash2 className="h-4 w-4" />
+                                Supprimer le compte
+                            </h3>
+                            <button 
+                                onClick={() => setUserToDelete(null)}
+                                className="p-1 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
+                                disabled={isDeletingUser}
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-3 text-xs">
+                            <div className="p-4 bg-rose-950/20 border border-rose-900/40 rounded-xl space-y-1">
+                                <p className="text-zinc-300">
+                                    Vous êtes sur le point de supprimer définitivement le compte de
+                                </p>
+                                <p className="font-bold text-white text-sm">{userToDelete.full_name}</p>
+                                <p className="text-zinc-400">{userToDelete.email}</p>
+                            </div>
+                            <p className="text-rose-400 font-semibold">
+                                ⚠️ Cette action est irréversible. Le compte sera supprimé de la plateforme.
+                            </p>
+                        </div>
+
+                        <div className="flex justify-end gap-2 border-t border-zinc-800 pt-4">
+                            <Button 
+                                type="button" 
+                                variant="outline" 
+                                onClick={() => setUserToDelete(null)}
+                                disabled={isDeletingUser}
+                                className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850 text-xs h-9 px-4 font-bold rounded-lg"
+                            >
+                                Annuler
+                            </Button>
+                            <Button 
+                                type="button" 
+                                onClick={handleDeleteUser}
+                                disabled={isDeletingUser}
+                                className="bg-rose-700 hover:bg-rose-800 text-white text-xs h-9 px-4 font-bold rounded-lg shadow-lg flex items-center gap-1.5"
+                            >
+                                {isDeletingUser ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                )}
+                                Supprimer définitivement
                             </Button>
                         </div>
                     </div>

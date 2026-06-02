@@ -2990,5 +2990,42 @@ export async function resetUserPasswordAction(userId: string, newPassword: strin
     return { success: true }
 }
 
+export async function deleteUserAction(userId: string) {
+    const supabase = await createClient()
+
+    // Enforce Master role security check
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    if (!currentUser) {
+        throw new Error('Non authentifié. Veuillez vous connecter.')
+    }
+
+    const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', currentUser.id)
+        .single()
+
+    if (currentProfile?.role !== 'Master') {
+        throw new Error('Sécurité : Seul le rôle Master est autorisé à supprimer des comptes.')
+    }
+
+    if (userId === currentUser.id) {
+        throw new Error('Vous ne pouvez pas supprimer votre propre compte.')
+    }
+
+    // Call the SECURITY DEFINER RPC function to delete user from auth.users
+    const { error } = await supabase
+        .rpc('admin_delete_user', {
+            target_user_id: userId,
+        })
+
+    if (error) {
+        throw new Error(`Erreur lors de la suppression du compte : ${error.message}`)
+    }
+
+    return { success: true }
+}
+
+
 
 
