@@ -2552,10 +2552,24 @@ export async function checkExistingStatsAction(managerId: string, yearMonth: str
     }
 }
 
-export async function deleteMonthlyStatsAction(managerId: string, yearMonth: string, type: 'calls' | 'comms' | 'tasks') {
+export async function deleteMonthlyStatsAction(managerId: string, yearMonth: string, type: 'calls' | 'comms' | 'tasks' | 'all') {
     const supabase = await createClient()
 
-    if (type === 'calls') {
+    if (type === 'all') {
+        const { error: callsErr } = await supabase
+            .from('manager_monthly_calls')
+            .delete()
+            .eq('manager_id', managerId)
+            .eq('year_month', yearMonth)
+        if (callsErr) throw new Error(callsErr.message)
+
+        const { error: workloadErr } = await supabase
+            .from('manager_monthly_workload')
+            .delete()
+            .eq('manager_id', managerId)
+            .eq('year_month', yearMonth)
+        if (workloadErr) throw new Error(workloadErr.message)
+    } else if (type === 'calls') {
         const { error } = await supabase
             .from('manager_monthly_calls')
             .delete()

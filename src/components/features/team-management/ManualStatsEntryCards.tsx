@@ -66,7 +66,7 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
     const [isPendingTasks, startTransitionTasks] = useTransition()
 
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-    const [deleteType, setDeleteType] = useState<'calls' | 'comms' | 'tasks'>('calls')
+    const [deleteType, setDeleteType] = useState<'calls' | 'comms' | 'tasks' | 'all'>('calls')
     const [deleting, setDeleting] = useState(false)
 
     // Effect for Calls check
@@ -182,10 +182,10 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
         try {
             let mId = ''
             let mMonth = ''
-            if (deleteType === 'calls') {
+            if (activeTab === 'calls') {
                 mId = callManagerId
                 mMonth = callMonth
-            } else if (deleteType === 'comms') {
+            } else if (activeTab === 'comms') {
                 mId = commManagerId
                 mMonth = commMonth
             } else {
@@ -196,9 +196,17 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
             await deleteMonthlyStatsAction(mId, mMonth, deleteType)
             toast.success("Données supprimées avec succès.")
             
-            if (deleteType === 'calls') setHasCalls(false)
-            else if (deleteType === 'comms') setHasComms(false)
-            else setHasTasks(false)
+            if (deleteType === 'all') {
+                setHasCalls(false)
+                setHasComms(false)
+                setHasTasks(false)
+            } else if (deleteType === 'calls') {
+                setHasCalls(false)
+            } else if (deleteType === 'comms') {
+                setHasComms(false)
+            } else {
+                setHasTasks(false)
+            }
 
             router.refresh()
         } catch (err: any) {
@@ -372,17 +380,30 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
 
                             <div className="flex justify-between items-center pt-4 border-t border-zinc-850/50">
                                 {hasCalls ? (
-                                    <Button
-                                        type="button"
-                                        onClick={() => {
-                                            setDeleteType('calls')
-                                            setDeleteDialogOpen(true)
-                                        }}
-                                        variant="outline"
-                                        className="border-rose-900/50 hover:border-rose-800 text-rose-400 hover:text-rose-300 bg-rose-950/20 hover:bg-rose-950/40 text-xs h-10 px-4 rounded-xl font-bold transition-all"
-                                    >
-                                        Supprimer les données
-                                    </Button>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            type="button"
+                                            onClick={() => {
+                                                setDeleteType('calls')
+                                                setDeleteDialogOpen(true)
+                                            }}
+                                            variant="outline"
+                                            className="border-rose-900/50 hover:border-rose-800 text-rose-400 hover:text-rose-300 bg-rose-950/20 hover:bg-rose-950/40 text-xs h-10 px-4 rounded-xl font-bold transition-all"
+                                        >
+                                            Supprimer Appels
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            onClick={() => {
+                                                setDeleteType('all')
+                                                setDeleteDialogOpen(true)
+                                            }}
+                                            variant="outline"
+                                            className="border-rose-900/80 hover:border-rose-700 text-rose-300 hover:text-rose-200 bg-rose-900/30 hover:bg-rose-900/50 text-xs h-10 px-4 rounded-xl font-bold transition-all"
+                                        >
+                                            Supprimer Tout le Mois
+                                        </Button>
+                                    </div>
                                 ) : <div />}
                                 <Button 
                                     type="submit" 
@@ -445,17 +466,30 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
 
                             <div className="flex justify-between items-center pt-4 border-t border-zinc-850/50">
                                 {hasComms ? (
-                                    <Button
-                                        type="button"
-                                        onClick={() => {
-                                            setDeleteType('comms')
-                                            setDeleteDialogOpen(true)
-                                        }}
-                                        variant="outline"
-                                        className="border-rose-900/50 hover:border-rose-800 text-rose-400 hover:text-rose-300 bg-rose-950/20 hover:bg-rose-950/40 text-xs h-10 px-4 rounded-xl font-bold transition-all"
-                                    >
-                                        Supprimer les données
-                                    </Button>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            type="button"
+                                            onClick={() => {
+                                                setDeleteType('comms')
+                                                setDeleteDialogOpen(true)
+                                            }}
+                                            variant="outline"
+                                            className="border-rose-900/50 hover:border-rose-800 text-rose-400 hover:text-rose-300 bg-rose-950/20 hover:bg-rose-950/40 text-xs h-10 px-4 rounded-xl font-bold transition-all"
+                                        >
+                                            Supprimer Comm.
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            onClick={() => {
+                                                setDeleteType('all')
+                                                setDeleteDialogOpen(true)
+                                            }}
+                                            variant="outline"
+                                            className="border-rose-900/80 hover:border-rose-700 text-rose-300 hover:text-rose-250 bg-rose-900/30 hover:bg-rose-900/50 text-xs h-10 px-4 rounded-xl font-bold transition-all"
+                                        >
+                                            Supprimer Tout le Mois
+                                        </Button>
+                                    </div>
                                 ) : <div />}
                                 <Button 
                                     type="submit" 
@@ -529,17 +563,30 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
 
                             <div className="flex justify-between items-center pt-4 border-t border-zinc-850/50">
                                 {hasTasks ? (
-                                    <Button
-                                        type="button"
-                                        onClick={() => {
-                                            setDeleteType('tasks')
-                                            setDeleteDialogOpen(true)
-                                        }}
-                                        variant="outline"
-                                        className="border-rose-900/50 hover:border-rose-800 text-rose-400 hover:text-rose-300 bg-rose-950/20 hover:bg-rose-950/40 text-xs h-10 px-4 rounded-xl font-bold transition-all"
-                                    >
-                                        Supprimer les données
-                                    </Button>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            type="button"
+                                            onClick={() => {
+                                                setDeleteType('tasks')
+                                                setDeleteDialogOpen(true)
+                                            }}
+                                            variant="outline"
+                                            className="border-rose-900/50 hover:border-rose-800 text-rose-400 hover:text-rose-300 bg-rose-950/20 hover:bg-rose-950/40 text-xs h-10 px-4 rounded-xl font-bold transition-all"
+                                        >
+                                            Supprimer Tâches
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            onClick={() => {
+                                                setDeleteType('all')
+                                                setDeleteDialogOpen(true)
+                                            }}
+                                            variant="outline"
+                                            className="border-rose-900/80 hover:border-rose-700 text-rose-300 hover:text-rose-250 bg-rose-900/30 hover:bg-rose-900/50 text-xs h-10 px-4 rounded-xl font-bold transition-all"
+                                        >
+                                            Supprimer Tout le Mois
+                                        </Button>
+                                    </div>
                                 ) : <div />}
                                 <Button 
                                     type="submit" 
@@ -560,7 +607,7 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
                 onOpenChange={setDeleteDialogOpen}
                 title="Supprimer les statistiques"
                 description={`Êtes-vous sûr de vouloir supprimer définitivement les données de ${
-                    deleteType === 'calls' ? 'téléphonie' : deleteType === 'comms' ? 'communications' : 'tâches'
+                    deleteType === 'calls' ? 'téléphonie' : deleteType === 'comms' ? 'communications' : deleteType === 'tasks' ? 'tâches' : 'toutes les catégories'
                 } pour ce mois ? Cette action est irréversible.`}
                 confirmText="Supprimer"
                 cancelText="Annuler"
