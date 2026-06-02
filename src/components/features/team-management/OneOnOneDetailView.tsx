@@ -49,6 +49,20 @@ import { CallsStatsPanel } from './CallsStatsPanel'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { toast } from 'sonner'
 
+const formatYearMonthFr = (ym: string | null) => {
+    if (!ym) return ''
+    if (ym.startsWith('Réunion')) return ym
+    const parts = ym.split('-')
+    if (parts.length < 2) return ym
+    const [year, month] = parts.map(Number)
+    const months = [
+        'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+    ]
+    if (month < 1 || month > 12) return ym
+    return `${months[month - 1]} ${year}`
+}
+
 const AUDIT_LABELS: Record<string, string> = {
     registre_coproprietaires: 'Registre des documents complets',
     convocations_assemblee: 'Convocations d\'assemblées conformes',
@@ -128,6 +142,11 @@ export function OneOnOneDetailView({
     const [emailsReceivedPrev, setEmailsReceivedPrev] = useState(0)
     const [billsNoNotesPrev, setBillsNoNotesPrev] = useState(0)
     const [openComplaintsPrev, setOpenComplaintsPrev] = useState(0)
+
+    const [callsMonthCurrent, setCallsMonthCurrent] = useState<string | null>(null)
+    const [callsMonthPrev, setCallsMonthPrev] = useState<string | null>(null)
+    const [workloadMonthCurrent, setWorkloadMonthCurrent] = useState<string | null>(null)
+    const [workloadMonthPrev, setWorkloadMonthPrev] = useState<string | null>(null)
 
     // Global Stats
     const [quoteApprovalRate, setQuoteApprovalRate] = useState(0)
@@ -467,6 +486,11 @@ export function OneOnOneDetailView({
                 setEmailsReceivedPrev(snapshot.emails_received_prev)
                 setBillsNoNotesPrev(snapshot.bills_no_notes_prev)
                 setOpenComplaintsPrev(snapshot.open_complaints_count_prev)
+
+                setCallsMonthCurrent(snapshot.calls_month_current)
+                setCallsMonthPrev(snapshot.calls_month_prev)
+                setWorkloadMonthCurrent(snapshot.workload_month_current)
+                setWorkloadMonthPrev(snapshot.workload_month_prev)
 
                 // Global stats
                 setQuoteApprovalRate(snapshot.quote_approval_rate)
@@ -1143,8 +1167,18 @@ export function OneOnOneDetailView({
                             <tbody className="divide-y divide-zinc-850">
                                 <tr>
                                     <td className="p-2 font-semibold text-zinc-200">Courriels &gt; 48 heures</td>
-                                    <td className="p-2 text-center font-bold text-white">{emailsOver48h}</td>
-                                    <td className="p-2 text-center text-zinc-500">{emailsReceivedPrev || 'N/A'}</td>
+                                    <td className="p-2 text-center font-bold text-white">
+                                        <div>{emailsOver48h}</div>
+                                        {workloadMonthCurrent && (
+                                            <div className="text-[9px] text-zinc-500 font-normal mt-0.5">{formatYearMonthFr(workloadMonthCurrent)}</div>
+                                        )}
+                                    </td>
+                                    <td className="p-2 text-center text-zinc-500">
+                                        <div>{emailsReceivedPrev || 'N/A'}</div>
+                                        {workloadMonthPrev && (
+                                            <div className="text-[9px] text-zinc-650 font-normal mt-0.5">{formatYearMonthFr(workloadMonthPrev)}</div>
+                                        )}
+                                    </td>
                                     <td className="p-2 text-center">
                                         {emailsOver48h < (emailsReceivedPrev || 0) ? (
                                             <span className="text-emerald-400 flex items-center justify-center gap-0.5"><TrendingUp className="h-3 w-3 shrink-0" /> Amélioration</span>
@@ -1155,8 +1189,18 @@ export function OneOnOneDetailView({
                                 </tr>
                                 <tr>
                                     <td className="p-2 font-semibold text-zinc-200">Tâches en Retard</td>
-                                    <td className="p-2 text-center font-bold text-white">{lateTasks}</td>
-                                    <td className="p-2 text-center text-zinc-500">{lateTasksPrev}</td>
+                                    <td className="p-2 text-center font-bold text-white">
+                                        <div>{lateTasks}</div>
+                                        {workloadMonthCurrent && (
+                                            <div className="text-[9px] text-zinc-500 font-normal mt-0.5">{formatYearMonthFr(workloadMonthCurrent)}</div>
+                                        )}
+                                    </td>
+                                    <td className="p-2 text-center text-zinc-500">
+                                        <div>{lateTasksPrev}</div>
+                                        {workloadMonthPrev && (
+                                            <div className="text-[9px] text-zinc-650 font-normal mt-0.5">{formatYearMonthFr(workloadMonthPrev)}</div>
+                                        )}
+                                    </td>
                                     <td className="p-2 text-center">
                                         {lateTasks < lateTasksPrev ? (
                                             <span className="text-emerald-400 flex items-center justify-center gap-0.5"><TrendingUp className="h-3 w-3 shrink-0" /> Amélioration</span>
@@ -1174,8 +1218,16 @@ export function OneOnOneDetailView({
                                             Math.round(callsPct) > 55 ? 'text-amber-400' :
                                             'text-rose-500'
                                         }`}>{callsTotal > 0 ? `${Math.round(callsPct)}%` : 'N/A'}</span>
+                                        {callsMonthCurrent && (
+                                            <div className="text-[9px] text-zinc-500 font-normal mt-0.5">{formatYearMonthFr(callsMonthCurrent)}</div>
+                                        )}
                                     </td>
-                                    <td className="p-2 text-center text-zinc-500">{callsTotalPrev > 0 ? `${Math.round(prevCallsPct)}%` : 'N/A'}</td>
+                                    <td className="p-2 text-center text-zinc-500">
+                                        <div>{callsTotalPrev > 0 ? `${Math.round(prevCallsPct)}%` : 'N/A'}</div>
+                                        {callsMonthPrev && (
+                                            <div className="text-[9px] text-zinc-650 font-normal mt-0.5">{formatYearMonthFr(callsMonthPrev)}</div>
+                                        )}
+                                    </td>
                                     <td className="p-2 text-center">
                                         {callsPct > prevCallsPct ? (
                                             <span className="text-emerald-400 flex items-center justify-center gap-0.5"><TrendingUp className="h-3 w-3 shrink-0" /> Amélioration</span>

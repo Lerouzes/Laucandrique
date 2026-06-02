@@ -2123,6 +2123,12 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         bills_no_notes_prev: billsNoNotesCountPrev || lastMeeting?.bills_no_notes_over_7d || 0,
         open_complaints_count_prev: openComplaintsPrev,
 
+        // Period labels
+        calls_month_current: callsHistory?.[0]?.year_month || null,
+        calls_month_prev: callsHistory?.[1]?.year_month || (lastMeeting ? `Réunion (${new Date(lastMeeting.meeting_date).toLocaleDateString('fr-CA')})` : null),
+        workload_month_current: workloadHistory?.[0]?.year_month || null,
+        workload_month_prev: workloadHistory?.[1]?.year_month || (lastMeeting ? `Réunion (${new Date(lastMeeting.meeting_date).toLocaleDateString('fr-CA')})` : null),
+
         // Global stats
         quote_approval_rate: stats?.quoteApprovalRate || 0,
         doors_count: stats?.doorsCount || 0,
