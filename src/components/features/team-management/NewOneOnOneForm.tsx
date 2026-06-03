@@ -58,6 +58,32 @@ const formatYearMonthFr = (ym: string | null) => {
     return `${months[month - 1]} ${year}`
 }
 
+const getEvalYearMonth = (dateStr: string) => {
+    const parts = dateStr.split('-')
+    if (parts.length < 2) return ''
+    let year = Number(parts[0])
+    let month = Number(parts[1])
+    month -= 1
+    if (month === 0) {
+        month = 12
+        year -= 1
+    }
+    return `${year}-${String(month).padStart(2, '0')}`
+}
+
+const getPrevEvalYearMonth = (dateStr: string) => {
+    const parts = dateStr.split('-')
+    if (parts.length < 2) return ''
+    let year = Number(parts[0])
+    let month = Number(parts[1])
+    month -= 2
+    if (month <= 0) {
+        month += 12
+        year -= 1
+    }
+    return `${year}-${String(month).padStart(2, '0')}`
+}
+
 const AUDIT_LABELS: Record<string, string> = {
     registre_coproprietaires: 'Registre des documents complets',
     convocations_assemblee: 'Convocations d\'assemblées conformes',
@@ -978,15 +1004,11 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                     <td className="p-2 font-semibold text-zinc-200">Courriels &gt; 48 heures</td>
                                     <td className="p-2 text-center font-bold text-white">
                                         <div>{emailsOver48h}</div>
-                                        {workloadMonthCurrent && (
-                                            <div className="text-[9px] text-zinc-500 font-normal mt-0.5">{formatYearMonthFr(workloadMonthCurrent)}</div>
-                                        )}
+                                        <div className="text-[9px] text-zinc-500 font-normal mt-0.5">{formatYearMonthFr(getEvalYearMonth(meetingDate))}</div>
                                     </td>
                                     <td className="p-2 text-center text-zinc-500">
                                         <div>{emailsReceivedPrev || 'N/A'}</div>
-                                        {workloadMonthPrev && (
-                                            <div className="text-[9px] text-zinc-650 font-normal mt-0.5">{formatYearMonthFr(workloadMonthPrev)}</div>
-                                        )}
+                                        <div className="text-[9px] text-zinc-650 font-normal mt-0.5">{formatYearMonthFr(workloadMonthPrev || getPrevEvalYearMonth(meetingDate))}</div>
                                     </td>
                                     <td className="p-2 text-center">
                                         {emailsOver48h < (emailsReceivedPrev || 0) ? (
@@ -1000,15 +1022,11 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                     <td className="p-2 font-semibold text-zinc-200">Tâches en Retard</td>
                                     <td className="p-2 text-center font-bold text-white">
                                         <div>{lateTasks}</div>
-                                        {workloadMonthCurrent && (
-                                            <div className="text-[9px] text-zinc-500 font-normal mt-0.5">{formatYearMonthFr(workloadMonthCurrent)}</div>
-                                        )}
+                                        <div className="text-[9px] text-zinc-500 font-normal mt-0.5">{formatYearMonthFr(getEvalYearMonth(meetingDate))}</div>
                                     </td>
                                     <td className="p-2 text-center text-zinc-500">
                                         <div>{lateTasksPrev}</div>
-                                        {workloadMonthPrev && (
-                                            <div className="text-[9px] text-zinc-650 font-normal mt-0.5">{formatYearMonthFr(workloadMonthPrev)}</div>
-                                        )}
+                                        <div className="text-[9px] text-zinc-650 font-normal mt-0.5">{formatYearMonthFr(workloadMonthPrev || getPrevEvalYearMonth(meetingDate))}</div>
                                     </td>
                                     <td className="p-2 text-center">
                                         {lateTasks < lateTasksPrev ? (
@@ -1022,15 +1040,11 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                     <td className="p-2 font-semibold text-zinc-200">Taux d'Appels Répondus</td>
                                     <td className="p-2 text-center font-bold text-white">
                                         <div>{callsTotal > 0 ? `${Math.round(callsPct)}%` : 'N/A'}</div>
-                                        {callsMonthCurrent && (
-                                            <div className="text-[9px] text-zinc-500 font-normal mt-0.5">{formatYearMonthFr(callsMonthCurrent)}</div>
-                                        )}
+                                        <div className="text-[9px] text-zinc-500 font-normal mt-0.5">{formatYearMonthFr(getEvalYearMonth(meetingDate))}</div>
                                     </td>
                                     <td className="p-2 text-center text-zinc-500">
                                         <div>{callsTotalPrev > 0 ? `${Math.round(prevCallsPct)}%` : 'N/A'}</div>
-                                        {callsMonthPrev && (
-                                            <div className="text-[9px] text-zinc-650 font-normal mt-0.5">{formatYearMonthFr(callsMonthPrev)}</div>
-                                        )}
+                                        <div className="text-[9px] text-zinc-650 font-normal mt-0.5">{formatYearMonthFr(callsMonthPrev || getPrevEvalYearMonth(meetingDate))}</div>
                                     </td>
                                     <td className="p-2 text-center">
                                         {callsPct > prevCallsPct ? (
