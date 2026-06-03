@@ -18,6 +18,7 @@ import {
 } from '@/actions/team-management'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { BatchCallStatsModal } from './BatchCallStatsModal'
+import { SearchableManagerSelect } from './SearchableManagerSelect'
 
 interface Manager {
     id: string
@@ -326,19 +327,14 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
                                 <div className="space-y-4">
                                     <div>
                                         <Label className="text-zinc-400 text-xs mb-1.5 block">Gestionnaire</Label>
-                                        <select 
-                                            name="manager_id" 
-                                            value={callManagerId}
-                                            onChange={(e) => setCallManagerId(e.target.value)}
-                                            className="w-full h-10 bg-zinc-950 border border-zinc-850 rounded-xl px-3 text-white outline-none focus:ring-1 focus:ring-purple-500 text-xs cursor-pointer" 
+                                        <SearchableManagerSelect
+                                            managers={managers}
+                                            name="manager_id"
+                                            placeholder="Rechercher un gestionnaire..."
                                             required
-                                        >
-                                            {managers.map(m => (
-                                                <option key={m.id} value={m.id} className="bg-zinc-900 text-zinc-100">
-                                                    {m.first_name} {m.last_name}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            defaultValue={callManagerId}
+                                            onChange={setCallManagerId}
+                                        />
                                     </div>
                                     <div>
                                         <Label className="text-zinc-400 text-xs mb-1.5 block">Mois de la statistique</Label>
@@ -423,19 +419,14 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
                                 <div className="space-y-4">
                                     <div>
                                         <Label className="text-zinc-400 text-xs mb-1.5 block">Gestionnaire</Label>
-                                        <select 
-                                            name="manager_id" 
-                                            value={commManagerId}
-                                            onChange={(e) => setCommManagerId(e.target.value)}
-                                            className="w-full h-10 bg-zinc-950 border border-zinc-850 rounded-xl px-3 text-white outline-none focus:ring-1 focus:ring-purple-500 text-xs cursor-pointer" 
+                                        <SearchableManagerSelect
+                                            managers={managers}
+                                            name="manager_id"
+                                            placeholder="Rechercher un gestionnaire..."
                                             required
-                                        >
-                                            {managers.map(m => (
-                                                <option key={m.id} value={m.id} className="bg-zinc-900 text-zinc-100">
-                                                    {m.first_name} {m.last_name}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            defaultValue={commManagerId}
+                                            onChange={setCommManagerId}
+                                        />
                                     </div>
                                     <div>
                                         <Label className="text-zinc-400 text-xs mb-1.5 block">Mois de la statistique</Label>
@@ -509,19 +500,14 @@ export function ManualStatsEntryCards({ managers = [], teams = [] }: ManualStats
                                 <div className="space-y-4">
                                     <div>
                                         <Label className="text-zinc-400 text-xs mb-1.5 block">Gestionnaire</Label>
-                                        <select 
-                                            name="manager_id" 
-                                            value={taskManagerId}
-                                            onChange={(e) => setTaskManagerId(e.target.value)}
-                                            className="w-full h-10 bg-zinc-950 border border-zinc-850 rounded-xl px-3 text-white outline-none focus:ring-1 focus:ring-purple-500 text-xs cursor-pointer" 
+                                        <SearchableManagerSelect
+                                            managers={managers}
+                                            name="manager_id"
+                                            placeholder="Rechercher un gestionnaire..."
                                             required
-                                        >
-                                            {managers.map(m => (
-                                                <option key={m.id} value={m.id} className="bg-zinc-900 text-zinc-100">
-                                                    {m.first_name} {m.last_name}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            defaultValue={taskManagerId}
+                                            onChange={setTaskManagerId}
+                                        />
                                     </div>
                                     <div>
                                         <Label className="text-zinc-400 text-xs mb-1.5 block">Mois de la statistique</Label>

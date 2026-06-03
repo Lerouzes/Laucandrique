@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Loader2, Plus, Calendar, User, FileText, FolderOpen } from 'lucide-react'
+import { SearchableManagerSelect } from './SearchableManagerSelect'
 
 interface Manager {
     id: string
@@ -105,22 +106,17 @@ export function DashboardQuickNote({ managers = [], categories = [], clients = [
                             <User className="h-3 w-3 text-purple-400" />
                             Gestionnaire <span className="text-rose-500">*</span>
                         </Label>
-                        <select
-                            value={managerId}
-                            onChange={(e) => {
-                                setManagerId(e.target.value)
+                        <SearchableManagerSelect
+                            managers={managers}
+                            name="manager_id"
+                            placeholder="Choisir un gestionnaire..."
+                            required
+                            defaultValue={managerId}
+                            onChange={(val) => {
+                                setManagerId(val)
                                 setClientId('') // Clear selected client since manager changed
                             }}
-                            required
-                            className="h-9 text-xs bg-zinc-950 border border-zinc-850 text-white rounded-lg px-2 w-full focus:outline-none focus:border-purple-500"
-                        >
-                            <option value="" disabled className="bg-zinc-950">Choisir un gestionnaire...</option>
-                            {managers.map(m => (
-                                <option key={m.id} value={m.id} className="bg-zinc-950">
-                                    {m.first_name} {m.last_name}
-                                </option>
-                            ))}
-                        </select>
+                        />
                     </div>
 
                     {/* Syndicate (Client) Select (Optional) */}

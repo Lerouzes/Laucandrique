@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { SearchableClientSelect } from './SearchableClientSelect'
+import { SearchableManagerSelect } from './SearchableManagerSelect'
 import { UsersRound, Save, HelpCircle, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -278,16 +279,14 @@ export function NewAssemblyEvaluationForm({
                     </div>
                     <div className="space-y-1">
                         <Label className="text-zinc-500">Gestionnaire Animateur</Label>
-                        <select 
-                            value={managerId} 
-                            onChange={(e) => setManagerId(e.target.value)} 
-                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-[16px] md:text-xs"
+                        <SearchableManagerSelect
+                            managers={managers}
+                            name="manager_id"
+                            placeholder="Rechercher un gestionnaire..."
                             required
-                        >
-                            {managers.map(m => (
-                                <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
-                            ))}
-                        </select>
+                            defaultValue={managerId}
+                            onChange={(val) => setManagerId(val)}
+                        />
                     </div>
                     <div className="space-y-1">
                         <Label className="text-zinc-500">Type d'Assemblée</Label>

@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { SearchableClientSelect } from './SearchableClientSelect'
+import { SearchableManagerSelect } from './SearchableManagerSelect'
 import { 
     AlertTriangle, 
     ShieldCheck, 
@@ -424,10 +425,12 @@ export function ComplaintsClientPage({
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Gestionnaire Assigné</Label>
-                                    <select name="manager_id" className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-8 text-[16px] md:text-xs" required>
-                                        <option value="">Sélectionner un gestionnaire...</option>
-                                        {managers?.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
-                                    </select>
+                                    <SearchableManagerSelect
+                                        managers={managers || []}
+                                        name="manager_id"
+                                        placeholder="Sélectionner ou chercher..."
+                                        required
+                                    />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-500">Catégorie de la Plainte</Label>
