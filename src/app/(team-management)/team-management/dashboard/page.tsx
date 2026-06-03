@@ -1,9 +1,12 @@
-import { getGlobalTeamStats } from '@/actions/team-management'
+import { getGlobalTeamStats, getComplaintCategoriesAction } from '@/actions/team-management'
 import { getManagers, getManagerTeams } from '@/actions/managers'
+import { getClients } from '@/actions/clients'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { CallsStatsPanel } from '@/components/features/team-management/CallsStatsPanel'
 import { DashboardFilterBar } from '@/components/features/team-management/DashboardFilterBar'
 import { ManualStatsEntryCards } from '@/components/features/team-management/ManualStatsEntryCards'
+import { WeeklyAssessmentGrid } from '@/components/features/team-management/WeeklyAssessmentGrid'
+import { DashboardQuickNote } from '@/components/features/team-management/DashboardQuickNote'
 import { TeamTrendsCharts } from '@/components/features/team-management/TeamTrendsCharts'
 import { 
     Building2, 
@@ -35,10 +38,12 @@ export default async function TeamManagementDashboard(props: {
 
     const context = await getActiveTeamContext()
 
-    const [stats, managers, teams] = await Promise.all([
+    const [stats, managers, teams, categories, clients] = await Promise.all([
         getGlobalTeamStats({ range, fromMonth: from, toMonth: to, teamId }),
         getManagers(),
-        getManagerTeams()
+        getManagerTeams(),
+        getComplaintCategoriesAction(),
+        getClients()
     ])
 
     const packageData = Object.entries(stats.packageCounts).map(([name, count]) => ({
@@ -346,6 +351,16 @@ export default async function TeamManagementDashboard(props: {
                         </div>
                     </CardContent>
                 </Card>
+            </div>
+
+            {/* Weekly Assessment & Quick Notes section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                    <WeeklyAssessmentGrid managers={managers} />
+                </div>
+                <div>
+                    <DashboardQuickNote managers={managers} categories={categories} clients={clients} />
+                </div>
             </div>
 
             {/* Activity History & Analytics Panel */}

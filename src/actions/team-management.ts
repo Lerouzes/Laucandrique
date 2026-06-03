@@ -1913,7 +1913,7 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         .eq('manager_id', managerId)
         .gt('total_calls', 0)
         .order('year_month', { ascending: false })
-        .limit(2)
+        .limit(6)
 
     // Fetch monthly workload history (only months containing workload/task data)
     const { data: workloadHistory } = await supabase
@@ -1922,7 +1922,15 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         .eq('manager_id', managerId)
         .or('communications_received.gt.0,open_tasks.gt.0,closed_tasks.gt.0')
         .order('year_month', { ascending: false })
-        .limit(2)
+        .limit(6)
+
+    // Fetch recent performance logs (weekly ad-hoc assessments)
+    const { data: statsLogs } = await supabase
+        .from('manager_stats_logs')
+        .select('*')
+        .eq('manager_id', managerId)
+        .order('logged_at', { ascending: false })
+        .limit(30)
 
     // Calculate current bills without notes older than 7 days
     let billsNoNotesCount = 0
@@ -2008,20 +2016,21 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         }
     }
 
-    // Fetch active complaints for the manager
+    // Fetch active complaints and notes for the manager
     const { data: openComplaints } = await supabase
         .from('complaints')
         .select(`
             id,
             title,
             description,
+            type,
             severity,
             received_date,
             clients(company_name, full_name),
-            complaint_categories(name)
+            complaint_categories(name, id)
         `)
         .eq('manager_id', managerId)
-        .eq('status', 'open')
+        .eq('status', 'open') as any
 
     let openComplaintsPrev = 0
     if (lastMeeting) {
@@ -2142,6 +2151,9 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         assemblyEvaluations: assemblies || [],
         operationalRisks: risks || [],
         clientsList: clientsList || [],
+        callsHistory: callsHistory || [],
+        workloadHistory: workloadHistory || [],
+        statsLogs: statsLogs || [],
         lastMeeting: lastMeeting ? {
             ...lastMeeting,
             commitments: lastMeetingCommitments
@@ -3024,6 +3036,100 @@ export async function deleteUserAction(userId: string) {
     }
 
     return { success: true }
+}
+
+// ==========================================
+// 10. WEEKLY ASSESSMENT & MANAGER NOTES ACTIONS
+// ==========================================
+
+export async function createManagerNoteAction(data: {
+    manager_id: string
+    client_id?: string | null
+    description: string
+    category_id: string
+    date_occurred: string
+}) {
+    const supabase = await createClient()
+
+    const { error } = await supabase
+        .from('complaints')
+        .insert({
+            manager_id: data.manager_id,
+            client_id: data.client_id || null,
+            title: 'Note de suivi',
+            description: data.description,
+            severity: 'low',
+            status: 'open',
+            category_id: data.category_id || null,
+            received_date: data.date_occurred,
+            type: 'note'
+        })
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/team-management/dashboard')
+    if (data.manager_id) {
+        revalidatePath(`/team-management/managers/${data.manager_id}`)
+    }
+}
+
+export async function savePerformanceLogAction(data: {
+    manager_id: string
+    metric_type: 'emails_over_48h' | 'late_tasks' | 'bills_no_notes_over_7d'
+    value: number
+    logged_at?: string
+}) {
+    const supabase = await createClient()
+
+    const { error } = await supabase
+        .from('manager_stats_logs')
+        .insert({
+            manager_id: data.manager_id,
+            metric_type: data.metric_type,
+            value: data.value,
+            logged_at: data.logged_at ? new Date(data.logged_at).toISOString() : new Date().toISOString()
+        })
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/team-management/dashboard')
+}
+
+export async function deletePerformanceLogAction(logId: string) {
+    const supabase = await createClient()
+
+    const { error } = await supabase
+        .from('manager_stats_logs')
+        .delete()
+        .eq('id', logId)
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/team-management/dashboard')
+}
+
+export async function getPerformanceLogsAction(managerId: string) {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+        .from('manager_stats_logs')
+        .select('*')
+        .eq('manager_id', managerId)
+        .order('logged_at', { ascending: false })
+
+    if (error) throw new Error(error.message)
+    return data || []
+}
+
+export async function getLatestTeamPerformanceLogsAction(): Promise<any[]> {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('manager_stats_logs' as any)
+        .select('*')
+        .order('logged_at', { ascending: false }) as any
+
+    if (error) throw new Error(error.message)
+    return (data || []) as any[]
 }
 
 

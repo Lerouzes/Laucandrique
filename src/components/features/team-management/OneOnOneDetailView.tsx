@@ -42,7 +42,8 @@ import {
     Unlock,
     X,
     ArrowLeft,
-    RefreshCw
+    RefreshCw,
+    Clock
 } from 'lucide-react'
 import { SearchableClientSelect } from './SearchableClientSelect'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -249,6 +250,10 @@ export function OneOnOneDetailView({
 
     // Section 6: New Agreed Actions (This Meeting Commitments)
     const [newAgreedActions, setNewAgreedActions] = useState<any[]>([])
+
+    const [callsHistory, setCallsHistory] = useState<any[]>([])
+    const [workloadHistory, setWorkloadHistory] = useState<any[]>([])
+    const [statsLogs, setStatsLogs] = useState<any[]>([])
     const [newActionText, setNewActionText] = useState('')
     const [newActionOwner, setNewActionOwner] = useState('Manager')
     const [newActionDueDate, setNewActionDueDate] = useState('')
@@ -525,6 +530,10 @@ export function OneOnOneDetailView({
             setQuoteApprovalRate(snapshot.quote_approval_rate)
             setDoorsCount(snapshot.doors_count)
             setSyndicatesCount(snapshot.syndicates_count)
+
+            setCallsHistory(snapshot.callsHistory || [])
+            setWorkloadHistory(snapshot.workloadHistory || [])
+            setStatsLogs(snapshot.statsLogs || [])
 
             // Merge open items for review and already reviewed audits/assemblies in this meeting
             const snapshotAudits = snapshot.syndicateAudits || []
@@ -995,6 +1004,28 @@ export function OneOnOneDetailView({
         }
     }
 
+    // Merge calls history and workload history by month
+    const mergedHistoryMap: Record<string, { year_month: string; total_calls?: number; answered_calls?: number; open_tasks?: number; closed_tasks?: number; communications_received?: number }> = {}
+    
+    callsHistory.forEach(item => {
+        if (!mergedHistoryMap[item.year_month]) {
+            mergedHistoryMap[item.year_month] = { year_month: item.year_month }
+        }
+        mergedHistoryMap[item.year_month].total_calls = item.total_calls
+        mergedHistoryMap[item.year_month].answered_calls = item.answered_calls
+    })
+
+    workloadHistory.forEach(item => {
+        if (!mergedHistoryMap[item.year_month]) {
+            mergedHistoryMap[item.year_month] = { year_month: item.year_month }
+        }
+        mergedHistoryMap[item.year_month].open_tasks = item.open_tasks
+        mergedHistoryMap[item.year_month].closed_tasks = item.closed_tasks
+        mergedHistoryMap[item.year_month].communications_received = item.communications_received
+    })
+
+    const alignedHistory = Object.values(mergedHistoryMap).sort((a, b) => b.year_month.localeCompare(a.year_month))
+
     return (
         <div className="space-y-6 w-full max-w-[1600px] mx-auto px-4 md:px-8 pb-20">
             {/* Back button */}
@@ -1341,6 +1372,111 @@ export function OneOnOneDetailView({
                         </div>
                     </div>
 
+                    {/* Sub-section: Historique & Mesures Hebdomadaires */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 border-t border-zinc-900 pt-4 mt-2">
+                        {/* Part A: 3-6 Month historical trends table */}
+                        <div className="p-3 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
+                            <span className="font-bold text-zinc-200 uppercase text-[9px] tracking-wider block border-b border-zinc-800 pb-1.5 flex items-center gap-1">
+                                <TrendingUp className="h-3.5 w-3.5 text-purple-400" />
+                                Historique de Rendement (3 à 6 derniers mois)
+                            </span>
+                            {alignedHistory.length === 0 ? (
+                                <p className="italic text-zinc-500 text-xxs py-4 text-center">Aucun historique disponible.</p>
+                            ) : (
+                                <div className="overflow-x-auto max-h-[220px] overflow-y-auto pr-1">
+                                    <table className="w-full text-left text-[10px] text-zinc-300">
+                                        <thead className="bg-zinc-950/40 text-zinc-400 font-bold border-b border-zinc-850 uppercase">
+                                            <tr>
+                                                <th className="p-1.5">Mois</th>
+                                                <th className="p-1.5 text-center">Appels</th>
+                                                <th className="p-1.5 text-center">Tâches (O/F)</th>
+                                                <th className="p-1.5 text-center">Courriels</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-zinc-850/60 font-mono">
+                                            {alignedHistory.map((item, idx) => {
+                                                const callsPct = item.total_calls ? Math.round((item.answered_calls || 0) / item.total_calls * 105) : 0
+                                                const cappedCallsPct = Math.min(100, callsPct)
+                                                return (
+                                                    <tr key={idx} className="hover:bg-zinc-900/10">
+                                                        <td className="p-1.5 font-bold text-zinc-200">{formatYearMonthFr(item.year_month)}</td>
+                                                        <td className="p-1.5 text-center">
+                                                            {item.total_calls ? (
+                                                                <span>{cappedCallsPct}% ({item.answered_calls}/{item.total_calls})</span>
+                                                            ) : (
+                                                                <span className="text-zinc-650">-</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-1.5 text-center">
+                                                            {item.open_tasks !== undefined || item.closed_tasks !== undefined ? (
+                                                                <span>{item.open_tasks || 0} O / {item.closed_tasks || 0} F</span>
+                                                            ) : (
+                                                                <span className="text-zinc-650">-</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-1.5 text-center">
+                                                            {item.communications_received !== undefined ? (
+                                                                <span>{item.communications_received}</span>
+                                                            ) : (
+                                                                <span className="text-zinc-650">-</span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Part B: Granular stats logs feed */}
+                        <div className="p-3 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
+                            <span className="font-bold text-zinc-200 uppercase text-[9px] tracking-wider block border-b border-zinc-800 pb-1.5 flex items-center gap-1">
+                                <Clock className="h-3.5 w-3.5 text-purple-400" />
+                                Mesures & Indicateurs Hebdomadaires Récents (Dashboard)
+                            </span>
+                            {statsLogs.length === 0 ? (
+                                <p className="italic text-zinc-500 text-xxs py-4 text-center">Aucun relevé récent enregistré.</p>
+                            ) : (
+                                <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                                    {statsLogs.map((log, idx) => {
+                                        const formattedDate = new Date(log.logged_at).toLocaleDateString('fr-CA', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        })
+                                        const metricLabel = 
+                                            log.metric_type === 'emails_over_48h' ? 'Courriels > 48h' :
+                                            log.metric_type === 'late_tasks' ? 'Tâches en retard' :
+                                            log.metric_type === 'bills_no_notes_over_7d' ? 'Factures sans notes > 7j' :
+                                            log.metric_type
+                                        
+                                        const badgeColor = 
+                                            log.metric_type === 'emails_over_48h' ? 'bg-blue-950/30 text-blue-400 border-blue-900/40' :
+                                            log.metric_type === 'late_tasks' ? 'bg-purple-950/30 text-purple-400 border-purple-900/40' :
+                                            'bg-amber-950/30 text-amber-400 border-amber-900/40'
+
+                                        return (
+                                            <div key={log.id || idx} className="flex justify-between items-center text-[10px] text-zinc-300 bg-zinc-900/10 p-1.5 rounded border border-zinc-850/60">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Badge variant="outline" className={`text-[8px] font-bold py-0.5 px-1 shrink-0 ${badgeColor}`}>
+                                                        {metricLabel}
+                                                    </Badge>
+                                                    <span className="font-extrabold text-white">{log.value}</span>
+                                                </div>
+                                                <span className="text-[8px] text-zinc-500 font-mono flex items-center gap-0.5">
+                                                    <Clock className="h-2 w-2" /> {formattedDate}
+                                                </span>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Interactive calls history for this manager */}
                     <div className="border-t border-zinc-900 pt-4 mt-2">
                         <CallsStatsPanel
@@ -1363,8 +1499,8 @@ export function OneOnOneDetailView({
                     {previousCommitments.length === 0 ? (
                         <p className="text-xxs text-zinc-500 italic text-center py-4">Aucun engagement de la rencontre précédente en suspens.</p>
                     ) : (
-                        <table className="w-full text-left text-xxs text-zinc-300">
-                            <thead className="bg-zinc-950/40 text-zinc-400 font-bold border-b border-zinc-850">
+                        <table className="w-full text-left text-xs text-zinc-300">
+                            <thead className="bg-zinc-950/40 text-zinc-450 font-bold border-b border-zinc-850">
                                 <tr>
                                     <th className="p-2 w-1/3">Engagement Convenu</th>
                                     <th className="p-2 text-center w-28">Statut de Suivi</th>
@@ -1375,9 +1511,9 @@ export function OneOnOneDetailView({
                             <tbody className="divide-y divide-zinc-850">
                                 {previousCommitments.map((c, idx) => (
                                     <tr key={c.id || idx} className="hover:bg-zinc-900/10">
-                                        <td className="p-2 font-medium text-zinc-200">
+                                        <td className="p-2 font-semibold text-zinc-200">
                                             {c.commitment_text}
-                                            <div className="text-[8px] text-zinc-500 mt-0.5 flex gap-2">
+                                            <div className="text-[10px] text-zinc-500 mt-0.5 flex gap-2 font-bold">
                                                 <span>Propriétaire: {c.owner || 'Manager'}</span>
                                                 {c.client_id && <span>· Syndicat: {getClientName(c.client_id)}</span>}
                                             </div>
@@ -1387,7 +1523,7 @@ export function OneOnOneDetailView({
                                                 value={c.status || 'Open'}
                                                 onChange={(e) => handlePrevCommitmentChange(idx, 'status', e.target.value)}
                                                 disabled={!isEditing}
-                                                className="bg-[#121318] border border-zinc-850 rounded p-1 text-zinc-300 outline-none text-[10px]"
+                                                className="bg-[#121318] border border-zinc-850 rounded p-1 text-zinc-300 outline-none text-xs font-semibold"
                                             >
                                                 <option value="Open">En attente (Open)</option>
                                                 <option value="Improved">Amélioré (Improved)</option>
@@ -1402,7 +1538,7 @@ export function OneOnOneDetailView({
                                                     value={c.failure_reason || 'Lack of organization'}
                                                     onChange={(e) => handlePrevCommitmentChange(idx, 'failure_reason', e.target.value)}
                                                     disabled={!isEditing}
-                                                    className="w-full bg-[#121318] border border-zinc-850 rounded p-1 text-[10px] text-zinc-400 outline-none"
+                                                    className="w-full bg-[#121318] border border-zinc-850 rounded p-1 text-xs font-semibold text-zinc-400 outline-none"
                                                 >
                                                     <option value="Lack of organization">Manque d'organisation</option>
                                                     <option value="Lack of training">Besoin de formation</option>
@@ -1422,7 +1558,7 @@ export function OneOnOneDetailView({
                                                 value={c.notes || ''}
                                                 onChange={(e) => handlePrevCommitmentChange(idx, 'notes', e.target.value)}
                                                 disabled={!isEditing}
-                                                className="bg-[#121318] border-zinc-850 text-xxs min-h-[50px] resize-y py-1 px-2"
+                                                className="bg-[#121318] border-zinc-850 text-xs min-h-[50px] resize-y py-1 px-2"
                                             />
                                         </td>
                                     </tr>
@@ -1441,7 +1577,7 @@ export function OneOnOneDetailView({
                         3. Section Revue d'Audits & Imputabilité Tâches/Courriels
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6 text-xxs">
+                <CardContent className="space-y-6 text-xs sm:text-sm">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Syndicate Audits */}
                         <div className="p-4 bg-zinc-900/30 border border-zinc-850 rounded-xl space-y-3">
@@ -1566,23 +1702,23 @@ export function OneOnOneDetailView({
                                                 {(isChecked || reviewedAssembliesState[ae.id]?.my_notes || reviewedAssembliesState[ae.id]?.manager_notes) && (
                                                     <div className="grid grid-cols-1 gap-2 pt-2 border-t border-zinc-850 animate-in fade-in duration-200">
                                                         <div className="space-y-0.5">
-                                                            <Label className="text-zinc-500 text-[8px]">Ce que j'ai dit (Notes Direction)</Label>
+                                                            <Label className="text-zinc-500 text-[10px] font-bold">Ce que j'ai dit (Notes Direction)</Label>
                                                             <Input 
                                                                 value={reviewedAssembliesState[ae.id]?.my_notes || ''} 
                                                                 onClick={(e) => e.stopPropagation()}
                                                                 onChange={(e) => setReviewedAssembliesState(prev => ({ ...prev, [ae.id]: { ...prev[ae.id], my_notes: e.target.value } }))} 
                                                                 disabled={!isEditing}
-                                                                className="bg-[#121318] border-zinc-850 h-7 text-xxs" 
+                                                                className="bg-[#121318] border-zinc-850 h-8 text-xs font-medium" 
                                                             />
                                                         </div>
                                                         <div className="space-y-0.5">
-                                                            <Label className="text-zinc-500 text-[8px]">Ce que le gestionnaire a dit</Label>
+                                                            <Label className="text-zinc-500 text-[10px] font-bold">Ce que le gestionnaire a dit</Label>
                                                             <Input 
                                                                 value={reviewedAssembliesState[ae.id]?.manager_notes || ''} 
                                                                 onClick={(e) => e.stopPropagation()}
                                                                 onChange={(e) => setReviewedAssembliesState(prev => ({ ...prev, [ae.id]: { ...prev[ae.id], manager_notes: e.target.value } }))} 
                                                                 disabled={!isEditing}
-                                                                className="bg-[#121318] border-zinc-850 h-7 text-xxs" 
+                                                                className="bg-[#121318] border-zinc-850 h-8 text-xs font-medium" 
                                                             />
                                                         </div>
                                                     </div>
@@ -1595,11 +1731,11 @@ export function OneOnOneDetailView({
                         </div>
                     </div>
 
-                    {/* Part B: Complaints review */}
+                    {/* Part B: Complaints & Notes review */}
                     <div className="p-4 bg-zinc-900/30 border border-zinc-850 rounded-xl space-y-3">
-                        <span className="font-bold text-zinc-200 uppercase text-[9px] tracking-wider block border-b border-zinc-800 pb-1.5">Revue des Plaintes Actives ({managerComplaints.length})</span>
+                        <span className="font-bold text-zinc-200 uppercase text-xs tracking-wider block border-b border-zinc-800 pb-1.5">Revue des Plaintes & Notes Actives ({managerComplaints.length})</span>
                         {managerComplaints.length === 0 ? (
-                            <p className="italic text-zinc-500 py-1 text-center">Aucune plainte active.</p>
+                            <p className="italic text-zinc-500 py-1 text-center text-xs">Aucune plainte ni note active.</p>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                 {managerComplaints.map(c => {
@@ -1609,6 +1745,12 @@ export function OneOnOneDetailView({
                                     const clientName = c.clients ? (c.clients.company_name || c.clients.full_name) : 'Copropriété'
                                     const catLabel = c.complaint_categories?.name || 'Général'
                                     
+                                    const isNote = c.type === 'note'
+                                    const typeBadgeColor = isNote 
+                                        ? 'bg-purple-950/30 text-purple-400 border-purple-900/40' 
+                                        : 'bg-rose-950/30 text-rose-400 border-rose-900/40'
+                                    const typeLabel = isNote ? 'Note de Suivi' : 'Plainte Client'
+
                                     const sevColors = 
                                         c.severity === 'critical' ? 'bg-rose-955/30 text-rose-400 border-rose-900/40' :
                                         c.severity === 'high' ? 'bg-orange-955/30 text-orange-400 border-orange-900/40' :
@@ -1628,24 +1770,27 @@ export function OneOnOneDetailView({
                                         >
                                             <div className="space-y-2">
                                                 <div className="flex justify-between items-start gap-2">
-                                                    <span className="font-bold text-zinc-200 text-xs line-clamp-1">{c.title}</span>
-                                                    <Badge variant="outline" className={`text-[8px] font-bold shrink-0 ${sevColors}`}>{c.severity}</Badge>
+                                                    <span className="font-bold text-zinc-200 text-xs line-clamp-1">{isNote ? 'Note de Suivi' : c.title}</span>
+                                                    <div className="flex gap-1.5 flex-wrap">
+                                                        <Badge variant="outline" className={`text-[10px] font-bold shrink-0 ${typeBadgeColor}`}>{typeLabel}</Badge>
+                                                        {!isNote && <Badge variant="outline" className={`text-[10px] font-bold shrink-0 ${sevColors}`}>{c.severity}</Badge>}
+                                                    </div>
                                                 </div>
-                                                <p className="text-zinc-400 text-[10px] line-clamp-2 leading-relaxed">{c.description || "Aucune description."}</p>
+                                                <p className="text-zinc-400 text-xs line-clamp-2 leading-relaxed">{c.description || "Aucune description."}</p>
                                             </div>
-                                            <div className="pt-2 border-t border-zinc-800/50 flex justify-between items-center text-[9px]">
+                                            <div className="pt-2 border-t border-zinc-800/50 flex justify-between items-center text-xs font-medium">
                                                 <span className="text-zinc-500 truncate max-w-[120px]">
                                                     {clientName} · <strong className="text-purple-400">{catLabel}</strong>
                                                 </span>
                                                 <div className="flex items-center gap-1">
                                                     {isDiscussed ? (
                                                         isResolved ? (
-                                                            <span className="text-emerald-400 font-bold flex items-center gap-0.5"><CheckCircle2 className="h-3 w-3" /> Résolue</span>
+                                                            <span className="text-emerald-400 font-bold flex items-center gap-0.5"><CheckCircle2 className="h-4 w-4" /> Résolu</span>
                                                         ) : (
-                                                            <span className="text-amber-400 font-bold flex items-center gap-0.5"><AlertCircle className="h-3 w-3" /> Reportée</span>
+                                                            <span className="text-amber-400 font-bold flex items-center gap-0.5"><AlertCircle className="h-4 w-4" /> Reporté</span>
                                                         )
                                                     ) : (
-                                                        <span className="text-zinc-500">Non discutée</span>
+                                                        <span className="text-zinc-500 font-semibold">Non discuté</span>
                                                     )}
                                                 </div>
                                             </div>
@@ -1866,7 +2011,7 @@ export function OneOnOneDetailView({
                         )}
                     </div>
                 </CardHeader>
-                <CardContent className="space-y-4 text-xxs">
+                <CardContent className="space-y-4 text-xs sm:text-sm">
                     {showRiskForm && (
                         <div className="p-4 bg-zinc-950/50 border border-zinc-850 rounded-xl space-y-4 animate-in slide-in-from-top-1 duration-200">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2015,31 +2160,31 @@ export function OneOnOneDetailView({
                     {coachingOpen ? <ChevronUp className="h-4 w-4 text-zinc-400" /> : <ChevronDown className="h-4 w-4 text-zinc-400" />}
                 </button>
                 {coachingOpen && (
-                    <CardContent className="pt-2 border-t border-zinc-900/60 animate-in fade-in duration-200 text-xxs">
+                    <CardContent className="pt-2 border-t border-zinc-900/60 animate-in fade-in duration-200 text-xs sm:text-sm">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <Label className="text-zinc-500">Charge de Travail (Workload)</Label>
-                                <Textarea value={workloadNotes} onChange={(e) => setWorkloadNotes(e.target.value)} disabled={!isEditing} placeholder="Notes sur la charge de travail ressentie..." rows={2} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                                <Textarea value={workloadNotes} onChange={(e) => setWorkloadNotes(e.target.value)} disabled={!isEditing} placeholder="Notes sur la charge de travail ressentie..." rows={2} className="bg-[#121318] border-zinc-800 text-sm text-white" />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-zinc-500">Priorisation des dossiers (Prioritization)</Label>
-                                <Textarea value={prioritizationNotes} onChange={(e) => setPrioritizationNotes(e.target.value)} disabled={!isEditing} placeholder="Comment le gestionnaire gère ses priorités..." rows={2} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                                <Textarea value={prioritizationNotes} onChange={(e) => setPrioritizationNotes(e.target.value)} disabled={!isEditing} placeholder="Comment le gestionnaire gère ses priorités..." rows={2} className="bg-[#121318] border-zinc-800 text-sm text-white" />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-zinc-500">Gestion du Stress (Stress & Mood)</Label>
-                                <Textarea value={stressNotes} onChange={(e) => setStressNotes(e.target.value)} disabled={!isEditing} placeholder="Observations sur le stress ou le moral..." rows={2} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                                <Textarea value={stressNotes} onChange={(e) => setStressNotes(e.target.value)} disabled={!isEditing} placeholder="Observations sur le stress ou le moral..." rows={2} className="bg-[#121318] border-zinc-800 text-sm text-white" />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-zinc-500">Organisation personnelle</Label>
-                                <Textarea value={organizationNotes} onChange={(e) => setOrganizationNotes(e.target.value)} disabled={!isEditing} placeholder="Notes sur la structure d'organisation..." rows={2} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                                <Textarea value={organizationNotes} onChange={(e) => setOrganizationNotes(e.target.value)} disabled={!isEditing} placeholder="Notes sur la structure d'organisation..." rows={2} className="bg-[#121318] border-zinc-800 text-sm text-white" />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-zinc-500">Support Requis de la Direction</Label>
-                                <Textarea value={supportNeeded} onChange={(e) => setSupportNeeded(e.target.value)} disabled={!isEditing} placeholder="Besoins de support spécifiques..." rows={2} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                                <Textarea value={supportNeeded} onChange={(e) => setSupportNeeded(e.target.value)} disabled={!isEditing} placeholder="Besoins de support spécifiques..." rows={2} className="bg-[#121318] border-zinc-800 text-sm text-white" />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-zinc-500">Besoins en Formation / Mentorat</Label>
-                                <Textarea value={trainingNeeded} onChange={(e) => setTrainingNeeded(e.target.value)} disabled={!isEditing} placeholder="Formations ou accompagnement à prévoir..." rows={2} className="bg-[#121318] border-zinc-800 text-xs text-white" />
+                                <Textarea value={trainingNeeded} onChange={(e) => setTrainingNeeded(e.target.value)} disabled={!isEditing} placeholder="Formations ou accompagnement à prévoir..." rows={2} className="bg-[#121318] border-zinc-800 text-sm text-white" />
                             </div>
                         </div>
                     </CardContent>
@@ -2062,15 +2207,15 @@ export function OneOnOneDetailView({
                         </Badge>
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="text-xxs">
+                <CardContent className="text-xs sm:text-sm">
                     {newAgreedActions.length === 0 ? (
                         <p className="text-zinc-500 italic text-center py-2">Aucun nouvel engagement acté. Cliquez pour en ajouter un.</p>
                     ) : (
                         <div className="space-y-1.5 text-left">
                             {newAgreedActions.slice(0, 3).map((a, idx) => (
-                                <div key={idx} className="flex justify-between items-center text-[10px] text-zinc-300 bg-zinc-900/10 p-1.5 rounded border border-zinc-850">
+                                <div key={idx} className="flex justify-between items-center text-xs text-zinc-300 bg-zinc-900/10 p-1.5 rounded border border-zinc-850">
                                     <span className="truncate max-w-[70%] font-semibold text-left">{a.commitment_text}</span>
-                                    <span className="text-[9px] text-purple-400 font-medium">{a.owner} - {a.due_next_review ? 'Prochaine rencontre' : a.due_date}</span>
+                                    <span className="text-[10px] text-purple-450 text-purple-400 font-semibold">{a.owner} - {a.due_next_review ? 'Prochaine rencontre' : a.due_date}</span>
                                 </div>
                             ))}
                             {newAgreedActions.length > 3 && (
@@ -2148,32 +2293,34 @@ export function OneOnOneDetailView({
                         <div className="space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <Label className="text-zinc-500">Titre de la plainte</Label>
+                                    <Label className="text-zinc-500">{activeEditingComplaint.type === 'note' ? 'Titre de la note' : 'Titre de la plainte'}</Label>
                                     <Input 
                                         value={editingComplaintTitle}
                                         onChange={(e) => setEditingComplaintTitle(e.target.value)}
                                         disabled={!isEditing}
-                                        className="bg-[#121318] border-zinc-850 h-9 text-xs text-white disabled:opacity-75 disabled:text-zinc-400"
+                                        className="bg-[#121318] border-zinc-855 border-zinc-850 h-9 text-xs text-white disabled:opacity-75 disabled:text-zinc-400"
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Gravité</Label>
-                                    <select 
-                                        value={editingComplaintSeverity}
-                                        onChange={(e) => setEditingComplaintSeverity(e.target.value as any)}
-                                        disabled={!isEditing}
-                                        className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-xs disabled:opacity-75 disabled:text-zinc-400"
-                                    >
-                                        <option value="low">Faible (Low)</option>
-                                        <option value="medium">Moyenne (Medium)</option>
-                                        <option value="high">Élevée (High)</option>
-                                        <option value="critical">Critique (Critical)</option>
-                                    </select>
-                                </div>
+                                {activeEditingComplaint.type !== 'note' && (
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500">Gravité</Label>
+                                        <select 
+                                            value={editingComplaintSeverity}
+                                            onChange={(e) => setEditingComplaintSeverity(e.target.value as any)}
+                                            disabled={!isEditing}
+                                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-xs disabled:opacity-75 disabled:text-zinc-400"
+                                        >
+                                            <option value="low">Faible (Low)</option>
+                                            <option value="medium">Moyenne (Medium)</option>
+                                            <option value="high">Élevée (High)</option>
+                                            <option value="critical">Critique (Critical)</option>
+                                        </select>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="space-y-1">
-                                <Label className="text-zinc-500">Description de la plainte</Label>
+                                <Label className="text-zinc-500">{activeEditingComplaint.type === 'note' ? 'Description de la note' : 'Description de la plainte'}</Label>
                                 <Textarea 
                                     value={editingComplaintDesc}
                                     onChange={(e) => setEditingComplaintDesc(e.target.value)}
@@ -2183,22 +2330,22 @@ export function OneOnOneDetailView({
                                 />
                             </div>
 
-                            <div className="p-3 bg-zinc-955/40 border border-zinc-900 rounded-xl space-y-1.5 text-xxs">
-                                <span className="text-zinc-500 block">Détails additionnels:</span>
-                                <div>Syndicat: <strong className="text-zinc-300">{activeEditingComplaint.clients?.company_name || activeEditingComplaint.clients?.full_name || 'Copropriété'}</strong></div>
+                            <div className="p-3 bg-zinc-955/40 border border-zinc-900 rounded-xl space-y-1.5 text-xs">
+                                <span className="text-zinc-500 block font-semibold text-[10px] uppercase">Détails additionnels:</span>
+                                <div>Syndicat: <strong className="text-zinc-355 text-zinc-300">{activeEditingComplaint.clients?.company_name || activeEditingComplaint.clients?.full_name || 'Copropriété'}</strong></div>
                                 <div className="flex justify-between items-center">
                                     <div>Catégorie: <strong className="text-purple-400">{activeEditingComplaint.complaint_categories?.name || 'Général'}</strong></div>
                                     <Button 
                                         type="button"
                                         onClick={() => handleShowComplaintHistory(activeEditingComplaint)}
                                         variant="outline" 
-                                        className="h-6 px-2.5 bg-zinc-900 border-zinc-850 hover:bg-zinc-800 text-[9px] font-bold text-purple-400 flex items-center gap-1.5"
+                                        className="h-6 px-2.5 bg-zinc-900 border-zinc-855 border-zinc-850 hover:bg-zinc-800 text-[9px] font-bold text-purple-400 flex items-center gap-1.5"
                                     >
                                         <Search className="h-3 w-3" />
                                         Voir Historique Catégorie
                                     </Button>
                                 </div>
-                                {activeEditingComplaint.received_date && <div>Date de réception: <strong className="text-zinc-300">{new Date(activeEditingComplaint.received_date).toLocaleDateString('fr-CA')}</strong></div>}
+                                {activeEditingComplaint.received_date && <div>Date de réception: <strong className="text-zinc-355 text-zinc-300">{new Date(activeEditingComplaint.received_date).toLocaleDateString('fr-CA')}</strong></div>}
                             </div>
                         </div>
 

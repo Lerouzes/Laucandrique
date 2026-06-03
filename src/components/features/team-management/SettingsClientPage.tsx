@@ -430,7 +430,7 @@ export function SettingsClientPage({
                             : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                 >
-                    Catégories de Plaintes
+                    Catégories de Plaintes & Notes
                     {activeTab === 'categories' && (
                         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500" />
                     )}
@@ -505,7 +505,7 @@ export function SettingsClientPage({
                                     Créer une Catégorie
                                 </CardTitle>
                                 <CardDescription className="text-xs text-zinc-400">
-                                    Ajouter un nouveau type pour classifier les plaintes et réclamations.
+                                    Ajouter un nouveau type pour classifier les plaintes, réclamations et notes de suivi.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="pt-4">
@@ -545,7 +545,7 @@ export function SettingsClientPage({
                             <CardHeader>
                                 <CardTitle className="text-base font-bold text-white">Catégories existantes</CardTitle>
                                 <CardDescription className="text-xs text-zinc-400">
-                                    Liste des catégories disponibles pour les plaintes et rapports.
+                                    Liste des catégories disponibles pour les plaintes, rapports et notes de suivi.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-2">
