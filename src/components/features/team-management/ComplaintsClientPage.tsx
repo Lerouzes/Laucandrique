@@ -74,13 +74,15 @@ interface ComplaintsClientPageProps {
     clients: Client[]
     managers: Manager[]
     categories: Category[]
+    userRole?: string
 }
 
 export function ComplaintsClientPage({
     initialComplaints,
     clients,
     managers,
-    categories
+    categories,
+    userRole
 }: ComplaintsClientPageProps) {
     const router = useRouter()
     // Search and Filter states
@@ -304,16 +306,16 @@ export function ComplaintsClientPage({
                 <div className="lg:col-span-2">
                     <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                         <CardHeader>
-                            <CardTitle className="text-base font-bold text-white flex items-center justify-between">
+                            <CardTitle className="text-lg font-bold text-white flex items-center justify-between">
                                 <span>Registre des Plaintes ({filteredComplaints.length})</span>
                             </CardTitle>
                             <CardDescription className="text-xs text-zinc-400">
-                                Liste filtrée des réclamations clients formulées.
+                                Liste filtrée des réclamations clients et notes de suivi.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-3.5">
+                        <CardContent className="space-y-4">
                             {filteredComplaints.length === 0 ? (
-                                <p className="text-xs text-zinc-500 italic py-8 text-center">Aucune plainte ne correspond aux filtres.</p>
+                                <p className="text-sm text-zinc-500 italic py-8 text-center">Aucune plainte ne correspond aux filtres.</p>
                             ) : (
                                 filteredComplaints.map((c) => {
                                     const clientName = c.clients ? (c.clients.company_name || c.clients.full_name) : 'Copropriété inconnue'
@@ -333,64 +335,68 @@ export function ComplaintsClientPage({
                                             : 'bg-emerald-500/20 text-emerald-300 border-emerald-850/40'
 
                                     return (
-                                        <div key={c.id} className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-3 text-xs relative">
-                                            <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
-                                                <div className="space-y-1">
-                                                    <p className="text-sm font-bold text-zinc-200">{c.title}</p>
-                                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-zinc-500">
-                                                        <span>Syndicat: <strong className="text-zinc-300">{clientName} [{sdcNum}]</strong></span>
+                                        <div key={c.id} className="p-5 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-4 text-xs relative">
+                                            <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
+                                                <div className="space-y-1.5 flex-1">
+                                                    <p className="text-base font-extrabold text-white leading-snug">{c.title || 'Note de Suivi'}</p>
+                                                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-zinc-400">
+                                                        <span>Syndicat: <strong className="text-zinc-200">{clientName} [{sdcNum}]</strong></span>
                                                         <span>·</span>
-                                                        <span>Gestionnaire: <strong className="text-zinc-300">{managerName}</strong></span>
+                                                        <span>Gestionnaire: <strong className="text-zinc-200">{managerName}</strong></span>
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-wrap gap-2 shrink-0">
                                                     {c.category_id && (
-                                                        <Badge variant="outline" className="text-[8px] font-bold bg-purple-950/20 text-purple-400 border-purple-800/30">
+                                                        <Badge variant="outline" className="text-[10px] font-bold py-1 px-2.5 bg-purple-950/20 text-purple-400 border-purple-800/30">
                                                             {categoryName}
                                                         </Badge>
                                                     )}
-                                                    <Badge variant="outline" className={`text-[8px] font-bold ${sevStyle}`}>{c.severity}</Badge>
-                                                    <Badge variant="outline" className={`text-[8px] font-bold ${statusStyle}`}>
+                                                    <Badge variant="outline" className={`text-[10px] font-bold py-1 px-2.5 ${sevStyle}`}>{c.severity}</Badge>
+                                                    <Badge variant="outline" className={`text-[10px] font-bold py-1 px-2.5 ${statusStyle}`}>
                                                         {c.status === 'open' ? 'En cours' : 'Résolue'}
                                                     </Badge>
                                                 </div>
                                             </div>
 
                                             {c.description && (
-                                                <p className="text-[10px] text-zinc-400 leading-relaxed bg-zinc-950/40 p-2.5 rounded-lg border border-zinc-900/80">
+                                                <p className="text-xs text-zinc-300 leading-relaxed bg-zinc-950/40 p-3.5 rounded-lg border border-zinc-900/80">
                                                     {c.description}
                                                 </p>
                                             )}
 
-                                            <div className="text-[9px] text-zinc-500 pt-2 border-t border-zinc-850 flex justify-between items-center">
-                                                <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> Signalée le : {new Date(c.received_date).toLocaleDateString('fr-CA')}</span>
-                                                {c.resolved_date && <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-emerald-400" /> Résolue le : {new Date(c.resolved_date).toLocaleDateString('fr-CA')}</span>}
+                                            <div className="text-xs text-zinc-400 pt-3 border-t border-zinc-850 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                                <div className="flex flex-col gap-1 text-[11px]">
+                                                    <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 text-zinc-500" /> Signalée le : {new Date(c.received_date).toLocaleDateString('fr-CA')}</span>
+                                                    {c.resolved_date && <span className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-emerald-400" /> Résolue le : {new Date(c.resolved_date).toLocaleDateString('fr-CA')}</span>}
+                                                </div>
                                                 
-                                                {c.status === 'open' && (
-                                                    <div className="flex gap-2">
+                                                <div className="flex gap-2 w-full sm:w-auto justify-end">
+                                                    {c.status === 'open' && (
                                                         <form action={async () => {
                                                             await resolveComplaintAction(c.id)
                                                         }}>
                                                             <Button 
                                                                 type="submit" 
                                                                 size="sm" 
-                                                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[9px] px-2.5 h-6 rounded flex items-center gap-0.5 shadow-md"
+                                                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 h-8 rounded-lg flex items-center gap-1 shadow-md"
                                                             >
-                                                                <Check className="h-3 w-3" />
+                                                                <Check className="h-3.5 w-3.5" />
                                                                 Résoudre
                                                             </Button>
                                                         </form>
-                                                        
+                                                    )}
+                                                    
+                                                    {(c.status === 'open' || userRole === 'Master') && (
                                                         <Button 
                                                             type="button" 
                                                             onClick={() => setComplaintToDelete(c.id)}
                                                             size="sm" 
-                                                            className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-[9px] px-2.5 h-6 rounded flex items-center gap-0.5 shadow-md animate-fade-in"
+                                                            className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-3 h-8 rounded-lg flex items-center gap-1 shadow-md animate-fade-in"
                                                         >
                                                             Supprimer
                                                         </Button>
-                                                    </div>
-                                                )}
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     )
@@ -404,7 +410,7 @@ export function ComplaintsClientPage({
                 <div>
                     <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                         <CardHeader className="pb-3 bg-zinc-950/20">
-                            <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+                            <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
                                 <PlusCircle className="h-4 w-4 text-purple-400" />
                                 Enregistrer une Plainte
                             </CardTitle>
@@ -414,8 +420,8 @@ export function ComplaintsClientPage({
                         </CardHeader>
                         <CardContent className="pt-4">
                             <form action={createComplaintAction} className="space-y-4 text-xs">
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Syndicat de Copropriété</Label>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold text-zinc-400">Syndicat de Copropriété</Label>
                                     <SearchableClientSelect 
                                         clients={clientOptions} 
                                         name="client_id" 
@@ -423,8 +429,8 @@ export function ComplaintsClientPage({
                                         placeholder="Sélectionner ou chercher..." 
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Gestionnaire Assigné</Label>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold text-zinc-400">Gestionnaire Assigné</Label>
                                     <SearchableManagerSelect
                                         managers={managers || []}
                                         name="manager_id"
@@ -432,24 +438,24 @@ export function ComplaintsClientPage({
                                         required
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Catégorie de la Plainte</Label>
-                                    <select name="category_id" className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-8 text-[16px] md:text-xs" required>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold text-zinc-400">Catégorie de la Plainte</Label>
+                                    <select name="category_id" className="w-full bg-[#121318] border border-zinc-800 rounded-lg px-3 text-white outline-none focus:border-purple-600 h-9 text-xs" required>
                                         <option value="">Sélectionner une catégorie...</option>
                                         {categories?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Sujet de la Plainte</Label>
-                                    <Input type="text" name="title" required placeholder="ex: Retards de PV..." className="bg-[#121318] border-zinc-800 h-8 text-white text-[16px] md:text-xs" />
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold text-zinc-400">Sujet de la Plainte</Label>
+                                    <Input type="text" name="title" required placeholder="ex: Retards de PV..." className="bg-[#121318] border-zinc-800 h-9 text-white text-xs" />
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Description détaillée</Label>
-                                    <Textarea name="description" required placeholder="Expliquer le litige..." rows={3} className="bg-[#121318] border-zinc-800 text-white text-[16px] md:text-xs" />
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold text-zinc-400">Description détaillée</Label>
+                                    <Textarea name="description" required placeholder="Expliquer le litige..." rows={3} className="bg-[#121318] border-zinc-800 text-white text-xs" />
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-zinc-500">Niveau de Sévérité</Label>
-                                    <select name="severity" className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-8 text-[16px] md:text-xs" required>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold text-zinc-400">Niveau de Sévérité</Label>
+                                    <select name="severity" className="w-full bg-[#121318] border border-zinc-800 rounded-lg px-3 text-white outline-none focus:border-purple-600 h-9 text-xs" required>
                                         <option value="low">Faible</option>
                                         <option value="medium">Moyenne</option>
                                         <option value="high">Élevée</option>
@@ -457,7 +463,7 @@ export function ComplaintsClientPage({
                                     </select>
                                 </div>
 
-                                <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold h-8 rounded-lg mt-2 flex items-center justify-center gap-1 shadow-lg">
+                                <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold h-9 rounded-lg mt-3 flex items-center justify-center gap-1.5 shadow-lg text-xs">
                                     <PlusCircle className="h-4 w-4" />
                                     Enregistrer la Plainte
                                 </Button>

@@ -67,6 +67,7 @@ export default async function ComplaintsListPage() {
                 clients={clients || []}
                 managers={managers || []}
                 categories={categories || []}
+                userRole={context.role}
             />
         </div>
     )
