@@ -299,7 +299,7 @@ export default async function TeamManagementDashboard(props: {
             {/* Visual Trends Analytics Charts */}
             <TeamTrendsCharts trends={stats.monthlyTrends || []} />
 
-            {/* Split Content: Packages breakdown and Manual entry logs */}
+            {/* Split Content: Manual entry logs & Add a Note (replaces Forfaits de Gestion) */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Manual stats entry split component */}
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md lg:col-span-2">
@@ -316,51 +316,8 @@ export default async function TeamManagementDashboard(props: {
                     </CardContent>
                 </Card>
 
-                {/* Contracts package breakdown card */}
-                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                    <CardHeader>
-                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-                            <FileSpreadsheet className="h-4 w-4 text-purple-400" />
-                            Forfaits de Gestion
-                        </CardTitle>
-                        <CardDescription className="text-xxs text-zinc-400">
-                            Répartition des forfaits de services.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-3">
-                            {packageData.map((pkg) => {
-                                const total = stats.totalSyndicates || 1
-                                const percent = Math.round((pkg.count / total) * 105)
-                                const cappedPercent = Math.min(100, percent)
-                                return (
-                                    <div key={pkg.name} className="space-y-1">
-                                        <div className="flex justify-between text-xxs font-medium">
-                                            <span className="text-zinc-300">{pkg.name}</span>
-                                            <span className="text-zinc-550 text-zinc-400">{pkg.count} contr. ({Math.round((pkg.count / total) * 100)}%)</span>
-                                        </div>
-                                        <div className="h-1.5 w-full bg-zinc-950 rounded-full overflow-hidden border border-zinc-900">
-                                            <div 
-                                                className="h-full bg-purple-600 rounded-full" 
-                                                style={{ width: `${cappedPercent}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Weekly Assessment & Quick Notes section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2">
-                    <WeeklyAssessmentGrid managers={managers} />
-                </div>
-                <div>
-                    <DashboardQuickNote managers={managers} categories={categories} clients={clients} />
-                </div>
+                {/* Dashboard Quick Note instead of Forfaits de Gestion */}
+                <DashboardQuickNote managers={managers} categories={categories} clients={clients} />
             </div>
 
             {/* Activity History & Analytics Panel */}
@@ -382,6 +339,9 @@ export default async function TeamManagementDashboard(props: {
                     />
                 </CardContent>
             </Card>
+
+            {/* Weekly Assessment Grid at the very bottom (Togglable) */}
+            <WeeklyAssessmentGrid managers={managers} />
         </div>
     )
 }

@@ -19,7 +19,9 @@ import {
     Clock,
     Mail, 
     CheckSquare, 
-    FileText 
+    FileText,
+    ChevronDown,
+    ChevronUp
 } from 'lucide-react'
 
 interface Manager {
@@ -36,6 +38,7 @@ interface WeeklyAssessmentGridProps {
 
 export function WeeklyAssessmentGrid({ managers = [] }: WeeklyAssessmentGridProps) {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().substring(0, 10))
+    const [isOpen, setIsOpen] = useState(false)
     const [latestLogs, setLatestLogs] = useState<Record<string, { value: number; logged_at: string; id: string }>>({})
     const [inputValues, setInputValues] = useState<Record<string, string>>({})
     const [saving, setSaving] = useState<Record<string, boolean>>({})
@@ -202,8 +205,11 @@ export function WeeklyAssessmentGrid({ managers = [] }: WeeklyAssessmentGridProp
 
     return (
         <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-            <CardHeader className="pb-3 bg-zinc-950/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
+            <CardHeader 
+                className="pb-3 bg-zinc-950/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 cursor-pointer select-none"
+                onClick={() => setIsOpen(!isOpen)}
+            >
+                <div className="flex-1">
                     <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
                         📋 Grille d'Évaluation Rapide de l'Équipe
                     </CardTitle>
@@ -212,61 +218,74 @@ export function WeeklyAssessmentGrid({ managers = [] }: WeeklyAssessmentGridProp
                     </CardDescription>
                 </div>
 
-                {/* Saisie date */}
-                <div className="flex items-center gap-2 shrink-0 bg-zinc-950 border border-zinc-850 px-3 py-1.5 rounded-xl">
-                    <Calendar className="h-3.5 w-3.5 text-purple-400" />
-                    <Label className="text-[10px] text-zinc-400 font-bold uppercase shrink-0">Date de saisie :</Label>
-                    <input 
-                        type="date"
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="bg-transparent border-none outline-none text-xxs font-mono text-white cursor-pointer"
-                    />
+                <div className="flex items-center gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {isOpen && (
+                        <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-850 px-3 py-1.5 rounded-xl">
+                            <Calendar className="h-3.5 w-3.5 text-purple-400" />
+                            <Label className="text-[10px] text-zinc-400 font-bold uppercase shrink-0">Date de saisie :</Label>
+                            <input 
+                                type="date"
+                                value={selectedDate}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                className="bg-transparent border-none outline-none text-xxs font-mono text-white cursor-pointer"
+                            />
+                        </div>
+                    )}
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setIsOpen(!isOpen)}
+                        className="text-zinc-450 text-zinc-400 hover:text-white p-1 hover:bg-zinc-800/50"
+                    >
+                        {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
                 </div>
             </CardHeader>
-            <CardContent className="p-0">
-                {loading ? (
-                    <div className="flex flex-col items-center justify-center py-12 gap-2 text-zinc-400 text-xs">
-                        <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
-                        Chargement des indicateurs...
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xxs text-zinc-300">
-                            <thead className="bg-zinc-950/40 text-zinc-400 font-bold uppercase border-b border-zinc-850">
-                                <tr>
-                                    <th className="p-3 w-[150px]">Gestionnaire</th>
-                                    <th className="p-3">Courriels &gt; 48 heures</th>
-                                    <th className="p-3">Tâches en Retard</th>
-                                    <th className="p-3">Factures sans notes &gt; 7 jours</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-zinc-850/60 bg-zinc-900/10">
-                                {managers.map(manager => {
-                                    const teamName = manager.manager_teams?.name || 'Classique'
-                                    return (
-                                        <tr key={manager.id} className="hover:bg-zinc-850/10 transition-colors">
-                                            <td className="p-3 font-semibold text-zinc-150 align-top">
-                                                <div className="text-xs font-bold text-white">{manager.first_name} {manager.last_name}</div>
-                                                <div className="text-[8px] text-zinc-550 text-zinc-500 font-mono mt-0.5">Forfait : {teamName}</div>
-                                            </td>
-                                            <td className="p-2">
-                                                {renderCell(manager, 'emails_over_48h', <Mail className="h-3 w-3 text-blue-400" />)}
-                                            </td>
-                                            <td className="p-2">
-                                                {renderCell(manager, 'late_tasks', <CheckSquare className="h-3 w-3 text-purple-400" />)}
-                                            </td>
-                                            <td className="p-2">
-                                                {renderCell(manager, 'bills_no_notes_over_7d', <FileText className="h-3 w-3 text-amber-400" />)}
-                                            </td>
-                                        </tr>
-                                    )
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </CardContent>
+            {isOpen && (
+                <CardContent className="p-0">
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center py-12 gap-2 text-zinc-400 text-xs">
+                            <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
+                            Chargement des indicateurs...
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xxs text-zinc-300">
+                                <thead className="bg-zinc-950/40 text-zinc-400 font-bold uppercase border-b border-zinc-850">
+                                    <tr>
+                                        <th className="p-3 w-[150px]">Gestionnaire</th>
+                                        <th className="p-3">Courriels &gt; 48 heures</th>
+                                        <th className="p-3">Tâches en Retard</th>
+                                        <th className="p-3">Factures sans notes &gt; 7 jours</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-850/60 bg-zinc-900/10">
+                                    {managers.map(manager => {
+                                        const teamName = manager.manager_teams?.name || 'Classique'
+                                        return (
+                                            <tr key={manager.id} className="hover:bg-zinc-850/10 transition-colors">
+                                                <td className="p-3 font-semibold text-zinc-150 align-top">
+                                                    <div className="text-xs font-bold text-white">{manager.first_name} {manager.last_name}</div>
+                                                    <div className="text-[8px] text-zinc-550 text-zinc-500 font-mono mt-0.5">Forfait : {teamName}</div>
+                                                </td>
+                                                <td className="p-2">
+                                                    {renderCell(manager, 'emails_over_48h', <Mail className="h-3 w-3 text-blue-400" />)}
+                                                </td>
+                                                <td className="p-2">
+                                                    {renderCell(manager, 'late_tasks', <CheckSquare className="h-3 w-3 text-purple-400" />)}
+                                                </td>
+                                                <td className="p-2">
+                                                    {renderCell(manager, 'bills_no_notes_over_7d', <FileText className="h-3 w-3 text-amber-400" />)}
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </CardContent>
+            )}
         </Card>
     )
 }
