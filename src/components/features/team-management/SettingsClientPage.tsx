@@ -22,7 +22,8 @@ import {
     Shield,
     Users,
     RefreshCw,
-    Key
+    Key,
+    BarChart3
 } from 'lucide-react'
 import { 
     createComplaintCategoryAction, 
@@ -122,7 +123,7 @@ export function SettingsClientPage({
     currentUserId,
     initialUsers
 }: SettingsClientPageProps) {
-    const [activeTab, setActiveTab] = useState<'categories' | 'audits' | 'accounts' | 'assemblies'>('categories')
+    const [activeTab, setActiveTab] = useState<'categories' | 'audits' | 'accounts' | 'assemblies' | 'scoring'>('categories')
     
     // Categories states
     const [categories, setCategories] = useState<ComplaintCategory[]>(initialCategories)
@@ -420,7 +421,7 @@ export function SettingsClientPage({
             )}
 
             {/* Custom Tab Selector */}
-            <div className="flex border-b border-zinc-800 gap-4">
+            <div className="flex border-b border-zinc-800 gap-4 flex-wrap">
                 <button
                     onClick={() => setActiveTab('categories')}
                     className={`pb-2.5 text-sm font-bold transition-all relative ${
@@ -442,8 +443,21 @@ export function SettingsClientPage({
                             : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                 >
-                    Descriptions d'Audits
+                    Descriptions d&apos;Audits
                     {activeTab === 'audits' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500" />
+                    )}
+                </button>
+                <button
+                    onClick={() => setActiveTab('scoring')}
+                    className={`pb-2.5 text-sm font-bold transition-all relative ${
+                        activeTab === 'scoring' 
+                            ? 'text-purple-400 font-extrabold' 
+                            : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                >
+                    Barème des Notes
+                    {activeTab === 'scoring' && (
                         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500" />
                     )}
                 </button>
@@ -457,7 +471,7 @@ export function SettingsClientPage({
                                     : 'text-zinc-400 hover:text-zinc-200'
                             }`}
                         >
-                            Descriptions d'Assemblées
+                            Descriptions d&apos;Assemblées
                             {activeTab === 'assemblies' && (
                                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500" />
                             )}
@@ -760,6 +774,108 @@ export function SettingsClientPage({
                                     </div>
                                 )
                             })}
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* Tab: Scoring Reference */}
+            {activeTab === 'scoring' && (
+                <div className="space-y-6 animate-in fade-in duration-200">
+                    <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                        <CardHeader>
+                            <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+                                <BarChart3 className="h-4 w-4 text-purple-400" />
+                                Calcul des notes 1-à-1
+                            </CardTitle>
+                            <CardDescription className="text-xs text-zinc-400">
+                                Référence complète sur la façon dont les scores et les notes des rencontres individuelles sont calculés.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {/* Weights table */}
+                            <div>
+                                <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Pondération des indicateurs</h4>
+                                <div className="overflow-x-auto rounded-lg border border-zinc-800">
+                                    <table className="w-full text-xs">
+                                        <thead>
+                                            <tr className="bg-zinc-950/60 border-b border-zinc-800">
+                                                <th className="text-left px-3 py-2.5 text-zinc-400 font-semibold">Indicateur</th>
+                                                <th className="text-left px-3 py-2.5 text-zinc-400 font-semibold">Formule</th>
+                                                <th className="text-center px-3 py-2.5 text-zinc-400 font-semibold">Poids</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-zinc-800/60">
+                                            <tr className="hover:bg-zinc-800/20 transition-colors">
+                                                <td className="px-3 py-2.5 font-medium text-zinc-200">Taux d&apos;appels répondus</td>
+                                                <td className="px-3 py-2.5 text-zinc-400 font-mono text-[10px]">(appels répondus ÷ total appels) × 100</td>
+                                                <td className="px-3 py-2.5 text-center"><span className="inline-block bg-purple-950/40 text-purple-300 border border-purple-800/50 rounded-full px-2 py-0.5 text-[10px] font-bold">25%</span></td>
+                                            </tr>
+                                            <tr className="hover:bg-zinc-800/20 transition-colors">
+                                                <td className="px-3 py-2.5 font-medium text-zinc-200">Hygiène des tâches</td>
+                                                <td className="px-3 py-2.5 text-zinc-400 font-mono text-[10px]">max(0, 100 − tâches en retard × 5)</td>
+                                                <td className="px-3 py-2.5 text-center"><span className="inline-block bg-purple-950/40 text-purple-300 border border-purple-800/50 rounded-full px-2 py-0.5 text-[10px] font-bold">25%</span></td>
+                                            </tr>
+                                            <tr className="hover:bg-zinc-800/20 transition-colors">
+                                                <td className="px-3 py-2.5 font-medium text-zinc-200">Hygiène des courriels</td>
+                                                <td className="px-3 py-2.5 text-zinc-400 font-mono text-[10px]">max(0, 100 − courriels &gt;48h × 10)</td>
+                                                <td className="px-3 py-2.5 text-center"><span className="inline-block bg-blue-950/40 text-blue-300 border border-blue-800/50 rounded-full px-2 py-0.5 text-[10px] font-bold">20%</span></td>
+                                            </tr>
+                                            <tr className="hover:bg-zinc-800/20 transition-colors">
+                                                <td className="px-3 py-2.5 font-medium text-zinc-200">Taux d&apos;approbation des soumissions</td>
+                                                <td className="px-3 py-2.5 text-zinc-400 font-mono text-[10px]">donnée globale (auto) — 100% si absent</td>
+                                                <td className="px-3 py-2.5 text-center"><span className="inline-block bg-amber-950/40 text-amber-300 border border-amber-800/50 rounded-full px-2 py-0.5 text-[10px] font-bold">10%</span></td>
+                                            </tr>
+                                            <tr className="hover:bg-zinc-800/20 transition-colors">
+                                                <td className="px-3 py-2.5 font-medium text-zinc-200">Hygiène des factures</td>
+                                                <td className="px-3 py-2.5 text-zinc-400 font-mono text-[10px]">max(0, 100 − factures sans notes &gt;7j × 10)</td>
+                                                <td className="px-3 py-2.5 text-center"><span className="inline-block bg-amber-950/40 text-amber-300 border border-amber-800/50 rounded-full px-2 py-0.5 text-[10px] font-bold">10%</span></td>
+                                            </tr>
+                                            <tr className="hover:bg-zinc-800/20 transition-colors">
+                                                <td className="px-3 py-2.5 font-medium text-zinc-200">Résolution des engagements</td>
+                                                <td className="px-3 py-2.5 text-zinc-400 font-mono text-[10px]">(engagements résolus ÷ total) × 100 — 100% si aucun</td>
+                                                <td className="px-3 py-2.5 text-center"><span className="inline-block bg-amber-950/40 text-amber-300 border border-amber-800/50 rounded-full px-2 py-0.5 text-[10px] font-bold">10%</span></td>
+                                            </tr>
+                                            <tr className="bg-zinc-950/40 font-bold border-t-2 border-zinc-700">
+                                                <td className="px-3 py-2.5 text-zinc-100" colSpan={2}>Total</td>
+                                                <td className="px-3 py-2.5 text-center"><span className="inline-block bg-zinc-800 text-zinc-100 border border-zinc-600 rounded-full px-2 py-0.5 text-[10px] font-bold">100%</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Grade thresholds */}
+                            <div>
+                                <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Barème des notes</h4>
+                                <div className="overflow-x-auto rounded-lg border border-zinc-800">
+                                    <table className="w-full text-xs">
+                                        <thead>
+                                            <tr className="bg-zinc-950/60 border-b border-zinc-800">
+                                                <th className="text-center px-3 py-2.5 text-zinc-400 font-semibold">Note</th>
+                                                <th className="text-center px-3 py-2.5 text-zinc-400 font-semibold">Score</th>
+                                                <th className="text-left px-3 py-2.5 text-zinc-400 font-semibold">Appréciation</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-zinc-800/60">
+                                            {[
+                                                { label: 'A+', score: '≥ 90', comment: 'Excellent', color: 'text-emerald-400' },
+                                                { label: 'A',  score: '≥ 80', comment: 'Très Bien', color: 'text-emerald-300' },
+                                                { label: 'B',  score: '≥ 70', comment: 'Bien',      color: 'text-purple-400' },
+                                                { label: 'C',  score: '≥ 60', comment: 'Satisfaisant', color: 'text-amber-400' },
+                                                { label: 'D',  score: '≥ 50', comment: 'À Améliorer', color: 'text-orange-400' },
+                                                { label: 'E',  score: '< 50', comment: 'Insuffisant', color: 'text-rose-400' },
+                                            ].map(g => (
+                                                <tr key={g.label} className="hover:bg-zinc-800/20 transition-colors">
+                                                    <td className={`px-3 py-2.5 text-center font-bold ${g.color}`}>{g.label}</td>
+                                                    <td className="px-3 py-2.5 text-center text-zinc-300">{g.score}</td>
+                                                    <td className="px-3 py-2.5 text-zinc-300">{g.comment}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
                 </div>

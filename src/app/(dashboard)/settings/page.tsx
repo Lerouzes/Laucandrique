@@ -3,7 +3,7 @@
 import { useTransition, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
-import { Save, Users, Layers, UserCheck, Wrench, Trash2, BarChart3 } from 'lucide-react'
+import { Save, Users, Layers, UserCheck, Wrench, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -495,119 +495,6 @@ export default function SettingsPage() {
                 </Card>
             </div>
 
-            {/* 1-À-1 SCORING REFERENCE */}
-            <Card className="bg-zinc-900 border-zinc-800">
-                <CardHeader>
-                    <CardTitle className="text-zinc-100 flex items-center gap-2">
-                        <BarChart3 className="h-5 w-5 text-purple-400" />
-                        Calcul des notes 1-à-1
-                    </CardTitle>
-                    <CardDescription className="text-zinc-400">
-                        Référence sur la façon dont les scores et les notes des rencontres individuelles sont calculés.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    {/* Weights table */}
-                    <div>
-                        <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Pondération des indicateurs</h4>
-                        <div className="overflow-x-auto rounded-lg border border-zinc-800">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="bg-zinc-950/60 border-b border-zinc-800">
-                                        <th className="text-left px-4 py-2.5 text-zinc-400 font-semibold">Indicateur</th>
-                                        <th className="text-left px-4 py-2.5 text-zinc-400 font-semibold">Formule</th>
-                                        <th className="text-center px-4 py-2.5 text-zinc-400 font-semibold">Poids</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-zinc-800/60">
-                                    <tr className="hover:bg-zinc-800/20 transition-colors">
-                                        <td className="px-4 py-3 font-medium text-zinc-200">Taux d&apos;appels répondus</td>
-                                        <td className="px-4 py-3 text-zinc-400 font-mono text-xs">(appels répondus ÷ total appels) × 100</td>
-                                        <td className="px-4 py-3 text-center"><span className="inline-block bg-purple-950/40 text-purple-300 border border-purple-800/50 rounded-full px-2.5 py-0.5 text-xs font-bold">25%</span></td>
-                                    </tr>
-                                    <tr className="hover:bg-zinc-800/20 transition-colors">
-                                        <td className="px-4 py-3 font-medium text-zinc-200">Hygiène des tâches</td>
-                                        <td className="px-4 py-3 text-zinc-400 font-mono text-xs">max(0, 100 − tâches en retard × 5)</td>
-                                        <td className="px-4 py-3 text-center"><span className="inline-block bg-purple-950/40 text-purple-300 border border-purple-800/50 rounded-full px-2.5 py-0.5 text-xs font-bold">25%</span></td>
-                                    </tr>
-                                    <tr className="hover:bg-zinc-800/20 transition-colors">
-                                        <td className="px-4 py-3 font-medium text-zinc-200">Hygiène des courriels</td>
-                                        <td className="px-4 py-3 text-zinc-400 font-mono text-xs">max(0, 100 − courriels &gt;48h × 10)</td>
-                                        <td className="px-4 py-3 text-center"><span className="inline-block bg-blue-950/40 text-blue-300 border border-blue-800/50 rounded-full px-2.5 py-0.5 text-xs font-bold">20%</span></td>
-                                    </tr>
-                                    <tr className="hover:bg-zinc-800/20 transition-colors">
-                                        <td className="px-4 py-3 font-medium text-zinc-200">Taux d&apos;approbation des soumissions</td>
-                                        <td className="px-4 py-3 text-zinc-400 font-mono text-xs">donnée globale (auto) — 100% si absent</td>
-                                        <td className="px-4 py-3 text-center"><span className="inline-block bg-amber-950/40 text-amber-300 border border-amber-800/50 rounded-full px-2.5 py-0.5 text-xs font-bold">10%</span></td>
-                                    </tr>
-                                    <tr className="hover:bg-zinc-800/20 transition-colors">
-                                        <td className="px-4 py-3 font-medium text-zinc-200">Hygiène des factures</td>
-                                        <td className="px-4 py-3 text-zinc-400 font-mono text-xs">max(0, 100 − factures sans notes &gt;7j × 10)</td>
-                                        <td className="px-4 py-3 text-center"><span className="inline-block bg-amber-950/40 text-amber-300 border border-amber-800/50 rounded-full px-2.5 py-0.5 text-xs font-bold">10%</span></td>
-                                    </tr>
-                                    <tr className="hover:bg-zinc-800/20 transition-colors">
-                                        <td className="px-4 py-3 font-medium text-zinc-200">Résolution des engagements</td>
-                                        <td className="px-4 py-3 text-zinc-400 font-mono text-xs">(engagements résolus ÷ total) × 100 — 100% si aucun</td>
-                                        <td className="px-4 py-3 text-center"><span className="inline-block bg-amber-950/40 text-amber-300 border border-amber-800/50 rounded-full px-2.5 py-0.5 text-xs font-bold">10%</span></td>
-                                    </tr>
-                                    <tr className="bg-zinc-950/40 font-bold border-t-2 border-zinc-700">
-                                        <td className="px-4 py-3 text-zinc-100" colSpan={2}>Total</td>
-                                        <td className="px-4 py-3 text-center"><span className="inline-block bg-zinc-800 text-zinc-100 border border-zinc-600 rounded-full px-2.5 py-0.5 text-xs font-bold">100%</span></td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    {/* Grade thresholds table */}
-                    <div>
-                        <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Barème des notes</h4>
-                        <div className="overflow-x-auto rounded-lg border border-zinc-800">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="bg-zinc-950/60 border-b border-zinc-800">
-                                        <th className="text-center px-4 py-2.5 text-zinc-400 font-semibold">Note</th>
-                                        <th className="text-center px-4 py-2.5 text-zinc-400 font-semibold">Score</th>
-                                        <th className="text-left px-4 py-2.5 text-zinc-400 font-semibold">Appréciation</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-zinc-800/60">
-                                    <tr className="hover:bg-zinc-800/20 transition-colors">
-                                        <td className="px-4 py-3 text-center font-bold text-emerald-400">A+</td>
-                                        <td className="px-4 py-3 text-center text-zinc-300">≥ 90</td>
-                                        <td className="px-4 py-3 text-zinc-300">Excellent</td>
-                                    </tr>
-                                    <tr className="hover:bg-zinc-800/20 transition-colors">
-                                        <td className="px-4 py-3 text-center font-bold text-emerald-300">A</td>
-                                        <td className="px-4 py-3 text-center text-zinc-300">≥ 80</td>
-                                        <td className="px-4 py-3 text-zinc-300">Très Bien</td>
-                                    </tr>
-                                    <tr className="hover:bg-zinc-800/20 transition-colors">
-                                        <td className="px-4 py-3 text-center font-bold text-purple-400">B</td>
-                                        <td className="px-4 py-3 text-center text-zinc-300">≥ 70</td>
-                                        <td className="px-4 py-3 text-zinc-300">Bien</td>
-                                    </tr>
-                                    <tr className="hover:bg-zinc-800/20 transition-colors">
-                                        <td className="px-4 py-3 text-center font-bold text-amber-400">C</td>
-                                        <td className="px-4 py-3 text-center text-zinc-300">≥ 60</td>
-                                        <td className="px-4 py-3 text-zinc-300">Satisfaisant</td>
-                                    </tr>
-                                    <tr className="hover:bg-zinc-800/20 transition-colors">
-                                        <td className="px-4 py-3 text-center font-bold text-orange-400">D</td>
-                                        <td className="px-4 py-3 text-center text-zinc-300">≥ 50</td>
-                                        <td className="px-4 py-3 text-zinc-300">À Améliorer</td>
-                                    </tr>
-                                    <tr className="hover:bg-zinc-800/20 transition-colors">
-                                        <td className="px-4 py-3 text-center font-bold text-rose-400">E</td>
-                                        <td className="px-4 py-3 text-center text-zinc-300">&lt; 50</td>
-                                        <td className="px-4 py-3 text-zinc-300">Insuffisant</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
 
             <ConfirmationDialog
                 open={!!managerToDelete}

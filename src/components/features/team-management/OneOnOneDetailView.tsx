@@ -1096,9 +1096,34 @@ export function OneOnOneDetailView({
                             <div className="h-16 w-16 rounded-full border-4 border-purple-500 flex items-center justify-center text-xl font-black text-white font-mono bg-purple-950/15">
                                 {computedScore}%
                             </div>
-                            <span className={`mt-2 border px-2 py-0.5 rounded text-[9px] font-black uppercase ${rating.color}`}>
-                                {rating.label} - {rating.comment}
-                            </span>
+                            <div className="relative group mt-2">
+                                <span className={`border px-2 py-0.5 rounded text-[9px] font-black uppercase flex items-center gap-1 cursor-help ${rating.color}`}>
+                                    {rating.label} - {rating.comment}
+                                    <HelpCircle className="h-2.5 w-2.5 opacity-60" />
+                                </span>
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-[#121318] border border-zinc-800 rounded-xl p-3 text-[10px] text-zinc-300 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50">
+                                    <p className="font-bold text-zinc-100 mb-2 border-b border-zinc-800 pb-1 flex items-center gap-1">
+                                        <HelpCircle className="h-3 w-3 text-purple-400" />
+                                        Calcul du Score Gustav
+                                    </p>
+                                    <div className="space-y-1.5 mb-2.5">
+                                        <div className="flex justify-between"><span>Appels répondus</span><span className="text-purple-400 font-bold">25%</span></div>
+                                        <div className="flex justify-between"><span>Hygiène tâches</span><span className="text-purple-400 font-bold">25%</span></div>
+                                        <div className="flex justify-between"><span>Hygiène courriels</span><span className="text-blue-400 font-bold">20%</span></div>
+                                        <div className="flex justify-between"><span>Approbation soumissions</span><span className="text-amber-400 font-bold">10%</span></div>
+                                        <div className="flex justify-between"><span>Hygiène factures</span><span className="text-amber-400 font-bold">10%</span></div>
+                                        <div className="flex justify-between"><span>Résolution engagements</span><span className="text-amber-400 font-bold">10%</span></div>
+                                    </div>
+                                    <div className="pt-2 border-t border-zinc-800 space-y-1">
+                                        <div className="flex gap-1.5"><span className="text-emerald-400 font-bold w-5">A+</span><span className="text-zinc-400">≥ 90 · Excellent</span></div>
+                                        <div className="flex gap-1.5"><span className="text-emerald-300 font-bold w-5">A</span><span className="text-zinc-400">≥ 80 · Très Bien</span></div>
+                                        <div className="flex gap-1.5"><span className="text-purple-400 font-bold w-5">B</span><span className="text-zinc-400">≥ 70 · Bien</span></div>
+                                        <div className="flex gap-1.5"><span className="text-amber-400 font-bold w-5">C</span><span className="text-zinc-400">≥ 60 · Satisfaisant</span></div>
+                                        <div className="flex gap-1.5"><span className="text-orange-400 font-bold w-5">D</span><span className="text-zinc-400">≥ 50 · À Améliorer</span></div>
+                                        <div className="flex gap-1.5"><span className="text-rose-400 font-bold w-5">E</span><span className="text-zinc-400">&lt; 50 · Insuffisant</span></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 w-full">
