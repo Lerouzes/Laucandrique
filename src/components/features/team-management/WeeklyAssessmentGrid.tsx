@@ -34,11 +34,13 @@ interface Manager {
 
 interface WeeklyAssessmentGridProps {
     managers: Manager[]
+    teams?: { id: string; name: string }[]
 }
 
-export function WeeklyAssessmentGrid({ managers = [] }: WeeklyAssessmentGridProps) {
+export function WeeklyAssessmentGrid({ managers = [], teams = [] }: WeeklyAssessmentGridProps) {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().substring(0, 10))
     const [isOpen, setIsOpen] = useState(false)
+    const [selectedTeamId, setSelectedTeamId] = useState<string>('all')
     const [latestLogs, setLatestLogs] = useState<Record<string, { value: number; logged_at: string; id: string }>>({})
     const [inputValues, setInputValues] = useState<Record<string, string>>({})
     const [saving, setSaving] = useState<Record<string, boolean>>({})
@@ -203,6 +205,10 @@ export function WeeklyAssessmentGrid({ managers = [] }: WeeklyAssessmentGridProp
 
     if (managers.length === 0) return null
 
+    const filteredManagers = selectedTeamId === 'all'
+        ? managers
+        : managers.filter(m => m.team_id === selectedTeamId)
+
     return (
         <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
             <CardHeader 
@@ -218,18 +224,36 @@ export function WeeklyAssessmentGrid({ managers = [] }: WeeklyAssessmentGridProp
                     </CardDescription>
                 </div>
 
-                <div className="flex items-center gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
+                <div className="flex flex-wrap items-center gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
                     {isOpen && (
-                        <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-850 px-3 py-1.5 rounded-xl">
-                            <Calendar className="h-3.5 w-3.5 text-purple-400" />
-                            <Label className="text-[10px] text-zinc-400 font-bold uppercase shrink-0">Date de saisie :</Label>
-                            <input 
-                                type="date"
-                                value={selectedDate}
-                                onChange={(e) => setSelectedDate(e.target.value)}
-                                className="bg-transparent border-none outline-none text-xxs font-mono text-white cursor-pointer"
-                            />
-                        </div>
+                        <>
+                            {/* Filtre Équipe */}
+                            <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-850 px-3 py-1.5 rounded-xl">
+                                <Label className="text-[10px] text-zinc-400 font-bold uppercase shrink-0">Équipe :</Label>
+                                <select 
+                                    value={selectedTeamId}
+                                    onChange={(e) => setSelectedTeamId(e.target.value)}
+                                    className="bg-transparent border-none outline-none text-xxs text-white cursor-pointer focus:ring-0"
+                                >
+                                    <option value="all" className="bg-[#121318] text-white">Toutes les équipes</option>
+                                    {teams.map(t => (
+                                        <option key={t.id} value={t.id} className="bg-[#121318] text-white">{t.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Saisie date */}
+                            <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-850 px-3 py-1.5 rounded-xl">
+                                <Calendar className="h-3.5 w-3.5 text-purple-400" />
+                                <Label className="text-[10px] text-zinc-400 font-bold uppercase shrink-0">Date de saisie :</Label>
+                                <input 
+                                    type="date"
+                                    value={selectedDate}
+                                    onChange={(e) => setSelectedDate(e.target.value)}
+                                    className="bg-transparent border-none outline-none text-xxs font-mono text-white cursor-pointer"
+                                />
+                            </div>
+                        </>
                     )}
                     <Button 
                         variant="ghost" 
@@ -260,26 +284,34 @@ export function WeeklyAssessmentGrid({ managers = [] }: WeeklyAssessmentGridProp
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-zinc-850/60 bg-zinc-900/10">
-                                    {managers.map(manager => {
-                                        const teamName = manager.manager_teams?.name || 'Classique'
-                                        return (
-                                            <tr key={manager.id} className="hover:bg-zinc-850/10 transition-colors">
-                                                <td className="p-3 font-semibold text-zinc-150 align-top">
-                                                    <div className="text-xs font-bold text-white">{manager.first_name} {manager.last_name}</div>
-                                                    <div className="text-[8px] text-zinc-550 text-zinc-500 font-mono mt-0.5">Forfait : {teamName}</div>
-                                                </td>
-                                                <td className="p-2">
-                                                    {renderCell(manager, 'emails_over_48h', <Mail className="h-3 w-3 text-blue-400" />)}
-                                                </td>
-                                                <td className="p-2">
-                                                    {renderCell(manager, 'late_tasks', <CheckSquare className="h-3 w-3 text-purple-400" />)}
-                                                </td>
-                                                <td className="p-2">
-                                                    {renderCell(manager, 'bills_no_notes_over_7d', <FileText className="h-3 w-3 text-amber-400" />)}
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
+                                    {filteredManagers.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="p-8 text-center text-zinc-500 italic">
+                                                Aucun gestionnaire trouvé pour cette équipe.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        filteredManagers.map(manager => {
+                                            const teamName = manager.manager_teams?.name || 'Classique'
+                                            return (
+                                                <tr key={manager.id} className="hover:bg-zinc-850/10 transition-colors">
+                                                    <td className="p-3 font-semibold text-zinc-150 align-top">
+                                                        <div className="text-xs font-bold text-white">{manager.first_name} {manager.last_name}</div>
+                                                        <div className="text-[8px] text-zinc-550 text-zinc-500 font-mono mt-0.5">Forfait : {teamName}</div>
+                                                    </td>
+                                                    <td className="p-2">
+                                                        {renderCell(manager, 'emails_over_48h', <Mail className="h-3 w-3 text-blue-400" />)}
+                                                    </td>
+                                                    <td className="p-2">
+                                                        {renderCell(manager, 'late_tasks', <CheckSquare className="h-3 w-3 text-purple-400" />)}
+                                                    </td>
+                                                    <td className="p-2">
+                                                        {renderCell(manager, 'bills_no_notes_over_7d', <FileText className="h-3 w-3 text-amber-400" />)}
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })
+                                    )}
                                 </tbody>
                             </table>
                         </div>

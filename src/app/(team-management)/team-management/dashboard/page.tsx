@@ -341,7 +341,7 @@ export default async function TeamManagementDashboard(props: {
             </Card>
 
             {/* Weekly Assessment Grid at the very bottom (Togglable) */}
-            <WeeklyAssessmentGrid managers={managers} />
+            <WeeklyAssessmentGrid managers={managers} teams={teams} />
         </div>
     )
 }
