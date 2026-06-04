@@ -101,7 +101,7 @@ export default async function GlobalAlertsPage() {
 
                                         <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
                                             <Link 
-                                                href={`/team-management/managers/${a.manager.id}`}
+                                                href={`/team-management/managers/${encodeURIComponent(a.manager.last_name)}`}
                                                 className="text-purple-400 hover:text-purple-300 font-bold hover:underline flex items-center gap-1 h-8 rounded-lg bg-zinc-950/40 border border-zinc-850 px-3"
                                             >
                                                 Accéder au dossier

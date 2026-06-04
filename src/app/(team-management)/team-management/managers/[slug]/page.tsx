@@ -3,26 +3,33 @@ import { createClient } from '@/utils/supabase/server'
 import { notFound } from 'next/navigation'
 import { ManagerProfileView } from '@/components/features/team-management/ManagerProfileView'
 import { getActiveTeamContext } from '@/utils/team-context'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 
 export default async function ManagerProfilePage({
     params
 }: {
-    params: Promise<{ id: string }>
+    params: Promise<{ slug: string }>
 }) {
-    const { id } = await params
+    const { slug } = await params
     const supabase = await createClient()
     const context = await getActiveTeamContext()
 
-    // 1. Fetch manager details
+    const decodedSlug = decodeURIComponent(slug)
+
+    // 1. Fetch manager details by last name (case-insensitive)
     const { data: manager } = await supabase
         .from('managers')
         .select('*, manager_teams(*)')
-        .eq('id', id)
-        .single()
+        .ilike('last_name', decodedSlug)
+        .limit(1)
+        .maybeSingle()
 
     if (!manager) {
         notFound()
     }
+
+    const id = manager.id
 
     // 2. Fetch stats
     const stats = await getManagerStats(id)
@@ -88,11 +95,20 @@ export default async function ManagerProfilePage({
 
     return (
         <div className="space-y-6 pb-12">
-            <div>
-                <h1 className="text-xl font-bold tracking-tight text-white uppercase">Dossier du Gestionnaire</h1>
-                <p className="text-xs text-zinc-400">
-                    Consultez l'historique complet, les audits et la performance de {manager.first_name} {manager.last_name}.
-                </p>
+            <div className="flex flex-col gap-3">
+                <Link 
+                    href="/team-management/managers" 
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition-colors w-fit"
+                >
+                    <ArrowLeft className="h-3.5 w-3.5 text-purple-400" />
+                    Retour aux gestionnaires
+                </Link>
+                <div>
+                    <h1 className="text-xl font-bold tracking-tight text-white uppercase font-sans">Dossier du Gestionnaire</h1>
+                    <p className="text-xs text-zinc-400">
+                        Consultez l'historique complet, les audits et la performance de {manager.first_name} {manager.last_name}.
+                    </p>
+                </div>
             </div>
 
             <ManagerProfileView

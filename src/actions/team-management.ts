@@ -2,8 +2,34 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath as nextRevalidatePath } from 'next/cache'
 import { createClient as createBaseClient } from '@supabase/supabase-js'
+
+async function revalidatePath(path: string, type?: 'page' | 'layout') {
+    if (path.startsWith('/team-management/managers/')) {
+        const parts = path.split('/')
+        const idOrSlug = parts[parts.length - 1]
+        if (idOrSlug && idOrSlug.length > 20) {
+            try {
+                const supabase = await createClient()
+                const { data: mgr } = await supabase
+                    .from('managers')
+                    .select('last_name')
+                    .eq('id', idOrSlug)
+                    .maybeSingle()
+                if (mgr?.last_name) {
+                    nextRevalidatePath(`/team-management/managers/${encodeURIComponent(mgr.last_name)}`, type)
+                }
+            } catch (e) {
+                console.error("Error in custom revalidatePath:", e)
+            }
+        } else {
+            nextRevalidatePath(path, type)
+        }
+    } else {
+        nextRevalidatePath(path, type)
+    }
+}
 
 // ==========================================
 // 1. DYNAMIC STATISTICS & KPI ENGINE
@@ -3136,6 +3162,48 @@ export async function getLatestTeamPerformanceLogsAction(): Promise<any[]> {
 
     if (error) throw new Error(error.message)
     return (data || []) as any[]
+}
+
+export async function updateComplaintNotesAndStatusAction(
+    id: string,
+    data: {
+        my_notes?: string | null
+        manager_notes?: string | null
+        status?: 'open' | 'resolved'
+    }
+) {
+    const supabase = await createClient()
+
+    // Fetch complaint to find manager_id
+    const { data: comp } = await supabase
+        .from('complaints')
+        .select('manager_id')
+        .eq('id', id)
+        .maybeSingle()
+
+    const updateFields: any = {}
+    if (data.my_notes !== undefined) updateFields.my_notes = data.my_notes
+    if (data.manager_notes !== undefined) updateFields.manager_notes = data.manager_notes
+    if (data.status !== undefined) {
+        updateFields.status = data.status
+        if (data.status === 'resolved') {
+            updateFields.resolved_date = new Date().toISOString().substring(0, 10)
+        } else {
+            updateFields.resolved_date = null
+        }
+    }
+
+    const { error } = await supabase
+        .from('complaints')
+        .update(updateFields)
+        .eq('id', id)
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/team-management/complaints')
+    if (comp?.manager_id) {
+        revalidatePath(`/team-management/managers/${comp.manager_id}`)
+    }
 }
 
 

@@ -23,6 +23,10 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CallsStatsPanel } from './CallsStatsPanel'
+import { useRouter } from 'next/navigation'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 
 export function ManagerProfileView({
@@ -52,6 +56,72 @@ export function ManagerProfileView({
     const [salaryVal, setSalaryVal] = useState(manager.salary?.toString() || '0')
     const [directionNotesVal, setDirectionNotesVal] = useState(manager.direction_notes || '')
     const [isSaving, setIsSaving] = useState(false)
+
+    const router = useRouter()
+    
+    // Complaint popup states
+    const [selectedComplaint, setSelectedComplaint] = useState<any | null>(null)
+    const [compMyNotes, setCompMyNotes] = useState('')
+    const [compManagerNotes, setCompManagerNotes] = useState('')
+    const [compStatus, setCompStatus] = useState<'open' | 'resolved'>('open')
+    const [isSavingComplaint, setIsSavingComplaint] = useState(false)
+
+    const handleOpenComplaintModal = (c: any) => {
+        setSelectedComplaint(c)
+        setCompMyNotes(c.my_notes || '')
+        setCompManagerNotes(c.manager_notes || '')
+        setCompStatus(c.status || 'open')
+    }
+
+    const handleSaveComplaint = async () => {
+        if (!selectedComplaint) return
+        setIsSavingComplaint(true)
+        try {
+            const { updateComplaintNotesAndStatusAction } = await import('@/actions/team-management')
+            await updateComplaintNotesAndStatusAction(selectedComplaint.id, {
+                my_notes: compMyNotes.trim(),
+                manager_notes: compManagerNotes.trim(),
+                status: compStatus
+            })
+            toast.success("Plainte / Note mise à jour avec succès")
+            setSelectedComplaint(null)
+            router.refresh()
+        } catch (err: any) {
+            console.error("Error updating complaint:", err)
+            toast.error("Erreur lors de la mise à jour : " + err.message)
+        } finally {
+            setIsSavingComplaint(false)
+        }
+    }
+
+    // Align monthly workload and calls data for performance history
+    const alignedHistory = (() => {
+        const historyMap: Record<string, {
+            year_month: string
+            total_calls?: number
+            answered_calls?: number
+            open_tasks?: number
+            closed_tasks?: number
+            communications_received?: number
+        }> = {}
+
+        monthlyWorkload.forEach(w => {
+            const ym = w.year_month
+            if (!historyMap[ym]) historyMap[ym] = { year_month: ym }
+            historyMap[ym].open_tasks = w.open_tasks
+            historyMap[ym].closed_tasks = w.closed_tasks
+            historyMap[ym].communications_received = w.communications_received
+        })
+
+        monthlyCalls.forEach(c => {
+            const ym = c.year_month
+            if (!historyMap[ym]) historyMap[ym] = { year_month: ym }
+            historyMap[ym].total_calls = c.total_calls
+            historyMap[ym].answered_calls = c.answered_calls
+        })
+
+        return Object.values(historyMap).sort((a, b) => b.year_month.localeCompare(a.year_month))
+    })()
 
     const tabs = [
         { id: 'overview', name: 'Aperçu', icon: User },
@@ -397,6 +467,101 @@ export function ManagerProfileView({
                                 </div>
                             </CardContent>
                         </Card>
+
+                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                            <CardHeader>
+                                <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                                    <Activity className="h-4 w-4 text-purple-400" />
+                                    Historique de Performance sur le Temps
+                                </CardTitle>
+                                <CardDescription className="text-xxs text-zinc-400">
+                                    Évolution mensuelle des appels téléphoniques, taux de traitement des tâches et communications reçues.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-xxs text-zinc-300">
+                                        <thead className="bg-zinc-950/40 text-zinc-400 font-bold border-b border-zinc-800 uppercase">
+                                            <tr>
+                                                <th className="p-3">Mois</th>
+                                                <th className="p-3">Taux de réponse (Appels)</th>
+                                                <th className="p-3">Fermeture des tâches</th>
+                                                <th className="p-3">Comms Reçues</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-zinc-850">
+                                            {alignedHistory.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={4} className="p-4 text-center italic text-zinc-500">Aucun historique de performance enregistré.</td>
+                                                </tr>
+                                            ) : (
+                                                alignedHistory.map((h) => {
+                                                    const formatYearMonth = (ym: string) => {
+                                                        if (!ym) return '';
+                                                        const [year, month] = ym.split('-');
+                                                        const months = [
+                                                            'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+                                                            'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+                                                        ];
+                                                        const mIdx = parseInt(month, 10) - 1;
+                                                        if (mIdx >= 0 && mIdx < 12) {
+                                                            return `${months[mIdx]} ${year}`;
+                                                        }
+                                                        return ym;
+                                                    }
+
+                                                    const callsAnswered = h.answered_calls || 0
+                                                    const callsTotal = h.total_calls || 0
+                                                    const callsPct = callsTotal > 0 ? Math.round((callsAnswered / callsTotal) * 100) : null
+
+                                                    const tasksOpen = h.open_tasks || 0
+                                                    const tasksClosed = h.closed_tasks || 0
+                                                    const tasksTotal = tasksOpen + tasksClosed
+                                                    const tasksPct = tasksTotal > 0 ? Math.round((tasksClosed / tasksTotal) * 100) : null
+
+                                                    return (
+                                                        <tr key={h.year_month} className="hover:bg-zinc-900/20">
+                                                            <td className="p-3 font-bold text-zinc-200">
+                                                                {formatYearMonth(h.year_month)}
+                                                            </td>
+                                                            <td className="p-3">
+                                                                {callsPct !== null ? (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-semibold text-zinc-200">{callsPct}%</span>
+                                                                        <span className="text-[10px] text-zinc-500 font-mono">({callsAnswered}/{callsTotal})</span>
+                                                                        <div className="h-1.5 w-16 bg-zinc-950 rounded-full overflow-hidden hidden sm:block">
+                                                                            <div className="h-full bg-purple-650 rounded-full" style={{ width: `${callsPct}%` }} />
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-zinc-500 italic">Aucune donnée</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-3">
+                                                                {tasksPct !== null ? (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-semibold text-zinc-200">{tasksPct}%</span>
+                                                                        <span className="text-[10px] text-zinc-500 font-mono">({tasksClosed}/{tasksTotal})</span>
+                                                                        <div className="h-1.5 w-16 bg-zinc-950 rounded-full overflow-hidden hidden sm:block">
+                                                                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${tasksPct}%` }} />
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-zinc-500 italic">Aucune donnée</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-3 font-mono font-semibold text-zinc-300">
+                                                                {h.communications_received ?? 0}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
                 )}
 
@@ -573,18 +738,32 @@ export function ManagerProfileView({
                                             c.status === 'open' ? 'bg-amber-950/40 text-amber-300 border-amber-800' : 'bg-emerald-950/40 text-emerald-300 border-emerald-850'
 
                                         return (
-                                            <div key={c.id} className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-3 text-xxs">
+                                            <div 
+                                                key={c.id} 
+                                                onClick={() => handleOpenComplaintModal(c)}
+                                                className="p-4 bg-zinc-900/40 border border-zinc-850 hover:bg-zinc-800/40 hover:border-zinc-700 transition-all rounded-xl space-y-3 text-xxs cursor-pointer"
+                                            >
                                                 <div className="flex justify-between items-start">
                                                     <div className="space-y-0.5">
-                                                        <p className="text-xs font-bold text-zinc-200">{c.title}</p>
+                                                        <p className="text-xs font-bold text-zinc-200 hover:text-purple-400 transition-colors">{c.title}</p>
                                                         <p className="text-zinc-500">Syndicat: {c.clients?.company_name}</p>
                                                     </div>
                                                     <div className="flex gap-2">
+                                                        {c.my_notes && (
+                                                            <Badge variant="outline" className="text-[8px] font-bold bg-purple-950/40 text-purple-300 border-purple-800">
+                                                                Note Dir.
+                                                            </Badge>
+                                                        )}
+                                                        {c.manager_notes && (
+                                                            <Badge variant="outline" className="text-[8px] font-bold bg-blue-950/40 text-blue-300 border-blue-800">
+                                                                Note Gest.
+                                                            </Badge>
+                                                        )}
                                                         <Badge variant="outline" className={`text-[8px] font-bold ${sevStyle}`}>{c.severity}</Badge>
-                                                        <Badge variant="outline" className={`text-[8px] font-bold ${statusStyle}`}>{c.status}</Badge>
+                                                        <Badge variant="outline" className={`text-[8px] font-bold ${statusStyle}`}>{c.status === 'resolved' ? 'résolue' : 'ouverte'}</Badge>
                                                     </div>
                                                 </div>
-                                                {c.description && <p className="text-[10px] text-zinc-400 mt-1">{c.description}</p>}
+                                                {c.description && <p className="text-[10px] text-zinc-400 mt-1 line-clamp-2">{c.description}</p>}
                                                 <div className="text-[9px] text-zinc-500 pt-2 border-t border-zinc-850 flex justify-between">
                                                     <span>Signalée le : {c.received_date ? (() => {
                                                         const d = new Date(c.received_date)
@@ -865,6 +1044,110 @@ export function ManagerProfileView({
                     </div>
                 )}
             </div>
+            
+            {/* Complaint details and edit dialog */}
+            <Dialog 
+                open={!!selectedComplaint} 
+                onOpenChange={(open) => { if (!open) setSelectedComplaint(null) }}
+            >
+                <DialogContent className="max-w-lg bg-[#16171e] border border-zinc-800 text-zinc-100 rounded-xl shadow-2xl p-6 overflow-hidden">
+                    <DialogHeader>
+                        <DialogTitle className="text-base font-bold text-white flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-amber-500" />
+                            {selectedComplaint?.title || 'Détails de la plainte'}
+                        </DialogTitle>
+                        <DialogDescription className="text-zinc-400 text-xs mt-1">
+                            Syndicat : <span className="font-semibold text-zinc-200">{selectedComplaint?.clients?.company_name}</span>
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 my-4 text-xs">
+                        {/* Description */}
+                        <div className="p-3 bg-zinc-900/60 border border-zinc-850 rounded-xl space-y-1">
+                            <span className="text-zinc-500 block uppercase font-bold text-[9px] tracking-wider">Description de l'incident</span>
+                            <p className="text-zinc-200 text-xs leading-relaxed whitespace-pre-wrap">
+                                {selectedComplaint?.description || "Aucune description fournie."}
+                            </p>
+                        </div>
+
+                        {/* Metadata grid */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                                <span className="text-zinc-500 block uppercase font-bold text-[9px] tracking-wider">Date de réception</span>
+                                <span className="text-zinc-200 font-mono mt-1 block">
+                                    {selectedComplaint?.received_date ? new Date(selectedComplaint.received_date).toLocaleDateString('fr-CA') : 'N/A'}
+                                </span>
+                            </div>
+                            <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                                <span className="text-zinc-500 block uppercase font-bold text-[9px] tracking-wider">Gravité</span>
+                                <span className="mt-1 block">
+                                    <Badge variant="outline" className={cn(
+                                        "text-[9px] font-bold uppercase",
+                                        selectedComplaint?.severity === 'critical' ? 'bg-rose-955 bg-rose-500/10 text-rose-400 border-rose-800/30' :
+                                        selectedComplaint?.severity === 'high' ? 'bg-orange-955 bg-orange-500/10 text-orange-400 border-orange-800/30' :
+                                        'bg-zinc-950 text-zinc-450 border-zinc-850'
+                                    )}>
+                                        {selectedComplaint?.severity || 'normal'}
+                                    </Badge>
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Status (Mark as resolved) */}
+                        <div className="space-y-1.5">
+                            <label className="text-zinc-400 font-bold block text-xxs uppercase tracking-wider">Statut</label>
+                            <select
+                                value={compStatus}
+                                onChange={(e) => setCompStatus(e.target.value as 'open' | 'resolved')}
+                                className="w-full bg-[#121318] border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 outline-none focus:border-purple-650 h-9 cursor-pointer"
+                            >
+                                <option value="open">En attente / Ouverte (Open)</option>
+                                <option value="resolved">Résolue (Resolved)</option>
+                            </select>
+                        </div>
+
+                        {/* Director notes / comments */}
+                        <div className="space-y-1.5">
+                            <label className="text-zinc-400 font-bold block text-xxs uppercase tracking-wider">Commentaires de la Direction</label>
+                            <Textarea
+                                value={compMyNotes}
+                                onChange={(e) => setCompMyNotes(e.target.value)}
+                                placeholder="Saisissez vos notes ou commentaires ici..."
+                                className="bg-[#121318] border-zinc-800 text-zinc-200 text-xs focus:border-purple-650 min-h-[70px] resize-none"
+                            />
+                        </div>
+
+                        {/* Manager notes / comments */}
+                        <div className="space-y-1.5">
+                            <label className="text-zinc-400 font-bold block text-xxs uppercase tracking-wider">Commentaires du Gestionnaire</label>
+                            <Textarea
+                                value={compManagerNotes}
+                                onChange={(e) => setCompManagerNotes(e.target.value)}
+                                placeholder="Commentaires ou retours formulés par le gestionnaire..."
+                                className="bg-[#121318] border-zinc-800 text-zinc-200 text-xs focus:border-purple-650 min-h-[70px] resize-none"
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter className="flex justify-between items-center border-t border-zinc-850 pt-4 mt-4">
+                        <Button
+                            variant="outline"
+                            onClick={() => setSelectedComplaint(null)}
+                            disabled={isSavingComplaint}
+                            className="border-zinc-800 text-zinc-400 bg-transparent hover:bg-zinc-900 text-xxs font-bold h-8 rounded-lg cursor-pointer"
+                        >
+                            Annuler
+                        </Button>
+                        <Button
+                            onClick={handleSaveComplaint}
+                            disabled={isSavingComplaint}
+                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xxs h-8 px-4 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                            {isSavingComplaint ? "Enregistrement..." : "Enregistrer"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

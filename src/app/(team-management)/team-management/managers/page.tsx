@@ -326,7 +326,7 @@ export default async function ManagersControlTowerPage() {
                                         </td>
                                         <td className="p-3 text-right">
                                             <Link 
-                                                href={`/team-management/managers/${m.manager.id}`}
+                                                href={`/team-management/managers/${encodeURIComponent(m.manager.last_name)}`}
                                                 className="text-purple-400 hover:text-purple-300 font-bold hover:underline inline-flex items-center gap-1"
                                             >
                                                 Voir

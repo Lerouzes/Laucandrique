@@ -95,6 +95,7 @@ export default async function TeamsListPage() {
                 managerDetails.push({
                     id: m.id,
                     name: `${m.first_name} ${m.last_name}`,
+                    lastName: m.last_name,
                     stats
                 })
             }
@@ -234,7 +235,7 @@ export default async function TeamsListPage() {
                                             {teamManagersList.map(mgr => (
                                                 <Link 
                                                     key={mgr.id} 
-                                                    href={`/team-management/managers/${mgr.id}`}
+                                                    href={`/team-management/managers/${encodeURIComponent(mgr.lastName)}`}
                                                     className="p-2 bg-zinc-950/30 border border-zinc-850/80 rounded-lg hover:border-purple-800/40 hover:bg-zinc-950/60 transition-all flex items-center justify-between text-xxs"
                                                 >
                                                     <span className="text-zinc-300 truncate font-semibold">

@@ -213,7 +213,7 @@ export default async function TeamDetailPage({
                                         return (
                                             <Link
                                                 key={manager.id}
-                                                href={`/team-management/managers/${manager.id}`}
+                                                href={`/team-management/managers/${encodeURIComponent(manager.last_name)}`}
                                                 className="flex flex-col sm:flex-row justify-between sm:items-center p-3.5 rounded-xl border border-zinc-805 bg-zinc-950/20 hover:bg-zinc-950/50 hover:border-zinc-700 transition-all gap-4 text-xxs"
                                             >
                                                 <div className="space-y-0.5">
