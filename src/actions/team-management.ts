@@ -1016,6 +1016,7 @@ export async function createOneOnOneAction(data: {
         failure_reason?: string
         carried_forward?: boolean
         client_id?: string | null
+        taken_at?: string | null
     }>
     complaints?: Array<{
         complaint_id: string
@@ -1125,7 +1126,8 @@ export async function createOneOnOneAction(data: {
             why_not: c.why_not || null,
             failure_reason: (c.failure_reason as any) || null,
             carried_forward: c.carried_forward || false,
-            client_id: c.client_id || null
+            client_id: c.client_id || null,
+            taken_at: c.taken_at || meeting.meeting_date
         }))
         const { error: commsErr } = await supabase.from('one_on_one_commitments').insert(comms)
         if (commsErr) throw new Error(commsErr.message)
@@ -1296,6 +1298,7 @@ export async function updateOneOnOneAction(id: string, data: {
         failure_reason?: string
         carried_forward?: boolean
         client_id?: string | null
+        taken_at?: string | null
     }>
     complaints?: Array<{
         complaint_id: string
@@ -1431,7 +1434,8 @@ export async function updateOneOnOneAction(id: string, data: {
                     due_next_review: c.due_next_review || false,
                     status: c.status || 'Open',
                     notes: c.notes || null,
-                    client_id: c.client_id || null
+                    client_id: c.client_id || null,
+                    taken_at: c.taken_at || null
                 })
                 .eq('id', c.id)
         } else {
@@ -1449,7 +1453,8 @@ export async function updateOneOnOneAction(id: string, data: {
                     due_next_review: c.due_next_review || false,
                     status: c.status || 'Open',
                     notes: c.notes || null,
-                    client_id: c.client_id || null
+                    client_id: c.client_id || null,
+                    taken_at: c.taken_at || data.meeting_date
                 })
         }
     }
@@ -2011,7 +2016,8 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
                     due_next_review: c.due_next_review || false,
                     status: c.status || 'Open',
                     notes: c.notes || '',
-                    completed: false
+                    completed: false,
+                    taken_at: c.taken_at || lastMeeting.meeting_date
                 }))
         }
     }

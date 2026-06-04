@@ -307,6 +307,9 @@ export function OneOnOneDetailView({
     const [modalRiskSeverity, setModalRiskSeverity] = useState<'low' | 'medium' | 'high' | 'critical'>('medium')
     const [modalRiskClientId, setModalRiskClientId] = useState('')
     const [modalRiskFutureActions, setModalRiskFutureActions] = useState('')
+    const [modalRiskStatus, setModalRiskStatus] = useState<'active' | 'resolved'>('active')
+    const [modalRiskResolutionNotes, setModalRiskResolutionNotes] = useState('')
+    const [modalRiskResolvedDate, setModalRiskResolvedDate] = useState('')
 
     const openTaskEmailAuditModal = (idx: number) => {
         const audit = taskEmailAudits[idx]
@@ -332,6 +335,9 @@ export function OneOnOneDetailView({
         setModalRiskSeverity(risk.severity || 'medium')
         setModalRiskClientId(risk.client_id || '')
         setModalRiskFutureActions(risk.future_actions || '')
+        setModalRiskStatus(risk.status || 'active')
+        setModalRiskResolutionNotes(risk.resolution_notes || '')
+        setModalRiskResolvedDate(risk.resolved_date || '')
     }
 
     const handleSaveModalAudit = () => {
@@ -362,7 +368,10 @@ export function OneOnOneDetailView({
             description: modalRiskDesc.trim(),
             severity: modalRiskSeverity,
             client_id: modalRiskClientId || null,
-            future_actions: modalRiskFutureActions.trim()
+            future_actions: modalRiskFutureActions.trim(),
+            status: modalRiskStatus,
+            resolution_notes: modalRiskStatus === 'resolved' ? modalRiskResolutionNotes.trim() : '',
+            resolved_date: modalRiskStatus === 'resolved' ? (modalRiskResolvedDate || new Date().toISOString().substring(0, 10)) : null
         }
         setOperationalRisks(updated)
         setSelectedRiskIdx(null)
@@ -653,6 +662,46 @@ export function OneOnOneDetailView({
 
     const rating = getGrade(computedScore)
 
+    // Color helpers for Section 1 metrics
+    const getEmailsColor = (count: number) => {
+        if (count === 0) return 'text-emerald-400 font-bold'
+        if (count <= 2) return 'text-emerald-300 font-bold'
+        if (count <= 4) return 'text-amber-400 font-bold'
+        return 'text-rose-500 font-bold'
+    }
+
+    const getLateTasksColor = (count: number) => {
+        if (count <= 4) return 'text-emerald-400 font-bold'
+        if (count <= 9) return 'text-amber-400 font-bold'
+        return 'text-rose-500 font-bold'
+    }
+
+    const getCallsColor = (pct: number, total: number) => {
+        if (total === 0) return 'text-white'
+        if (pct >= 80) return 'text-emerald-400 font-bold'
+        if (pct >= 70) return 'text-amber-400 font-bold'
+        return 'text-rose-500 font-bold'
+    }
+
+    const getComplaintsColor = (count: number) => {
+        if (count === 0) return 'text-emerald-400 font-bold'
+        if (count === 1) return 'text-amber-400 font-bold'
+        return 'text-rose-500 font-bold'
+    }
+
+    const getBillsColor = (count: number) => {
+        if (count === 0) return 'text-emerald-400 font-bold'
+        if (count <= 2) return 'text-amber-400 font-bold'
+        return 'text-rose-500 font-bold'
+    }
+
+    const getApprovalRateColor = (rate: number | null | undefined) => {
+        if (rate === null || rate === undefined) return 'text-white'
+        if (rate >= 80) return 'text-emerald-400 font-bold'
+        if (rate >= 70) return 'text-amber-400 font-bold'
+        return 'text-rose-500 font-bold'
+    }
+
     // Section 2: Previous Commitments State Handlers
     const handlePrevCommitmentChange = (idx: number, field: string, value: any) => {
         if (!isEditing) return
@@ -813,7 +862,8 @@ export function OneOnOneDetailView({
                         status: c.status,
                         notes: c.notes,
                         completed: c.completed,
-                        client_id: c.client_id || null
+                        client_id: c.client_id || null,
+                        taken_at: c.taken_at || null
                     })),
                     ...newAgreedActions.map(c => ({
                         id: c.id,
@@ -824,7 +874,8 @@ export function OneOnOneDetailView({
                         status: c.status,
                         notes: c.notes,
                         completed: c.completed,
-                        client_id: c.client_id || null
+                        client_id: c.client_id || null,
+                        taken_at: c.taken_at || meetingDate
                     }))
                 ],
                 complaints: Object.entries(reviewedComplaintsState)
@@ -938,7 +989,8 @@ export function OneOnOneDetailView({
                     status: c.status,
                     notes: c.notes,
                     completed: c.completed,
-                    client_id: c.client_id || null
+                    client_id: c.client_id || null,
+                    taken_at: c.taken_at || null
                 })),
                 ...newAgreedActions.map(c => ({
                     id: c.id,
@@ -949,7 +1001,8 @@ export function OneOnOneDetailView({
                     status: c.status,
                     notes: c.notes,
                     completed: c.completed,
-                    client_id: c.client_id || null
+                    client_id: c.client_id || null,
+                    taken_at: c.taken_at || meetingDate
                 }))
             ]
 
@@ -1269,8 +1322,8 @@ export function OneOnOneDetailView({
                             <tbody className="divide-y divide-zinc-850">
                                 <tr>
                                     <td className="p-2 font-semibold text-zinc-200">Courriels &gt; 48 heures</td>
-                                    <td className="p-2 text-center font-bold text-white">
-                                        <div>{emailsOver48h}</div>
+                                    <td className="p-2 text-center font-bold">
+                                        <div className={getEmailsColor(emailsOver48h)}>{emailsOver48h}</div>
                                         <div className="text-[9px] text-zinc-500 font-normal mt-0.5">{formatYearMonthFr(getEvalYearMonth(meetingDate))}</div>
                                     </td>
                                     <td className="p-2 text-center text-zinc-500">
@@ -1287,8 +1340,8 @@ export function OneOnOneDetailView({
                                 </tr>
                                 <tr>
                                     <td className="p-2 font-semibold text-zinc-200">Tâches en Retard</td>
-                                    <td className="p-2 text-center font-bold text-white">
-                                        <div>{lateTasks}</div>
+                                    <td className="p-2 text-center font-bold">
+                                        <div className={getLateTasksColor(lateTasks)}>{lateTasks}</div>
                                         <div className="text-[9px] text-zinc-500 font-normal mt-0.5">{formatYearMonthFr(getEvalYearMonth(meetingDate))}</div>
                                     </td>
                                     <td className="p-2 text-center text-zinc-500">
@@ -1306,12 +1359,7 @@ export function OneOnOneDetailView({
                                 <tr>
                                     <td className="p-2 font-semibold text-zinc-200">Taux d'Appels Répondus</td>
                                     <td className="p-2 text-center font-bold">
-                                        <span className={`${
-                                            callsTotal === 0 ? 'text-white' :
-                                            Math.round(callsPct) >= 80 ? 'text-emerald-400' :
-                                            Math.round(callsPct) > 55 ? 'text-amber-400' :
-                                            'text-rose-500'
-                                        }`}>{callsTotal > 0 ? `${Math.round(callsPct)}%` : 'N/A'}</span>
+                                        <div className={getCallsColor(callsPct, callsTotal)}>{callsTotal > 0 ? `${Math.round(callsPct)}%` : 'N/A'}</div>
                                         <div className="text-[9px] text-zinc-500 font-normal mt-0.5">{formatYearMonthFr(getEvalYearMonth(meetingDate))}</div>
                                     </td>
                                     <td className="p-2 text-center text-zinc-500">
@@ -1328,7 +1376,7 @@ export function OneOnOneDetailView({
                                 </tr>
                                 <tr>
                                     <td className="p-2 font-semibold text-zinc-200">Plaintes Client Ouvertes</td>
-                                    <td className="p-2 text-center font-bold text-white">{managerComplaints.length}</td>
+                                    <td className={`p-2 text-center font-bold ${getComplaintsColor(managerComplaints.length)}`}>{managerComplaints.length}</td>
                                     <td className="p-2 text-center text-zinc-500">{openComplaintsPrev}</td>
                                     <td className="p-2 text-center">
                                         {managerComplaints.length < openComplaintsPrev ? (
@@ -1340,7 +1388,7 @@ export function OneOnOneDetailView({
                                 </tr>
                                 <tr>
                                     <td className="p-2 font-semibold text-zinc-200">Factures sans notes &gt; 7 jours</td>
-                                    <td className="p-2 text-center font-bold text-white">{billsNoNotes}</td>
+                                    <td className={`p-2 text-center font-bold ${getBillsColor(billsNoNotes)}`}>{billsNoNotes}</td>
                                     <td className="p-2 text-center text-zinc-500">{billsNoNotesPrev}</td>
                                     <td className="p-2 text-center">
                                         {billsNoNotes < billsNoNotesPrev ? (
@@ -1359,7 +1407,7 @@ export function OneOnOneDetailView({
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-zinc-300 text-xxs">
                             <div>
                                 <span className="text-zinc-500 block">Taux d'Approbation Laucandrique</span>
-                                <strong className="text-sm text-white font-mono">{quoteApprovalRate}%</strong>
+                                <strong className={`text-sm font-mono ${getApprovalRateColor(quoteApprovalRate)}`}>{quoteApprovalRate}%</strong>
                             </div>
                             <div>
                                 <span className="text-zinc-500 block">Total Syndicats Actifs</span>
@@ -1513,9 +1561,10 @@ export function OneOnOneDetailView({
                                     <tr key={c.id || idx} className="hover:bg-zinc-900/10">
                                         <td className="p-2 font-semibold text-zinc-200">
                                             {c.commitment_text}
-                                            <div className="text-[10px] text-zinc-500 mt-0.5 flex gap-2 font-bold">
+                                            <div className="text-[10px] text-zinc-500 mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 font-bold">
                                                 <span>Propriétaire: {c.owner || 'Manager'}</span>
                                                 {c.client_id && <span>· Syndicat: {getClientName(c.client_id)}</span>}
+                                                {c.taken_at && <span className="text-purple-400">· Discuté le: {c.taken_at}</span>}
                                             </div>
                                         </td>
                                         <td className="p-2 text-center">
@@ -2114,27 +2163,8 @@ export function OneOnOneDetailView({
                                             )}
                                         </div>
 
-                                        {r.status === 'active' && isEditing ? (
-                                            <div className="flex gap-2 items-center shrink-0">
-                                                <Input 
-                                                    id={`risk-res-input-${idx}`}
-                                                    placeholder="Notes de résolution..." 
-                                                    className="bg-[#121318] border-zinc-800 h-7 text-xxs w-40 text-white" 
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
-                                                <Button 
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        const el = document.getElementById(`risk-res-input-${idx}`) as HTMLInputElement
-                                                        handleResolveRisk(idx, el?.value || 'Résolu en 1v1')
-                                                    }}
-                                                    className="h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-                                                >
-                                                    Résoudre
-                                                </Button>
-                                            </div>
-                                        ) : r.status === 'active' ? (
-                                            <Badge variant="outline" className="bg-amber-955/20 text-amber-400 border-amber-800/40 font-bold text-[8px] shrink-0">Risque Actif</Badge>
+                                        {r.status === 'active' ? (
+                                            <Badge variant="outline" className="bg-purple-950/20 text-purple-400 border-purple-800/40 font-bold text-[8px] self-start sm:self-center shrink-0">Risque Actif</Badge>
                                         ) : (
                                             <Badge variant="outline" className="bg-emerald-950/20 text-emerald-400 border-emerald-800/40 font-bold text-[8px] self-start sm:self-center shrink-0">Risque Résolu</Badge>
                                         )}
@@ -2985,6 +3015,49 @@ export function OneOnOneDetailView({
                                     </div>
                                 </div>
 
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-400">Statut du Risque</Label>
+                                        <select
+                                            value={modalRiskStatus}
+                                            onChange={(e) => {
+                                                const newStatus = e.target.value as 'active' | 'resolved'
+                                                setModalRiskStatus(newStatus)
+                                                if (newStatus === 'resolved' && !modalRiskResolutionNotes.trim()) {
+                                                    setModalRiskResolutionNotes('Résolu en 1v1')
+                                                }
+                                            }}
+                                            className="bg-[#121318] border border-zinc-800 text-zinc-300 text-xs rounded-lg p-2.5 w-full outline-none"
+                                        >
+                                            <option value="active">Actif (Active)</option>
+                                            <option value="resolved">Résolu (Resolved)</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-400">Date de Résolution</Label>
+                                        <Input
+                                            type="date"
+                                            disabled={modalRiskStatus !== 'resolved'}
+                                            value={modalRiskStatus === 'resolved' ? (modalRiskResolvedDate || new Date().toISOString().substring(0, 10)) : ''}
+                                            onChange={(e) => setModalRiskResolvedDate(e.target.value)}
+                                            className="bg-[#121318] border-zinc-800 text-xs text-white disabled:opacity-50"
+                                        />
+                                    </div>
+                                </div>
+
+                                {modalRiskStatus === 'resolved' && (
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-400">Notes de Résolution (Paragraphe)</Label>
+                                        <Textarea 
+                                            value={modalRiskResolutionNotes}
+                                            onChange={(e) => setModalRiskResolutionNotes(e.target.value)}
+                                            placeholder="Notes de résolution..."
+                                            rows={4}
+                                            className="bg-[#121318] border-zinc-800 text-xs text-white"
+                                        />
+                                    </div>
+                                )}
+
                                 <div className="space-y-1">
                                     <Label className="text-zinc-400">Actions Futures (Mitigation)</Label>
                                     <Textarea 
@@ -2998,7 +3071,7 @@ export function OneOnOneDetailView({
                             </div>
                         ) : (
                             <div className="space-y-4 text-xs">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-3 gap-4">
                                     <div>
                                         <span className="text-zinc-500 text-[10px] block">Gravité / Sévérité</span>
                                         <Badge variant="outline" className={`font-bold capitalize ${
@@ -3007,6 +3080,13 @@ export function OneOnOneDetailView({
                                             modalRiskSeverity === 'medium' ? 'bg-amber-950/20 text-amber-400 border-amber-800/40' :
                                             'bg-zinc-800 text-zinc-300 border-zinc-700'
                                         }`}>{modalRiskSeverity}</Badge>
+                                    </div>
+                                    <div>
+                                        <span className="text-zinc-500 text-[10px] block">Statut du Risque</span>
+                                        <Badge variant="outline" className={`font-bold capitalize ${
+                                            modalRiskStatus === 'resolved' ? 'bg-emerald-950/20 text-emerald-400 border-emerald-800/40' :
+                                            'bg-purple-950/20 text-purple-400 border-purple-800/40'
+                                        }`}>{modalRiskStatus === 'resolved' ? 'Résolu' : 'Actif'}</Badge>
                                     </div>
                                     <div>
                                         <span className="text-zinc-500 text-[10px] block">Copropriété</span>
@@ -3018,6 +3098,13 @@ export function OneOnOneDetailView({
                                     <span className="text-zinc-500 text-[10px] block">Description du risque</span>
                                     <p className="text-zinc-300 whitespace-pre-wrap leading-relaxed">{modalRiskDesc || "Aucune description."}</p>
                                 </div>
+
+                                {modalRiskStatus === 'resolved' && (
+                                    <div className="space-y-1 bg-zinc-950/30 p-3 border border-zinc-900 rounded-xl">
+                                        <span className="text-zinc-500 text-[10px] block">Notes de Résolution</span>
+                                        <p className="text-zinc-300 whitespace-pre-wrap leading-relaxed">{modalRiskResolutionNotes || "Aucune note."}</p>
+                                    </div>
+                                )}
 
                                 <div className="space-y-1 bg-zinc-950/30 p-3 border border-zinc-900 rounded-xl">
                                     <span className="text-zinc-500 text-[10px] block">Actions Futures (Mitigation)</span>
