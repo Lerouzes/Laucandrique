@@ -1636,9 +1636,27 @@ export async function createSyndicateAuditAction(data: {
     const { data: { user } } = await supabase.auth.getUser()
     const audited_by = user?.id || null
 
-    // Calculate overall health score dynamically
-    const sum = data.answers.reduce((acc, a) => acc + a.score, 0)
-    const maxPoints = data.answers.length > 0 ? data.answers.length * 5 : 1
+    const GRADED_KEYS = [
+        'contrats_condo_web',
+        'rapports_maintenance',
+        'proces_verbaux_ca',
+        'proces_verbaux_assemblees',
+        
+        'respect_franchise_assurance_last',
+        'fonds_prevoyance_last',
+        'qualite_budget_cree_last',
+        'respect_postes_budgetaires_score_last',
+        
+        'respect_franchise_assurance_curr',
+        'fonds_prevoyance_curr',
+        'qualite_budget_cree_curr',
+        'respect_postes_budgetaires_score_curr'
+    ]
+
+    // Calculate overall health score dynamically using only actual graded items that are not null/undefined
+    const gradedAnswers = data.answers.filter(a => GRADED_KEYS.includes(a.question_key) && a.score !== null && a.score !== undefined)
+    const sum = gradedAnswers.reduce((acc, a) => acc + a.score, 0)
+    const maxPoints = gradedAnswers.length > 0 ? gradedAnswers.length * 5 : 1
     const health_score = Math.round((sum / maxPoints) * 100)
 
     const { data: audit, error: err } = await supabase
@@ -2792,9 +2810,27 @@ export async function updateSyndicateAuditAction(id: string, data: {
         throw new Error("Sécurité : Seul le rôle Master peut modifier un audit.")
     }
 
-    // Calculate overall health score dynamically
-    const sum = data.answers.reduce((acc, a) => acc + a.score, 0)
-    const maxPoints = data.answers.length > 0 ? data.answers.length * 5 : 1
+    const GRADED_KEYS = [
+        'contrats_condo_web',
+        'rapports_maintenance',
+        'proces_verbaux_ca',
+        'proces_verbaux_assemblees',
+        
+        'respect_franchise_assurance_last',
+        'fonds_prevoyance_last',
+        'qualite_budget_cree_last',
+        'respect_postes_budgetaires_score_last',
+        
+        'respect_franchise_assurance_curr',
+        'fonds_prevoyance_curr',
+        'qualite_budget_cree_curr',
+        'respect_postes_budgetaires_score_curr'
+    ]
+
+    // Calculate overall health score dynamically using only actual graded items that are not null/undefined
+    const gradedAnswers = data.answers.filter(a => GRADED_KEYS.includes(a.question_key) && a.score !== null && a.score !== undefined)
+    const sum = gradedAnswers.reduce((acc, a) => acc + a.score, 0)
+    const maxPoints = gradedAnswers.length > 0 ? gradedAnswers.length * 5 : 1
     const health_score = Math.round((sum / maxPoints) * 100)
 
     const { error: err } = await supabase
@@ -2853,6 +2889,9 @@ export async function saveSyndicateWorkloadAction(data: {
     month: number | null
     tasks_count: number | null
     comms_count: number | null
+    syndicate_comms_count?: number | null
+    manager_comms_count?: number | null
+    board_meetings_count?: number | null
 }) {
     const supabase = await createClient()
 
@@ -2862,6 +2901,9 @@ export async function saveSyndicateWorkloadAction(data: {
         month: data.month,
         tasks_count: data.tasks_count,
         comms_count: data.comms_count,
+        syndicate_comms_count: data.syndicate_comms_count || null,
+        manager_comms_count: data.manager_comms_count || null,
+        board_meetings_count: data.board_meetings_count || null,
         updated_at: new Date().toISOString()
     }
 
@@ -2891,6 +2933,9 @@ export async function saveSyndicateWorkloadAction(data: {
                 .update({
                     tasks_count: data.tasks_count,
                     comms_count: data.comms_count,
+                    syndicate_comms_count: data.syndicate_comms_count || null,
+                    manager_comms_count: data.manager_comms_count || null,
+                    board_meetings_count: data.board_meetings_count || null,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', existing.id)
@@ -2937,6 +2982,78 @@ export async function deleteSyndicateWorkloadAction(id: string) {
     }
 
     revalidatePath('/clients')
+    return { success: true }
+}
+
+export async function getSyndicateTasksAction(clientId: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('syndicate_tasks')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('created_date', { ascending: false })
+
+    if (error) {
+        console.error("Error fetching syndicate tasks:", error.message)
+        return []
+    }
+    return data || []
+}
+
+export async function saveSyndicateTaskAction(data: {
+    id?: string
+    client_id: string
+    manager_id?: string | null
+    title: string
+    category?: string | null
+    status?: 'open' | 'completed' | 'late'
+    created_date?: string
+    due_date?: string | null
+}) {
+    const supabase = await createClient()
+
+    const payload: any = {
+        client_id: data.client_id,
+        manager_id: data.manager_id || null,
+        title: data.title,
+        category: data.category || null,
+        status: data.status || 'late',
+        due_date: data.due_date || null
+    }
+
+    if (data.created_date) {
+        payload.created_date = data.created_date
+    }
+
+    if (data.id) {
+        payload.id = data.id
+        payload.updated_at = new Date().toISOString()
+        const { data: res, error } = await supabase
+            .from('syndicate_tasks')
+            .upsert(payload)
+            .select()
+            .single()
+        if (error) throw new Error(error.message)
+        return res
+    } else {
+        const { data: res, error } = await supabase
+            .from('syndicate_tasks')
+            .insert(payload)
+            .select()
+            .single()
+        if (error) throw new Error(error.message)
+        return res
+    }
+}
+
+export async function deleteSyndicateTaskAction(id: string) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('syndicate_tasks')
+        .delete()
+        .eq('id', id)
+
+    if (error) throw new Error(error.message)
     return { success: true }
 }
 
@@ -3203,6 +3320,34 @@ export async function updateComplaintNotesAndStatusAction(
     revalidatePath('/team-management/complaints')
     if (comp?.manager_id) {
         revalidatePath(`/team-management/managers/${comp.manager_id}`)
+    }
+}
+
+export async function getManagerTaskCountsAction(managerId: string) {
+    const supabase = await createClient()
+    
+    // Get latest monthly workload for tasks count
+    const { data: workload } = await supabase
+        .from('manager_monthly_workload')
+        .select('open_tasks, closed_tasks')
+        .eq('manager_id', managerId)
+        .order('year_month', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+    // Get latest stats log for late tasks
+    const { data: log } = await supabase
+        .from('manager_stats_logs')
+        .select('value')
+        .eq('manager_id', managerId)
+        .eq('metric_type', 'late_tasks')
+        .order('logged_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+    return {
+        total_tasks: workload ? ((workload.open_tasks || 0) + (workload.closed_tasks || 0)) : 0,
+        late_tasks: log ? (log.value || 0) : 0
     }
 }
 

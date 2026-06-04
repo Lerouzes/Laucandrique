@@ -13,7 +13,7 @@ export default async function NewAuditPage() {
     // Fetch active syndicates (clients)
     let clientsQuery = supabase
         .from('clients')
-        .select('*')
+        .select('*, contracts(*), doors(id), managers(first_name, last_name)')
         .eq('status', 'active')
 
     if (context.teamId) {

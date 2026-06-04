@@ -9,7 +9,11 @@ import {
     saveSyndicateWorkloadAction, 
     getSyndicateWorkloadAction, 
     getClientHistoryAction,
-    deleteSyndicateWorkloadAction
+    deleteSyndicateWorkloadAction,
+    getSyndicateTasksAction,
+    saveSyndicateTaskAction,
+    deleteSyndicateTaskAction,
+    getManagerTaskCountsAction
 } from '@/actions/team-management'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,6 +21,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import { 
     ClipboardCheck, 
     ShieldAlert, 
@@ -32,31 +37,62 @@ import {
     ChevronDown,
     ChevronUp,
     Trash2,
-    ArrowLeft
+    ArrowLeft,
+    Star
 } from 'lucide-react'
 import { SearchableClientSelect } from './SearchableClientSelect'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { toast } from 'sonner'
 
 const QUESTIONS = [
-    { key: 'registre_coproprietaires', category: 'governance', text: 'Registre des documents complets' },
-    { key: 'convocations_assemblee', category: 'governance', text: 'Convocations d\'assemblées conformes' },
-    { key: 'proces_verbaux', category: 'governance', text: 'Procès-verbaux rédigés et archivés' },
-    { key: 'contrats_fournisseurs', category: 'governance', text: 'Contrats de fournisseurs signés et classés' },
+    // Governance questions (out of 5)
+    { key: 'contrats_condo_web', category: 'governance', text: 'Tous les contrats sont-ils sur Condo Web ?' },
+    { key: 'rapports_maintenance', category: 'governance', text: 'Tous les rapports de Laucandrique Maintenance sont-ils présents ?' },
+    { key: 'proces_verbaux_ca', category: 'governance', text: 'Les procès-verbaux des CA sont-ils présents ?' },
+    { key: 'proces_verbaux_assemblees', category: 'governance', text: 'Les procès-verbaux des assemblées sont-ils présents ?' },
     
-    { key: 'budget_annuel', category: 'financial', text: 'Budget annuel voté et respecté' },
-    { key: 'fonds_prevoyance', category: 'financial', text: 'Fonds de prévoyance (étude + cotisations) conforme' },
-    { key: 'qualite_budget_cree', category: 'financial', text: 'Qualité du budget créé' }
+    // Financial questions (out of 5) for Last Year
+    { key: 'respect_franchise_assurance_last', category: 'financial_last', text: 'Respect de la franchise d\'assurance basée sur le budget' },
+    { key: 'fonds_prevoyance_last', category: 'financial_last', text: 'Fonds de prévoyance (étude + cotisations) conforme' },
+    { key: 'qualite_budget_cree_last', category: 'financial_last', text: 'Qualité du budget créé' },
+    
+    // Financial questions (out of 5) for Current Year
+    { key: 'respect_franchise_assurance_curr', category: 'financial_curr', text: 'Respect de la franchise d\'assurance basée sur le budget' },
+    { key: 'fonds_prevoyance_curr', category: 'financial_curr', text: 'Fonds de prévoyance (étude + cotisations) conforme' },
+    { key: 'qualite_budget_cree_curr', category: 'financial_curr', text: 'Qualité du budget créé' },
+
+    // Financial calculations keys (so they are automatically managed in state)
+    { key: 'financial_year_target_last', category: 'financial_meta', text: 'Année ciblée' },
+    { key: 'financial_year_target_curr', category: 'financial_meta', text: 'Année ciblée' },
+    
+    { key: 'respect_postes_budgetaires_score_last', category: 'financial_meta', text: 'Score respect postes budgetaires' },
+    { key: 'respect_postes_budgetaires_score_curr', category: 'financial_meta', text: 'Score respect postes budgetaires' },
+    
+    { key: 'total_budget_items_last', category: 'financial_meta', text: 'Postes budgétaires totaux' },
+    { key: 'total_budget_items_curr', category: 'financial_meta', text: 'Postes budgétaires totaux' },
+    
+    { key: 'exceeded_budget_items_last', category: 'financial_meta', text: 'Postes budgétaires dépassés' },
+    { key: 'exceeded_budget_items_curr', category: 'financial_meta', text: 'Postes budgétaires dépassés' },
+    
+    { key: 'unrealized_budget_items_last', category: 'financial_meta', text: 'Projets non réalisés' },
+    { key: 'unrealized_budget_items_curr', category: 'financial_meta', text: 'Projets non réalisés' },
+    
+    { key: 'unplanned_budget_items_last', category: 'financial_meta', text: 'Postes non prévus' },
+    { key: 'unplanned_budget_items_curr', category: 'financial_meta', text: 'Postes non prévus' }
 ]
 
 const DEFAULT_DESCRIPTIONS: Record<string, string> = {
-    registre_coproprietaires: 'Vérifier que les documents juridiques, registres de copropriété, procès-verbaux et règlements sont complets.',
-    convocations_assemblee: 'Vérifier que les avis de convocation et procès-verbaux d\'assemblées sont conformes aux délais légaux.',
-    proces_verbaux: 'S\'assurer que les procès-verbaux des assemblées et réunions de CA sont signés, archivés et à jour.',
-    contrats_fournisseurs: 'Contrôler la signature, l\'archivage et le classement de tous les contrats de fournisseurs.',
-    budget_annuel: 'Valider que le budget de fonctionnement annuel est voté en assemblée générale et respecté.',
-    fonds_prevoyance: 'S\'assurer de la conformité de l\'étude du fonds de prévoyance et du versement régulier des cotisations.',
-    qualite_budget_cree: 'Évaluer la précision, la cohérence et la qualité générale du budget annuel produit.'
+    contrats_condo_web: 'Vérifier si tous les contrats de fournisseurs et de services sont téléversés et accessibles sur Condo Web.',
+    rapports_maintenance: 'S\'assurer que tous les rapports de visite et d\'entretien de Laucandrique Maintenance sont archivés.',
+    proces_verbaux_ca: 'Vérifier la présence et le classement des procès-verbaux pour chaque réunion du conseil d\'administration.',
+    proces_verbaux_assemblees: 'Vérifier la présence, l\'archivage et la conformité des procès-verbaux d\'assemblées générales.',
+    
+    respect_franchise_assurance_last: 'S\'assurer que la franchise d\'assurance est respectée sur la base du budget voté.',
+    respect_franchise_assurance_curr: 'S\'assurer que la franchise d\'assurance est respectée sur la base du budget voté.',
+    fonds_prevoyance_last: 'S\'assurer de la conformité de l\'étude du fonds de prévoyance et du versement régulier des cotisations.',
+    fonds_prevoyance_curr: 'S\'assurer de la conformité de l\'étude du fonds de prévoyance et du versement régulier des cotisations.',
+    qualite_budget_cree_last: 'Évaluer la précision, la cohérence et la qualité générale du budget annuel produit.',
+    qualite_budget_cree_curr: 'Évaluer la précision, la cohérence et la qualité générale du budget annuel produit.'
 }
 
 const MONTHS = [
@@ -100,6 +136,8 @@ export function NewAuditForm({
         sdc: c.full_name
     }))
 
+    const activeClientObj = clients.find(c => c.id === clientId)
+
     // Map custom configs to a lookup record
     const descriptionsMap: Record<string, string> = {
         ...DEFAULT_DESCRIPTIONS,
@@ -108,7 +146,16 @@ export function NewAuditForm({
     
     // Scores and individual notes for the questions
     const [scores, setScores] = useState<Record<string, number>>(() => {
-        const base: Record<string, number> = QUESTIONS.reduce((acc, q) => ({ ...acc, [q.key]: 3 }), {})
+        const base: Record<string, number> = QUESTIONS.reduce((acc, q) => {
+            let defVal = 3
+            if (q.key.includes('total_budget_items')) defVal = 0
+            else if (q.key.includes('exceeded_budget_items')) defVal = 0
+            else if (q.key.includes('unrealized_budget_items')) defVal = 0
+            else if (q.key.includes('unplanned_budget_items')) defVal = 0
+            else if (q.key === 'financial_year_target_last') defVal = new Date().getFullYear() - 1
+            else if (q.key === 'financial_year_target_curr') defVal = new Date().getFullYear()
+            return { ...acc, [q.key]: defVal }
+        }, {})
         if (initialAnswers && initialAnswers.length > 0) {
             initialAnswers.forEach(ans => {
                 base[ans.question_key] = ans.score
@@ -116,6 +163,7 @@ export function NewAuditForm({
         }
         return base
     })
+    
     const [qNotes, setQNotes] = useState<Record<string, string>>(() => {
         const base: Record<string, string> = QUESTIONS.reduce((acc, q) => ({ ...acc, [q.key]: '' }), {})
         if (initialAnswers && initialAnswers.length > 0) {
@@ -126,12 +174,17 @@ export function NewAuditForm({
         return base
     })
 
-    // History and workload state
+    // History, tasks and workload state
     const [clientHistory, setClientHistory] = useState<{ complaints: any[], audits: any[] }>({
         complaints: [],
         audits: []
     })
     const [savedWorkloads, setSavedWorkloads] = useState<any[]>([])
+    const [syndicateTasks, setSyndicateTasks] = useState<any[]>([])
+    const [managerTaskCounts, setManagerTaskCounts] = useState<{ total_tasks: number, late_tasks: number }>({
+        total_tasks: 0,
+        late_tasks: 0
+    })
     const [loadingHistory, setLoadingHistory] = useState(false)
     const [activeComplaint, setActiveComplaint] = useState<any | null>(null)
 
@@ -141,43 +194,91 @@ export function NewAuditForm({
     const [workloadMonth, setWorkloadMonth] = useState(new Date().getMonth() + 1)
     const [tasksCount, setTasksCount] = useState<string>('')
     const [commsCount, setCommsCount] = useState<string>('')
+    
+    // New workload fields
+    const [syndicateCommsCount, setSyndicateCommsCount] = useState<string>('')
+    const [managerCommsCount, setManagerCommsCount] = useState<string>('')
+    const [boardMeetingsCount, setBoardMeetingsCount] = useState<string>('')
+
     const [savingWorkload, setSavingWorkload] = useState(false)
     const [showWorkloadForm, setShowWorkloadForm] = useState(false)
     const [workloadToDelete, setWorkloadToDelete] = useState<string | null>(null)
 
-    // Fetch complaints, past audits, and workload details on client change
+    // Inline task form state
+    const [addingTask, setAddingTask] = useState(false)
+    const [newTaskTitle, setNewTaskTitle] = useState('')
+    const [newTaskCategory, setNewTaskCategory] = useState('Opérations')
+    const [newTaskCreatedDate, setNewTaskCreatedDate] = useState(new Date().toISOString().substring(0, 10))
+
+    // Fetch complaints, past audits, workload details and tasks on client change
     useEffect(() => {
         if (!clientId) return
         setLoadingHistory(true)
-        Promise.all([
+        
+        const clientObj = clients.find(c => c.id === clientId)
+        const managerId = clientObj?.manager_id
+
+        const promises: Promise<any>[] = [
             getClientHistoryAction(clientId),
-            getSyndicateWorkloadAction(clientId)
-        ]).then(([history, workloads]) => {
+            getSyndicateWorkloadAction(clientId),
+            getSyndicateTasksAction(clientId)
+        ]
+
+        if (managerId) {
+            promises.push(getManagerTaskCountsAction(managerId))
+        } else {
+            promises.push(Promise.resolve({ total_tasks: 0, late_tasks: 0 }))
+        }
+
+        Promise.all(promises).then(([history, workloads, tasks, mgrCounts]) => {
             setClientHistory({
                 complaints: history.complaints,
-                audits: history.audits.filter(a => a.id !== initialAudit?.id)
+                audits: history.audits.filter((a: any) => a.id !== initialAudit?.id)
             })
             setSavedWorkloads(workloads || [])
+            setSyndicateTasks(tasks || [])
+            setManagerTaskCounts(mgrCounts || { total_tasks: 0, late_tasks: 0 })
         }).catch(err => {
             console.error("Error loading client details:", err)
         }).finally(() => {
             setLoadingHistory(false)
         })
-    }, [clientId, initialAudit])
+    }, [clientId, initialAudit, clients])
 
     const handleScoreChange = (key: string, val: number) => {
-        setScores({ ...scores, [key]: val })
+        setScores(prev => ({ ...prev, [key]: val }))
     }
 
     const handleNoteChange = (key: string, val: string) => {
-        setQNotes({ ...qNotes, [key]: val })
+        setQNotes(prev => ({ ...prev, [key]: val }))
     }
 
-    // Realtime Calculations
-    const totalPoints = Object.values(scores).reduce((sum, s) => sum + s, 0)
-    // Dynamic max points: questions count * 5
-    const maxPoints = QUESTIONS.length * 5
-    const healthScore = Math.round((totalPoints / maxPoints) * 100)
+    // Graded questions calculation
+    const GRADED_KEYS = [
+        'contrats_condo_web',
+        'rapports_maintenance',
+        'proces_verbaux_ca',
+        'proces_verbaux_assemblees',
+        
+        'respect_franchise_assurance_last',
+        'fonds_prevoyance_last',
+        'qualite_budget_cree_last',
+        'respect_postes_budgetaires_score_last',
+        
+        'respect_franchise_assurance_curr',
+        'fonds_prevoyance_curr',
+        'qualite_budget_cree_curr',
+        'respect_postes_budgetaires_score_curr'
+    ]
+
+    const getHealthScore = () => {
+        const gradedKeysPresent = GRADED_KEYS.filter(k => scores[k] !== undefined && scores[k] !== null)
+        const sum = gradedKeysPresent.reduce((acc, k) => acc + (scores[k] || 0), 0)
+        const maxPoints = gradedKeysPresent.length > 0 ? gradedKeysPresent.length * 5 : 1
+        return Math.round((sum / maxPoints) * 100)
+    }
+
+    const healthScore = getHealthScore()
 
     const getHealthRating = (score: number) => {
         if (score >= 90) return { label: 'Excellent', style: 'bg-emerald-500/20 text-emerald-400 border-emerald-800/40' }
@@ -200,13 +301,19 @@ export function NewAuditForm({
                 year: Number(workloadYear),
                 month: workloadType === 'monthly' ? Number(workloadMonth) : null,
                 tasks_count: tasksCount === '' ? null : Number(tasksCount),
-                comms_count: commsCount === '' ? null : Number(commsCount)
+                comms_count: commsCount === '' ? null : Number(commsCount),
+                syndicate_comms_count: syndicateCommsCount === '' ? null : Number(syndicateCommsCount),
+                manager_comms_count: managerCommsCount === '' ? null : Number(managerCommsCount),
+                board_meetings_count: boardMeetingsCount === '' ? null : Number(boardMeetingsCount)
             })
             // Refresh saved workloads list
             const workloads = await getSyndicateWorkloadAction(clientId)
             setSavedWorkloads(workloads || [])
             setTasksCount('')
             setCommsCount('')
+            setSyndicateCommsCount('')
+            setManagerCommsCount('')
+            setBoardMeetingsCount('')
             toast.success('Volume de travail enregistré avec succès.')
         } catch (err) {
             toast.error('Erreur lors de l\'enregistrement du volume de travail : ' + (err as Error).message)
@@ -232,6 +339,49 @@ export function NewAuditForm({
         }
     }
 
+    const handleAddTask = async () => {
+        if (!newTaskTitle.trim()) {
+            toast.error("Veuillez saisir un intitulé pour la tâche.")
+            return
+        }
+        setSavingWorkload(true)
+        try {
+            const managerId = activeClientObj?.manager_id
+            await saveSyndicateTaskAction({
+                client_id: clientId,
+                manager_id: managerId,
+                title: newTaskTitle.trim(),
+                category: newTaskCategory,
+                status: 'late',
+                created_date: newTaskCreatedDate
+            })
+
+            const tasks = await getSyndicateTasksAction(clientId)
+            setSyndicateTasks(tasks || [])
+            setNewTaskTitle('')
+            setAddingTask(false)
+            toast.success("Tâche ajoutée avec succès.")
+        } catch (err: any) {
+            toast.error("Erreur lors de la création de la tâche: " + err.message)
+        } finally {
+            setSavingWorkload(false)
+        }
+    }
+
+    const handleDeleteTask = async (taskId: string) => {
+        setSavingWorkload(true)
+        try {
+            await deleteSyndicateTaskAction(taskId)
+            const tasks = await getSyndicateTasksAction(clientId)
+            setSyndicateTasks(tasks || [])
+            toast.success("Tâche supprimée.")
+        } catch (err: any) {
+            toast.error("Erreur lors de la suppression de la tâche: " + err.message)
+        } finally {
+            setSavingWorkload(false)
+        }
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!clientId) {
@@ -241,12 +391,19 @@ export function NewAuditForm({
 
         setLoading(true)
         try {
-            const answers = QUESTIONS.map(q => ({
-                category: q.category as 'governance' | 'financial' | 'operations',
-                question_key: q.key,
-                score: scores[q.key],
-                note: qNotes[q.key]
-            }))
+            const answers = QUESTIONS.map(q => {
+                let dbCategory: 'governance' | 'financial' | 'operations' = 'governance'
+                if (q.category === 'governance') dbCategory = 'governance'
+                else if (q.category.startsWith('financial')) dbCategory = 'financial'
+                else dbCategory = 'operations'
+
+                return {
+                    category: dbCategory,
+                    question_key: q.key,
+                    score: scores[q.key] !== undefined ? scores[q.key] : 0,
+                    note: qNotes[q.key] || undefined
+                }
+            })
 
             if (isEditMode) {
                 await updateSyndicateAuditAction(initialAudit.id, {
@@ -278,7 +435,7 @@ export function NewAuditForm({
             <div className="mb-2">
                 <Link
                     href="/team-management/audits"
-                    className="text-xxs text-zinc-500 hover:text-zinc-300 font-bold flex items-center gap-1 w-fit transition-colors"
+                    className="text-xxs text-zinc-500 hover:text-zinc-300 font-bold flex items-center gap-1 w-fit transition-colors animate-fade-in"
                 >
                     <ArrowLeft className="h-3 w-3" />
                     Retour aux Audits
@@ -315,7 +472,7 @@ export function NewAuditForm({
                     <Button 
                         type="submit"
                         disabled={loading || !clientId}
-                        className="bg-purple-600 hover:bg-purple-700 text-white text-xxs h-9 px-4 rounded-lg font-bold flex items-center gap-1.5 shadow-lg transition-all"
+                        className="bg-purple-600 hover:bg-purple-700 text-white text-xxs h-9 px-4 rounded-lg font-bold flex items-center gap-1.5 shadow-lg transition-all cursor-pointer"
                     >
                         <Save className="h-3.5 w-3.5" />
                         {isEditMode ? "Mettre à jour l'Audit" : "Enregistrer l'Audit"}
@@ -357,32 +514,231 @@ export function NewAuditForm({
                                         onChange={(e) => setNotes(e.target.value)} 
                                         placeholder="Observations globales qualitatives sur ce dossier (plusieurs paragraphes acceptés)..." 
                                         rows={3}
-                                        className="bg-[#121318] border-zinc-850 text-xs text-zinc-200 focus-visible:ring-purple-600 resize-y" 
+                                        className="bg-[#121318] border-zinc-850 text-xs text-zinc-200 focus-visible:ring-purple-650 resize-y font-normal" 
                                     />
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Questions Categories */}
-                    {(['governance', 'financial'] as const).map(cat => {
-                        const catQuestions = QUESTIONS.filter(q => q.category === cat)
-                        if (catQuestions.length === 0) return null
-                        const catTitle = 
-                            cat === 'governance' ? 'Gouvernance & Conformité Juridique' : 'Santé Financière & Budgets'
+                    {/* Section 1: Governance Questions */}
+                    <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                        <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10">
+                            <CardTitle className="text-xs font-bold text-white uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                                <BookOpen className="h-4 w-4 text-purple-400" />
+                                Gouvernance & Conformité Juridique
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4 space-y-5">
+                            {QUESTIONS.filter(q => q.category === 'governance').map(q => (
+                                <div key={q.key} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border-b border-zinc-900 pb-4 last:border-b-0 last:pb-0">
+                                    {/* Question Text */}
+                                    <div className="md:col-span-4 text-xxs font-semibold text-zinc-200 flex items-center gap-1.5 pt-2">
+                                        <span>{q.text}</span>
+                                        {descriptionsMap[q.key] && (
+                                            <div className="relative group cursor-pointer inline-flex items-center">
+                                                <HelpCircle className="h-3.5 w-3.5 text-zinc-500 hover:text-purple-400 transition-colors shrink-0" />
+                                                <div className="absolute left-0 bottom-6 hidden group-hover:block z-50 w-64 p-2.5 bg-[#121318] border border-zinc-800 rounded-lg text-[10px] text-zinc-400 shadow-2xl pointer-events-none font-normal leading-relaxed">
+                                                    {descriptionsMap[q.key]}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {/* Score Selector */}
+                                    <div className="md:col-span-3">
+                                        <Label className="text-[8px] text-zinc-500 md:hidden block mb-1">Cote d'évaluation</Label>
+                                        <select 
+                                            value={scores[q.key] !== undefined ? scores[q.key] : 3}
+                                            onChange={(e) => handleScoreChange(q.key, Number(e.target.value))}
+                                            className="w-full bg-[#121318] border border-zinc-850 rounded-lg py-1.5 px-2.5 text-zinc-100 outline-none focus:border-purple-600 h-9 text-xs font-semibold"
+                                        >
+                                            <option value="5">5/5 - Parfait / Conforme</option>
+                                            <option value="4">4/5 - Bon / Dérives mineures</option>
+                                            <option value="3">3/5 - Moyen / Suivi régulier requis</option>
+                                            <option value="2">2/5 - Insuffisant / Dérives notables</option>
+                                            <option value="1">1/5 - Urgent / Déficiences majeures</option>
+                                            <option value="0">0/5 - Critique / Absence totale</option>
+                                        </select>
+                                    </div>
+                                    {/* Comment field */}
+                                    <div className="md:col-span-5">
+                                        <Label className="text-[8px] text-zinc-500 md:hidden block mb-1">Remarques</Label>
+                                        <Textarea 
+                                            value={qNotes[q.key] || ''}
+                                            onChange={(e) => handleNoteChange(q.key, e.target.value)}
+                                            placeholder="Remarque ou observation spécifique à ce point..." 
+                                            rows={2}
+                                            className="bg-[#121318] border-zinc-850 text-xs text-zinc-200 focus-visible:ring-purple-650 resize-y min-h-[50px] py-1.5" 
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
 
-                        return (
-                            <Card key={cat} className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                                <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10">
-                                    <CardTitle className="text-xs font-bold text-white uppercase tracking-wider text-purple-400">
-                                        {catTitle}
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="pt-4 space-y-5">
-                                    {catQuestions.map(q => (
-                                        <div key={q.key} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border-b border-zinc-900 pb-4 last:border-b-0 last:pb-0">
-                                            {/* Question Text */}
-                                            <div className="md:col-span-4 text-xxs font-semibold text-zinc-200 flex items-center gap-1.5 pt-2">
+                    {/* Section 2: Financial Questions (Stacked Last Year & Current Year) */}
+                    <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                        <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10">
+                            <CardTitle className="text-xs font-bold text-white uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                                <Activity className="h-4 w-4 text-purple-400" />
+                                Santé Financière & Budgets
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4 space-y-8">
+                            {/* LAST YEAR FINANCIAL ANALYSES */}
+                            <div className="space-y-4 p-4 bg-zinc-900/35 border border-zinc-850/80 rounded-2xl">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-900 pb-3 gap-2">
+                                    <h4 className="text-xxs font-bold text-white uppercase tracking-wider text-purple-400">
+                                        Dernière Année Financière (Last Year)
+                                    </h4>
+                                    <div className="flex items-center gap-2">
+                                        <Label className="text-zinc-500 text-[9px] uppercase font-bold">Année</Label>
+                                        <Input 
+                                            type="number"
+                                            value={scores.financial_year_target_last || (new Date().getFullYear() - 1)}
+                                            onChange={(e) => handleScoreChange('financial_year_target_last', Number(e.target.value))}
+                                            placeholder="2025"
+                                            className="bg-[#121318] border-zinc-850 h-7 text-xxs w-16"
+                                        />
+                                        <Label className="text-zinc-500 text-[9px] uppercase font-bold ml-1">Vérifié le</Label>
+                                        <Input 
+                                            type="date"
+                                            value={qNotes.financial_year_target_last || ''}
+                                            onChange={(e) => handleNoteChange('financial_year_target_last', e.target.value)}
+                                            className="bg-[#121318] border-zinc-850 h-7 text-xxs w-28"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Budget count parameters */}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-zinc-950/20 p-3 rounded-lg border border-zinc-900">
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500 text-[9px]">Postes budgétaires totaux</Label>
+                                        <Input 
+                                            type="number"
+                                            min="0"
+                                            value={scores.total_budget_items_last || 0}
+                                            onChange={(e) => handleScoreChange('total_budget_items_last', Number(e.target.value))}
+                                            className="bg-[#121318] border-zinc-850 h-8 text-xs font-semibold text-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500 text-[9px]">Postes dépassés (excès +5% à 10%)</Label>
+                                        <Input 
+                                            type="number"
+                                            min="0"
+                                            max={scores.total_budget_items_last || 0}
+                                            value={scores.exceeded_budget_items_last || 0}
+                                            onChange={(e) => handleScoreChange('exceeded_budget_items_last', Number(e.target.value))}
+                                            className="bg-[#121318] border-zinc-850 h-8 text-xs font-semibold text-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500 text-[9px]">Projets non réalisés</Label>
+                                        <Input 
+                                            type="number"
+                                            min="0"
+                                            max={scores.total_budget_items_last || 0}
+                                            value={scores.unrealized_budget_items_last || 0}
+                                            onChange={(e) => handleScoreChange('unrealized_budget_items_last', Number(e.target.value))}
+                                            className="bg-[#121318] border-zinc-850 h-8 text-xs font-semibold text-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500 text-[9px]">Postes non prévus</Label>
+                                        <Input 
+                                            type="number"
+                                            min="0"
+                                            value={scores.unplanned_budget_items_last || 0}
+                                            onChange={(e) => handleScoreChange('unplanned_budget_items_last', Number(e.target.value))}
+                                            className="bg-[#121318] border-zinc-850 h-8 text-xs font-semibold text-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Live stats */}
+                                {(() => {
+                                    const T = scores.total_budget_items_last || 0
+                                    const E = scores.exceeded_budget_items_last || 0
+                                    const U = scores.unrealized_budget_items_last || 0
+                                    const compliance = T > 0 ? Math.max(0, Math.round(((T - E - U) / T) * 100)) : 100
+                                    
+                                    let autoRating = 3
+                                    if (T > 0) {
+                                        if (compliance === 100) autoRating = 5
+                                        else if (compliance >= 90) autoRating = 4
+                                        else if (compliance >= 80) autoRating = 3
+                                        else if (compliance >= 70) autoRating = 2
+                                        else if (compliance >= 50) autoRating = 1
+                                        else autoRating = 0
+                                    }
+
+                                    if (scores.respect_postes_budgetaires_score_last !== autoRating) {
+                                        setTimeout(() => handleScoreChange('respect_postes_budgetaires_score_last', autoRating), 0)
+                                    }
+
+                                    return (
+                                        <div className="flex justify-between items-center bg-zinc-950/40 p-2.5 rounded-lg border border-zinc-900 text-xxs">
+                                            <div className="flex items-center gap-4">
+                                                <div>
+                                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Taux de respect du budget</span>
+                                                    <strong className="text-sm font-extrabold text-purple-400 mt-0.5 block">{compliance}%</strong>
+                                                </div>
+                                                <div>
+                                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Cote automatique</span>
+                                                    <strong className="text-sm font-extrabold text-zinc-200 mt-0.5 block">{autoRating}/5</strong>
+                                                </div>
+                                            </div>
+                                            <div className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">
+                                                Respect des postes budgétaires (+5% à 10% acceptable)
+                                            </div>
+                                        </div>
+                                    )
+                                })()}
+
+                                {/* Comments for last year metrics */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500 text-[9px]">Notes - Respect postes budgétaires</Label>
+                                        <Textarea 
+                                            value={qNotes.exceeded_budget_items_last || ''}
+                                            onChange={(e) => handleNoteChange('exceeded_budget_items_last', e.target.value)}
+                                            placeholder="Commentaires sur les dépassements..."
+                                            rows={2}
+                                            className="bg-[#121318] border-zinc-850 text-xxs text-zinc-200 resize-none font-normal"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500 text-[9px]">Notes - Réalisation projets</Label>
+                                        <Textarea 
+                                            value={qNotes.unrealized_budget_items_last || ''}
+                                            onChange={(e) => handleNoteChange('unrealized_budget_items_last', e.target.value)}
+                                            placeholder="Notes sur les projets budgétés non réalisés..."
+                                            rows={2}
+                                            className="bg-[#121318] border-zinc-850 text-xxs text-zinc-200 resize-none font-normal"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500 text-[9px]">Notes - Postes imprévus</Label>
+                                        <Textarea 
+                                            value={qNotes.unplanned_budget_items_last || ''}
+                                            onChange={(e) => handleNoteChange('unplanned_budget_items_last', e.target.value)}
+                                            placeholder="Notes sur les postes imprévus..."
+                                            rows={2}
+                                            className="bg-[#121318] border-zinc-850 text-xxs text-zinc-200 resize-none font-normal"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Rest of standard graded questions */}
+                                <div className="space-y-4 pt-3 border-t border-zinc-900">
+                                    {[
+                                        { key: 'respect_franchise_assurance_last', text: 'Respect de la franchise d\'assurance basée sur le budget' },
+                                        { key: 'fonds_prevoyance_last', text: 'Fonds de prévoyance (étude + cotisations) conforme' },
+                                        { key: 'qualite_budget_cree_last', text: 'Qualité du budget créé' }
+                                    ].map(q => (
+                                        <div key={q.key} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border-b border-zinc-900 pb-3 last:border-b-0 last:pb-0">
+                                            <div className="md:col-span-4 text-xxs font-semibold text-zinc-200 pt-2 flex items-center gap-1.5">
                                                 <span>{q.text}</span>
                                                 {descriptionsMap[q.key] && (
                                                     <div className="relative group cursor-pointer inline-flex items-center">
@@ -393,11 +749,9 @@ export function NewAuditForm({
                                                     </div>
                                                 )}
                                             </div>
-                                            {/* Score Selector */}
                                             <div className="md:col-span-3">
-                                                <Label className="text-[8px] text-zinc-500 md:hidden block mb-1">Cote d'évaluation</Label>
                                                 <select 
-                                                    value={scores[q.key]}
+                                                    value={scores[q.key] !== undefined ? scores[q.key] : 3}
                                                     onChange={(e) => handleScoreChange(q.key, Number(e.target.value))}
                                                     className="w-full bg-[#121318] border border-zinc-850 rounded-lg py-1.5 px-2.5 text-zinc-100 outline-none focus:border-purple-600 h-9 text-xs font-semibold"
                                                 >
@@ -409,27 +763,415 @@ export function NewAuditForm({
                                                     <option value="0">0/5 - Critique / Absence totale</option>
                                                 </select>
                                             </div>
-                                            {/* Comment field (Textarea instead of input) */}
                                             <div className="md:col-span-5">
-                                                <Label className="text-[8px] text-zinc-500 md:hidden block mb-1">Remarques</Label>
                                                 <Textarea 
-                                                    value={qNotes[q.key]}
+                                                    value={qNotes[q.key] || ''}
                                                     onChange={(e) => handleNoteChange(q.key, e.target.value)}
-                                                    placeholder="Remarque ou observation spécifique à ce point..." 
+                                                    placeholder="Remarque spécifique..." 
                                                     rows={2}
-                                                    className="bg-[#121318] border-zinc-850 text-xs text-zinc-200 focus-visible:ring-purple-600 resize-y min-h-[50px] py-1.5" 
+                                                    className="bg-[#121318] border-zinc-850 text-xs text-zinc-200 focus-visible:ring-purple-650 min-h-[45px] py-1.5 font-normal" 
                                                 />
                                             </div>
                                         </div>
                                     ))}
-                                </CardContent>
-                            </Card>
-                        )
-                    })}
+                                </div>
+                            </div>
+
+                            {/* CURRENT YEAR FINANCIAL ANALYSES */}
+                            <div className="space-y-4 p-4 bg-zinc-900/35 border border-zinc-850/80 rounded-2xl">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-900 pb-3 gap-2">
+                                    <h4 className="text-xxs font-bold text-white uppercase tracking-wider text-purple-400">
+                                        Année Financière Courante (Current Year)
+                                    </h4>
+                                    <div className="flex items-center gap-2">
+                                        <Label className="text-zinc-500 text-[9px] uppercase font-bold">Année</Label>
+                                        <Input 
+                                            type="number"
+                                            value={scores.financial_year_target_curr || new Date().getFullYear()}
+                                            onChange={(e) => handleScoreChange('financial_year_target_curr', Number(e.target.value))}
+                                            placeholder="2026"
+                                            className="bg-[#121318] border-zinc-850 h-7 text-xxs w-16"
+                                        />
+                                        <Label className="text-zinc-500 text-[9px] uppercase font-bold ml-1">Vérifié le</Label>
+                                        <Input 
+                                            type="date"
+                                            value={qNotes.financial_year_target_curr || ''}
+                                            onChange={(e) => handleNoteChange('financial_year_target_curr', e.target.value)}
+                                            className="bg-[#121318] border-zinc-850 h-7 text-xxs w-28"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Budget count parameters */}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-zinc-950/20 p-3 rounded-lg border border-zinc-900">
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500 text-[9px]">Postes budgétaires totaux</Label>
+                                        <Input 
+                                            type="number"
+                                            min="0"
+                                            value={scores.total_budget_items_curr || 0}
+                                            onChange={(e) => handleScoreChange('total_budget_items_curr', Number(e.target.value))}
+                                            className="bg-[#121318] border-zinc-850 h-8 text-xs font-semibold text-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500 text-[9px]">Postes dépassés (excès +5% à 10%)</Label>
+                                        <Input 
+                                            type="number"
+                                            min="0"
+                                            max={scores.total_budget_items_curr || 0}
+                                            value={scores.exceeded_budget_items_curr || 0}
+                                            onChange={(e) => handleScoreChange('exceeded_budget_items_curr', Number(e.target.value))}
+                                            className="bg-[#121318] border-zinc-850 h-8 text-xs font-semibold text-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500 text-[9px]">Projets non réalisés</Label>
+                                        <Input 
+                                            type="number"
+                                            min="0"
+                                            max={scores.total_budget_items_curr || 0}
+                                            value={scores.unrealized_budget_items_curr || 0}
+                                            onChange={(e) => handleScoreChange('unrealized_budget_items_curr', Number(e.target.value))}
+                                            className="bg-[#121318] border-zinc-850 h-8 text-xs font-semibold text-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500 text-[9px]">Postes non prévus</Label>
+                                        <Input 
+                                            type="number"
+                                            min="0"
+                                            value={scores.unplanned_budget_items_curr || 0}
+                                            onChange={(e) => handleScoreChange('unplanned_budget_items_curr', Number(e.target.value))}
+                                            className="bg-[#121318] border-zinc-850 h-8 text-xs font-semibold text-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Live stats */}
+                                {(() => {
+                                    const T = scores.total_budget_items_curr || 0
+                                    const E = scores.exceeded_budget_items_curr || 0
+                                    const U = scores.unrealized_budget_items_curr || 0
+                                    const compliance = T > 0 ? Math.max(0, Math.round(((T - E - U) / T) * 100)) : 100
+                                    
+                                    let autoRating = 3
+                                    if (T > 0) {
+                                        if (compliance === 100) autoRating = 5
+                                        else if (compliance >= 90) autoRating = 4
+                                        else if (compliance >= 80) autoRating = 3
+                                        else if (compliance >= 70) autoRating = 2
+                                        else if (compliance >= 50) autoRating = 1
+                                        else autoRating = 0
+                                    }
+
+                                    if (scores.respect_postes_budgetaires_score_curr !== autoRating) {
+                                        setTimeout(() => handleScoreChange('respect_postes_budgetaires_score_curr', autoRating), 0)
+                                    }
+
+                                    return (
+                                        <div className="flex justify-between items-center bg-zinc-950/40 p-2.5 rounded-lg border border-zinc-900 text-xxs">
+                                            <div className="flex items-center gap-4">
+                                                <div>
+                                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Taux de respect du budget</span>
+                                                    <strong className="text-sm font-extrabold text-purple-400 mt-0.5 block">{compliance}%</strong>
+                                                </div>
+                                                <div>
+                                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Cote automatique</span>
+                                                    <strong className="text-sm font-extrabold text-zinc-200 mt-0.5 block">{autoRating}/5</strong>
+                                                </div>
+                                            </div>
+                                            <div className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">
+                                                Respect des postes budgétaires (+5% à 10% acceptable)
+                                            </div>
+                                        </div>
+                                    )
+                                })()}
+
+                                {/* Comments for current year metrics */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500 text-[9px]">Notes - Respect postes budgétaires</Label>
+                                        <Textarea 
+                                            value={qNotes.exceeded_budget_items_curr || ''}
+                                            onChange={(e) => handleNoteChange('exceeded_budget_items_curr', e.target.value)}
+                                            placeholder="Commentaires sur les dépassements..."
+                                            rows={2}
+                                            className="bg-[#121318] border-zinc-850 text-xxs text-zinc-200 resize-none font-normal"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500 text-[9px]">Notes - Réalisation projets</Label>
+                                        <Textarea 
+                                            value={qNotes.unrealized_budget_items_curr || ''}
+                                            onChange={(e) => handleNoteChange('unrealized_budget_items_curr', e.target.value)}
+                                            placeholder="Notes sur les projets budgétés non réalisés..."
+                                            rows={2}
+                                            className="bg-[#121318] border-zinc-850 text-xxs text-zinc-200 resize-none font-normal"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500 text-[9px]">Notes - Postes imprévus</Label>
+                                        <Textarea 
+                                            value={qNotes.unplanned_budget_items_curr || ''}
+                                            onChange={(e) => handleNoteChange('unplanned_budget_items_curr', e.target.value)}
+                                            placeholder="Notes sur les postes imprévus..."
+                                            rows={2}
+                                            className="bg-[#121318] border-zinc-850 text-xxs text-zinc-200 resize-none font-normal"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Rest of standard graded questions */}
+                                <div className="space-y-4 pt-3 border-t border-zinc-900">
+                                    {[
+                                        { key: 'respect_franchise_assurance_curr', text: 'Respect de la franchise d\'assurance basée sur le budget' },
+                                        { key: 'fonds_prevoyance_curr', text: 'Fonds de prévoyance (étude + cotisations) conforme' },
+                                        { key: 'qualite_budget_cree_curr', text: 'Qualité du budget créé' }
+                                    ].map(q => (
+                                        <div key={q.key} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border-b border-zinc-900 pb-3 last:border-b-0 last:pb-0">
+                                            <div className="md:col-span-4 text-xxs font-semibold text-zinc-200 pt-2 flex items-center gap-1.5">
+                                                <span>{q.text}</span>
+                                                {descriptionsMap[q.key] && (
+                                                    <div className="relative group cursor-pointer inline-flex items-center">
+                                                        <HelpCircle className="h-3.5 w-3.5 text-zinc-500 hover:text-purple-400 transition-colors shrink-0" />
+                                                        <div className="absolute left-0 bottom-6 hidden group-hover:block z-50 w-64 p-2.5 bg-[#121318] border border-zinc-800 rounded-lg text-[10px] text-zinc-400 shadow-2xl pointer-events-none font-normal leading-relaxed">
+                                                            {descriptionsMap[q.key]}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="md:col-span-3">
+                                                <select 
+                                                    value={scores[q.key] !== undefined ? scores[q.key] : 3}
+                                                    onChange={(e) => handleScoreChange(q.key, Number(e.target.value))}
+                                                    className="w-full bg-[#121318] border border-zinc-850 rounded-lg py-1.5 px-2.5 text-zinc-100 outline-none focus:border-purple-600 h-9 text-xs font-semibold"
+                                                >
+                                                    <option value="5">5/5 - Parfait / Conforme</option>
+                                                    <option value="4">4/5 - Bon / Dérives mineures</option>
+                                                    <option value="3">3/5 - Moyen / Suivi régulier requis</option>
+                                                    <option value="2">2/5 - Insuffisant / Dérives notables</option>
+                                                    <option value="1">1/5 - Urgent / Déficiences majeures</option>
+                                                    <option value="0">0/5 - Critique / Absence totale</option>
+                                                </select>
+                                            </div>
+                                            <div className="md:col-span-5">
+                                                <Textarea 
+                                                    value={qNotes[q.key] || ''}
+                                                    onChange={(e) => handleNoteChange(q.key, e.target.value)}
+                                                    placeholder="Remarque spécifique..." 
+                                                    rows={2}
+                                                    className="bg-[#121318] border-zinc-850 text-xs text-zinc-200 focus-visible:ring-purple-650 min-h-[45px] py-1.5 font-normal" 
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Section 3: Syndicate Tasks Checklist Section */}
+                    <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                        <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10">
+                            <CardTitle className="text-xs font-bold text-white uppercase tracking-wider text-purple-400 flex items-center gap-2">
+                                <ClipboardCheck className="h-4 w-4 text-purple-400" />
+                                Suivi des Tâches Opérationnelles
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4 space-y-4">
+                            {/* Manager overall metrics */}
+                            <div className="grid grid-cols-2 gap-4 bg-[#121318] p-3 rounded-lg border border-zinc-900 text-xxs">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-zinc-500 uppercase font-bold">Tâches totales du gestionnaire</span>
+                                    <strong className="text-sm font-extrabold text-zinc-100">{managerTaskCounts.total_tasks}</strong>
+                                </div>
+                                <div className="flex justify-between items-center border-l border-zinc-850 pl-4">
+                                    <span className="text-zinc-500 uppercase font-bold">Tâches en retard du gestionnaire</span>
+                                    <strong className="text-sm font-extrabold text-rose-455 text-rose-400">{managerTaskCounts.late_tasks}</strong>
+                                </div>
+                            </div>
+
+                            {/* List of late tasks for this syndicate specifically */}
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">
+                                        Tâches en retard du syndicat ({syndicateTasks.filter(t => t.status === 'late').length})
+                                    </span>
+                                    <Button 
+                                        type="button" 
+                                        onClick={() => setAddingTask(!addingTask)}
+                                        className="bg-purple-900/40 hover:bg-purple-800/40 text-purple-400 text-[9px] font-bold h-6 px-2.5 rounded border border-purple-800/40 cursor-pointer"
+                                    >
+                                        + Ajouter une tâche
+                                    </Button>
+                                </div>
+
+                                {/* Form to add a new task */}
+                                {addingTask && (
+                                    <div className="p-3 bg-[#121318] border border-zinc-850 rounded-lg space-y-3 text-xxs animate-in fade-in slide-in-from-top-1">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <div className="space-y-1">
+                                                <Label className="text-zinc-500">Intitulé de la tâche</Label>
+                                                <Input 
+                                                    placeholder="ex: Réparer la pompe"
+                                                    value={newTaskTitle}
+                                                    onChange={(e) => setNewTaskTitle(e.target.value)}
+                                                    className="bg-[#121318] border-zinc-850 h-8 text-xxs text-zinc-100"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-zinc-500">Catégorie</Label>
+                                                <select 
+                                                    value={newTaskCategory}
+                                                    onChange={(e) => setNewTaskCategory(e.target.value)}
+                                                    className="w-full bg-[#121318] border border-zinc-850 rounded p-1.5 text-white outline-none h-8 text-xxs font-semibold cursor-pointer"
+                                                >
+                                                    <option value="Gouvernance">Gouvernance</option>
+                                                    <option value="Financier">Financier</option>
+                                                    <option value="Opérations">Opérations</option>
+                                                    <option value="Entretien">Entretien</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-zinc-500">Date de création</Label>
+                                                <Input 
+                                                    type="date"
+                                                    value={newTaskCreatedDate}
+                                                    onChange={(e) => setNewTaskCreatedDate(e.target.value)}
+                                                    className="bg-[#121318] border-zinc-850 h-8 text-xxs text-zinc-100"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-end gap-2">
+                                            <Button 
+                                                type="button" 
+                                                onClick={() => setAddingTask(false)}
+                                                className="bg-transparent border border-zinc-800 text-zinc-400 text-[9px] font-bold h-7 px-3 rounded hover:bg-zinc-900 cursor-pointer"
+                                            >
+                                                Annuler
+                                            </Button>
+                                            <Button 
+                                                type="button" 
+                                                onClick={handleAddTask}
+                                                className="bg-purple-600 text-white text-[9px] font-bold h-7 px-3 rounded hover:bg-purple-700 cursor-pointer"
+                                            >
+                                                Enregistrer
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Syndicate tasks table list */}
+                                {syndicateTasks.length === 0 ? (
+                                    <p className="text-xxs italic text-zinc-500 text-center py-4 bg-zinc-950/20 border border-zinc-900 rounded-lg">
+                                        Aucune tâche en retard enregistrée pour ce syndicat.
+                                    </p>
+                                ) : (
+                                    <div className="overflow-x-auto border border-zinc-850 rounded-lg">
+                                        <table className="w-full text-left text-xxs text-zinc-300">
+                                            <thead className="bg-zinc-950/40 text-zinc-400 font-bold border-b border-zinc-800 uppercase">
+                                                <tr>
+                                                    <th className="p-2.5">Tâche</th>
+                                                    <th className="p-2.5">Catégorie</th>
+                                                    <th className="p-2.5">Date de création</th>
+                                                    <th className="p-2.5">Statut</th>
+                                                    <th className="p-2.5 text-right">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-zinc-850">
+                                                {syndicateTasks.map(t => (
+                                                    <tr key={t.id} className="hover:bg-zinc-900/20">
+                                                        <td className="p-2.5 font-semibold text-zinc-200">{t.title}</td>
+                                                        <td className="p-2.5">
+                                                            <Badge variant="outline" className="text-[8px] bg-purple-950/20 text-purple-300 border-purple-800/40 px-1.5 py-0.5 font-bold">
+                                                                {t.category || 'Opérations'}
+                                                            </Badge>
+                                                        </td>
+                                                        <td className="p-2.5 font-mono text-[10px] text-zinc-400">
+                                                            {t.created_date ? new Date(t.created_date).toLocaleDateString('fr-CA') : 'N/A'}
+                                                        </td>
+                                                        <td className="p-2.5">
+                                                            <Badge variant="outline" className={`text-[8px] font-bold uppercase ${
+                                                                t.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-800/30' : 'bg-rose-500/10 text-rose-400 border-rose-800/30'
+                                                            }`}>
+                                                                {t.status === 'completed' ? 'complétée' : 'en retard'}
+                                                            </Badge>
+                                                        </td>
+                                                        <td className="p-2.5 text-right">
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => handleDeleteTask(t.id)}
+                                                                className="h-6 w-6 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 {/* Right Context Panels: Workload & Past Data (1 Column) */}
                 <div className="space-y-6">
+                    {/* Syndicate Statistics Card */}
+                    {activeClientObj && (
+                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-xs font-bold text-white flex items-center gap-1.5">
+                                    <User className="h-4 w-4 text-purple-400" />
+                                    Statistiques du Syndicat
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3 text-xxs leading-relaxed">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="p-2.5 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                                        <span className="text-zinc-500 block uppercase font-bold text-[8px]">Nombre de Portes</span>
+                                        <strong className="text-sm font-extrabold text-zinc-100 block mt-0.5">
+                                            {activeClientObj.doors ? activeClientObj.doors.length : 0} portes
+                                        </strong>
+                                    </div>
+                                    <div className="p-2.5 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                                        <span className="text-zinc-500 block uppercase font-bold text-[8px]">Revenu Mensuel (MRR)</span>
+                                        <strong className="text-sm font-extrabold text-emerald-450 text-emerald-400 block mt-0.5">
+                                            {activeClientObj.contracts && activeClientObj.contracts[0] 
+                                                ? `$${Number(activeClientObj.contracts[0].monthly_fee || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}` 
+                                                : 'Aucun contrat'}
+                                        </strong>
+                                    </div>
+                                </div>
+                                <div className="p-2.5 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
+                                    <div className="flex justify-between items-center text-[9px]">
+                                        <span className="text-zinc-500 uppercase font-bold">Gestionnaire en charge</span>
+                                        <span className="text-purple-400 font-bold">
+                                            {activeClientObj.managers 
+                                                ? `${activeClientObj.managers.first_name} ${activeClientObj.managers.last_name}` 
+                                                : 'Non assigné'}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-[9px] border-t border-zinc-850/60 pt-1 mt-1">
+                                        <span className="text-zinc-500 uppercase font-bold">Assigné depuis le</span>
+                                        <span className="text-zinc-300 font-mono">
+                                            {activeClientObj.manager_assigned_at 
+                                                ? new Date(activeClientObj.manager_assigned_at).toLocaleDateString('fr-CA') 
+                                                : activeClientObj.created_at 
+                                                    ? new Date(activeClientObj.created_at).toLocaleDateString('fr-CA')
+                                                    : 'Non définie'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
                     {/* Collapsible Workload Stats Panel */}
                     <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                         <CardHeader className="pb-3 flex flex-row justify-between items-center cursor-pointer select-none" onClick={() => setShowWorkloadForm(!showWorkloadForm)}>
@@ -453,7 +1195,7 @@ export function NewAuditForm({
                                             <select 
                                                 value={workloadYear} 
                                                 onChange={(e) => setWorkloadYear(Number(e.target.value))}
-                                                className="w-full bg-[#121318] border border-zinc-850 rounded p-1.5 text-white outline-none h-8"
+                                                className="w-full bg-[#121318] border border-zinc-850 rounded p-1.5 text-white outline-none h-8 cursor-pointer"
                                             >
                                                 <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
                                                 <option value={new Date().getFullYear() - 1}>{new Date().getFullYear() - 1}</option>
@@ -465,7 +1207,7 @@ export function NewAuditForm({
                                             <select 
                                                 value={workloadType} 
                                                 onChange={(e) => setWorkloadType(e.target.value as any)}
-                                                className="w-full bg-[#121318] border border-zinc-850 rounded p-1.5 text-white outline-none h-8"
+                                                className="w-full bg-[#121318] border border-zinc-850 rounded p-1.5 text-white outline-none h-8 cursor-pointer"
                                             >
                                                 <option value="annual">Annuelle (Total global)</option>
                                                 <option value="monthly">Mensuelle</option>
@@ -479,7 +1221,7 @@ export function NewAuditForm({
                                             <select 
                                                 value={workloadMonth} 
                                                 onChange={(e) => setWorkloadMonth(Number(e.target.value))}
-                                                className="w-full bg-[#121318] border border-zinc-850 rounded p-1.5 text-white outline-none h-8"
+                                                className="w-full bg-[#121318] border border-zinc-850 rounded p-1.5 text-white outline-none h-8 cursor-pointer"
                                             >
                                                 {MONTHS.map(m => (
                                                     <option key={m.value} value={m.value}>{m.label}</option>
@@ -496,17 +1238,40 @@ export function NewAuditForm({
                                                 placeholder="ex: 150"
                                                 value={tasksCount}
                                                 onChange={(e) => setTasksCount(e.target.value)}
-                                                className="bg-[#121318] border-zinc-850 h-8 text-xxs"
+                                                className="bg-[#121318] border-zinc-850 h-8 text-xxs text-zinc-100"
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <Label className="text-zinc-500">Communications</Label>
+                                            <Label className="text-zinc-500">Comms Totales Syndicat</Label>
                                             <Input 
                                                 type="number" 
-                                                placeholder="ex: 800"
-                                                value={commsCount}
-                                                onChange={(e) => setCommsCount(e.target.value)}
-                                                className="bg-[#121318] border-zinc-850 h-8 text-xxs"
+                                                placeholder="ex: 1000"
+                                                value={syndicateCommsCount}
+                                                onChange={(e) => setSyndicateCommsCount(e.target.value)}
+                                                className="bg-[#121318] border-zinc-850 h-8 text-xxs text-zinc-100"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <Label className="text-zinc-500">Comms Assignées Gest.</Label>
+                                            <Input 
+                                                type="number" 
+                                                placeholder="ex: 400"
+                                                value={managerCommsCount}
+                                                onChange={(e) => setManagerCommsCount(e.target.value)}
+                                                className="bg-[#121318] border-zinc-850 h-8 text-xxs text-zinc-100"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-zinc-500">Réunions de CA / an</Label>
+                                            <Input 
+                                                type="number" 
+                                                placeholder="ex: 6"
+                                                value={boardMeetingsCount}
+                                                onChange={(e) => setBoardMeetingsCount(e.target.value)}
+                                                className="bg-[#121318] border-zinc-850 h-8 text-xxs text-zinc-100"
                                             />
                                         </div>
                                     </div>
@@ -515,7 +1280,7 @@ export function NewAuditForm({
                                         type="button" 
                                         onClick={handleSaveWorkload} 
                                         disabled={savingWorkload || !clientId}
-                                        className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-xxs h-8 font-semibold rounded-lg mt-2 shadow"
+                                        className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-xxs h-8 font-semibold rounded-lg mt-2 shadow cursor-pointer"
                                     >
                                         {savingWorkload ? 'Enregistrement...' : 'Sauvegarder le volume'}
                                     </Button>
@@ -535,9 +1300,11 @@ export function NewAuditForm({
                                                                 {wl.month ? `(${MONTHS.find(m => m.value === wl.month)?.label})` : '(Annuel)'}
                                                             </span>
                                                         </div>
-                                                        <div className="text-[9px] text-zinc-400 flex gap-2.5 mt-0.5">
+                                                        <div className="text-[9px] text-zinc-400 flex flex-wrap gap-x-2.5 gap-y-0.5 mt-0.5 font-mono">
                                                             <span>Tâches: <strong className="text-purple-400 font-bold">{wl.tasks_count ?? '-'}</strong></span>
-                                                            <span>Comms: <strong className="text-cyan-400 font-bold">{wl.comms_count ?? '-'}</strong></span>
+                                                            <span>CA / an: <strong className="text-amber-400 font-bold">{wl.board_meetings_count ?? '-'}</strong></span>
+                                                            <span>Comms Syndicat: <strong className="text-cyan-400 font-bold">{wl.syndicate_comms_count ?? '-'}</strong></span>
+                                                            <span>Comms Gest.: <strong className="text-blue-400 font-bold">{wl.manager_comms_count ?? '-'}</strong></span>
                                                         </div>
                                                     </div>
                                                     <Button
@@ -545,7 +1312,7 @@ export function NewAuditForm({
                                                         variant="ghost"
                                                         size="icon"
                                                         onClick={() => setWorkloadToDelete(wl.id)}
-                                                        className="h-6 w-6 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                                                        className="h-6 w-6 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0 cursor-pointer"
                                                     >
                                                         <Trash2 className="h-3.5 w-3.5" />
                                                     </Button>
@@ -584,10 +1351,10 @@ export function NewAuditForm({
                                                         key={c.id}
                                                         type="button"
                                                         onClick={() => setActiveComplaint(c)}
-                                                        className="w-full text-left p-2 rounded-lg bg-rose-950/10 hover:bg-rose-950/20 border border-rose-900/30 text-[10px] text-zinc-200 transition-colors flex justify-between items-center group"
+                                                        className="w-full text-left p-2 rounded-lg bg-rose-955 bg-rose-500/5 hover:bg-rose-500/10 border border-rose-900/30 text-[10px] text-zinc-200 transition-colors flex justify-between items-center group cursor-pointer"
                                                     >
                                                         <span className="truncate pr-1 group-hover:text-purple-400 transition-colors font-medium">{c.title}</span>
-                                                        <Badge variant="outline" className="text-[7px] uppercase font-mono px-1 shrink-0 bg-rose-500/10 border-rose-500/20 text-rose-400">
+                                                        <Badge variant="outline" className="text-[7px] uppercase font-mono px-1 shrink-0 bg-rose-500/10 border-rose-500/20 text-rose-400 font-bold">
                                                             {c.severity}
                                                         </Badge>
                                                     </button>
@@ -609,14 +1376,14 @@ export function NewAuditForm({
                                                         className="p-2 rounded-lg bg-zinc-950/40 border border-zinc-850 flex justify-between items-center text-[10px]"
                                                     >
                                                         <div>
-                                                            <strong className="text-zinc-300">{a.health_score}%</strong>
+                                                            <strong className="text-zinc-300">{Math.round(a.health_score)}%</strong>
                                                             <span className="text-zinc-500 ml-1">({a.audit_date ? new Date(a.audit_date).toLocaleDateString('fr-CA') : 'N/A'})</span>
                                                             <p className="text-[8px] text-zinc-500 mt-0.5">Par: {a.profiles?.full_name || 'Évaluateur'}</p>
                                                         </div>
                                                         <Button 
                                                             type="button" 
                                                             variant="ghost" 
-                                                            className="text-purple-400 hover:text-purple-300 font-bold p-0 h-6 text-[9px]"
+                                                            className="text-purple-400 hover:text-purple-300 font-bold p-0 h-6 text-[9px] cursor-pointer"
                                                             onClick={() => router.push(`/team-management/audits/${a.id}`)}
                                                         >
                                                             Fiche
@@ -640,7 +1407,7 @@ export function NewAuditForm({
                         <button 
                             type="button" 
                             onClick={() => setActiveComplaint(null)} 
-                            className="absolute top-4 right-4 text-zinc-500 hover:text-white text-base font-black transition-colors"
+                            className="absolute top-4 right-4 text-zinc-500 hover:text-white text-base font-black transition-colors cursor-pointer"
                         >
                             ✕
                         </button>
@@ -697,7 +1464,7 @@ export function NewAuditForm({
                             </div>
                         </div>
                         <div className="mt-6 flex justify-end">
-                            <Button type="button" onClick={() => setActiveComplaint(null)} className="bg-purple-600 hover:bg-purple-700 text-white text-xxs h-8 px-4 font-bold rounded-lg shadow-lg">
+                            <Button type="button" onClick={() => setActiveComplaint(null)} className="bg-purple-600 hover:bg-purple-700 text-white text-xxs h-8 px-4 font-bold rounded-lg shadow-lg cursor-pointer">
                                 Fermer
                             </Button>
                         </div>
