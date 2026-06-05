@@ -10,6 +10,7 @@ import {
     getAvailableTimeSlotsAction
 } from '@/actions/maintenance'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -58,17 +59,23 @@ export function ResidentInvitePortal({
     const [saving, setSaving] = useState(false)
     const [booking, setBooking] = useState(false)
     const [showSuccessBanner, setShowSuccessBanner] = useState(false)
+    const [isEditing, setIsEditing] = useState(unit.participation === 'pending')
+    const [showConfirmDialog, setShowConfirmDialog] = useState(false)
 
     // Option lists
     const dates = Object.keys(availableSlots).sort()
 
-    const handleSaveParticipation = async (e: React.FormEvent) => {
+    const handleSaveParticipationAttempt = (e: React.FormEvent) => {
         e.preventDefault()
         if (!contactName.trim()) {
             toast.error("Veuillez renseigner le nom de la personne contact.")
             return
         }
+        setShowConfirmDialog(true)
+    }
 
+    const handleConfirmSaveParticipation = async () => {
+        setShowConfirmDialog(false)
         setSaving(true)
         setShowSuccessBanner(false)
         try {
@@ -80,6 +87,7 @@ export function ResidentInvitePortal({
             })
 
             setShowSuccessBanner(true)
+            setIsEditing(false)
             toast.success("Votre choix de participation a été enregistré.")
             
             if (participation === 'not_interested' || participation === 'completed_elsewhere') {
@@ -142,6 +150,8 @@ export function ResidentInvitePortal({
         }
     }
 
+    const hasAppointment = !!appointment
+    const isFieldsLocked = !isEditing || hasAppointment
     const isParticipating = participation === 'interested' || participation === 'pending' || participation === 'more_info'
 
     return (
@@ -192,14 +202,20 @@ export function ResidentInvitePortal({
 
             {/* Participation Form */}
             <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/15">
+                <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/15 flex flex-row items-center justify-between">
                     <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
                         <User className="h-4 w-4" />
                         1. Participation & Contact
                     </CardTitle>
+                    {!isEditing && participation !== 'pending' && (
+                        <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                            <Check className="h-3 w-3" />
+                            Confirmé
+                        </Badge>
+                    )}
                 </CardHeader>
                 <CardContent className="pt-4">
-                    <form onSubmit={handleSaveParticipation} className="space-y-4">
+                    <form onSubmit={handleSaveParticipationAttempt} className="space-y-4">
                         {showSuccessBanner && (
                             <div className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-emerald-300 transition-all duration-300">
                                 <CheckCircle className="h-4.5 w-4.5 text-emerald-400 shrink-0" />
@@ -211,34 +227,37 @@ export function ResidentInvitePortal({
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 <button
                                     type="button"
+                                    disabled={isFieldsLocked}
                                     onClick={() => setParticipation('interested')}
                                     className={`py-2.5 px-3.5 rounded-xl border font-bold text-xs transition-all cursor-pointer ${
                                         participation === 'interested' 
                                             ? 'bg-purple-950/30 border-purple-500 text-white' 
                                             : 'bg-zinc-900/35 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                                    }`}
+                                    } ${isFieldsLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
                                 >
                                     Je souhaite participer
                                 </button>
                                 <button
                                     type="button"
+                                    disabled={isFieldsLocked}
                                     onClick={() => setParticipation('not_interested')}
                                     className={`py-2.5 px-3.5 rounded-xl border font-bold text-xs transition-all cursor-pointer ${
                                         participation === 'not_interested' 
                                             ? 'bg-rose-950/30 border-rose-500 text-white' 
                                             : 'bg-zinc-900/35 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                                    }`}
+                                    } ${isFieldsLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
                                 >
                                     Je refuse / Pas intéressé
                                 </button>
                                 <button
                                     type="button"
+                                    disabled={isFieldsLocked}
                                     onClick={() => setParticipation('completed_elsewhere')}
                                     className={`py-2.5 px-3.5 rounded-xl border font-bold text-xs transition-all cursor-pointer ${
                                         participation === 'completed_elsewhere' 
                                             ? 'bg-blue-950/30 border-blue-500 text-white' 
                                             : 'bg-zinc-900/35 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                                    }`}
+                                    } ${isFieldsLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
                                 >
                                     Déjà effectué moi-même
                                 </button>
@@ -250,26 +269,29 @@ export function ResidentInvitePortal({
                             <div className="space-y-2">
                                 <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Personne contact sur place *</Label>
                                 <Input
+                                    disabled={isFieldsLocked}
                                     value={contactName}
                                     onChange={(e) => setContactName(e.target.value)}
-                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white disabled:opacity-60 disabled:cursor-not-allowed"
                                 />
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Courriel de contact</Label>
                                 <Input
                                     type="email"
+                                    disabled={isFieldsLocked}
                                     value={contactEmail}
                                     onChange={(e) => setContactEmail(e.target.value)}
-                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white disabled:opacity-60 disabled:cursor-not-allowed"
                                 />
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Téléphone de contact</Label>
                                 <Input
+                                    disabled={isFieldsLocked}
                                     value={contactPhone}
                                     onChange={(e) => setContactPhone(e.target.value)}
-                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white disabled:opacity-60 disabled:cursor-not-allowed"
                                 />
                             </div>
                         </div>
@@ -277,22 +299,39 @@ export function ResidentInvitePortal({
                         <div className="space-y-2">
                             <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Note ou consigne pour le technicien</Label>
                             <Textarea
+                                disabled={isFieldsLocked}
                                 value={residentNotes}
                                 onChange={(e) => setResidentNotes(e.target.value)}
                                 placeholder="Code d'accès, présence d'un animal domestique, contrainte particulière..."
                                 rows={2}
-                                className="bg-[#121318] border-zinc-850 text-xs text-white py-2"
+                                className="bg-[#121318] border-zinc-850 text-xs text-white py-2 disabled:opacity-60 disabled:cursor-not-allowed"
                             />
                         </div>
 
                         <div className="flex justify-end pt-1">
-                            <Button
-                                type="submit"
-                                disabled={saving}
-                                className="bg-purple-650 hover:bg-purple-700 text-white font-bold h-10 px-5 rounded-xl shadow cursor-pointer flex items-center gap-1.5 transition-all text-xs"
-                            >
-                                {saving ? 'Enregistrement...' : <><Send className="h-4 w-4" /> Enregistrer mes préférences</>}
-                            </Button>
+                            {isFieldsLocked ? (
+                                hasAppointment ? (
+                                    <span className="text-xxs text-zinc-400 italic">
+                                        Informations verrouillées car votre rendez-vous est planifié.
+                                    </span>
+                                ) : (
+                                    <Button
+                                        type="button"
+                                        onClick={() => setIsEditing(true)}
+                                        className="bg-zinc-800 hover:bg-zinc-750 text-zinc-200 font-bold h-10 px-5 rounded-xl cursor-pointer text-xs"
+                                    >
+                                        Modifier mes informations
+                                    </Button>
+                                )
+                            ) : (
+                                <Button
+                                    type="submit"
+                                    disabled={saving}
+                                    className="bg-purple-650 hover:bg-purple-700 text-white font-bold h-10 px-5 rounded-xl shadow cursor-pointer flex items-center gap-1.5 transition-all text-xs"
+                                >
+                                    {saving ? 'Enregistrement...' : <><Send className="h-4 w-4" /> Enregistrer mes préférences</>}
+                                </Button>
+                            )}
                         </div>
                     </form>
                 </CardContent>
@@ -433,6 +472,17 @@ export function ResidentInvitePortal({
                 </Card>
             )}
 
+            <ConfirmationDialog
+                open={showConfirmDialog}
+                onOpenChange={setShowConfirmDialog}
+                title="Enregistrer vos préférences ?"
+                description="Voulez-vous vraiment enregistrer vos informations de contact et votre choix de participation ?"
+                confirmText="Enregistrer"
+                cancelText="Annuler"
+                onConfirm={handleConfirmSaveParticipation}
+                loading={saving}
+                variant="info"
+            />
         </div>
     )
 }
