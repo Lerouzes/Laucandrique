@@ -57,6 +57,7 @@ export function ResidentInvitePortal({
     const [selectedSlot, setSelectedSlot] = useState<string>('')
     const [saving, setSaving] = useState(false)
     const [booking, setBooking] = useState(false)
+    const [showSuccessBanner, setShowSuccessBanner] = useState(false)
 
     // Option lists
     const dates = Object.keys(availableSlots).sort()
@@ -69,6 +70,7 @@ export function ResidentInvitePortal({
         }
 
         setSaving(true)
+        setShowSuccessBanner(false)
         try {
             await submitParticipationAction(token, participation as any, {
                 contact_name: contactName.trim(),
@@ -77,6 +79,7 @@ export function ResidentInvitePortal({
                 resident_notes: residentNotes.trim()
             })
 
+            setShowSuccessBanner(true)
             toast.success("Votre choix de participation a été enregistré.")
             
             if (participation === 'not_interested' || participation === 'completed_elsewhere') {
@@ -197,6 +200,12 @@ export function ResidentInvitePortal({
                 </CardHeader>
                 <CardContent className="pt-4">
                     <form onSubmit={handleSaveParticipation} className="space-y-4">
+                        {showSuccessBanner && (
+                            <div className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-emerald-300 transition-all duration-300">
+                                <CheckCircle className="h-4.5 w-4.5 text-emerald-400 shrink-0" />
+                                <span className="font-semibold text-xs">Vos préférences de participation ont été enregistrées avec succès !</span>
+                            </div>
+                        )}
                         <div className="space-y-2">
                             <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Votre statut de participation</Label>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
