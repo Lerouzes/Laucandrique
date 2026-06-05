@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { 
     Calendar, 
     Save, 
@@ -121,118 +122,119 @@ export function NewCampaignForm({
     }
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6 text-xxs">
+        <form onSubmit={handleSubmit} className="space-y-6 text-xs text-zinc-300">
             {/* Section 1: Campaign Configuration */}
             <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
                 <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10">
-                    <CardTitle className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
+                    <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
                         <Building2 className="h-4 w-4" />
                         Configuration générale
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4 space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <Label className="text-zinc-500 uppercase font-bold text-[8px]">Copropriété / Syndicat *</Label>
-                            <select
+                        <div className="space-y-2">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Copropriété / Syndicat *</Label>
+                            <SearchableSelect
                                 value={clientId}
-                                onChange={(e) => setClientId(e.target.value)}
-                                className="w-full bg-[#121318] border border-zinc-850 rounded-lg p-2 text-white outline-none h-8 text-xxs font-semibold cursor-pointer"
-                            >
-                                <option value="">Sélectionner un syndicat...</option>
-                                {clients.map(c => (
-                                    <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>
-                                ))}
-                            </select>
+                                onChange={setClientId}
+                                options={clients.map(c => ({ value: c.id, label: c.company_name || c.full_name }))}
+                                placeholder="Sélectionner un syndicat..."
+                                searchPlaceholder="Rechercher un syndicat..."
+                            />
                         </div>
-                        <div className="space-y-1.5">
-                            <Label className="text-zinc-500 uppercase font-bold text-[8px]">Intitulé de la campagne *</Label>
+                        <div className="space-y-2">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Intitulé de la campagne *</Label>
                             <Input
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 placeholder="Ex: Inspection plomberie annuelle 2026"
-                                className="bg-[#121318] border-zinc-850 h-8 text-xxs text-white"
+                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
                             />
                         </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                        <Label className="text-zinc-500 uppercase font-bold text-[8px]">Description de la campagne</Label>
+                    <div className="space-y-2">
+                        <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Description de la campagne</Label>
                         <Textarea
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="Informations transmises aux résidents concernant les interventions..."
                             rows={3}
-                            className="bg-[#121318] border-zinc-850 text-xxs text-white py-1.5"
+                            className="bg-[#121318] border-zinc-850 text-xs text-white py-2"
                         />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="space-y-1.5">
-                            <Label className="text-zinc-500 uppercase font-bold text-[8px]">Date de début *</Label>
+                        <div className="space-y-2">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Date de début *</Label>
                             <Input
                                 type="date"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-8 text-xxs text-white"
+                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
                             />
                         </div>
-                        <div className="space-y-1.5">
-                            <Label className="text-zinc-500 uppercase font-bold text-[8px]">Date de fin *</Label>
+                        <div className="space-y-2">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Date de fin *</Label>
                             <Input
                                 type="date"
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-8 text-xxs text-white"
+                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
                             />
                         </div>
-                        <div className="space-y-1.5">
-                            <Label className="text-zinc-500 uppercase font-bold text-[8px]">Contracteur assigné</Label>
-                            <select
+                        <div className="space-y-2">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Contracteur assigné</Label>
+                            <SearchableSelect
                                 value={contractorId}
-                                onChange={(e) => setContractorId(e.target.value)}
-                                className="w-full bg-[#121318] border border-zinc-850 rounded-lg p-2 text-white outline-none h-8 text-xxs font-semibold cursor-pointer"
-                            >
-                                <option value="">Sélectionner un contracteur...</option>
-                                {contractors.map(c => (
-                                    <option key={c.id} value={c.id}>{c.full_name}</option>
-                                ))}
-                            </select>
+                                onChange={setContractorId}
+                                options={[
+                                    { value: '', label: 'Aucun (Sélectionner un contracteur...)' },
+                                    ...contractors.map(c => ({ value: c.id, label: c.full_name }))
+                                ]}
+                                placeholder="Sélectionner un contracteur..."
+                                searchPlaceholder="Rechercher un contracteur..."
+                            />
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-zinc-900 pt-3">
-                        <div className="space-y-1.5">
-                            <Label className="text-zinc-500 uppercase font-bold text-[8px]">Participation</Label>
-                            <select
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-zinc-900 pt-4">
+                        <div className="space-y-2">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Participation</Label>
+                            <SearchableSelect
                                 value={isMandatory ? 'mandatory' : 'optional'}
-                                onChange={(e) => setIsMandatory(e.target.value === 'mandatory')}
-                                className="w-full bg-[#121318] border border-zinc-850 rounded-lg p-2 text-white outline-none h-8 text-xxs font-semibold cursor-pointer"
-                            >
-                                <option value="mandatory">Obligatoire (Mandatory)</option>
-                                <option value="optional">Optionnelle (Optional)</option>
-                            </select>
+                                onChange={(val) => setIsMandatory(val === 'mandatory')}
+                                options={[
+                                    { value: 'mandatory', label: 'Obligatoire (Mandatory)' },
+                                    { value: 'optional', label: 'Optionnelle (Optional)' }
+                                ]}
+                                placeholder="Choisir la participation..."
+                                searchPlaceholder="Rechercher..."
+                            />
                         </div>
-                        <div className="space-y-1.5">
-                            <Label className="text-zinc-500 uppercase font-bold text-[8px]">Affichage des prix aux résidents</Label>
-                            <select
+                        <div className="space-y-2">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Affichage des prix aux résidents</Label>
+                            <SearchableSelect
                                 value={pricingType}
-                                onChange={(e) => setPricingType(e.target.value as any)}
-                                className="w-full bg-[#121318] border border-zinc-850 rounded-lg p-2 text-white outline-none h-8 text-xxs font-semibold cursor-pointer"
-                            >
-                                <option value="free">Gratuit / Inclus</option>
-                                <option value="visible">Visible</option>
-                                <option value="hidden">Masqué</option>
-                            </select>
+                                onChange={(val) => setPricingType(val as any)}
+                                options={[
+                                    { value: 'free', label: 'Gratuit / Inclus' },
+                                    { value: 'visible', label: 'Visible' },
+                                    { value: 'hidden', label: 'Masqué' }
+                                ]}
+                                placeholder="Choisir l'affichage..."
+                                searchPlaceholder="Rechercher..."
+                            />
                         </div>
-                        <div className="space-y-1.5">
-                            <Label className="text-zinc-500 uppercase font-bold text-[8px]">Participation minimale requise (Unités)</Label>
+                        <div className="space-y-2">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Participation minimale requise (Unités)</Label>
                             <Input
                                 type="number"
                                 min="0"
                                 value={minParticipation}
                                 onChange={(e) => setMinParticipation(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-8 text-xxs text-white"
+                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
                             />
                         </div>
                     </div>
@@ -242,19 +244,19 @@ export function NewCampaignForm({
             {/* Section 2: Services Library Selection */}
             <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
                 <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10 flex flex-row justify-between items-center">
-                    <CardTitle className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
+                    <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
                         <Hammer className="h-4 w-4" />
                         Services à inclure
                     </CardTitle>
                     {totalDuration > 0 && (
-                        <Badge variant="outline" className="text-[7.5px] font-extrabold uppercase bg-purple-950/20 text-purple-300 border-purple-800/40 py-0.5 px-2">
+                        <Badge variant="outline" className="text-xs font-extrabold uppercase bg-purple-950/20 text-purple-300 border-purple-800/40 py-1 px-2.5">
                             Durée totale estimée : {totalDuration} min
                         </Badge>
                     )}
                 </CardHeader>
                 <CardContent className="pt-4">
                     {services.length === 0 ? (
-                        <p className="text-xxs italic text-zinc-500 py-4 text-center">
+                        <p className="text-xs italic text-zinc-500 py-4 text-center">
                             Aucun service configuré dans la bibliothèque. Créez-en d'abord.
                         </p>
                     ) : (
@@ -279,15 +281,15 @@ export function NewCampaignForm({
                                             {isChecked && <Check className="h-3 w-3" />}
                                         </div>
                                         <div className="space-y-1">
-                                            <span className={`font-semibold block ${isChecked ? 'text-zinc-200' : 'text-zinc-400'}`}>
+                                            <span className={`font-semibold block text-xs ${isChecked ? 'text-zinc-200' : 'text-zinc-400'}`}>
                                                 {svc.name}
                                             </span>
-                                            <div className="flex items-center gap-2 text-[8px] text-zinc-500 font-medium">
-                                                <Badge variant="outline" className="text-[7px] border-zinc-800/50">
+                                            <div className="flex items-center gap-2 text-xs text-zinc-500 font-medium">
+                                                <Badge variant="outline" className="text-[10px] border-zinc-800/50">
                                                     {svc.category}
                                                 </Badge>
                                                 <span className="flex items-center gap-0.5">
-                                                    <Clock className="h-2.5 w-2.5" /> {svc.duration} min
+                                                    <Clock className="h-3.5 w-3.5" /> {svc.duration} min
                                                 </span>
                                             </div>
                                         </div>
@@ -302,54 +304,54 @@ export function NewCampaignForm({
             {/* Section 3: Scheduling Settings */}
             <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
                 <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10">
-                    <CardTitle className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
+                    <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
                         <Settings className="h-4 w-4" />
                         Planification & Capacité
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4 space-y-4">
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        <div className="space-y-1.5">
-                            <Label className="text-zinc-500 uppercase font-bold text-[8px]">Début de journée</Label>
+                        <div className="space-y-2">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Début de journée</Label>
                             <Input
                                 type="time"
                                 value={workStart}
                                 onChange={(e) => setWorkStart(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-8 text-xxs text-white"
+                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
                             />
                         </div>
-                        <div className="space-y-1.5">
-                            <Label className="text-zinc-500 uppercase font-bold text-[8px]">Fin de journée</Label>
+                        <div className="space-y-2">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Fin de journée</Label>
                             <Input
                                 type="time"
                                 value={workEnd}
                                 onChange={(e) => setWorkEnd(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-8 text-xxs text-white"
+                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
                             />
                         </div>
-                        <div className="space-y-1.5">
-                            <Label className="text-zinc-500 uppercase font-bold text-[8px]">Techniciens (Équipes)</Label>
+                        <div className="space-y-2">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Techniciens (Équipes)</Label>
                             <Input
                                 type="number"
                                 min="1"
                                 value={techsCount}
                                 onChange={(e) => setTechsCount(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-8 text-xxs text-white"
+                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
                             />
                         </div>
-                        <div className="space-y-1.5">
-                            <Label className="text-zinc-500 uppercase font-bold text-[8px]">Marge de sécurité (min)</Label>
+                        <div className="space-y-2">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Marge de sécurité (min)</Label>
                             <Input
                                 type="number"
                                 min="0"
                                 value={buffer}
                                 onChange={(e) => setBuffer(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-8 text-xxs text-white"
+                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
                             />
                         </div>
                     </div>
                     
-                    <p className="text-[9px] text-zinc-500 italic mt-2 font-medium">
+                    <p className="text-xs text-zinc-500 italic mt-2 font-medium">
                         * Note : Une pause déjeuner est automatiquement configurée par défaut de 12:00 à 13:00 pour toutes les équipes.
                     </p>
                 </CardContent>
@@ -360,14 +362,14 @@ export function NewCampaignForm({
                 <Button
                     type="button"
                     onClick={() => router.push('/maintenance-hub')}
-                    className="bg-transparent border border-zinc-850 text-zinc-400 text-xxs font-bold h-9 px-6 rounded-xl hover:bg-zinc-900 cursor-pointer"
+                    className="bg-transparent border border-zinc-850 text-zinc-400 text-xs font-bold h-10 px-6 rounded-xl hover:bg-zinc-900 cursor-pointer"
                 >
                     Annuler
                 </Button>
                 <Button
                     type="submit"
                     disabled={loading}
-                    className="bg-purple-650 hover:bg-purple-700 text-white font-bold text-xxs h-9 px-6 rounded-xl shadow cursor-pointer flex items-center gap-1.5"
+                    className="bg-purple-650 hover:bg-purple-700 text-white font-bold text-xs h-10 px-6 rounded-xl shadow cursor-pointer flex items-center gap-1.5"
                 >
                     {loading ? 'Enregistrement...' : <><Save className="h-4 w-4" /> Créer la Campagne</>}
                 </Button>
@@ -375,3 +377,4 @@ export function NewCampaignForm({
         </form>
     )
 }
+

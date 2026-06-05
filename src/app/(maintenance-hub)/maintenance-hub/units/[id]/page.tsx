@@ -52,12 +52,12 @@ export default async function UnitHistoryPage({
     }
 
     return (
-        <div className="space-y-6 max-w-4xl mx-auto">
+        <div className="space-y-6 max-w-4xl mx-auto text-xs text-zinc-300">
             {/* Top Navigation */}
             <div>
                 <Link
                     href="/maintenance-hub"
-                    className="text-xxs text-zinc-500 hover:text-zinc-300 font-bold flex items-center gap-1.5 transition-colors w-fit"
+                    className="text-xs text-zinc-500 hover:text-zinc-300 font-bold flex items-center gap-1.5 transition-colors w-fit"
                 >
                     <ArrowLeft className="h-3.5 w-3.5" />
                     Retour au Tableau de bord
@@ -72,7 +72,7 @@ export default async function UnitHistoryPage({
                     </div>
                     <div>
                         <h2 className="text-base font-extrabold text-white uppercase tracking-wider">Unité {details.door.door_number}</h2>
-                        <p className="text-[10px] text-zinc-400 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <p className="text-xs text-zinc-400 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span>Syndicat : <strong className="text-zinc-200">{clientName}</strong></span>
                             {details.door.notes && (
                                 <>
@@ -87,32 +87,32 @@ export default async function UnitHistoryPage({
 
             {/* Permanent Interventions History */}
             <div className="space-y-4">
-                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider pl-1">
+                <h3 className="text-sm font-bold text-zinc-450 uppercase tracking-wider pl-1">
                     Historique permanent des interventions
                 </h3>
 
                 {details.history.length === 0 ? (
                     <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
-                        <CardContent className="p-8 text-center text-xxs text-zinc-500">
+                        <CardContent className="p-8 text-center text-xs text-zinc-500">
                             Aucune intervention enregistrée pour cette unité.
                         </CardContent>
                     </Card>
                 ) : (
                     details.history.map(record => (
-                        <Card key={record.id} className="bg-[#16171e]/70 border-zinc-850 shadow-md overflow-hidden text-xxs">
+                        <Card key={record.id} className="bg-[#16171e]/70 border-zinc-850 shadow-md overflow-hidden text-xs">
                             
                             {/* Card Header details */}
                             <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                                 <div className="space-y-1 pr-4">
-                                    <h4 className="text-xxs font-extrabold text-white uppercase tracking-wider text-purple-400">
+                                    <h4 className="text-xs font-extrabold text-white uppercase tracking-wider text-purple-400">
                                         {record.campaign_name}
                                     </h4>
-                                    <div className="text-[9px] text-zinc-400 font-medium">
+                                    <div className="text-xs text-zinc-400 font-medium">
                                         Passage du : <strong className="text-zinc-300">{new Date(record.date).toLocaleDateString('fr-CA')}</strong> · 
                                         Technicien : <strong className="text-zinc-300">{record.contractor_name}</strong>
                                     </div>
                                 </div>
-                                <Badge variant="outline" className={`text-[8.5px] font-extrabold uppercase px-2 py-0.5 ${getStatusBadge(record.status)}`}>
+                                <Badge variant="outline" className={`text-[10px] font-extrabold uppercase px-2 py-0.5 ${getStatusBadge(record.status)}`}>
                                     {getStatusLabel(record.status)}
                                 </Badge>
                             </CardHeader>
@@ -126,29 +126,29 @@ export default async function UnitHistoryPage({
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             {record.report.notes && (
                                                 <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                                                    <span className="text-zinc-500 uppercase font-bold text-[7.5px] block tracking-wider flex items-center gap-1">
-                                                        <MessageSquare className="h-3 w-3 text-purple-450" />
+                                                    <span className="text-zinc-550 uppercase font-bold text-[10px] block tracking-wider flex items-center gap-1">
+                                                        <MessageSquare className="h-3.5 w-3.5 text-purple-450" />
                                                         Notes de visite
                                                     </span>
-                                                    <p className="text-zinc-300 text-[10px] leading-relaxed font-medium">{record.report.notes}</p>
+                                                    <p className="text-zinc-300 text-xs leading-relaxed font-medium">{record.report.notes}</p>
                                                 </div>
                                             )}
                                             {record.report.observations && (
                                                 <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                                                    <span className="text-zinc-500 uppercase font-bold text-[7.5px] block tracking-wider flex items-center gap-1">
-                                                        <AlertCircle className="h-3 w-3 text-amber-500" />
+                                                    <span className="text-zinc-550 uppercase font-bold text-[10px] block tracking-wider flex items-center gap-1">
+                                                        <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
                                                         Observations
                                                     </span>
-                                                    <p className="text-zinc-300 text-[10px] leading-relaxed font-medium">{record.report.observations}</p>
+                                                    <p className="text-zinc-300 text-xs leading-relaxed font-medium">{record.report.observations}</p>
                                                 </div>
                                             )}
                                             {record.report.recommendations && (
                                                 <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl space-y-1">
-                                                    <span className="text-zinc-500 uppercase font-bold text-[7.5px] block tracking-wider flex items-center gap-1">
-                                                        <FileText className="h-3 w-3 text-cyan-400" />
+                                                    <span className="text-zinc-550 uppercase font-bold text-[10px] block tracking-wider flex items-center gap-1">
+                                                        <FileText className="h-3.5 w-3.5 text-cyan-400" />
                                                         Recommandations
                                                     </span>
-                                                    <p className="text-zinc-300 text-[10px] leading-relaxed font-medium">{record.report.recommendations}</p>
+                                                    <p className="text-zinc-300 text-xs leading-relaxed font-medium">{record.report.recommendations}</p>
                                                 </div>
                                             )}
                                         </div>
@@ -156,8 +156,8 @@ export default async function UnitHistoryPage({
                                         {/* Attached photos grid */}
                                         {record.photos && record.photos.length > 0 && (
                                             <div className="space-y-1.5 border-t border-zinc-900 pt-3 mt-3">
-                                                <span className="text-zinc-500 uppercase font-bold text-[7.5px] block tracking-wider flex items-center gap-1">
-                                                    <Camera className="h-3.5 w-3.5 text-zinc-400" />
+                                                <span className="text-zinc-550 uppercase font-bold text-[10px] block tracking-wider flex items-center gap-1">
+                                                    <Camera className="h-4 w-4 text-zinc-400" />
                                                     Photos jointes ({record.photos.length})
                                                 </span>
                                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -169,7 +169,7 @@ export default async function UnitHistoryPage({
                                                                 className="w-full h-full object-cover transition-transform group-hover:scale-105"
                                                             />
                                                             {ph.caption && (
-                                                                <div className="absolute inset-x-0 bottom-0 bg-black/75 p-1 text-[8px] text-zinc-300 truncate">
+                                                                <div className="absolute inset-x-0 bottom-0 bg-black/75 p-1.5 text-[10px] text-zinc-300 truncate">
                                                                     {ph.caption}
                                                                 </div>
                                                             )}
@@ -181,7 +181,7 @@ export default async function UnitHistoryPage({
                                         
                                     </div>
                                 ) : (
-                                    <p className="text-xxs italic text-zinc-500">
+                                    <p className="text-xs italic text-zinc-500">
                                         Aucun rapport écrit ni photo soumis pour cette intervention.
                                     </p>
                                 )}
@@ -190,7 +190,6 @@ export default async function UnitHistoryPage({
                     ))
                 )}
             </div>
-
         </div>
     )
 }

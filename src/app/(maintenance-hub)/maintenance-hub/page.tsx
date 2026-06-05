@@ -52,7 +52,7 @@ export default async function MaintenanceDashboardPage() {
     }
 
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in text-xs text-zinc-300">
             {/* Header section */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
@@ -67,16 +67,16 @@ export default async function MaintenanceDashboardPage() {
                 <div className="flex gap-2">
                     <Link
                         href="/maintenance-hub/services"
-                        className="h-8 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 font-bold text-xxs flex items-center px-4 hover:bg-zinc-850 hover:text-white transition-all cursor-pointer"
+                        className="h-9 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 font-bold text-xs flex items-center px-4 hover:bg-zinc-850 hover:text-white transition-all cursor-pointer"
                     >
-                        <Hammer className="h-3.5 w-3.5 mr-1.5 text-zinc-400" />
+                        <Hammer className="h-4 w-4 mr-1.5 text-zinc-400" />
                         Bibliothèque de services
                     </Link>
                     <Link
                         href="/maintenance-hub/campaigns/new"
-                        className="h-8 rounded-xl bg-purple-650 hover:bg-purple-700 text-white font-bold text-xxs flex items-center px-4 shadow transition-all hover:scale-[1.02] cursor-pointer"
+                        className="h-9 rounded-xl bg-purple-650 hover:bg-purple-700 text-white font-bold text-xs flex items-center px-4 shadow transition-all hover:scale-[1.02] cursor-pointer"
                     >
-                        <Plus className="h-3.5 w-3.5 mr-1.5" />
+                        <Plus className="h-4 w-4 mr-1.5" />
                         Nouvelle Campagne
                     </Link>
                 </div>
@@ -87,9 +87,9 @@ export default async function MaintenanceDashboardPage() {
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardContent className="p-4 flex items-center justify-between">
                         <div className="space-y-1">
-                            <span className="text-zinc-500 uppercase font-bold text-[8px] tracking-wider block">Campagnes actives</span>
+                            <span className="text-zinc-550 uppercase font-bold text-xs tracking-wider block">Campagnes actives</span>
                             <span className="text-xl font-extrabold text-white block">{stats.activeCampaigns}</span>
-                            <span className="text-[9px] text-zinc-400">{stats.totalCampaigns} au total</span>
+                            <span className="text-xs text-zinc-450">{stats.totalCampaigns} au total</span>
                         </div>
                         <div className="h-9 w-9 rounded-lg bg-purple-950/40 border border-purple-800/40 flex items-center justify-center">
                             <Activity className="h-4 w-4 text-purple-400" />
@@ -100,9 +100,9 @@ export default async function MaintenanceDashboardPage() {
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardContent className="p-4 flex items-center justify-between">
                         <div className="space-y-1">
-                            <span className="text-zinc-500 uppercase font-bold text-[8px] tracking-wider block">Unités gérées</span>
+                            <span className="text-zinc-550 uppercase font-bold text-xs tracking-wider block">Unités gérées</span>
                             <span className="text-xl font-extrabold text-white block">{stats.totalUnitsCount}</span>
-                            <span className="text-[9px] text-zinc-400">{stats.completedUnits} complétées</span>
+                            <span className="text-xs text-zinc-450">{stats.completedUnits} complétées</span>
                         </div>
                         <div className="h-9 w-9 rounded-lg bg-emerald-950/40 border border-emerald-800/40 flex items-center justify-center">
                             <Users className="h-4 w-4 text-emerald-400" />
@@ -113,7 +113,7 @@ export default async function MaintenanceDashboardPage() {
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardContent className="p-4 flex items-center justify-between">
                         <div className="space-y-1">
-                            <span className="text-zinc-500 uppercase font-bold text-[8px] tracking-wider block">Taux de participation</span>
+                            <span className="text-zinc-550 uppercase font-bold text-xs tracking-wider block">Taux de participation</span>
                             <span className="text-xl font-extrabold text-white block">{stats.participationRate}%</span>
                             {/* Simple progress indicator */}
                             <div className="w-24 h-1 bg-zinc-850 rounded-full mt-1.5 overflow-hidden">
@@ -129,7 +129,7 @@ export default async function MaintenanceDashboardPage() {
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardContent className="p-4 flex items-center justify-between">
                         <div className="space-y-1">
-                            <span className="text-zinc-500 uppercase font-bold text-[8px] tracking-wider block">Taux de complétion</span>
+                            <span className="text-zinc-550 uppercase font-bold text-xs tracking-wider block">Taux de complétion</span>
                             <span className="text-xl font-extrabold text-white block">{stats.completionRate}%</span>
                             {/* Simple progress indicator */}
                             <div className="w-24 h-1 bg-zinc-850 rounded-full mt-1.5 overflow-hidden">
@@ -150,14 +150,14 @@ export default async function MaintenanceDashboardPage() {
                 <div className="lg:col-span-2 space-y-4">
                     <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                         <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10">
-                            <CardTitle className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                            <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                                 <Calendar className="h-4 w-4 text-purple-400" />
                                 Campagnes actives & récentes
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
                             {campaigns.length === 0 ? (
-                                <div className="p-8 text-center text-xxs text-zinc-500">
+                                <div className="p-8 text-center text-xs text-zinc-500">
                                     Aucune campagne créée pour le moment.
                                 </div>
                             ) : (
@@ -168,25 +168,25 @@ export default async function MaintenanceDashboardPage() {
                                             href={`/maintenance-hub/campaigns/${c.id}`}
                                             className="flex items-center justify-between p-4 hover:bg-zinc-900/20 transition-all group"
                                         >
-                                            <div className="space-y-1 pr-4">
+                                            <div className="space-y-1 pr-4 text-xs">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-semibold text-xxs text-zinc-100 group-hover:text-purple-400 transition-colors">
+                                                    <span className="font-semibold text-xs text-zinc-100 group-hover:text-purple-400 transition-colors">
                                                         {c.name}
                                                     </span>
-                                                    <Badge variant="outline" className={`text-[7px] font-extrabold uppercase px-1.5 py-0 ${getStatusBadge(c.status)}`}>
+                                                    <Badge variant="outline" className={`text-[10px] font-extrabold uppercase px-1.5 py-0.5 ${getStatusBadge(c.status)}`}>
                                                         {getStatusLabel(c.status)}
                                                     </Badge>
                                                 </div>
-                                                <p className="text-[10px] text-zinc-400 line-clamp-1">
+                                                <p className="text-xs text-zinc-400 line-clamp-1">
                                                     {c.clients?.company_name || c.clients?.full_name} · du {new Date(c.start_date).toLocaleDateString('fr-CA')} au {new Date(c.end_date).toLocaleDateString('fr-CA')}
                                                 </p>
                                             </div>
                                             <div className="flex items-center gap-4 text-right">
-                                                <div className="text-xxs hidden sm:block">
-                                                    <span className="text-zinc-500 uppercase block font-bold text-[7px]">Contracteur</span>
-                                                    <span className="text-zinc-300 font-medium">{c.contractors?.full_name || 'Non assigné'}</span>
+                                                <div className="text-xs hidden sm:block">
+                                                    <span className="text-zinc-550 uppercase block font-bold text-[9px] tracking-wider">Contracteur</span>
+                                                    <span className="text-zinc-300 font-semibold">{c.contractors?.full_name || 'Non assigné'}</span>
                                                 </div>
-                                                <ChevronRight className="h-4 w-4 text-zinc-650 group-hover:text-zinc-450 group-hover:translate-x-0.5 transition-all" />
+                                                <ChevronRight className="h-4 w-4 text-zinc-600 group-hover:text-zinc-400 group-hover:translate-x-0.5 transition-all" />
                                             </div>
                                         </Link>
                                     ))}
@@ -200,32 +200,32 @@ export default async function MaintenanceDashboardPage() {
                 <div className="space-y-4">
                     <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                         <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10">
-                            <CardTitle className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                            <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                                 <UserCheck className="h-4 w-4 text-purple-400" />
                                 Performance par gestionnaire
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="pt-4 space-y-4">
                             {stats.teamStats.length === 0 ? (
-                                <p className="text-xxs italic text-zinc-500 text-center py-4">
+                                <p className="text-xs italic text-zinc-500 text-center py-4">
                                     Aucune statistique disponible.
                                 </p>
                             ) : (
                                 <div className="space-y-3.5">
                                     {stats.teamStats.map(m => (
-                                        <div key={m.managerName} className="p-3 bg-zinc-900/35 border border-zinc-850 rounded-xl space-y-2 text-xxs">
-                                            <div className="flex justify-between items-center border-b border-zinc-850/50 pb-1.5">
+                                        <div key={m.managerName} className="p-3 bg-zinc-900/35 border border-zinc-850 rounded-xl space-y-2 text-xs">
+                                            <div className="flex justify-between items-center border-b border-zinc-855/50 pb-1.5">
                                                 <span className="font-extrabold text-zinc-200">{m.managerName}</span>
-                                                <span className="text-[9px] text-zinc-500 font-bold">{m.campaignsCreated} campagne(s)</span>
+                                                <span className="text-xs text-zinc-500 font-bold">{m.campaignsCreated} campagne(s)</span>
                                             </div>
-                                            <div className="flex justify-between items-center text-[10px]">
+                                            <div className="flex justify-between items-center text-xs">
                                                 <span className="text-zinc-500">Unités ciblées:</span>
                                                 <strong className="text-zinc-300">{m.unitsProcessed}</strong>
                                             </div>
                                             <div className="space-y-1">
-                                                <div className="flex justify-between text-[10px]">
-                                                    <span className="text-zinc-500">Complétion:</span>
-                                                    <strong className="text-emerald-400 font-bold">{m.completionRate}%</strong>
+                                                <div className="flex justify-between text-xs">
+                                                    <span className="text-zinc-550">Complétion:</span>
+                                                    <strong className="text-emerald-450 text-emerald-400 font-bold">{m.completionRate}%</strong>
                                                 </div>
                                                 <div className="w-full h-1 bg-zinc-850 rounded-full overflow-hidden">
                                                     <div className="h-full bg-emerald-500" style={{ width: `${m.completionRate}%` }}></div>
