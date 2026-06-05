@@ -65,11 +65,12 @@ function ServiceRow({ svc, contractorId, onUnlink }: { svc: any; contractorId: s
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 overflow-hidden">
-      <button
-        onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-zinc-800/30 transition-colors group"
-      >
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center justify-between px-4 py-3 hover:bg-zinc-800/30 transition-colors group">
+        {/* Clickable expand area */}
+        <div
+          className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+          onClick={() => setOpen(v => !v)}
+        >
           <div className="min-w-0">
             <p className="text-sm font-medium text-zinc-100 truncate">{svc.name}</p>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -92,28 +93,32 @@ function ServiceRow({ svc, contractorId, onUnlink }: { svc: any; contractorId: s
             </div>
           </div>
         </div>
+
+        {/* Action buttons — separate from expand area */}
         <div className="flex items-center gap-1 ml-2 flex-shrink-0">
           {confirming ? (
             <span className="flex items-center gap-1">
-              <button onClick={e => { e.stopPropagation(); unlink() }} disabled={isPending}
+              <button onClick={unlink} disabled={isPending}
                 className="text-xs text-red-400 hover:text-red-300 font-semibold px-2 py-1 rounded bg-red-950/30">
                 Retirer
               </button>
-              <button onClick={e => { e.stopPropagation(); setConfirming(false) }}
+              <button onClick={() => setConfirming(false)}
                 className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1">
                 Annuler
               </button>
             </span>
           ) : (
-            <button onClick={e => { e.stopPropagation(); setConfirming(true) }}
+            <button onClick={() => setConfirming(true)}
               className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 p-1.5 rounded transition-all"
               title="Retirer ce service">
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}
-          {open ? <ChevronUp className="h-4 w-4 text-zinc-500" /> : <ChevronDown className="h-4 w-4 text-zinc-500" />}
+          <div className="cursor-pointer p-1" onClick={() => setOpen(v => !v)}>
+            {open ? <ChevronUp className="h-4 w-4 text-zinc-500" /> : <ChevronDown className="h-4 w-4 text-zinc-500" />}
+          </div>
         </div>
-      </button>
+      </div>
 
       {open && (
         <div className="px-4 pb-4 space-y-3 border-t border-zinc-800/50 pt-3 bg-zinc-900/20">
