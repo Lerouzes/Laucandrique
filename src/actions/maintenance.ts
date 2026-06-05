@@ -1129,29 +1129,107 @@ export async function importCoOwnersAction(
 // 10. CONTRACTOR HUB: SERVICES + PRICING
 // ==========================================
 
-/** All global services + optional contractor-specific price override */
+/**
+ * Returns only services LINKED to this contractor (entries in contractor_service_pricing).
+ * Each row includes pricing overrides. Global services without an entry are NOT returned.
+ */
 export async function getContractorServicesAction(contractorId: string) {
     const supabase = await createClient()
-    const [servicesRes, pricingRes] = await Promise.all([
-        supabase
-            .from('maintenance_services')
-            .select('*')
-            .order('category')
-            .order('name'),
-        supabase
-            .from('contractor_service_pricing')
-            .select('*')
-            .eq('contractor_id', contractorId)
-    ])
-    const services = servicesRes.data || []
-    const pricing = pricingRes.data || []
-    // Merge: attach contractor's custom price/note if set
-    return services.map((s: any) => {
-        const custom = pricing.find((p: any) => p.service_id === s.id)
-        return { ...s, custom_price: custom?.price ?? null, pricing_note: custom?.note ?? null, has_custom: !!custom }
-    })
+    const { data, error } = await supabase
+        .from('contractor_service_pricing')
+        .select('*, service:maintenance_services(*)')
+        .eq('contractor_id', contractorId)
+        .order('created_at')
+    if (error) return []
+    return (data || []).map((row: any) => ({
+        ...row.service,
+        custom_price: row.price ?? null,
+        pricing_note: row.note ?? null,
+        has_custom: row.price !== null,
+        pricing_id: row.id,
+    }))
 }
 
+/**
+ * Returns global services NOT yet linked to this contractor — for the import picker.
+ */
+export async function getUnlinkedServicesAction(contractorId: string) {
+    const supabase = await createClient()
+    const { data: linked } = await supabase
+        .from('contractor_service_pricing')
+        .select('service_id')
+        .eq('contractor_id', contractorId)
+    const linkedIds = (linked || []).map((r: any) => r.service_id)
+
+    let query = supabase
+        .from('maintenance_services')
+        .select('*')
+        .order('category')
+        .order('name')
+    if (linkedIds.length > 0) {
+        query = query.not('id', 'in', `(${linkedIds.join(',')})`)
+    }
+    const { data, error } = await query
+    if (error) return []
+    return data || []
+}
+
+/**
+ * Creates a brand-new global service AND immediately links it to this contractor.
+ */
+export async function createAndLinkServiceAction(contractorId: string, serviceData: {
+    name: string
+    description?: string | null
+    duration: number
+    price?: number | null
+    category: string
+    photos_required?: boolean
+    report_required?: boolean
+}) {
+    const supabase = await createClient()
+    // 1. Create global service
+    const { data: svc, error: svcErr } = await supabase
+        .from('maintenance_services')
+        .insert({
+            name: serviceData.name,
+            description: serviceData.description || null,
+            duration: serviceData.duration,
+            price: serviceData.price || 0,
+            category: serviceData.category,
+            photos_required: !!serviceData.photos_required,
+            report_required: !!serviceData.report_required,
+            default_contractor_id: contractorId,
+        })
+        .select()
+        .single()
+    if (svcErr) throw new Error(svcErr.message)
+
+    // 2. Link to contractor with base price
+    const { error: linkErr } = await supabase
+        .from('contractor_service_pricing')
+        .insert({ contractor_id: contractorId, service_id: svc.id, price: serviceData.price || null })
+    if (linkErr) throw new Error(linkErr.message)
+
+    revalidatePath(`/maintenance-hub/contractors/${contractorId}`)
+    revalidatePath('/maintenance-hub/services')
+    return svc
+}
+
+/**
+ * Links existing global services to a contractor (import from library).
+ */
+export async function linkExistingServicesAction(contractorId: string, serviceIds: string[]) {
+    const supabase = await createClient()
+    const rows = serviceIds.map(sid => ({ contractor_id: contractorId, service_id: sid }))
+    const { error } = await supabase
+        .from('contractor_service_pricing')
+        .upsert(rows, { onConflict: 'contractor_id,service_id', ignoreDuplicates: true })
+    if (error) throw new Error(error.message)
+    revalidatePath(`/maintenance-hub/contractors/${contractorId}`)
+    return { success: true }
+}
+
+/** Update the contractor's custom price/note for a service (service stays linked). */
 export async function upsertContractorServicePricingAction(contractorId: string, serviceId: string, price: number | null, note: string) {
     const supabase = await createClient()
     const { error } = await supabase
@@ -1162,7 +1240,8 @@ export async function upsertContractorServicePricingAction(contractorId: string,
     return { success: true }
 }
 
-export async function removeContractorServicePricingAction(contractorId: string, serviceId: string) {
+/** Unlink a service from this contractor only — global service is NOT deleted. */
+export async function unlinkContractorServiceAction(contractorId: string, serviceId: string) {
     const supabase = await createClient()
     const { error } = await supabase
         .from('contractor_service_pricing')
@@ -1173,6 +1252,9 @@ export async function removeContractorServicePricingAction(contractorId: string,
     revalidatePath(`/maintenance-hub/contractors/${contractorId}`)
     return { success: true }
 }
+
+// Keep old name as alias for backward compatibility
+export const removeContractorServicePricingAction = unlinkContractorServiceAction
 
 // ==========================================
 // 11. CONTRACTOR HUB: CHECKLIST

@@ -8,6 +8,7 @@ import {
   getCampaignsByContractorAction,
   getContractorChecklistAction,
   getOrCreateContractorTokenAction,
+  getUnlinkedServicesAction,
 } from '@/actions/maintenance'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,12 +29,13 @@ export default async function MaintenanceContractorDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [contractor, services, campaigns, checklist, token] = await Promise.all([
+  const [contractor, services, campaigns, checklist, token, library] = await Promise.all([
     getContractorById(id),
     getContractorServicesAction(id),
     getCampaignsByContractorAction(id),
     getContractorChecklistAction(id),
     getOrCreateContractorTokenAction(id).catch(() => null),
+    getUnlinkedServicesAction(id),
   ])
 
   if (!contractor) notFound()
@@ -160,6 +162,7 @@ export default async function MaintenanceContractorDetailPage({
             checklist={checklist}
             portalToken={token}
             baseUrl={baseUrl}
+            library={library}
           />
         </div>
 

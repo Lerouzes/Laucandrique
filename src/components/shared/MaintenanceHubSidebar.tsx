@@ -8,7 +8,6 @@ import {
     Layers,
     RefreshCw,
     Wrench,
-    Hammer,
     Plus,
     Building2
 } from 'lucide-react'
@@ -21,7 +20,6 @@ type Profile = Database['public']['Tables']['profiles']['Row']
 const navItems = [
     { name: 'Tableau de bord', href: '/maintenance-hub', icon: LayoutDashboard },
     { name: 'Entrepreneurs', href: '/maintenance-hub/contractors', icon: Building2 },
-    { name: 'Bibliothèque de services', href: '/maintenance-hub/services', icon: Hammer },
     { name: 'Nouvelle Campagne', href: '/maintenance-hub/campaigns/new', icon: Plus },
 ]
 
