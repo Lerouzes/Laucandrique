@@ -25,7 +25,7 @@ export default async function TeamManagementLayout({
 
     // Enforce role security: Operations role is blocked from Team Management
     const userRole = profile?.role || 'Operations'
-    if (userRole === 'Operations') {
+    if (userRole.toLowerCase() === 'operations') {
         redirect('/dashboard')
     }
 
