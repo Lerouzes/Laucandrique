@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { saveCoOwnerAction, deleteCoOwnerAction, importCoOwnersAction } from '@/actions/maintenance'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 
 interface CoOwnersManagerProps {
     clientId: string
@@ -46,6 +47,10 @@ export function CoOwnersManager({ clientId, initialCoOwners }: CoOwnersManagerPr
     const [email, setEmail] = useState('')
     const [phone, setPhone] = useState('')
     const [saving, setSaving] = useState(false)
+
+    // Deletion states
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+    const [doorToDelete, setDoorToDelete] = useState<{ id: string; doorNumber: string } | null>(null)
 
     // Excel import modal state
     const [showImportModal, setShowImportModal] = useState(false)
@@ -123,15 +128,25 @@ export function CoOwnersManager({ clientId, initialCoOwners }: CoOwnersManagerPr
         }
     }
 
-    const handleDelete = async (doorId: string, unitNum: string) => {
-        if (!confirm(`Voulez-vous vraiment supprimer l'unité ${unitNum} et son résident ? Cette action supprimera également tous les rendez-vous associés dans les campagnes.`)) return
+    const triggerDeleteConfirm = (doorId: string, unitNum: string) => {
+        setDoorToDelete({ id: doorId, doorNumber: unitNum })
+        setDeleteConfirmOpen(true)
+    }
+
+    const handleDelete = async () => {
+        if (!doorToDelete) return
+        setDeleteConfirmOpen(false)
+        setSaving(true)
         try {
-            await deleteCoOwnerAction(doorId, clientId)
+            await deleteCoOwnerAction(doorToDelete.id, clientId)
             toast.success("Unité supprimée avec succès.")
             router.refresh()
             window.location.reload()
         } catch (err) {
             toast.error("Erreur de suppression : " + (err as Error).message)
+        } finally {
+            setSaving(false)
+            setDoorToDelete(null)
         }
     }
 
@@ -368,7 +383,7 @@ export function CoOwnersManager({ clientId, initialCoOwners }: CoOwnersManagerPr
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        onClick={() => handleDelete(co.id, co.door_number)}
+                                                        onClick={() => triggerDeleteConfirm(co.id, co.door_number)}
                                                         className="h-8 w-8 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg cursor-pointer"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
@@ -455,6 +470,20 @@ export function CoOwnersManager({ clientId, initialCoOwners }: CoOwnersManagerPr
                         </CardContent>
                     </Card>
                 </div>
+            )}
+
+            {doorToDelete && (
+                <ConfirmationDialog
+                    open={deleteConfirmOpen}
+                    onOpenChange={setDeleteConfirmOpen}
+                    title="Supprimer le co-propriétaire ?"
+                    description={`Voulez-vous vraiment supprimer l'unité ${doorToDelete.doorNumber} et son résident ? Cette action supprimera également tous les rendez-vous associés dans les campagnes.`}
+                    confirmText="Supprimer"
+                    cancelText="Annuler"
+                    onConfirm={handleDelete}
+                    loading={saving}
+                    variant="danger"
+                />
             )}
         </div>
     )
