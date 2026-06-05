@@ -27,6 +27,7 @@ import {
 import { toast } from 'sonner'
 import { saveCoOwnerAction, deleteCoOwnerAction, importCoOwnersAction } from '@/actions/maintenance'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
+import { CoOwnersExcelImport } from './CoOwnersExcelImport'
 
 interface CoOwnersManagerProps {
     clientId: string
@@ -51,16 +52,6 @@ export function CoOwnersManager({ clientId, initialCoOwners }: CoOwnersManagerPr
     // Deletion states
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
     const [doorToDelete, setDoorToDelete] = useState<{ id: string; doorNumber: string } | null>(null)
-
-    // Excel import modal state
-    const [showImportModal, setShowImportModal] = useState(false)
-    const [importData, setImportData] = useState('')
-    const [importing, setImporting] = useState(false)
-    const [importResult, setImportResult] = useState<{
-        success: boolean
-        importedCount: number
-        conflicts: string[]
-    } | null>(null)
 
     const splitName = (fullName: string) => {
         const parts = (fullName || '').trim().split(' ')
@@ -150,56 +141,7 @@ export function CoOwnersManager({ clientId, initialCoOwners }: CoOwnersManagerPr
         }
     }
 
-    const handleImportCoOwners = async () => {
-        if (!importData.trim()) {
-            toast.error("Veuillez coller ou saisir les données des co-propriétaires.")
-            return
-        }
 
-        setImporting(true)
-        setImportResult(null)
-
-        try {
-            const lines = importData.split('\n')
-            const parsedRows: any[] = []
-
-            lines.forEach((line) => {
-                if (!line.trim()) return
-                const columns = line.split(/\t|,/)
-                
-                const door_number = columns[0]?.trim()
-                const fName = columns[1]?.trim() || ''
-                const lName = columns[2]?.trim() || ''
-                const fullName = `${fName} ${lName}`.trim()
-                
-                if (door_number && fullName) {
-                    parsedRows.push({
-                        door_number,
-                        full_name: fullName,
-                        email: columns[3]?.trim() || '',
-                        phone: columns[4]?.trim() || ''
-                    })
-                }
-            })
-
-            if (parsedRows.length === 0) {
-                toast.error("Aucune ligne valide détectée. Format requis : Unité, Prénom, Nom, Courriel, Téléphone")
-                setImporting(false)
-                return
-            }
-
-            const res = await importCoOwnersAction(clientId, parsedRows)
-            setImportResult(res)
-            toast.success(`${res.importedCount} co-propriétaires importés !`)
-            
-            // Reload page
-            router.refresh()
-        } catch (err) {
-            toast.error("Erreur lors de l'import : " + (err as Error).message)
-        } finally {
-            setImporting(false)
-        }
-    }
 
     const filteredCoOwners = coOwners.filter(co => {
         const matchesSearch = String(co.door_number).toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -223,14 +165,14 @@ export function CoOwnersManager({ clientId, initialCoOwners }: CoOwnersManagerPr
                 </div>
                 
                 <div className="flex gap-2 w-full sm:w-auto">
-                    <Button
-                        type="button"
-                        onClick={() => setShowImportModal(true)}
-                        className="bg-purple-900/40 hover:bg-purple-800/40 text-purple-400 border border-purple-800/40 text-xs font-bold h-10 px-4 rounded-xl flex items-center gap-1.5 cursor-pointer"
-                    >
-                        <FileSpreadsheet className="h-4 w-4" />
-                        Importer (Excel)
-                    </Button>
+                    <CoOwnersExcelImport
+                        clientId={clientId}
+                        existingCoOwners={coOwners}
+                        onSuccess={() => {
+                            router.refresh()
+                            window.location.reload()
+                        }}
+                    />
                     <Button
                         type="button"
                         onClick={() => setShowForm(true)}
@@ -399,78 +341,7 @@ export function CoOwnersManager({ clientId, initialCoOwners }: CoOwnersManagerPr
                 </CardContent>
             </Card>
 
-            {/* Excel Import Modal */}
-            {showImportModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <Card className="bg-[#16171e] border border-zinc-800 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <CardHeader className="pb-3 border-b border-zinc-900">
-                            <CardTitle className="text-sm font-bold text-white uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
-                                <FileSpreadsheet className="h-4 w-4" />
-                                Importation Excel / CSV des co-propriétaires
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-4 space-y-4">
-                            <p className="text-xs text-zinc-400 leading-relaxed">
-                                Collez des lignes copiées directement depuis Excel ou un fichier CSV. 
-                                Format attendu (séparation par tabulation ou virgule) :<br />
-                                <strong className="text-zinc-300 font-mono text-xs">Unité (ex: 304) | Prénom (ex: Alice) | Nom (ex: Roy) | Email (optionnel) | Téléphone (optionnel)</strong>
-                            </p>
 
-                            <div className="space-y-2">
-                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Données à importer</Label>
-                                <Textarea
-                                    value={importData}
-                                    onChange={(e) => setImportData(e.target.value)}
-                                    placeholder="304&#9;Alice&#9;Roy&#9;alice@email.com&#9;514-123-4567&#10;305&#9;Marc&#9;Tremblay&#9;marc@email.com"
-                                    rows={8}
-                                    className="bg-zinc-950 border-zinc-850 text-xs text-white py-2 font-mono"
-                                />
-                            </div>
-
-                            {/* Result log */}
-                            {importResult && (
-                                <div className="p-3 bg-zinc-950 border border-zinc-850 rounded-xl space-y-2 max-h-[150px] overflow-y-auto text-xs">
-                                    <p className="font-bold text-emerald-400">
-                                        Import réussi : {importResult.importedCount} co-propriétaires importés.
-                                    </p>
-                                    {importResult.conflicts.length > 0 && (
-                                        <div className="text-amber-400">
-                                            <span className="font-bold">Conflits rencontrés :</span>
-                                            <ul className="list-disc list-inside font-mono text-xs mt-0.5 space-y-0.5">
-                                                {importResult.conflicts.map((c, i) => <li key={i}>{c}</li>)}
-                                            </ul>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            <div className="flex justify-end gap-2 pt-2">
-                                <Button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowImportModal(false)
-                                        setImportData('')
-                                        setImportResult(null)
-                                        resetForm()
-                                        router.refresh()
-                                        window.location.reload()
-                                    }}
-                                    className="bg-transparent border border-zinc-850 text-zinc-400 text-xs font-bold h-10 px-4 rounded-xl hover:bg-zinc-950 cursor-pointer"
-                                >
-                                    Fermer
-                                </Button>
-                                <Button
-                                    onClick={handleImportCoOwners}
-                                    disabled={importing}
-                                    className="bg-purple-650 hover:bg-purple-700 text-white font-bold text-xs h-10 px-4 rounded-xl shadow cursor-pointer flex items-center gap-1.5"
-                                >
-                                    {importing ? 'Importation...' : 'Lancer l\'import'}
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
 
             {doorToDelete && (
                 <ConfirmationDialog
