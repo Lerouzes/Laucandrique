@@ -1125,3 +1125,137 @@ export async function importCoOwnersAction(
     }
 }
 
+// ==========================================
+// 10. CONTRACTOR HUB: SERVICES + PRICING
+// ==========================================
+
+/** All global services + optional contractor-specific price override */
+export async function getContractorServicesAction(contractorId: string) {
+    const supabase = await createClient()
+    const [servicesRes, pricingRes] = await Promise.all([
+        supabase
+            .from('maintenance_services')
+            .select('*')
+            .order('category')
+            .order('name'),
+        supabase
+            .from('contractor_service_pricing')
+            .select('*')
+            .eq('contractor_id', contractorId)
+    ])
+    const services = servicesRes.data || []
+    const pricing = pricingRes.data || []
+    // Merge: attach contractor's custom price/note if set
+    return services.map((s: any) => {
+        const custom = pricing.find((p: any) => p.service_id === s.id)
+        return { ...s, custom_price: custom?.price ?? null, pricing_note: custom?.note ?? null, has_custom: !!custom }
+    })
+}
+
+export async function upsertContractorServicePricingAction(contractorId: string, serviceId: string, price: number | null, note: string) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('contractor_service_pricing')
+        .upsert({ contractor_id: contractorId, service_id: serviceId, price, note: note || null }, { onConflict: 'contractor_id,service_id' })
+    if (error) throw new Error(error.message)
+    revalidatePath(`/maintenance-hub/contractors/${contractorId}`)
+    return { success: true }
+}
+
+export async function removeContractorServicePricingAction(contractorId: string, serviceId: string) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('contractor_service_pricing')
+        .delete()
+        .eq('contractor_id', contractorId)
+        .eq('service_id', serviceId)
+    if (error) throw new Error(error.message)
+    revalidatePath(`/maintenance-hub/contractors/${contractorId}`)
+    return { success: true }
+}
+
+// ==========================================
+// 11. CONTRACTOR HUB: CHECKLIST
+// ==========================================
+
+export async function getContractorChecklistAction(contractorId: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('contractor_checklist')
+        .select('*')
+        .eq('contractor_id', contractorId)
+        .order('created_at')
+    if (error) return []
+    return data || []
+}
+
+export async function addContractorChecklistItemAction(contractorId: string, label: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('contractor_checklist')
+        .insert({ contractor_id: contractorId, label, done: false })
+        .select()
+        .single()
+    if (error) throw new Error(error.message)
+    revalidatePath(`/maintenance-hub/contractors/${contractorId}`)
+    return data
+}
+
+export async function toggleContractorChecklistItemAction(id: string, done: boolean) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('contractor_checklist')
+        .update({ done })
+        .eq('id', id)
+    if (error) throw new Error(error.message)
+    return { success: true }
+}
+
+export async function deleteContractorChecklistItemAction(id: string) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('contractor_checklist')
+        .delete()
+        .eq('id', id)
+    if (error) throw new Error(error.message)
+    return { success: true }
+}
+
+// ==========================================
+// 12. CONTRACTOR HUB: CAMPAIGNS LOOKUP
+// ==========================================
+
+export async function getCampaignsByContractorAction(contractorId: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('maintenance_campaigns')
+        .select('id, name, status, start_date, end_date, clients(company_name, full_name)')
+        .eq('contractor_id', contractorId)
+        .order('start_date', { ascending: false })
+    if (error) return []
+    return data || []
+}
+
+// ==========================================
+// 13. CONTRACTOR HUB: PORTAL TOKEN
+// ==========================================
+
+export async function getOrCreateContractorTokenAction(contractorId: string) {
+    const supabase = await createClient()
+    // Try to find existing token
+    const { data: existing } = await supabase
+        .from('maintenance_contractor_tokens')
+        .select('token')
+        .eq('contractor_id', contractorId)
+        .maybeSingle()
+    if (existing?.token) return existing.token
+
+    // Create new token
+    const crypto = require('crypto')
+    const token = crypto.randomBytes(24).toString('hex')
+    const { error } = await supabase
+        .from('maintenance_contractor_tokens')
+        .insert({ contractor_id: contractorId, token })
+    if (error) throw new Error(error.message)
+    return token
+}
