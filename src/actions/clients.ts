@@ -77,16 +77,33 @@ export async function createClientAction(formData: FormData) {
     console.log('Inserting novel client:', newClient)
 
     try {
-        let { error } = await supabase.from('clients').insert(newClient)
+        let { data, error } = await supabase.from('clients').insert(newClient).select('id').single()
         if (error && error.message.includes('manager_id')) {
             const { manager_id, ...fallbackClient } = newClient as any
-            const retry = await supabase.from('clients').insert(fallbackClient)
+            const retry = await supabase.from('clients').insert(fallbackClient).select('id').single()
+            data = retry.data
             error = retry.error
         }
 
-        if (error) {
+        if (error || !data) {
             console.error('SUPABASE INSERT ERROR on client:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: error ? error.message : 'Missing inserted client' }
+        }
+
+        const clientId = data.id
+        const doors_count_raw = formData.get('doors_count')
+        if (doors_count_raw !== null && doors_count_raw !== '') {
+            const doorsNum = Math.floor(Number(doors_count_raw))
+            if (!isNaN(doorsNum) && doorsNum > 0) {
+                const doorsToInsert = Array.from({ length: doorsNum }, (_, i) => ({
+                    client_id: clientId,
+                    door_number: `Porte ${i + 1}`,
+                }))
+                const { error: doorsErr } = await supabase.from('doors').insert(doorsToInsert)
+                if (doorsErr) {
+                    console.error('SUPABASE INSERT ERROR on doors:', doorsErr)
+                }
+            }
         }
 
         revalidatePath('/clients')

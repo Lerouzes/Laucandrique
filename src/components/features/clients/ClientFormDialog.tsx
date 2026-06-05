@@ -37,6 +37,7 @@ const clientSchema = z.object({
     province: z.string().optional(),
     postal_code: z.string().optional(),
     manager_id: z.string().optional(),
+    doors_count: z.string().optional().or(z.literal('')),
 })
 
 export function ClientFormDialog({ managers = [] }: { managers?: any[] }) {
@@ -55,6 +56,7 @@ export function ClientFormDialog({ managers = [] }: { managers?: any[] }) {
             province: '',
             postal_code: '',
             manager_id: '',
+            doors_count: '',
         },
     })
 
@@ -143,6 +145,20 @@ export function ClientFormDialog({ managers = [] }: { managers?: any[] }) {
                                                 ))}
                                             </select>
                                         </FormControl>
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="doors_count"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="text-zinc-300">Nombre de portes</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" placeholder="ex: 20" {...field} className="bg-zinc-900 border-zinc-800 focus-visible:ring-zinc-600" />
+                                        </FormControl>
+                                        <FormMessage />
                                     </FormItem>
                                 )}
                             />
