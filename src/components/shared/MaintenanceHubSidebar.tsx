@@ -9,7 +9,8 @@ import {
     RefreshCw,
     Wrench,
     Hammer,
-    Plus
+    Plus,
+    Building2
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -19,6 +20,7 @@ type Profile = Database['public']['Tables']['profiles']['Row']
 
 const navItems = [
     { name: 'Tableau de bord', href: '/maintenance-hub', icon: LayoutDashboard },
+    { name: 'Entrepreneurs', href: '/maintenance-hub/contractors', icon: Building2 },
     { name: 'Bibliothèque de services', href: '/maintenance-hub/services', icon: Hammer },
     { name: 'Nouvelle Campagne', href: '/maintenance-hub/campaigns/new', icon: Plus },
 ]
