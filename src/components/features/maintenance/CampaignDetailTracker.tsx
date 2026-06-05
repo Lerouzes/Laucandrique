@@ -504,7 +504,7 @@ export function CampaignDetailTracker({
                                         <tr key={u.id} className="hover:bg-zinc-900/15">
                                             <td className="p-3">
                                                 <Link 
-                                                    href={`/team-management/maintenance/units/${u.door_id}`}
+                                                    href={`/maintenance-hub/units/${u.door_id}`}
                                                     className="font-extrabold text-purple-400 hover:text-purple-300 hover:underline flex items-center gap-1"
                                                 >
                                                     Unit {u.door?.door_number}

@@ -32,7 +32,7 @@ export default async function NewCampaignPage() {
             {/* Top Navigation */}
             <div>
                 <Link
-                    href="/team-management/maintenance"
+                    href="/maintenance-hub"
                     className="text-xxs text-zinc-500 hover:text-zinc-300 font-bold flex items-center gap-1.5 transition-colors w-fit"
                 >
                     <ArrowLeft className="h-3.5 w-3.5" />

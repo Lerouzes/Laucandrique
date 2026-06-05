@@ -14,7 +14,6 @@ const navItems = [
     { name: 'Clients', href: '/clients', icon: Users },
     { name: 'Soumissions', href: '/quotes', icon: FileText },
     { name: 'Planification', href: '/planification', icon: CalendarDays },
-    { name: 'Hub de Maintenance', href: '/team-management/maintenance', icon: Wrench },
     { name: 'Contracteurs', href: '/contractors', icon: HardHat },
     { name: 'Factures', href: '/bills', icon: Receipt },
     { name: 'Analytiques', href: '/analytics', icon: BarChart },
@@ -25,8 +24,8 @@ export function SidebarContent({ profile }: { profile: Profile | null }) {
     const pathname = usePathname()
     const [isSwitcherOpen, setIsSwitcherOpen] = useState(false)
     
-    const role = profile?.role || 'Operations'
-    const hasBothAccess = role === 'Direction' || role === 'Master'
+    const role = (profile?.role || 'Operations').toLowerCase()
+    const hasBothAccess = role === 'direction' || role === 'master'
 
     return (
         <>
@@ -61,6 +60,14 @@ export function SidebarContent({ profile }: { profile: Profile | null }) {
                             >
                                 <Layers className="h-3.5 w-3.5 text-purple-400" />
                                 Gestion d'Équipe
+                            </Link>
+                            <Link 
+                                href="/maintenance-hub"
+                                onClick={() => setIsSwitcherOpen(false)}
+                                className="flex items-center gap-2 p-3 text-xs text-white/70 hover:text-white hover:bg-white/15 transition-all"
+                            >
+                                <Wrench className="h-3.5 w-3.5 text-amber-400" />
+                                Hub de Maintenance
                             </Link>
                         </div>
                     )}

@@ -57,7 +57,7 @@ export default async function MaintenanceDashboardPage() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h1 className="text-xl font-bold tracking-tight text-white uppercase flex items-center gap-2">
-                        <Wrench className="h-5 w-5 text-purple-400" />
+                        <Wrench className="h-5 w-5 text-amber-500" />
                         Maintenance Hub
                     </h1>
                     <p className="text-xs text-zinc-400">
@@ -66,14 +66,14 @@ export default async function MaintenanceDashboardPage() {
                 </div>
                 <div className="flex gap-2">
                     <Link
-                        href="/team-management/maintenance/services"
+                        href="/maintenance-hub/services"
                         className="h-8 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 font-bold text-xxs flex items-center px-4 hover:bg-zinc-850 hover:text-white transition-all cursor-pointer"
                     >
                         <Hammer className="h-3.5 w-3.5 mr-1.5 text-zinc-400" />
                         Bibliothèque de services
                     </Link>
                     <Link
-                        href="/team-management/maintenance/campaigns/new"
+                        href="/maintenance-hub/campaigns/new"
                         className="h-8 rounded-xl bg-purple-650 hover:bg-purple-700 text-white font-bold text-xxs flex items-center px-4 shadow transition-all hover:scale-[1.02] cursor-pointer"
                     >
                         <Plus className="h-3.5 w-3.5 mr-1.5" />
@@ -165,7 +165,7 @@ export default async function MaintenanceDashboardPage() {
                                     {campaigns.map(c => (
                                         <Link 
                                             key={c.id} 
-                                            href={`/team-management/maintenance/campaigns/${c.id}`}
+                                            href={`/maintenance-hub/campaigns/${c.id}`}
                                             className="flex items-center justify-between p-4 hover:bg-zinc-900/20 transition-all group"
                                         >
                                             <div className="space-y-1 pr-4">

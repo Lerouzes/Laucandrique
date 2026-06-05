@@ -111,7 +111,7 @@ export function NewCampaignForm({
             })
 
             toast.success("Campagne de maintenance créée avec succès.")
-            router.push(`/team-management/maintenance/campaigns/${campaign.id}`)
+            router.push(`/maintenance-hub/campaigns/${campaign.id}`)
             router.refresh()
         } catch (err) {
             toast.error("Erreur lors de la création : " + (err as Error).message)
@@ -359,7 +359,7 @@ export function NewCampaignForm({
             <div className="flex justify-end gap-3 pt-2">
                 <Button
                     type="button"
-                    onClick={() => router.push('/team-management/maintenance')}
+                    onClick={() => router.push('/maintenance-hub')}
                     className="bg-transparent border border-zinc-850 text-zinc-400 text-xxs font-bold h-9 px-6 rounded-xl hover:bg-zinc-900 cursor-pointer"
                 >
                     Annuler

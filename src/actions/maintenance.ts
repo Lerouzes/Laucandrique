@@ -56,7 +56,7 @@ export async function saveServiceAction(data: {
             .select()
             .single()
         if (error) throw new Error(error.message)
-        revalidatePath('/team-management/maintenance/services')
+        revalidatePath('/maintenance-hub/services')
         return res
     } else {
         const { data: res, error } = await supabase
@@ -65,7 +65,7 @@ export async function saveServiceAction(data: {
             .select()
             .single()
         if (error) throw new Error(error.message)
-        revalidatePath('/team-management/maintenance/services')
+        revalidatePath('/maintenance-hub/services')
         return res
     }
 }
@@ -78,7 +78,7 @@ export async function deleteServiceAction(id: string) {
         .eq('id', id)
 
     if (error) throw new Error(error.message)
-    revalidatePath('/team-management/maintenance/services')
+    revalidatePath('/maintenance-hub/services')
     return { success: true }
 }
 
@@ -182,7 +182,7 @@ export async function createCampaignAction(data: {
         }
     }
 
-    revalidatePath('/team-management/maintenance')
+    revalidatePath('/maintenance-hub')
     return campaign
 }
 
@@ -196,8 +196,8 @@ export async function updateCampaignStatusAction(id: string, status: 'draft' | '
         .single()
 
     if (error) throw new Error(error.message)
-    revalidatePath(`/team-management/maintenance/campaigns/${id}`)
-    revalidatePath('/team-management/maintenance')
+    revalidatePath(`/maintenance-hub/campaigns/${id}`)
+    revalidatePath('/maintenance-hub')
     return data
 }
 
@@ -512,7 +512,7 @@ export async function submitParticipationAction(
             .eq('door_id', unit.door_id)
     }
 
-    revalidatePath(`/team-management/maintenance/campaigns/${unit.campaign_id}`)
+    revalidatePath(`/maintenance-hub/campaigns/${unit.campaign_id}`)
     return unit
 }
 
@@ -596,7 +596,7 @@ export async function scheduleAppointmentAction(
         .update({ participation: 'interested' })
         .eq('id', unit.id)
 
-    revalidatePath(`/team-management/maintenance/campaigns/${unit.campaign_id}`)
+    revalidatePath(`/maintenance-hub/campaigns/${unit.campaign_id}`)
     return result
 }
 
@@ -619,7 +619,7 @@ export async function cancelAppointmentAction(token: string) {
 
     if (cancelErr) throw new Error(cancelErr.message)
 
-    revalidatePath(`/team-management/maintenance/campaigns/${unit.campaign_id}`)
+    revalidatePath(`/maintenance-hub/campaigns/${unit.campaign_id}`)
     return { success: true }
 }
 
@@ -821,7 +821,7 @@ export async function saveMaintenanceReportAction(
             .eq('door_id', appt.door_id)
     }
 
-    revalidatePath(`/team-management/maintenance/campaigns/${appt.campaign_id}`)
+    revalidatePath(`/maintenance-hub/campaigns/${appt.campaign_id}`)
     return { success: true, reportId }
 }
 

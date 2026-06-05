@@ -22,7 +22,7 @@ export default async function DashboardLayout({
         .single()
 
     // Redirect Managers to Team Management
-    if (profile?.role === 'Managers') {
+    if (profile?.role?.toLowerCase() === 'managers') {
         redirect('/team-management/dashboard')
     }
 
