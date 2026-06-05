@@ -7,7 +7,8 @@ import { useRouter } from 'next/navigation'
 import { 
     updateCampaignStatusAction, 
     importResidentsAction,
-    getCampaignDetailsAction
+    getCampaignDetailsAction,
+    advanceCampaignPhaseAction
 } from '@/actions/maintenance'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -55,6 +56,7 @@ export function CampaignDetailTracker({
     const [searchTerm, setSearchTerm] = useState('')
     const [statusFilter, setStatusFilter] = useState('All')
     const [updatingStatus, setUpdatingStatus] = useState(false)
+    const [advancingPhase, setAdvancingPhase] = useState(false)
 
     // Excel import modal state
     const [showImportModal, setShowImportModal] = useState(false)
@@ -96,6 +98,19 @@ export function CampaignDetailTracker({
             toast.error("Erreur lors de la modification du statut: " + (err as Error).message)
         } finally {
             setUpdatingStatus(false)
+        }
+    }
+
+    const handleAdvancePhase = async () => {
+        setAdvancingPhase(true)
+        try {
+            await advanceCampaignPhaseAction(campaign.id)
+            toast.success("Campagne de maintenance passée à la phase de planification.")
+            router.refresh()
+        } catch (err) {
+            toast.error("Erreur lors du changement de phase: " + (err as Error).message)
+        } finally {
+            setAdvancingPhase(false)
         }
     }
 
@@ -219,6 +234,14 @@ export function CampaignDetailTracker({
                              campaign.status === 'completed' ? 'Complété' :
                              campaign.status === 'cancelled' ? 'Annulé' : 'Brouillon'}
                         </Badge>
+                        {campaign.survey_required && (
+                            <Badge variant="outline" className={`text-[10px] font-extrabold uppercase px-1.5 py-0.5 ${
+                                campaign.current_phase === 'survey' ? 'bg-amber-500/10 text-amber-400 border-amber-500/25' :
+                                'bg-purple-500/10 text-purple-400 border-purple-500/25'
+                            }`}>
+                                {campaign.current_phase === 'survey' ? 'Phase 1 : Sondage d\'intérêt' : 'Phase 2 : Planification'}
+                            </Badge>
+                        )}
                         <h2 className="text-base font-extrabold text-white uppercase tracking-wider">{campaign.name}</h2>
                     </div>
                     <p className="text-xs text-zinc-400">
@@ -241,6 +264,15 @@ export function CampaignDetailTracker({
                     )}
                     {campaign.status === 'active' && (
                         <>
+                            {campaign.survey_required && campaign.current_phase === 'survey' && (
+                                <Button
+                                    disabled={advancingPhase || updatingStatus}
+                                    onClick={handleAdvancePhase}
+                                    className="bg-purple-650 hover:bg-purple-700 text-white font-bold text-xs h-9 px-4 rounded-xl shadow cursor-pointer transition-colors"
+                                >
+                                    Passer à la planification
+                                </Button>
+                            )}
                             <Button
                                 disabled={updatingStatus}
                                 onClick={() => handleStatusChange('completed')}
@@ -549,14 +581,25 @@ export function CampaignDetailTracker({
                                                 )}
                                             </td>
                                             <td className="p-3 text-right">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => handleCopyInviteLink(u.invite_token)}
-                                                    className="h-8 w-8 text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg cursor-pointer"
-                                                >
-                                                    {copiedToken === u.invite_token ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
-                                                </Button>
+                                                <div className="flex justify-end gap-1">
+                                                    <Link
+                                                        href={`/maintenance/invite/${u.invite_token}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex h-8 w-8 items-center justify-center text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors"
+                                                        title="Tester le lien résident"
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                    </Link>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => handleCopyInviteLink(u.invite_token)}
+                                                        className="h-8 w-8 text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg cursor-pointer"
+                                                    >
+                                                        {copiedToken === u.invite_token ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                                                    </Button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}

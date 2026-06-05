@@ -299,9 +299,20 @@ export function ResidentInvitePortal({
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-4 space-y-4">
-                        
-                        {/* Currently scheduled appointment details */}
-                        {appointment ? (
+                        {campaign.current_phase === 'survey' ? (
+                            <div className="p-4 bg-purple-950/10 border border-purple-900/30 rounded-xl space-y-2 text-xs">
+                                <div className="flex items-start gap-3">
+                                    <Clock className="h-5 w-5 text-purple-400 shrink-0 mt-0.5" />
+                                    <div className="space-y-1">
+                                        <span className="font-extrabold text-purple-300 text-xs block">Phase de sondage en cours</span>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">
+                                            Cette campagne est actuellement en phase de sondage de participation. 
+                                            Dès que l'administrateur aura validé la participation et ouvert la phase de planification, vous pourrez choisir votre date et votre plage horaire de rendez-vous sur cette page.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : appointment ? (
                             <div className="p-4 bg-emerald-950/10 border border-emerald-900/40 rounded-xl space-y-3 text-xs">
                                 <div className="flex items-start gap-3">
                                     <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />

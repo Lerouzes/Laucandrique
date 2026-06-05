@@ -28,15 +28,15 @@ import {
 import { toast } from 'sonner'
 
 const CATEGORIES = [
-    'Plumbing',
-    'Windows',
-    'Patio Doors',
-    'Screens',
+    'Plomberie',
+    'Fenêtres',
+    'Portes-patio',
+    'Moustiquaires',
     'Ventilation',
-    'Electrical',
-    'Safety',
-    'Building',
-    'Administrative'
+    'Électricité',
+    'Sécurité',
+    'Bâtiment',
+    'Administratif'
 ]
 
 export function ServicesLibrary({ 
@@ -57,7 +57,7 @@ export function ServicesLibrary({
     const [description, setDescription] = useState('')
     const [duration, setDuration] = useState('20')
     const [price, setPrice] = useState('0')
-    const [category, setCategory] = useState('Plumbing')
+    const [category, setCategory] = useState('Plomberie')
     const [photosRequired, setPhotosRequired] = useState(false)
     const [reportRequired, setReportRequired] = useState(false)
     const [defaultContractorId, setDefaultContractorId] = useState('')
@@ -82,7 +82,7 @@ export function ServicesLibrary({
         setDescription('')
         setDuration('20')
         setPrice('0')
-        setCategory('Plumbing')
+        setCategory('Plomberie')
         setPhotosRequired(false)
         setReportRequired(false)
         setDefaultContractorId('')

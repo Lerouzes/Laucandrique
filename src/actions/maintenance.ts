@@ -112,6 +112,7 @@ export async function createCampaignAction(data: {
     pricing_type?: 'hidden' | 'visible' | 'free'
     services: string[] // Array of service IDs
     availability_settings?: any
+    survey_required?: boolean
 }) {
     const supabase = await createClient()
 
@@ -134,7 +135,9 @@ export async function createCampaignAction(data: {
                 bufferMinutes: 10,
                 breakPeriods: [{ start: '12:00', end: '13:00' }]
             },
-            status: 'draft'
+            status: 'draft',
+            survey_required: !!data.survey_required,
+            current_phase: data.survey_required ? 'survey' : 'scheduling'
         })
         .select()
         .single()
@@ -971,3 +974,154 @@ export async function getUnitMaintenanceHistoryAction(doorId: string) {
         history
     }
 }
+
+export async function advanceCampaignPhaseAction(campaignId: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('maintenance_campaigns')
+        .update({ current_phase: 'scheduling', updated_at: new Date().toISOString() })
+        .eq('id', campaignId)
+        .select()
+        .single()
+
+    if (error) throw new Error(error.message)
+    revalidatePath(`/maintenance-hub/campaigns/${campaignId}`)
+    revalidatePath('/maintenance-hub')
+    return data
+}
+
+export async function saveCoOwnerAction(data: {
+    id?: string
+    clientId: string
+    door_number: string
+    full_name: string
+    email?: string | null
+    phone?: string | null
+}) {
+    const supabase = await createClient()
+    
+    if (data.id) {
+        // Update door
+        const { error: doorErr } = await supabase
+            .from('doors')
+            .update({ door_number: data.door_number })
+            .eq('id', data.id)
+        if (doorErr) throw new Error(doorErr.message)
+
+        // Upsert resident using door_id unique constraint
+        const { error: resErr } = await supabase
+            .from('maintenance_residents')
+            .upsert({
+                door_id: data.id,
+                full_name: data.full_name,
+                email: data.email || null,
+                phone: data.phone || null,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'door_id' })
+        if (resErr) throw new Error(resErr.message)
+        
+        revalidatePath(`/clients/${data.clientId}`)
+        return { success: true }
+    } else {
+        // Insert door
+        const { data: door, error: doorErr } = await supabase
+            .from('doors')
+            .insert({ client_id: data.clientId, door_number: data.door_number })
+            .select()
+            .single()
+        if (doorErr) throw new Error(doorErr.message)
+
+        // Insert resident
+        const { error: resErr } = await supabase
+            .from('maintenance_residents')
+            .insert({
+                door_id: door.id,
+                full_name: data.full_name,
+                email: data.email || null,
+                phone: data.phone || null
+            })
+        if (resErr) throw new Error(resErr.message)
+        
+        revalidatePath(`/clients/${data.clientId}`)
+        return { success: true }
+    }
+}
+
+export async function deleteCoOwnerAction(doorId: string, clientId: string) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('doors')
+        .delete()
+        .eq('id', doorId)
+    if (error) throw new Error(error.message)
+    revalidatePath(`/clients/${clientId}`)
+    return { success: true }
+}
+
+export async function importCoOwnersAction(
+    clientId: string,
+    rows: Array<{ door_number: string; full_name: string; email?: string; phone?: string }>
+) {
+    const supabase = await createClient()
+    
+    // Fetch all existing doors
+    const { data: doors, error: doorsErr } = await supabase
+        .from('doors')
+        .select('*')
+        .eq('client_id', clientId)
+    if (doorsErr) throw new Error(doorsErr.message)
+
+    const conflicts: string[] = []
+    let importedCount = 0
+
+    for (const row of rows) {
+        const doorNum = String(row.door_number).trim()
+        if (!doorNum) continue
+
+        let matchedDoor = (doors || []).find(d => String(d.door_number).trim().toLowerCase() === doorNum.toLowerCase())
+        
+        try {
+            let doorId = matchedDoor?.id
+            if (!doorId) {
+                // Create new door
+                const { data: newDoor, error: doorErr } = await supabase
+                    .from('doors')
+                    .insert({ client_id: clientId, door_number: doorNum })
+                    .select()
+                    .single()
+                if (doorErr) {
+                    conflicts.push(`${doorNum}: ${doorErr.message}`)
+                    continue
+                }
+                doorId = newDoor.id
+            }
+
+            // Upsert resident details for that door
+            const { error: upsertErr } = await supabase
+                .from('maintenance_residents')
+                .upsert({
+                    door_id: doorId,
+                    full_name: row.full_name,
+                    email: row.email || null,
+                    phone: row.phone || null,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'door_id' })
+
+            if (upsertErr) {
+                conflicts.push(`${doorNum}: ${upsertErr.message}`)
+            } else {
+                importedCount++
+            }
+        } catch (err) {
+            conflicts.push(`${doorNum}: ${(err as Error).message}`)
+        }
+    }
+
+    revalidatePath(`/clients/${clientId}`)
+    return {
+        success: true,
+        importedCount,
+        conflicts
+    }
+}
+

@@ -213,13 +213,19 @@ export async function updateClientAction(clientIdOrPrev: any, formData: FormData
     if (doors_count_raw !== null && doors_count_raw !== '') {
         const doorsNum = Math.floor(Number(doors_count_raw))
         if (!isNaN(doorsNum) && doorsNum >= 0) {
-            const { error: deleteErr } = await supabase.from('doors').delete().eq('client_id', clientId)
-            if (deleteErr) {
-                console.error('Error deleting doors on client update:', deleteErr.message)
-                logImportError('Error deleting doors on client update: ' + deleteErr.message)
-                return { success: false, error: 'Erreur portes (suppression): ' + deleteErr.message }
+            const { data: existingDoors, error: fetchErr } = await supabase
+                .from('doors')
+                .select('id, door_number')
+                .eq('client_id', clientId)
+                .order('created_at', { ascending: true })
+
+            if (fetchErr) {
+                console.error('Error fetching doors on client update:', fetchErr.message)
+                return { success: false, error: 'Erreur lecture portes: ' + fetchErr.message }
             }
-            if (doorsNum > 0) {
+
+            const currentCount = existingDoors ? existingDoors.length : 0
+            if (currentCount === 0 && doorsNum > 0) {
                 const doorsToInsert = Array.from({ length: doorsNum }, (_, i) => ({
                     client_id: clientId,
                     door_number: `Porte ${i + 1}`,
@@ -227,8 +233,27 @@ export async function updateClientAction(clientIdOrPrev: any, formData: FormData
                 const { error: insertErr } = await supabase.from('doors').insert(doorsToInsert)
                 if (insertErr) {
                     console.error('Error inserting doors on client update:', insertErr.message)
-                    logImportError('Error inserting doors on client update: ' + insertErr.message)
-                    return { success: false, error: 'Erreur portes (insertion): ' + insertErr.message }
+                    return { success: false, error: 'Erreur insertion portes: ' + insertErr.message }
+                }
+            } else if (doorsNum > currentCount) {
+                const additionalCount = doorsNum - currentCount
+                const doorsToInsert = Array.from({ length: additionalCount }, (_, i) => ({
+                    client_id: clientId,
+                    door_number: `Porte ${currentCount + i + 1}`,
+                }))
+                const { error: insertErr } = await supabase.from('doors').insert(doorsToInsert)
+                if (insertErr) {
+                    console.error('Error inserting extra doors on client update:', insertErr.message)
+                    return { success: false, error: 'Erreur insertion portes sup: ' + insertErr.message }
+                }
+            } else if (doorsNum < currentCount && doorsNum >= 0) {
+                const doorsToDelete = existingDoors.slice(doorsNum).map(d => d.id)
+                if (doorsToDelete.length > 0) {
+                    const { error: deleteErr } = await supabase.from('doors').delete().in('id', doorsToDelete)
+                    if (deleteErr) {
+                        console.error('Error deleting extra doors on client update:', deleteErr.message)
+                        return { success: false, error: 'Erreur suppression surplus portes: ' + deleteErr.message }
+                    }
                 }
             }
         }

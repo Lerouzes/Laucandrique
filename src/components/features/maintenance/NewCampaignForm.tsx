@@ -48,6 +48,7 @@ export function NewCampaignForm({
     const [isMandatory, setIsMandatory] = useState(true)
     const [pricingType, setPricingType] = useState<'hidden' | 'visible' | 'free'>('free')
     const [selectedServices, setSelectedServices] = useState<string[]>([])
+    const [surveyRequired, setSurveyRequired] = useState(false)
 
     // Availability settings state
     const [workStart, setWorkStart] = useState('08:00')
@@ -103,6 +104,7 @@ export function NewCampaignForm({
                 is_mandatory: isMandatory,
                 pricing_type: pricingType,
                 services: selectedServices,
+                survey_required: surveyRequired,
                 availability_settings: {
                     workingHours: { start: workStart, end: workEnd },
                     techniciansCount: Number(techsCount),
@@ -236,6 +238,24 @@ export function NewCampaignForm({
                                 onChange={(e) => setMinParticipation(e.target.value)}
                                 className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
                             />
+                        </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 border-t border-zinc-900 pt-4">
+                        <input
+                            type="checkbox"
+                            id="surveyRequired"
+                            checked={surveyRequired}
+                            onChange={(e) => setSurveyRequired(e.target.checked)}
+                            className="h-4 w-4 mt-0.5 rounded border-zinc-850 bg-[#121318] text-purple-650 focus:ring-purple-650 cursor-pointer"
+                        />
+                        <div className="space-y-0.5">
+                            <Label htmlFor="surveyRequired" className="text-xs text-zinc-300 font-semibold cursor-pointer flex items-center gap-1.5">
+                                Sondage de participation requis (Phase 1)
+                            </Label>
+                            <p className="text-[10px] text-zinc-500 font-medium">
+                                Si coché, les copropriétaires devront d'abord indiquer s'ils sont intéressés avant que la phase de planification (choix des dates et plages horaires) ne soit débloquée.
+                            </p>
                         </div>
                     </div>
                 </CardContent>

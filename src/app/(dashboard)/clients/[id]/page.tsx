@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { createClient } from '@/utils/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,24 +10,31 @@ import { getQuotes } from '@/actions/quotes'
 import { getSyndicateWorkloadAction } from '@/actions/team-management'
 import { Badge } from '@/components/ui/badge'
 import { ClientDetailForm } from '@/components/features/clients/ClientDetailForm'
+import { ClientTabsContainer } from '@/components/features/clients/ClientTabsContainer'
+import { CoOwnersManager } from '@/components/features/clients/CoOwnersManager'
 import { ArrowLeft } from 'lucide-react'
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const supabase = await createClient()
 
-  // Fetch client + contract separately (direct query avoids join caching issues)
-  const [client, managers, quotes, contractDirect, workload] = await Promise.all([
+  // Fetch client + contract + co-owners separately
+  const [client, managers, quotes, contractDirect, workload, coOwnersRes] = await Promise.all([
     getClientById(id),
     getManagers(true),
     getQuotes(),
     getContractForClient(id),
-    getSyndicateWorkloadAction(id)
+    getSyndicateWorkloadAction(id),
+    supabase
+      .from('doors')
+      .select('*, resident:maintenance_residents(*)')
+      .eq('client_id', id)
+      .order('door_number', { ascending: true })
   ])
 
   if (!client) notFound()
 
   const clientQuotes = quotes.filter((q: any) => q.client_id === id)
-  // Prefer the direct contract fetch over the join result (with robust support for array and object shapes)
   const contractJoined = Array.isArray(client.contracts) ? client.contracts[0] : client.contracts
   const contract = contractDirect || contractJoined || null
   const doorsCount = (client.doors as any[])?.length || 0
@@ -52,16 +60,26 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         </div>
       </div>
 
-      <ClientDetailForm
-        key={`${contract?.package_name ?? ''}-${contract?.monthly_fee ?? ''}-${contract?.start_date ?? ''}-${doorsCount}`}
-        clientId={id}
-        client={client}
-        managers={managers}
-        clientQuotes={clientQuotes}
-        contract={contract}
-        doorsCount={doorsCount}
-        workload={workload || []}
-        saveAction={updateClientAction}
+      <ClientTabsContainer
+        infoForm={
+          <ClientDetailForm
+            key={`${contract?.package_name ?? ''}-${contract?.monthly_fee ?? ''}-${contract?.start_date ?? ''}-${doorsCount}`}
+            clientId={id}
+            client={client}
+            managers={managers}
+            clientQuotes={clientQuotes}
+            contract={contract}
+            doorsCount={doorsCount}
+            workload={workload || []}
+            saveAction={updateClientAction}
+          />
+        }
+        coOwnersManager={
+          <CoOwnersManager
+            clientId={id}
+            initialCoOwners={coOwnersRes.data || []}
+          />
+        }
       />
     </div>
   )
