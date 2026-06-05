@@ -18,7 +18,8 @@ import {
     RefreshCw,
     Layers,
     UserCheck,
-    Settings
+    Settings,
+    Wrench
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -33,6 +34,7 @@ const navItems = [
     { name: '1-à-1 Rencontres', href: '/team-management/one-on-ones', icon: CalendarDays },
     { name: 'Syndicats', href: '/team-management/syndicates', icon: Building2 },
     { name: 'Audits de Santé', href: '/team-management/audits', icon: ClipboardCheck },
+    { name: 'Hub de Maintenance', href: '/team-management/maintenance', icon: Wrench },
     { name: 'Assemblées', href: '/team-management/assemblies', icon: UsersRound },
     { name: 'Projets', href: '/team-management/projects', icon: FolderGit },
     { name: 'Plaintes', href: '/team-management/complaints', icon: AlertTriangle },
