@@ -3,7 +3,7 @@
 'use client'
 
 import { useState } from 'react'
-import { saveMaintenanceReportAction, getContractorDashboardAction } from '@/actions/maintenance'
+import { saveMaintenanceReportAction, getContractorDashboardAction, setContractorDayStatusAction } from '@/actions/maintenance'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -64,6 +64,17 @@ export function ContractorDashboard({
     // Filter appointments for the selected date
     const dailyAppointments = appointments.filter((a: any) => a.appointment_date === selectedDate)
 
+    // Extract unique campaigns for the selected date
+    const campaignsOnSelectedDate = Array.from(
+        new Set(dailyAppointments.map((a: any) => a.campaign_id))
+    ).map(cid => {
+        const campaign = details.campaigns?.find((c: any) => c.id === cid)
+        return {
+            id: cid as string,
+            name: (campaign?.name || 'Campagne') as string
+        }
+    })
+
     const handleOpenReportModal = (appt: any) => {
         setActiveAppt(appt)
         setReportStatus(appt.status === 'scheduled' ? 'completed' : appt.status)
@@ -87,6 +98,22 @@ export function ContractorDashboard({
 
     const handleRemovePhoto = (index: number) => {
         setPhotoUrls(prev => prev.filter((_, i) => i !== index))
+    }
+
+    const handleUpdateDayStatus = async (campaignId: string, newStatus: 'started' | 'finished') => {
+        try {
+            await setContractorDayStatusAction(token, campaignId, selectedDate, newStatus)
+            toast.success(
+                newStatus === 'started'
+                    ? "Journée d'intervention démarrée."
+                    : "Journée d'intervention terminée."
+            )
+            // Reload dashboard details
+            const fresh = await getContractorDashboardAction(token)
+            setDetails(fresh)
+        } catch (err) {
+            toast.error("Erreur lors de la mise à jour du statut : " + (err as Error).message)
+        }
     }
 
     const handleSaveReport = async (e: React.FormEvent) => {
@@ -190,6 +217,70 @@ export function ContractorDashboard({
                     </div>
                 )}
             </div>
+
+            {/* Daily Progress Action Bar */}
+            {dailyAppointments.length > 0 && campaignsOnSelectedDate.map(camp => {
+                const progressRecord = (details.progress || []).find(
+                    (p: any) => p.campaign_id === camp.id && p.date === selectedDate
+                )
+                const status = progressRecord?.status || 'not_started'
+
+                return (
+                    <Card key={camp.id} className="bg-[#16171e]/70 border-zinc-850 shadow-md">
+                        <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
+                                    status === 'started' 
+                                        ? 'bg-emerald-500/20 text-emerald-450 animate-pulse' 
+                                        : status === 'finished' 
+                                        ? 'bg-zinc-850/50 text-zinc-500 border border-zinc-800' 
+                                        : 'bg-amber-500/20 text-amber-450 border border-amber-800/30'
+                                }`}>
+                                    <Activity className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-white text-[11px] uppercase tracking-wider">{camp.name}</h4>
+                                    <p className="text-[10px] text-zinc-400 mt-0.5">
+                                        {status === 'not_started' && "La journée d'intervention n'est pas encore débutée."}
+                                        {status === 'started' && "La journée d'intervention est en cours. Les résidents peuvent suivre votre progression."}
+                                        {status === 'finished' && "La journée d'intervention est terminée."}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {status === 'not_started' && (
+                                    <Button
+                                        onClick={() => handleUpdateDayStatus(camp.id, 'started')}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-8 px-4 rounded-xl cursor-pointer text-xxs flex items-center gap-1.5"
+                                    >
+                                        <Check className="h-3.5 w-3.5" /> Débuter la journée
+                                    </Button>
+                                )}
+                                {status === 'started' && (
+                                    <>
+                                        <span className="text-[9px] font-bold text-emerald-450 uppercase tracking-widest bg-emerald-500/10 px-2 py-1 rounded-md border border-emerald-500/20 mr-2 flex items-center gap-1">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                                            En cours
+                                        </span>
+                                        <Button
+                                            onClick={() => handleUpdateDayStatus(camp.id, 'finished')}
+                                            className="bg-red-650 hover:bg-red-750 text-white font-bold h-8 px-4 rounded-xl cursor-pointer text-xxs flex items-center gap-1.5 border border-red-500/30"
+                                        >
+                                            <XCircle className="h-3.5 w-3.5" /> Terminer la journée
+                                        </Button>
+                                    </>
+                                )}
+                                {status === 'finished' && (
+                                    <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest bg-zinc-800/50 px-2 py-1 rounded-md border border-zinc-700/40 flex items-center gap-1">
+                                        <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
+                                        Journée d'intervention terminée
+                                    </span>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )
+            })}
 
             {/* Appointments List for the selected Date */}
             <div className="space-y-4">

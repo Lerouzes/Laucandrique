@@ -104,8 +104,8 @@ export async function createCampaignAction(data: {
     client_id: string
     name: string
     description?: string | null
-    start_date: string
-    end_date: string
+    start_date?: string | null
+    end_date?: string | null
     contractor_id?: string | null
     min_participation?: number
     is_mandatory?: boolean
@@ -123,8 +123,8 @@ export async function createCampaignAction(data: {
             client_id: data.client_id,
             name: data.name,
             description: data.description || null,
-            start_date: data.start_date,
-            end_date: data.end_date,
+            start_date: data.survey_required ? (data.start_date || null) : data.start_date,
+            end_date: data.survey_required ? (data.end_date || null) : data.end_date,
             contractor_id: data.contractor_id || null,
             min_participation: data.min_participation || 0,
             is_mandatory: data.is_mandatory !== false,
@@ -473,7 +473,7 @@ export async function getResidentInviteAction(token: string) {
     if (unitErr) throw new Error(unitErr.message)
 
     // Check expiry for cancelled campaigns (30 days past campaign end_date)
-    if (unit.campaign?.status === 'cancelled') {
+    if (unit.campaign?.status === 'cancelled' && unit.campaign?.end_date) {
         const endDate = new Date(unit.campaign.end_date)
         const expiryTime = endDate.getTime() + 30 * 24 * 60 * 60 * 1000
         const now = new Date().getTime()
@@ -506,7 +506,7 @@ export async function getResidentInviteAction(token: string) {
     // 5. Fetch syndicate (client) details
     const { data: clientObj } = await supabase
         .from('clients')
-        .select('company_name, full_name')
+        .select('company_name, full_name, email, phone')
         .eq('id', unit.campaign.client_id)
         .single()
 
@@ -521,13 +521,34 @@ export async function getResidentInviteAction(token: string) {
         contractorObj = contractor
     }
 
+    // 7. Fetch contractor progress records for this campaign
+    const { data: progressRecords } = await supabase
+        .from('maintenance_contractor_progress')
+        .select('*')
+        .eq('campaign_id', unit.campaign_id)
+
+    // 8. Fetch daily appointments for queue tracking if scheduled
+    let dailyAppointments: any[] = []
+    if (appointment) {
+        const { data: appts } = await supabase
+            .from('maintenance_appointments')
+            .select('*')
+            .eq('campaign_id', unit.campaign_id)
+            .eq('appointment_date', appointment.appointment_date)
+            .neq('status', 'cancelled')
+            .order('start_time')
+        dailyAppointments = appts || []
+    }
+
     return {
         unit,
         resident,
         appointment,
         client: clientObj,
         contractor: contractorObj,
-        services: (campaignServices || []).map(cs => cs.service)
+        services: (campaignServices || []).map(cs => cs.service),
+        progress: progressRecords || [],
+        dailyAppointments
     }
 }
 
@@ -761,10 +782,21 @@ export async function getContractorDashboardAction(token: string) {
         }
     })
 
+    // Fetch contractor progress records for these campaigns
+    let progress: any[] = []
+    if (campaignIds.length > 0) {
+        const { data: progData } = await supabase
+            .from('maintenance_contractor_progress')
+            .select('*')
+            .in('campaign_id', campaignIds)
+        progress = progData || []
+    }
+
     return {
         contractor: tokenObj.contractor,
         campaigns: campaigns || [],
-        appointments: appointmentsDetails
+        appointments: appointmentsDetails,
+        progress: progress
     }
 }
 
@@ -1027,11 +1059,32 @@ export async function getUnitMaintenanceHistoryAction(doorId: string) {
     }
 }
 
-export async function advanceCampaignPhaseAction(campaignId: string) {
+export async function advanceCampaignPhaseAction(
+    campaignId: string,
+    schedulingData?: {
+        start_date: string
+        end_date: string
+        availability_settings?: any
+    }
+) {
     const supabase = await createClient()
+
+    const updatePayload: any = {
+        current_phase: 'scheduling',
+        updated_at: new Date().toISOString()
+    }
+
+    if (schedulingData) {
+        updatePayload.start_date = schedulingData.start_date
+        updatePayload.end_date = schedulingData.end_date
+        if (schedulingData.availability_settings) {
+            updatePayload.availability_settings = schedulingData.availability_settings
+        }
+    }
+
     const { data, error } = await supabase
         .from('maintenance_campaigns')
-        .update({ current_phase: 'scheduling', updated_at: new Date().toISOString() })
+        .update(updatePayload)
         .eq('id', campaignId)
         .select()
         .single()
@@ -1041,6 +1094,68 @@ export async function advanceCampaignPhaseAction(campaignId: string) {
     revalidatePath('/maintenance-hub')
     return data
 }
+
+export async function updateCampaignSettingsAction(
+    campaignId: string,
+    settings: {
+        allow_reschedule: boolean
+        reschedule_cutoff_hours: number
+        response_deadline_date: string | null
+    }
+) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('maintenance_campaigns')
+        .update({
+            allow_reschedule: settings.allow_reschedule,
+            reschedule_cutoff_hours: settings.reschedule_cutoff_hours,
+            response_deadline_date: settings.response_deadline_date ? new Date(settings.response_deadline_date).toISOString() : null,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', campaignId)
+        .select()
+        .single()
+
+    if (error) throw new Error(error.message)
+    revalidatePath(`/maintenance-hub/campaigns/${campaignId}`)
+    revalidatePath('/maintenance-hub')
+    return data
+}
+
+export async function setContractorDayStatusAction(
+    token: string,
+    campaignId: string,
+    date: string,
+    status: 'not_started' | 'started' | 'finished'
+) {
+    const supabase = await createClient()
+
+    // 1. Verify token
+    const { data: tokenObj, error: tokenErr } = await supabase
+        .from('maintenance_contractor_tokens')
+        .select('*')
+        .eq('token', token)
+        .single()
+
+    if (tokenErr) throw new Error("Jeton d'accès invalide.")
+
+    // 2. Upsert progress
+    const { error } = await supabase
+        .from('maintenance_contractor_progress')
+        .upsert({
+            campaign_id: campaignId,
+            date: date,
+            status: status,
+            started_at: status === 'started' ? new Date().toISOString() : undefined,
+            updated_at: new Date().toISOString()
+        }, {
+            onConflict: 'campaign_id,date'
+        })
+
+    if (error) throw new Error(error.message)
+    return { success: true }
+}
+
 
 export async function saveCoOwnerAction(data: {
     id?: string

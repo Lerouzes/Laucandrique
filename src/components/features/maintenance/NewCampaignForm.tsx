@@ -84,11 +84,13 @@ export function NewCampaignForm({
             return
         }
 
-        const start = new Date(startDate)
-        const end = new Date(endDate)
-        if (start > end) {
-            toast.error("La date de début ne peut pas être postérieure à la date de fin.")
-            return
+        if (!surveyRequired) {
+            const start = new Date(startDate)
+            const end = new Date(endDate)
+            if (start > end) {
+                toast.error("La date de début ne peut pas être postérieure à la date de fin.")
+                return
+            }
         }
 
         setLoading(true)
@@ -97,15 +99,15 @@ export function NewCampaignForm({
                 client_id: clientId,
                 name: name.trim(),
                 description: description.trim() || null,
-                start_date: startDate,
-                end_date: endDate,
+                start_date: surveyRequired ? null : startDate,
+                end_date: surveyRequired ? null : endDate,
                 contractor_id: contractorId || null,
                 min_participation: Number(minParticipation),
                 is_mandatory: isMandatory,
                 pricing_type: pricingType,
                 services: selectedServices,
                 survey_required: surveyRequired,
-                availability_settings: {
+                availability_settings: surveyRequired ? null : {
                     workingHours: { start: workStart, end: workEnd },
                     techniciansCount: Number(techsCount),
                     bufferMinutes: Number(buffer),
@@ -168,25 +170,29 @@ export function NewCampaignForm({
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Date de début *</Label>
-                            <Input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Date de fin *</Label>
-                            <Input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
-                            />
-                        </div>
-                        <div className="space-y-2">
+                        {!surveyRequired ? (
+                            <>
+                                <div className="space-y-2">
+                                    <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Date de début *</Label>
+                                    <Input
+                                        type="date"
+                                        value={startDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                        className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Date de fin *</Label>
+                                    <Input
+                                        type="date"
+                                        value={endDate}
+                                        onChange={(e) => setEndDate(e.target.value)}
+                                        className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                    />
+                                </div>
+                            </>
+                        ) : null}
+                        <div className={`space-y-2 ${surveyRequired ? 'sm:col-span-3' : ''}`}>
                             <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Contracteur assigné</Label>
                             <SearchableSelect
                                 value={contractorId}
@@ -322,60 +328,69 @@ export function NewCampaignForm({
             </Card>
 
             {/* Section 3: Scheduling Settings */}
-            <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
-                <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10">
-                    <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
-                        <Settings className="h-4 w-4" />
-                        Planification & Capacité
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4 space-y-4">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Début de journée</Label>
-                            <Input
-                                type="time"
-                                value={workStart}
-                                onChange={(e) => setWorkStart(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
-                            />
+            {!surveyRequired ? (
+                <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
+                    <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10">
+                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
+                            <Settings className="h-4 w-4" />
+                            Planification & Capacité
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4 space-y-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div className="space-y-2">
+                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Début de journée</Label>
+                                <Input
+                                    type="time"
+                                    value={workStart}
+                                    onChange={(e) => setWorkStart(e.target.value)}
+                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Fin de journée</Label>
+                                <Input
+                                    type="time"
+                                    value={workEnd}
+                                    onChange={(e) => setWorkEnd(e.target.value)}
+                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Techniciens (Équipes)</Label>
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    value={techsCount}
+                                    onChange={(e) => setTechsCount(e.target.value)}
+                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Zone tampon / Marge de sécurité (min)</Label>
+                                <Input
+                                    type="number"
+                                    min="0"
+                                    value={buffer}
+                                    onChange={(e) => setBuffer(e.target.value)}
+                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Fin de journée</Label>
-                            <Input
-                                type="time"
-                                value={workEnd}
-                                onChange={(e) => setWorkEnd(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Techniciens (Équipes)</Label>
-                            <Input
-                                type="number"
-                                min="1"
-                                value={techsCount}
-                                onChange={(e) => setTechsCount(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Marge de sécurité (min)</Label>
-                            <Input
-                                type="number"
-                                min="0"
-                                value={buffer}
-                                onChange={(e) => setBuffer(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
-                            />
-                        </div>
-                    </div>
-                    
-                    <p className="text-xs text-zinc-500 italic mt-2 font-medium">
-                        * Note : Une pause déjeuner est automatiquement configurée par défaut de 12:00 à 13:00 pour toutes les équipes.
-                    </p>
-                </CardContent>
-            </Card>
+                        
+                        <p className="text-xs text-zinc-500 italic mt-2 font-medium">
+                            * Note : Une pause déjeuner est automatiquement configurée par défaut de 12:00 à 13:00 pour toutes les équipes.
+                        </p>
+                    </CardContent>
+                </Card>
+            ) : (
+                <Card className="bg-[#16171e]/40 border-zinc-850/50 shadow-md border-dashed">
+                    <CardContent className="p-6 text-center text-zinc-500 text-xs">
+                        <Settings className="h-5 w-5 text-zinc-600 mx-auto mb-2" />
+                        Les dates de début/fin de campagne et les paramètres de planification (heures, équipes, zones tampons) seront configurés à l'étape suivante, lors de l'activation de la phase de planification (Phase 2).
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Action Bar */}
             <div className="flex justify-end gap-3 pt-2">

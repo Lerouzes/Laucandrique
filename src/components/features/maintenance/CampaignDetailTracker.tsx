@@ -9,7 +9,8 @@ import {
     importResidentsAction,
     getCampaignDetailsAction,
     advanceCampaignPhaseAction,
-    deleteCampaignAction
+    deleteCampaignAction,
+    updateCampaignSettingsAction
 } from '@/actions/maintenance'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -83,6 +84,78 @@ export function CampaignDetailTracker({
             toast.error("Erreur lors de la suppression: " + (err as Error).message)
         } finally {
             setDeletingCampaign(false)
+        }
+    }
+
+    // Settings modal state
+    const [showSettingsModal, setShowSettingsModal] = useState(false)
+    const [allowReschedule, setAllowReschedule] = useState<boolean>(campaign.allow_reschedule !== false)
+    const [rescheduleCutoff, setRescheduleCutoff] = useState<string>(String(campaign.reschedule_cutoff_hours ?? 24))
+    const [deadlineDate, setDeadlineDate] = useState<string>(() => {
+        if (!campaign.response_deadline_date) return ''
+        const d = new Date(campaign.response_deadline_date)
+        const tzoffset = d.getTimezoneOffset() * 60000
+        return (new Date(d.getTime() - tzoffset)).toISOString().slice(0, 16)
+    })
+    const [savingSettings, setSavingSettings] = useState(false)
+
+    // Transition modal state
+    const [showTransitionModal, setShowTransitionModal] = useState(false)
+    const [transStartDate, setTransStartDate] = useState(new Date().toISOString().substring(0, 10))
+    const [transEndDate, setTransEndDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10))
+    const [transWorkStart, setTransWorkStart] = useState('08:00')
+    const [transWorkEnd, setTransWorkEnd] = useState('17:00')
+    const [transTechsCount, setTransTechsCount] = useState('1')
+    const [transBuffer, setTransBuffer] = useState('10')
+    const [savingTransition, setSavingTransition] = useState(false)
+
+    const handleSaveSettings = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setSavingSettings(true)
+        try {
+            await updateCampaignSettingsAction(campaign.id, {
+                allow_reschedule: allowReschedule,
+                reschedule_cutoff_hours: Number(rescheduleCutoff),
+                response_deadline_date: deadlineDate ? new Date(deadlineDate).toISOString() : null
+            })
+            toast.success("Réglages de la campagne mis à jour avec succès.")
+            setShowSettingsModal(false)
+            router.refresh()
+        } catch (err) {
+            toast.error("Erreur lors de la mise à jour des réglages: " + (err as Error).message)
+        } finally {
+            setSavingSettings(false)
+        }
+    }
+
+    const handleConfirmTransition = async (e: React.FormEvent) => {
+        e.preventDefault()
+        const start = new Date(transStartDate)
+        const end = new Date(transEndDate)
+        if (start > end) {
+            toast.error("La date de début ne peut pas être postérieure à la date de fin.")
+            return
+        }
+
+        setSavingTransition(true)
+        try {
+            await advanceCampaignPhaseAction(campaign.id, {
+                start_date: transStartDate,
+                end_date: transEndDate,
+                availability_settings: {
+                    workingHours: { start: transWorkStart, end: transWorkEnd },
+                    techniciansCount: Number(transTechsCount),
+                    bufferMinutes: Number(transBuffer),
+                    breakPeriods: [{ start: '12:00', end: '13:00' }]
+                }
+            })
+            toast.success("La campagne de maintenance est passée à la phase de planification.")
+            setShowTransitionModal(false)
+            router.refresh()
+        } catch (err) {
+            toast.error("Erreur lors du changement de phase: " + (err as Error).message)
+        } finally {
+            setSavingTransition(false)
         }
     }
 
@@ -295,7 +368,7 @@ export function CampaignDetailTracker({
                             {campaign.survey_required && campaign.current_phase === 'survey' && (
                                 <Button
                                     disabled={advancingPhase || updatingStatus}
-                                    onClick={handleAdvancePhase}
+                                    onClick={() => setShowTransitionModal(true)}
                                     className="bg-purple-650 hover:bg-purple-700 text-white font-bold text-xs h-9 px-4 rounded-xl shadow cursor-pointer transition-colors"
                                 >
                                     Passer à la planification
@@ -322,6 +395,16 @@ export function CampaignDetailTracker({
                             <CheckCircle className="h-4 w-4 text-emerald-400" />
                             Campagne archivée
                         </span>
+                    )}
+                    {campaign.status !== 'completed' && campaign.status !== 'cancelled' && (
+                        <Button
+                            type="button"
+                            onClick={() => setShowSettingsModal(true)}
+                            className="bg-zinc-900 border border-zinc-800 text-zinc-300 font-bold text-xs h-9 px-4 rounded-xl hover:bg-zinc-800 cursor-pointer transition-colors flex items-center gap-1"
+                        >
+                            <SlidersHorizontal className="h-3.5 w-3.5" />
+                            Réglages
+                        </Button>
                     )}
                     {isMaster && (
                         <Button
@@ -672,6 +755,187 @@ export function CampaignDetailTracker({
                 onConfirm={handleDelete2}
                 loading={deletingCampaign}
             />
+
+            {/* Modal Réglages de la Campagne */}
+            {showSettingsModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <Card className="bg-[#16171e] border-zinc-800 shadow-2xl max-w-md w-full">
+                        <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/15">
+                            <CardTitle className="text-xs font-bold text-white uppercase tracking-wider text-purple-400">
+                                Réglages de la Campagne
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                            <form onSubmit={handleSaveSettings} className="space-y-4">
+                                <div className="flex items-start gap-3">
+                                    <input
+                                        type="checkbox"
+                                        id="allowReschedule"
+                                        checked={allowReschedule}
+                                        onChange={(e) => setAllowReschedule(e.target.checked)}
+                                        className="h-4 w-4 mt-0.5 rounded border-zinc-850 bg-[#121318] text-purple-650 focus:ring-purple-650 cursor-pointer"
+                                    />
+                                    <div className="space-y-0.5">
+                                        <Label htmlFor="allowReschedule" className="text-xs text-zinc-300 font-semibold cursor-pointer">
+                                            Autoriser le déplacement de rendez-vous
+                                        </Label>
+                                        <p className="text-[10px] text-zinc-500 font-medium">
+                                            Si activé, les copropriétaires pourront déplacer leur rendez-vous directement depuis leur portail.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {allowReschedule && (
+                                    <div className="space-y-2">
+                                        <Label className="text-zinc-500 uppercase font-bold text-[8px]">Délai limite de modification (Heures)</Label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            value={rescheduleCutoff}
+                                            onChange={(e) => setRescheduleCutoff(e.target.value)}
+                                            className="bg-[#121318] border-zinc-850 h-8 text-xs text-white"
+                                        />
+                                        <p className="text-[10px] text-zinc-500 font-medium">
+                                            Nombre d'heures avant le rendez-vous où la modification reste possible (ex: 24h).
+                                        </p>
+                                    </div>
+                                )}
+
+                                <div className="space-y-2 border-t border-zinc-900 pt-3">
+                                    <Label className="text-zinc-500 uppercase font-bold text-[8px]">Date limite de réponse</Label>
+                                    <Input
+                                        type="datetime-local"
+                                        value={deadlineDate}
+                                        onChange={(e) => setDeadlineDate(e.target.value)}
+                                        className="bg-[#121318] border-zinc-850 h-8 text-xs text-white"
+                                    />
+                                    <p className="text-[10px] text-zinc-500 font-medium">
+                                        Après cette date, les résidents ne pourront plus répondre ni modifier leurs choix. Laissez vide pour aucune limite.
+                                    </p>
+                                </div>
+
+                                <div className="flex justify-end gap-2 border-t border-zinc-900 pt-3">
+                                    <Button
+                                        type="button"
+                                        onClick={() => setShowSettingsModal(false)}
+                                        className="bg-transparent border border-zinc-850 text-zinc-400 text-xxs font-bold h-8 px-4 rounded-xl hover:bg-zinc-900 cursor-pointer"
+                                    >
+                                        Fermer
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        disabled={savingSettings}
+                                        className="bg-purple-650 hover:bg-purple-700 text-white font-bold h-8 px-5 rounded-xl shadow cursor-pointer transition-all text-xxs"
+                                    >
+                                        {savingSettings ? 'Enregistrement...' : 'Enregistrer'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* Modal de transition vers la planification */}
+            {showTransitionModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <Card className="bg-[#16171e] border-zinc-800 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                        <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/15">
+                            <CardTitle className="text-xs font-bold text-white uppercase tracking-wider text-purple-400">
+                                Paramètres de planification (Phase 2)
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                            <form onSubmit={handleConfirmTransition} className="space-y-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Date de début *</Label>
+                                        <Input
+                                            type="date"
+                                            required
+                                            value={transStartDate}
+                                            onChange={(e) => setTransStartDate(e.target.value)}
+                                            className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Date de fin *</Label>
+                                        <Input
+                                            type="date"
+                                            required
+                                            value={transEndDate}
+                                            onChange={(e) => setTransEndDate(e.target.value)}
+                                            className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-zinc-900 pt-3">
+                                    <div className="space-y-2">
+                                        <Label className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Début de journée</Label>
+                                        <Input
+                                            type="time"
+                                            required
+                                            value={transWorkStart}
+                                            onChange={(e) => setTransWorkStart(e.target.value)}
+                                            className="bg-[#121318] border-zinc-850 h-8 text-xs text-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Fin de journée</Label>
+                                        <Input
+                                            type="time"
+                                            required
+                                            value={transWorkEnd}
+                                            onChange={(e) => setTransWorkEnd(e.target.value)}
+                                            className="bg-[#121318] border-zinc-850 h-8 text-xs text-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Techniciens</Label>
+                                        <Input
+                                            type="number"
+                                            min="1"
+                                            required
+                                            value={transTechsCount}
+                                            onChange={(e) => setTransTechsCount(e.target.value)}
+                                            className="bg-[#121318] border-zinc-850 h-8 text-xs text-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Zone tampon (min)</Label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            required
+                                            value={transBuffer}
+                                            onChange={(e) => setTransBuffer(e.target.value)}
+                                            className="bg-[#121318] border-zinc-850 h-8 text-xs text-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end gap-2 border-t border-zinc-900 pt-3">
+                                    <Button
+                                        type="button"
+                                        onClick={() => setShowTransitionModal(false)}
+                                        className="bg-transparent border border-zinc-850 text-zinc-400 text-xxs font-bold h-8 px-4 rounded-xl hover:bg-zinc-900 cursor-pointer"
+                                    >
+                                        Fermer
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        disabled={savingTransition}
+                                        className="bg-purple-650 hover:bg-purple-700 text-white font-bold h-8 px-5 rounded-xl shadow cursor-pointer transition-all text-xxs"
+                                    >
+                                        {savingTransition ? 'Transition...' : 'Lancer la Planification'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
         </div>
     )
 }
