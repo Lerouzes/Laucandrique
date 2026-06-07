@@ -4,6 +4,7 @@ import { getCampaignDetailsAction } from '@/actions/maintenance'
 import { CampaignDetailTracker } from '@/components/features/maintenance/CampaignDetailTracker'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { createClient } from '@/utils/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,18 @@ export default async function CampaignDetailPage({
 }) {
     const { id } = await params
     const details = await getCampaignDetailsAction(id)
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    let isMaster = false
+    if (user) {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+        isMaster = profile?.role === 'Master'
+    }
 
     return (
         <div className="space-y-6">
@@ -33,6 +46,7 @@ export default async function CampaignDetailPage({
                 campaign={details.campaign}
                 services={details.services}
                 units={details.units}
+                isMaster={isMaster}
             />
         </div>
     )

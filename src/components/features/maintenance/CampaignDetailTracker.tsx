@@ -8,7 +8,8 @@ import {
     updateCampaignStatusAction, 
     importResidentsAction,
     getCampaignDetailsAction,
-    advanceCampaignPhaseAction
+    advanceCampaignPhaseAction,
+    deleteCampaignAction
 } from '@/actions/maintenance'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { SearchableSelect } from '@/components/ui/searchable-select'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { 
     Activity, 
     Users, 
@@ -45,11 +47,13 @@ import Link from 'next/link'
 export function CampaignDetailTracker({ 
     campaign, 
     services, 
-    units: initialUnits 
+    units: initialUnits,
+    isMaster = false
 }: { 
     campaign: any
     services: any[]
     units: any[]
+    isMaster?: boolean
 }) {
     const router = useRouter()
     const [units, setUnits] = useState<any[]>(initialUnits)
@@ -57,6 +61,30 @@ export function CampaignDetailTracker({
     const [statusFilter, setStatusFilter] = useState('All')
     const [updatingStatus, setUpdatingStatus] = useState(false)
     const [advancingPhase, setAdvancingPhase] = useState(false)
+
+    // Deletion states
+    const [showDeleteConfirm1, setShowDeleteConfirm1] = useState(false)
+    const [showDeleteConfirm2, setShowDeleteConfirm2] = useState(false)
+    const [deletingCampaign, setDeletingCampaign] = useState(false)
+
+    const handleDelete1 = () => {
+        setShowDeleteConfirm1(false)
+        setShowDeleteConfirm2(true)
+    }
+
+    const handleDelete2 = async () => {
+        setShowDeleteConfirm2(false)
+        setDeletingCampaign(true)
+        try {
+            await deleteCampaignAction(campaign.id)
+            toast.success("Campagne supprimée avec succès.")
+            router.push('/maintenance-hub')
+        } catch (err) {
+            toast.error("Erreur lors de la suppression: " + (err as Error).message)
+        } finally {
+            setDeletingCampaign(false)
+        }
+    }
 
     // Excel import modal state
     const [showImportModal, setShowImportModal] = useState(false)
@@ -294,6 +322,16 @@ export function CampaignDetailTracker({
                             <CheckCircle className="h-4 w-4 text-emerald-400" />
                             Campagne archivée
                         </span>
+                    )}
+                    {isMaster && (
+                        <Button
+                            type="button"
+                            disabled={updatingStatus || deletingCampaign}
+                            onClick={() => setShowDeleteConfirm1(true)}
+                            className="bg-rose-950/20 border border-rose-900/50 hover:bg-rose-900/30 text-rose-400 font-bold text-xs h-9 px-4 rounded-xl cursor-pointer transition-colors"
+                        >
+                            Supprimer la Campagne
+                        </Button>
                     )}
                 </div>
             </div>
@@ -610,6 +648,30 @@ export function CampaignDetailTracker({
                 </CardContent>
             </Card>
 
+            {/* Confirmation de suppression - Étape 1 */}
+            <ConfirmationDialog
+                open={showDeleteConfirm1}
+                onOpenChange={setShowDeleteConfirm1}
+                title="Supprimer la campagne (Étape 1 de 2)"
+                description={`Êtes-vous sûr de vouloir supprimer la campagne "${campaign.name}" ? Tous les rendez-vous et invitations des copropriétaires seront supprimés définitivement.`}
+                confirmText="Continuer"
+                cancelText="Annuler"
+                variant="danger"
+                onConfirm={handleDelete1}
+            />
+
+            {/* Confirmation de suppression - Étape 2 */}
+            <ConfirmationDialog
+                open={showDeleteConfirm2}
+                onOpenChange={setShowDeleteConfirm2}
+                title="Confirmation finale (Étape 2 de 2)"
+                description={`Dernière confirmation: Cette action est irréversible. Veuillez confirmer que vous souhaitez supprimer définitivement la campagne "${campaign.name}" et toutes ses données associées.`}
+                confirmText="Supprimer définitivement"
+                cancelText="Annuler"
+                variant="danger"
+                onConfirm={handleDelete2}
+                loading={deletingCampaign}
+            />
         </div>
     )
 }

@@ -204,6 +204,36 @@ export async function updateCampaignStatusAction(id: string, status: 'draft' | '
     return data
 }
 
+export async function deleteCampaignAction(id: string) {
+    const supabase = await createClient()
+
+    // 1. Verify MASTER role
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error("Non authentifié.")
+
+    const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+    if (profileErr || profile?.role !== 'Master') {
+        throw new Error("Permission refusée. Seul le rôle Master peut supprimer une campagne.")
+    }
+
+    // 2. Delete Campaign (cascade will delete associated units, appointments, services)
+    const { error: deleteErr } = await supabase
+        .from('maintenance_campaigns')
+        .delete()
+        .eq('id', id)
+
+    if (deleteErr) throw new Error(deleteErr.message)
+
+    revalidatePath('/maintenance-hub')
+    return { success: true }
+}
+
+
 export async function getCampaignDetailsAction(id: string) {
     const supabase = await createClient()
     
@@ -442,6 +472,16 @@ export async function getResidentInviteAction(token: string) {
 
     if (unitErr) throw new Error(unitErr.message)
 
+    // Check expiry for cancelled campaigns (30 days past campaign end_date)
+    if (unit.campaign?.status === 'cancelled') {
+        const endDate = new Date(unit.campaign.end_date)
+        const expiryTime = endDate.getTime() + 30 * 24 * 60 * 60 * 1000
+        const now = new Date().getTime()
+        if (now > expiryTime) {
+            throw new Error("Ce lien d'invitation a expiré.")
+        }
+    }
+
     // 2. Fetch current resident contact info
     const { data: resident } = await supabase
         .from('maintenance_residents')
@@ -470,11 +510,23 @@ export async function getResidentInviteAction(token: string) {
         .eq('id', unit.campaign.client_id)
         .single()
 
+    // 6. Fetch contractor details
+    let contractorObj = null
+    if (unit.campaign?.contractor_id) {
+        const { data: contractor } = await supabase
+            .from('contractors')
+            .select('company_name, full_name, website, phone, email')
+            .eq('id', unit.campaign.contractor_id)
+            .maybeSingle()
+        contractorObj = contractor
+    }
+
     return {
         unit,
         resident,
         appointment,
         client: clientObj,
+        contractor: contractorObj,
         services: (campaignServices || []).map(cs => cs.service)
     }
 }

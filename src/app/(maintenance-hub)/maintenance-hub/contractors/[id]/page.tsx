@@ -118,6 +118,10 @@ export default async function MaintenanceContractorDetailPage({
                 </div>
               </div>
               <div>
+                <Label className="text-zinc-500 text-[10px] uppercase tracking-wider mb-1 block">Site web</Label>
+                <Input name="website" type="url" defaultValue={contractor.website || ''} placeholder="https://..." className="h-9 text-sm" />
+              </div>
+              <div>
                 <Label className="text-zinc-500 text-[10px] uppercase tracking-wider mb-1 block">Couleur</Label>
                 <div className="flex items-center gap-3">
                   <Input type="color" name="color" defaultValue={contractor.color || '#92400e'} className="h-9 p-1 w-14" />

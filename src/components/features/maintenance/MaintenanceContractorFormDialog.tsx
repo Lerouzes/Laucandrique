@@ -82,6 +82,10 @@ export function MaintenanceContractorFormDialog() {
             </div>
           </div>
           <div>
+            <Label>Site web</Label>
+            <Input name="website" type="url" placeholder="https://..." />
+          </div>
+          <div>
             <Label>Couleur d'identification</Label>
             <Input type="color" name="color" defaultValue="#92400e" className="h-10 p-1 w-16" />
           </div>

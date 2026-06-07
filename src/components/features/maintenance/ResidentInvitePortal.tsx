@@ -42,7 +42,7 @@ export function ResidentInvitePortal({
     initialSlots: Record<string, string[]>
     totalDuration: number
 }) {
-    const { unit, resident, appointment: initialAppointment, client, services } = details
+    const { unit, resident, appointment: initialAppointment, client, services, contractor } = details
     const campaign = unit.campaign
 
     const [participation, setParticipation] = useState<string>(unit.participation)
@@ -197,11 +197,43 @@ export function ResidentInvitePortal({
                             ))}
                         </div>
                     </div>
+                    {contractor && (
+                        <div className="border-t border-zinc-900 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                                <span className="text-zinc-500 text-[10px] uppercase tracking-wider block">Entrepreneur</span>
+                                <span className="font-bold text-zinc-350 text-xs block">{contractor.company_name || contractor.full_name}</span>
+                            </div>
+                            {contractor.website && (
+                                <a 
+                                    href={contractor.website.startsWith('http') ? contractor.website : `https://${contractor.website}`} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-purple-400 hover:text-purple-300 font-semibold underline inline-flex items-center gap-1 self-start sm:self-center"
+                                >
+                                    Visiter le site web →
+                                </a>
+                            )}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
-            {/* Participation Form */}
-            <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+            {campaign.status === 'cancelled' ? (
+                <div className="flex flex-col items-center justify-center p-8 bg-[#16171e]/70 border border-zinc-800/80 rounded-2xl text-center space-y-4 shadow-xl">
+                    <div className="h-12 w-12 rounded-xl flex items-center justify-center bg-rose-950/30 border border-rose-800/50">
+                        <XCircle className="h-6 w-6 text-rose-400" />
+                    </div>
+                    <div className="space-y-1">
+                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Campagne annulée</h2>
+                        <p className="text-zinc-400 text-xxs leading-relaxed font-normal max-w-sm">
+                            Cette campagne de maintenance a été annulée par la direction. Aucune autre action n'est requise de votre part.
+                        </p>
+                    </div>
+                </div>
+            ) : (
+                <>
+                    {/* Participation Form */}
+                    <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                 <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/15 flex flex-row items-center justify-between">
                     <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
                         <User className="h-4 w-4" />
@@ -470,6 +502,8 @@ export function ResidentInvitePortal({
                         
                     </CardContent>
                 </Card>
+            )}
+                </>
             )}
 
             <ConfirmationDialog
