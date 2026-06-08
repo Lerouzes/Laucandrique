@@ -30,7 +30,8 @@ import {
     Globe,
     Phone,
     Mail,
-    Activity
+    Activity,
+    MapPin
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -38,6 +39,9 @@ const translations = {
     fr: {
         portalTitle: "Gustav Portal Résident",
         portalSubtitle: "Espace sécurisé de planification et d'intervention pour les copropriétaires.",
+        campaignSwitcher: "Vos campagnes de maintenance",
+        switchCampaignBtn: "Accéder",
+        currentCampaignBadge: "Actuelle",
         syndicateInfo: "Informations du Syndicat",
         campaignName: "Campagne de Maintenance",
         unitNum: "Unité",
@@ -101,6 +105,9 @@ const translations = {
     en: {
         portalTitle: "Resident Portal",
         portalSubtitle: "Secure scheduling and intervention space for co-owners.",
+        campaignSwitcher: "Your Maintenance Campaigns",
+        switchCampaignBtn: "Access",
+        currentCampaignBadge: "Current",
         syndicateInfo: "Syndicate Information",
         campaignName: "Maintenance Campaign",
         unitNum: "Unit",
@@ -182,7 +189,8 @@ export function ResidentInvitePortal({
         services, 
         contractor,
         progress = [],
-        dailyAppointments = []
+        dailyAppointments = [],
+        siblingCampaigns = []
     } = details
     const campaign = unit.campaign
 
@@ -261,6 +269,10 @@ export function ResidentInvitePortal({
             toast.error(t.deadlinePassed)
             return
         }
+        if (!contactName.trim()) {
+            toast.error(t.contactNameErr)
+            return
+        }
         if (!selectedDate || !selectedSlot) {
             toast.error(t.dateSlotErr)
             return
@@ -268,6 +280,14 @@ export function ResidentInvitePortal({
 
         setBooking(true)
         try {
+            // Auto-save participation & contact details before scheduling appointment
+            await submitParticipationAction(token, 'interested', {
+                contact_name: contactName.trim(),
+                contact_email: contactEmail.trim(),
+                contact_phone: contactPhone.trim(),
+                resident_notes: residentNotes.trim()
+            })
+
             const appt = await scheduleAppointmentAction(
                 token, 
                 selectedDate, 
@@ -276,6 +296,7 @@ export function ResidentInvitePortal({
             )
             setAppointment(appt)
             setParticipation('interested')
+            setIsEditing(false)
             
             // Reload available slots
             const freshSlots = await getAvailableTimeSlotsAction(campaign.id, totalDuration)
@@ -342,7 +363,7 @@ export function ResidentInvitePortal({
     const isFieldsLocked = !isEditing || hasAppointment || isDeadlinePassed
     const isParticipating = participation === 'interested' || participation === 'pending' || participation === 'more_info'
     const isCutoffActive = isCutoffPassed()
-    const rescheduleAllowed = campaign.allow_reschedule && !isDeadlinePassed && !isCutoffActive
+    const rescheduleAllowed = campaign.allow_reschedule !== false && !isDeadlinePassed && !isCutoffActive
 
     return (
         <div className="max-w-2xl w-full space-y-6 text-xs text-zinc-300">
@@ -382,6 +403,82 @@ export function ResidentInvitePortal({
                 </div>
             )}
 
+            {/* Sibling Campaigns Switcher */}
+            {siblingCampaigns.length > 1 && (
+                <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
+                    <CardHeader className="pb-2.5 border-b border-zinc-900 bg-zinc-950/15">
+                        <CardTitle className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
+                            <Activity className="h-4 w-4" />
+                            {t.campaignSwitcher}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-3 space-y-2 text-xxs">
+                        <div className="flex flex-col gap-2">
+                            {siblingCampaigns.map((sib: any) => {
+                                const isCurrent = sib.invite_token === token
+                                return (
+                                    <div 
+                                        key={sib.campaign_id} 
+                                        className={`p-3 rounded-xl border flex flex-col sm:flex-row justify-between sm:items-center gap-2 transition-all ${
+                                            isCurrent 
+                                                ? 'bg-purple-950/20 border-purple-800/60 text-white' 
+                                                : 'bg-zinc-950/40 border-zinc-850 text-zinc-350 hover:bg-zinc-900/40'
+                                        }`}
+                                    >
+                                        <div className="space-y-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="font-extrabold text-xs">{sib.campaign_name}</span>
+                                                {isCurrent && (
+                                                    <Badge className="bg-purple-900/50 border border-purple-700 text-purple-200 text-[9px] font-bold px-1.5 py-0.2 rounded-md shrink-0">
+                                                        {t.currentCampaignBadge}
+                                                    </Badge>
+                                                )}
+                                                <Badge className={`${
+                                                    sib.campaign_status === 'active' 
+                                                        ? 'bg-emerald-950/30 border border-emerald-800 text-emerald-300' 
+                                                        : sib.campaign_status === 'completed'
+                                                        ? 'bg-blue-950/30 border border-blue-800 text-blue-300'
+                                                        : 'bg-zinc-800 border border-zinc-700 text-zinc-400'
+                                                } text-[9px] font-bold px-1.5 py-0.2 rounded-md shrink-0`}>
+                                                    {sib.campaign_status === 'active' ? (lang === 'fr' ? 'Active' : 'Active') : 
+                                                     sib.campaign_status === 'completed' ? (lang === 'fr' ? 'Complétée' : 'Completed') : 
+                                                     (lang === 'fr' ? 'Annulée' : 'Cancelled')}
+                                                </Badge>
+                                            </div>
+                                            <div className="text-[10px] text-zinc-400 flex flex-wrap gap-x-3 gap-y-1">
+                                                {sib.start_date && (
+                                                    <span>
+                                                        {lang === 'fr' ? 'Période: ' : 'Period: '}
+                                                        {new Date(sib.start_date).toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-US')} 
+                                                        {sib.end_date && ` - ${new Date(sib.end_date).toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-US')}`}
+                                                    </span>
+                                                )}
+                                                {sib.appointment && (
+                                                    <span className="text-emerald-455 font-semibold">
+                                                        {lang === 'fr' ? 'Rendez-vous: ' : 'Appointment: '}
+                                                        {new Date(sib.appointment.appointment_date).toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-US')} ({sib.appointment.start_time.substring(0, 5)})
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        
+                                        {!isCurrent && (
+                                            <Button
+                                                size="sm"
+                                                onClick={() => window.location.href = `/maintenance/invite/${sib.invite_token}`}
+                                                className="bg-purple-900/60 hover:bg-purple-800 border border-purple-700 text-white font-bold text-xxs h-7 rounded-lg px-3 shrink-0 self-end sm:self-center cursor-pointer transition-all"
+                                            >
+                                                {t.switchCampaignBtn}
+                                            </Button>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Syndicate & Contractor Info Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Syndicate & Campaign Details */}
@@ -406,10 +503,10 @@ export function ResidentInvitePortal({
                             </p>
                         )}
                         <div className="space-y-1 text-zinc-450 border-t border-zinc-900 pt-2 text-[10px]">
-                            {client?.phone && (
+                            {(client?.address || client?.city) && (
                                 <div className="flex items-center gap-1.5">
-                                    <Phone className="h-3.5 w-3.5 text-zinc-550 shrink-0" />
-                                    <span>{client.phone}</span>
+                                    <MapPin className="h-3.5 w-3.5 text-zinc-550 shrink-0" />
+                                    <span>{[client.address, client.city].filter(Boolean).join(', ')}</span>
                                 </div>
                             )}
                             {client?.email && (
@@ -722,7 +819,7 @@ export function ResidentInvitePortal({
                                                 </>
                                             ) : (
                                                 <div className="w-full text-left text-xxs text-zinc-500 italic mt-1 space-y-1">
-                                                    {!campaign.allow_reschedule && (
+                                                    {campaign.allow_reschedule === false && (
                                                         <div className="flex items-center gap-1 text-amber-500/70 font-semibold">
                                                             <AlertTriangle className="h-3 w-3" />
                                                             <span>{t.reschedulingDisabledDesc}</span>

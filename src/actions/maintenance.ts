@@ -510,7 +510,7 @@ export async function getResidentInviteAction(token: string) {
     // 5. Fetch syndicate (client) details
     const { data: clientObj } = await supabase
         .from('clients')
-        .select('company_name, full_name, email, phone')
+        .select('company_name, full_name, email, address, city, province, postal_code')
         .eq('id', unit.campaign.client_id)
         .single()
 
@@ -544,6 +544,44 @@ export async function getResidentInviteAction(token: string) {
         dailyAppointments = appts || []
     }
 
+    // 9. Fetch sibling campaign units (other campaigns for the same door)
+    const { data: siblingUnits } = await supabase
+        .from('maintenance_campaign_units')
+        .select('*, campaign:maintenance_campaigns(*)')
+        .eq('door_id', unit.door_id)
+
+    const siblingCampaigns: any[] = []
+    if (siblingUnits && siblingUnits.length > 0) {
+        // Fetch all appointments for this door
+        const { data: doorAppointments } = await supabase
+            .from('maintenance_appointments')
+            .select('*')
+            .eq('door_id', unit.door_id)
+        
+        for (const sUnit of siblingUnits) {
+            const appt = (doorAppointments || []).find(a => a.campaign_id === sUnit.campaign_id)
+            siblingCampaigns.push({
+                campaign_id: sUnit.campaign_id,
+                campaign_name: sUnit.campaign?.name,
+                campaign_status: sUnit.campaign?.status,
+                current_phase: sUnit.campaign?.current_phase,
+                invite_token: sUnit.invite_token,
+                participation: sUnit.participation,
+                start_date: sUnit.campaign?.start_date,
+                end_date: sUnit.campaign?.end_date,
+                appointment: appt || null
+            })
+        }
+        
+        // Sort campaigns by start_date descending
+        siblingCampaigns.sort((a, b) => {
+            const dateA = a.start_date ? new Date(a.start_date).getTime() : 0
+            const dateB = b.start_date ? new Date(b.start_date).getTime() : 0
+            if (dateA !== dateB) return dateB - dateA
+            return b.campaign_id.localeCompare(a.campaign_id)
+        })
+    }
+
     return {
         unit,
         resident,
@@ -552,7 +590,8 @@ export async function getResidentInviteAction(token: string) {
         contractor: contractorObj,
         services: (campaignServices || []).map(cs => cs.service),
         progress: progressRecords || [],
-        dailyAppointments
+        dailyAppointments,
+        siblingCampaigns
     }
 }
 
