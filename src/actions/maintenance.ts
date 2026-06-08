@@ -123,8 +123,8 @@ export async function createCampaignAction(data: {
             client_id: data.client_id,
             name: data.name,
             description: data.description || null,
-            start_date: data.survey_required ? (data.start_date || null) : data.start_date,
-            end_date: data.survey_required ? (data.end_date || null) : data.end_date,
+            start_date: data.survey_required ? (data.start_date || new Date().toISOString().substring(0, 10)) : data.start_date,
+            end_date: data.survey_required ? (data.end_date || new Date().toISOString().substring(0, 10)) : data.end_date,
             contractor_id: data.contractor_id || null,
             min_participation: data.min_participation || 0,
             is_mandatory: data.is_mandatory !== false,
@@ -238,20 +238,20 @@ export async function getCampaignDetailsAction(id: string) {
     const supabase = await createClient()
     
     const [campaignRes, servicesRes, unitsRes, appointmentsRes] = await Promise.all([
-        supabase
+        (supabase as any)
             .from('maintenance_campaigns')
             .select('*, clients(*), contractors(*)')
             .eq('id', id)
             .single(),
-        supabase
+        (supabase as any)
             .from('maintenance_campaign_services')
             .select('*, service:maintenance_services(*)')
             .eq('campaign_id', id),
-        supabase
+        (supabase as any)
             .from('maintenance_campaign_units')
             .select('*, door:doors(*)')
             .eq('campaign_id', id),
-        supabase
+        (supabase as any)
             .from('maintenance_appointments')
             .select('*, door:doors(*)')
             .eq('campaign_id', id)
@@ -363,6 +363,10 @@ export async function getAvailableTimeSlotsAction(campaignId: string, durationMi
         .single()
 
     if (campaignErr) throw new Error(campaignErr.message)
+
+    if (!campaign.start_date || !campaign.end_date || campaign.current_phase === 'survey') {
+        return {}
+    }
 
     // Fetch existing appointments
     const { data: appointments, error: apptsErr } = await supabase
@@ -1101,17 +1105,24 @@ export async function updateCampaignSettingsAction(
         allow_reschedule: boolean
         reschedule_cutoff_hours: number
         response_deadline_date: string | null
+        availability_settings?: any
     }
 ) {
     const supabase = await createClient()
+    const updatePayload: any = {
+        allow_reschedule: settings.allow_reschedule,
+        reschedule_cutoff_hours: settings.reschedule_cutoff_hours,
+        response_deadline_date: settings.response_deadline_date ? new Date(settings.response_deadline_date).toISOString() : null,
+        updated_at: new Date().toISOString()
+    }
+
+    if (settings.availability_settings) {
+        updatePayload.availability_settings = settings.availability_settings
+    }
+
     const { data, error } = await supabase
         .from('maintenance_campaigns')
-        .update({
-            allow_reschedule: settings.allow_reschedule,
-            reschedule_cutoff_hours: settings.reschedule_cutoff_hours,
-            response_deadline_date: settings.response_deadline_date ? new Date(settings.response_deadline_date).toISOString() : null,
-            updated_at: new Date().toISOString()
-        })
+        .update(updatePayload)
         .eq('id', campaignId)
         .select()
         .single()

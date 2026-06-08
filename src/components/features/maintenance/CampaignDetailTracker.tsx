@@ -4,6 +4,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import FullCalendar from '@fullcalendar/react'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import interactionPlugin from '@fullcalendar/interaction'
 import { 
     updateCampaignStatusAction, 
     importResidentsAction,
@@ -97,17 +101,36 @@ export function CampaignDetailTracker({
         const tzoffset = d.getTimezoneOffset() * 60000
         return (new Date(d.getTime() - tzoffset)).toISOString().slice(0, 16)
     })
+    const [workStart, setWorkStart] = useState<string>(campaign.availability_settings?.workingHours?.start ?? '08:00')
+    const [workEnd, setWorkEnd] = useState<string>(campaign.availability_settings?.workingHours?.end ?? '17:00')
+    const [techsCount, setTechsCount] = useState<string>(String(campaign.availability_settings?.techniciansCount ?? 1))
+    const [buffer, setBuffer] = useState<string>(String(campaign.availability_settings?.bufferMinutes ?? 10))
+    const [breakPeriods, setBreakPeriods] = useState<Array<{ start: string; end: string }>>(
+        campaign.availability_settings?.breakPeriods ?? [{ start: '12:00', end: '13:00' }]
+    )
+    const [newBreakStart, setNewBreakStart] = useState('')
+    const [newBreakEnd, setNewBreakEnd] = useState('')
     const [savingSettings, setSavingSettings] = useState(false)
 
     // Transition modal state
     const [showTransitionModal, setShowTransitionModal] = useState(false)
     const [transStartDate, setTransStartDate] = useState(new Date().toISOString().substring(0, 10))
     const [transEndDate, setTransEndDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10))
-    const [transWorkStart, setTransWorkStart] = useState('08:00')
-    const [transWorkEnd, setTransWorkEnd] = useState('17:00')
-    const [transTechsCount, setTransTechsCount] = useState('1')
-    const [transBuffer, setTransBuffer] = useState('10')
+    const [transWorkStart, setTransWorkStart] = useState(campaign.availability_settings?.workingHours?.start ?? '08:00')
+    const [transWorkEnd, setTransWorkEnd] = useState(campaign.availability_settings?.workingHours?.end ?? '17:00')
+    const [transTechsCount, setTransTechsCount] = useState(String(campaign.availability_settings?.techniciansCount ?? 1))
+    const [transBuffer, setTransBuffer] = useState(String(campaign.availability_settings?.bufferMinutes ?? 10))
+    const [transBreakPeriods, setTransBreakPeriods] = useState<Array<{ start: string; end: string }>>(
+        campaign.availability_settings?.breakPeriods ?? [{ start: '12:00', end: '13:00' }]
+    )
+    const [transNewBreakStart, setTransNewBreakStart] = useState('')
+    const [transNewBreakEnd, setTransNewBreakEnd] = useState('')
     const [savingTransition, setSavingTransition] = useState(false)
+
+    // View mode and appointment detail modal state
+    const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+    const [selectedAppointmentDetails, setSelectedAppointmentDetails] = useState<any | null>(null)
+    const [isApptModalOpen, setIsApptModalOpen] = useState(false)
 
     const handleSaveSettings = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -116,7 +139,13 @@ export function CampaignDetailTracker({
             await updateCampaignSettingsAction(campaign.id, {
                 allow_reschedule: allowReschedule,
                 reschedule_cutoff_hours: Number(rescheduleCutoff),
-                response_deadline_date: deadlineDate ? new Date(deadlineDate).toISOString() : null
+                response_deadline_date: deadlineDate ? new Date(deadlineDate).toISOString() : null,
+                availability_settings: {
+                    workingHours: { start: workStart, end: workEnd },
+                    techniciansCount: Number(techsCount),
+                    bufferMinutes: Number(buffer),
+                    breakPeriods: breakPeriods
+                }
             })
             toast.success("Réglages de la campagne mis à jour avec succès.")
             setShowSettingsModal(false)
@@ -146,7 +175,7 @@ export function CampaignDetailTracker({
                     workingHours: { start: transWorkStart, end: transWorkEnd },
                     techniciansCount: Number(transTechsCount),
                     bufferMinutes: Number(transBuffer),
-                    breakPeriods: [{ start: '12:00', end: '13:00' }]
+                    breakPeriods: transBreakPeriods
                 }
             })
             toast.success("La campagne de maintenance est passée à la phase de planification.")
@@ -292,6 +321,24 @@ export function CampaignDetailTracker({
         const matchesStatus = statusFilter === 'All' || u.participation === statusFilter
         return matchesSearch && matchesStatus
     })
+
+    const events = units
+        .filter(u => u.appointment)
+        .map(u => {
+            const dateStr = u.appointment.appointment_date
+            const startStr = `${dateStr}T${u.appointment.start_time}`
+            const endStr = `${dateStr}T${u.appointment.end_time}`
+            return {
+                id: u.appointment.id,
+                title: `Unité ${u.door?.door_number} - ${u.contact_name || u.resident?.full_name || 'Résident'}`,
+                start: startStr,
+                end: endStr,
+                extendedProps: {
+                    unit: u,
+                    appointment: u.appointment
+                }
+            }
+        })
 
     const getStatusLabel = (status: string) => {
         switch (status) {
@@ -606,126 +653,205 @@ export function CampaignDetailTracker({
             {/* Section 4: Units Enrollment Listing Table */}
             <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                 <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
-                        <Users className="h-4 w-4" />
-                        Unités & Planification des rendez-vous
-                    </CardTitle>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
+                            <Users className="h-4 w-4" />
+                            Unités & Planification des rendez-vous
+                        </CardTitle>
+                        
+                        {/* View Switcher Toggle */}
+                        <div className="flex items-center gap-1 bg-zinc-900/50 p-1 rounded-xl border border-zinc-800 w-fit">
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('list')}
+                                className={`text-[9px] font-bold h-7 px-3 rounded-lg transition-colors cursor-pointer ${
+                                    viewMode === 'list'
+                                        ? 'bg-purple-650 text-white shadow-sm'
+                                        : 'text-zinc-400 hover:text-zinc-200'
+                                }`}
+                            >
+                                Vue Liste
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('calendar')}
+                                className={`text-[9px] font-bold h-7 px-3 rounded-lg transition-colors cursor-pointer ${
+                                    viewMode === 'calendar'
+                                        ? 'bg-purple-650 text-white shadow-sm'
+                                        : 'text-zinc-400 hover:text-zinc-200'
+                                }`}
+                            >
+                                Vue Calendrier
+                            </button>
+                        </div>
+                    </div>
                     
-                    {/* Filters bar */}
-                    <div className="flex gap-3 w-full sm:w-auto items-center">
-                        <div className="relative flex-1 sm:max-w-xs">
-                            <Search className="absolute left-3 top-3 h-4 w-4 text-zinc-500" />
-                            <Input
-                                placeholder="Unité or résident..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-10 text-xs pl-9 text-white focus-visible:ring-purple-650"
+                    {/* Filters bar - only show when in list mode */}
+                    {viewMode === 'list' && (
+                        <div className="flex gap-3 w-full sm:w-auto items-center">
+                            <div className="relative flex-1 sm:max-w-xs">
+                                <Search className="absolute left-3 top-3 h-4 w-4 text-zinc-500" />
+                                <Input
+                                    placeholder="Unité or résident..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="bg-[#121318] border-zinc-850 h-10 text-xs pl-9 text-white focus-visible:ring-purple-650"
+                                />
+                            </div>
+                            <SearchableSelect
+                                value={statusFilter}
+                                onChange={setStatusFilter}
+                                options={[
+                                    { value: 'All', label: 'Tous les statuts' },
+                                    { value: 'pending', label: 'En attente' },
+                                    { value: 'interested', label: 'Intéressé' },
+                                    { value: 'not_interested', label: 'Refusé' },
+                                    { value: 'completed', label: 'Complété' }
+                                ]}
+                                placeholder="Statut..."
+                                searchPlaceholder="Rechercher..."
+                                className="h-10 w-48"
                             />
                         </div>
-                        <SearchableSelect
-                            value={statusFilter}
-                            onChange={setStatusFilter}
-                            options={[
-                                { value: 'All', label: 'Tous les statuts' },
-                                { value: 'pending', label: 'En attente' },
-                                { value: 'interested', label: 'Intéressé' },
-                                { value: 'not_interested', label: 'Refusé' },
-                                { value: 'completed', label: 'Complété' }
-                            ]}
-                            placeholder="Statut..."
-                            searchPlaceholder="Rechercher..."
-                            className="h-10 w-48"
-                        />
-                    </div>
+                    )}
                 </CardHeader>
-                <CardContent className="p-0">
-                    {filteredUnits.length === 0 ? (
-                        <p className="text-xs italic text-zinc-500 text-center py-8">
-                            Aucune unité ne correspond aux critères de filtrage.
-                        </p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs text-zinc-300">
-                                <thead className="bg-zinc-950/40 text-zinc-400 font-bold border-b border-zinc-800 uppercase text-[10px] tracking-wider">
-                                    <tr>
-                                        <th className="p-3">Unité</th>
-                                        <th className="p-3">Résident actuel</th>
-                                        <th className="p-3">Contact (Campagne)</th>
-                                        <th className="p-3">Participation</th>
-                                        <th className="p-3">Rendez-vous</th>
-                                        <th className="p-3 text-right">Lien d'invitation</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-zinc-900">
-                                    {filteredUnits.map(u => (
-                                        <tr key={u.id} className="hover:bg-zinc-900/15">
-                                            <td className="p-3">
-                                                <Link 
-                                                    href={`/maintenance-hub/units/${u.door_id}`}
-                                                    className="font-extrabold text-purple-400 hover:text-purple-300 hover:underline flex items-center gap-1 text-xs"
-                                                >
-                                                    Unit {u.door?.door_number}
-                                                    <ChevronRight className="h-3.5 w-3.5 text-zinc-650" />
-                                                </Link>
-                                            </td>
-                                            <td className="p-3 font-semibold text-zinc-200">
-                                                {u.resident?.full_name || 'Non défini (Import requis)'}
-                                            </td>
-                                            <td className="p-3">
-                                                <div className="space-y-0.5">
-                                                    <span className="font-semibold block text-zinc-300 text-xs">
-                                                        {u.contact_name || u.resident?.full_name || '-'}
-                                                    </span>
-                                                    <span className="text-xs text-zinc-500 block font-mono">
-                                                        {[u.contact_email || u.resident?.email, u.contact_phone || u.resident?.phone].filter(Boolean).join(' · ')}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="p-3">
-                                                <Badge variant="outline" className={`text-[10px] font-bold px-2.5 py-0.5 ${getStatusBadge(u.participation)}`}>
-                                                    {getStatusLabel(u.participation)}
-                                                </Badge>
-                                            </td>
-                                            <td className="p-3">
-                                                {u.appointment ? (
-                                                    <div className="space-y-0.5 text-zinc-300">
-                                                        <span className="font-semibold block flex items-center gap-1 font-mono text-xs">
-                                                            <Calendar className="h-3.5 w-3.5 text-purple-400" />
-                                                            {new Date(u.appointment.appointment_date).toLocaleDateString('fr-CA')}
+                <CardContent className={viewMode === 'list' ? 'p-0' : 'p-4'}>
+                    {viewMode === 'list' ? (
+                        filteredUnits.length === 0 ? (
+                            <p className="text-xs italic text-zinc-500 text-center py-8">
+                                Aucune unité ne correspond aux critères de filtrage.
+                            </p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs text-zinc-300">
+                                    <thead className="bg-zinc-950/40 text-zinc-400 font-bold border-b border-zinc-800 uppercase text-[10px] tracking-wider">
+                                        <tr>
+                                            <th className="p-3">Unité</th>
+                                            <th className="p-3">Résident actuel</th>
+                                            <th className="p-3">Contact (Campagne)</th>
+                                            <th className="p-3">Participation</th>
+                                            <th className="p-3">Rendez-vous</th>
+                                            <th className="p-3 text-right">Lien d'invitation</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-zinc-900">
+                                        {filteredUnits.map(u => (
+                                            <tr key={u.id} className="hover:bg-zinc-900/15">
+                                                <td className="p-3">
+                                                    <Link 
+                                                        href={`/maintenance-hub/units/${u.door_id}`}
+                                                        className="font-extrabold text-purple-400 hover:text-purple-300 hover:underline flex items-center gap-1 text-xs"
+                                                    >
+                                                        Unit {u.door?.door_number}
+                                                        <ChevronRight className="h-3.5 w-3.5 text-zinc-650" />
+                                                    </Link>
+                                                </td>
+                                                <td className="p-3 font-semibold text-zinc-200">
+                                                    {u.resident?.full_name || 'Non défini (Import requis)'}
+                                                </td>
+                                                <td className="p-3">
+                                                    <div className="space-y-0.5">
+                                                        <span className="font-semibold block text-zinc-300 text-xs">
+                                                            {u.contact_name || u.resident?.full_name || '-'}
                                                         </span>
                                                         <span className="text-xs text-zinc-500 block font-mono">
-                                                            Slot : {u.appointment.start_time.substring(0,5)} à {u.appointment.end_time.substring(0,5)}
+                                                            {[u.contact_email || u.resident?.email, u.contact_phone || u.resident?.phone].filter(Boolean).join(' · ')}
                                                         </span>
                                                     </div>
-                                                ) : (
-                                                    <span className="text-zinc-600 italic">Non planifié</span>
-                                                )}
-                                            </td>
-                                            <td className="p-3 text-right">
-                                                <div className="flex justify-end gap-1">
-                                                    <Link
-                                                        href={`/maintenance/invite/${u.invite_token}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="inline-flex h-8 w-8 items-center justify-center text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors"
-                                                        title="Tester le lien résident"
-                                                    >
-                                                        <Eye className="h-4 w-4" />
-                                                    </Link>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => handleCopyInviteLink(u.invite_token)}
-                                                        className="h-8 w-8 text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg cursor-pointer"
-                                                    >
-                                                        {copiedToken === u.invite_token ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
-                                                    </Button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                                </td>
+                                                <td className="p-3">
+                                                    <Badge variant="outline" className={`text-[10px] font-bold px-2.5 py-0.5 ${getStatusBadge(u.participation)}`}>
+                                                        {getStatusLabel(u.participation)}
+                                                    </Badge>
+                                                </td>
+                                                <td className="p-3">
+                                                    {u.appointment ? (
+                                                        <div className="space-y-0.5 text-zinc-300">
+                                                            <span className="font-semibold block flex items-center gap-1 font-mono text-xs">
+                                                                <Calendar className="h-3.5 w-3.5 text-purple-400" />
+                                                                {new Date(u.appointment.appointment_date).toLocaleDateString('fr-CA')}
+                                                            </span>
+                                                            <span className="text-xs text-zinc-500 block font-mono">
+                                                                Slot : {u.appointment.start_time.substring(0,5)} à {u.appointment.end_time.substring(0,5)}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-zinc-600 italic">Non planifié</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-3 text-right">
+                                                    <div className="flex justify-end gap-1">
+                                                        <Link
+                                                            href={`/maintenance/invite/${u.invite_token}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex h-8 w-8 items-center justify-center text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors"
+                                                            title="Tester le lien résident"
+                                                        >
+                                                            <Eye className="h-4 w-4" />
+                                                        </Link>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => handleCopyInviteLink(u.invite_token)}
+                                                            className="h-8 w-8 text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg cursor-pointer"
+                                                        >
+                                                            {copiedToken === u.invite_token ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                                                        </Button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )
+                    ) : (
+                        /* Calendar view mode */
+                        <div className="fc-dark-theme-wrapper min-h-[500px]">
+                            <FullCalendar
+                                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                                initialView="dayGridMonth"
+                                headerToolbar={{
+                                    left: 'prev,next today',
+                                    center: 'title',
+                                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                                }}
+                                events={events}
+                                eventClick={(info) => {
+                                    setSelectedAppointmentDetails(info.event.extendedProps)
+                                    setIsApptModalOpen(true)
+                                }}
+                                height="auto"
+                                locale="fr"
+                                firstDay={1}
+                                buttonText={{
+                                    today: "Aujourd'hui",
+                                    month: 'Mois',
+                                    week: 'Semaine',
+                                    day: 'Jour',
+                                }}
+                                eventDidMount={(info) => {
+                                    info.el.style.backgroundColor = '#6b21a8'
+                                    info.el.style.borderColor = '#7e22ce'
+                                }}
+                            />
+                            <style dangerouslySetInnerHTML={{
+                                __html: `
+                        .fc-dark-theme-wrapper { color: #f4f4f5; }
+                        .fc-theme-standard .fc-scrollgrid { border-color: #27272a; }
+                        .fc-theme-standard td, .fc-theme-standard th { border-color: #27272a; }
+                        .fc-button-primary { background-color: #18181b !important; border-color: #27272a !important; color: #f4f4f5 !important; font-size: 11px !important; padding: 4px 8px !important; }
+                        .fc-button-primary:hover { background-color: #27272a !important; }
+                        .fc-button-active { background-color: #3f3f46 !important; }
+                        .fc-v-event { border: none; }
+                        .fc-h-event { border: none; }
+                        .fc-toolbar-title { font-size: 13px !important; font-weight: 600; text-transform: capitalize; color: #fff; }
+                        .fc .fc-daygrid-day-number { color: #a1a1aa; font-size: 11px; }
+                        .fc .fc-col-header-cell-cushion { color: #f4f4f5; font-weight: 500; font-size: 11px; }
+                        .fc .fc-day-today { background-color: #18181b !important; }
+                        .fc-event { cursor: pointer; font-size: 11px; }
+                        `}} />
                         </div>
                     )}
                 </CardContent>
@@ -759,7 +885,7 @@ export function CampaignDetailTracker({
             {/* Modal Réglages de la Campagne */}
             {showSettingsModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <Card className="bg-[#16171e] border-zinc-800 shadow-2xl max-w-md w-full">
+                    <Card className="bg-[#16171e] border-zinc-800 shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
                         <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/15">
                             <CardTitle className="text-xs font-bold text-white uppercase tracking-wider text-purple-400">
                                 Réglages de la Campagne
@@ -802,7 +928,7 @@ export function CampaignDetailTracker({
                                 )}
 
                                 <div className="space-y-2 border-t border-zinc-900 pt-3">
-                                    <Label className="text-zinc-500 uppercase font-bold text-[8px]">Date limite de réponse</Label>
+                                    <Label className="text-zinc-550 uppercase font-bold text-[8px]">Date limite de réponse</Label>
                                     <Input
                                         type="datetime-local"
                                         value={deadlineDate}
@@ -812,6 +938,114 @@ export function CampaignDetailTracker({
                                     <p className="text-[10px] text-zinc-500 font-medium">
                                         Après cette date, les résidents ne pourront plus répondre ni modifier leurs choix. Laissez vide pour aucune limite.
                                     </p>
+                                </div>
+
+                                <div className="space-y-3 border-t border-zinc-900 pt-3">
+                                    <h4 className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Planification & Capacité</h4>
+                                    
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <Label className="text-zinc-550 uppercase font-bold text-[8px]">Heure de début</Label>
+                                            <Input
+                                                type="time"
+                                                value={workStart}
+                                                onChange={(e) => setWorkStart(e.target.value)}
+                                                className="bg-[#121318] border-zinc-850 h-8 text-xs text-white"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-zinc-550 uppercase font-bold text-[8px]">Heure de fin</Label>
+                                            <Input
+                                                type="time"
+                                                value={workEnd}
+                                                onChange={(e) => setWorkEnd(e.target.value)}
+                                                className="bg-[#121318] border-zinc-850 h-8 text-xs text-white"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <Label className="text-zinc-555 text-zinc-550 uppercase font-bold text-[8px]">Techniciens (Capacité)</Label>
+                                            <Input
+                                                type="number"
+                                                min="1"
+                                                value={techsCount}
+                                                onChange={(e) => setTechsCount(e.target.value)}
+                                                className="bg-[#121318] border-zinc-850 h-8 text-xs text-white"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-zinc-550 uppercase font-bold text-[8px]">Zone tampon (min)</Label>
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                value={buffer}
+                                                onChange={(e) => setBuffer(e.target.value)}
+                                                className="bg-[#121318] border-zinc-850 h-8 text-xs text-white"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Break Periods List Management inside settings modal */}
+                                    <div className="space-y-2 border-t border-zinc-900 pt-3">
+                                        <Label className="text-zinc-550 uppercase font-bold text-[8px]">Plages horaires réservées (ex: Repas)</Label>
+                                        
+                                        <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1">
+                                            {breakPeriods.map((bp, idx) => (
+                                                <div key={idx} className="flex items-center justify-between p-2 bg-[#121318] border border-zinc-850 rounded-lg">
+                                                    <span className="font-mono text-xs text-zinc-300">
+                                                        {bp.start} à {bp.end}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setBreakPeriods(prev => prev.filter((_, i) => i !== idx))}
+                                                        className="text-rose-450 text-rose-400 hover:text-rose-300 text-xxs font-semibold cursor-pointer"
+                                                    >
+                                                        Retirer
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            {breakPeriods.length === 0 && (
+                                                <span className="text-[10px] text-zinc-600 italic block">Aucune plage réservée.</span>
+                                            )}
+                                        </div>
+
+                                        <div className="flex gap-2 items-center pt-1">
+                                            <Input
+                                                type="time"
+                                                value={newBreakStart}
+                                                onChange={(e) => setNewBreakStart(e.target.value)}
+                                                className="bg-[#121318] border-zinc-850 h-8 text-xs text-white flex-1"
+                                            />
+                                            <span className="text-zinc-550 text-xs">à</span>
+                                            <Input
+                                                type="time"
+                                                value={newBreakEnd}
+                                                onChange={(e) => setNewBreakEnd(e.target.value)}
+                                                className="bg-[#121318] border-zinc-850 h-8 text-xs text-white flex-1"
+                                            />
+                                            <Button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (!newBreakStart || !newBreakEnd) {
+                                                        toast.error("Veuillez saisir une heure de début et de fin.")
+                                                        return
+                                                    }
+                                                    if (newBreakStart >= newBreakEnd) {
+                                                        toast.error("L'heure de début doit être antérieure à l'heure de fin.")
+                                                        return
+                                                    }
+                                                    setBreakPeriods(prev => [...prev, { start: newBreakStart, end: newBreakEnd }].sort((a,b) => a.start.localeCompare(b.start)))
+                                                    setNewBreakStart('')
+                                                    setNewBreakEnd('')
+                                                }}
+                                                className="bg-[#121318] hover:bg-zinc-800 text-zinc-300 text-xxs font-bold h-8 px-3 rounded-lg border border-zinc-800 cursor-pointer"
+                                            >
+                                                Ajouter
+                                            </Button>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="flex justify-end gap-2 border-t border-zinc-900 pt-3">
@@ -872,7 +1106,7 @@ export function CampaignDetailTracker({
 
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-zinc-900 pt-3">
                                     <div className="space-y-2">
-                                        <Label className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Début de journée</Label>
+                                        <Label className="text-xs text-zinc-550 text-zinc-500 font-semibold uppercase tracking-wider">Début de journée</Label>
                                         <Input
                                             type="time"
                                             required
@@ -915,6 +1149,66 @@ export function CampaignDetailTracker({
                                     </div>
                                 </div>
 
+                                {/* Break periods list management inside transition modal */}
+                                <div className="space-y-2 border-t border-zinc-900 pt-3">
+                                    <Label className="text-zinc-550 uppercase font-bold text-[10px] tracking-wider">Plages horaires réservées (ex: Repas)</Label>
+                                    
+                                    <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1">
+                                        {transBreakPeriods.map((bp, idx) => (
+                                            <div key={idx} className="flex items-center justify-between p-2 bg-[#121318] border border-zinc-850 rounded-lg">
+                                                <span className="font-mono text-xs text-zinc-300">
+                                                    {bp.start} à {bp.end}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setTransBreakPeriods(prev => prev.filter((_, i) => i !== idx))}
+                                                    className="text-rose-450 text-rose-400 hover:text-rose-300 text-xxs font-semibold cursor-pointer"
+                                                >
+                                                    Retirer
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {transBreakPeriods.length === 0 && (
+                                            <span className="text-[10px] text-zinc-650 italic block">Aucune plage réservée.</span>
+                                        )}
+                                    </div>
+
+                                    <div className="flex gap-2 items-center pt-1">
+                                        <Input
+                                            type="time"
+                                            value={transNewBreakStart}
+                                            onChange={(e) => setTransNewBreakStart(e.target.value)}
+                                            className="bg-[#121318] border-zinc-850 h-8 text-xs text-white flex-1"
+                                        />
+                                        <span className="text-zinc-550 text-xs">à</span>
+                                        <Input
+                                            type="time"
+                                            value={transNewBreakEnd}
+                                            onChange={(e) => setTransNewBreakEnd(e.target.value)}
+                                            className="bg-[#121318] border-zinc-850 h-8 text-xs text-white flex-1"
+                                        />
+                                        <Button
+                                            type="button"
+                                            onClick={() => {
+                                                if (!transNewBreakStart || !transNewBreakEnd) {
+                                                    toast.error("Veuillez saisir une heure de début et de fin.")
+                                                    return
+                                                }
+                                                if (transNewBreakStart >= transNewBreakEnd) {
+                                                    toast.error("L'heure de début doit être antérieure à l'heure de fin.")
+                                                    return
+                                                }
+                                                setTransBreakPeriods(prev => [...prev, { start: transNewBreakStart, end: transNewBreakEnd }].sort((a,b) => a.start.localeCompare(b.start)))
+                                                setTransNewBreakStart('')
+                                                setTransNewBreakEnd('')
+                                            }}
+                                            className="bg-[#121318] hover:bg-zinc-800 text-zinc-300 text-xxs font-bold h-8 px-3 rounded-lg border border-zinc-800 cursor-pointer"
+                                        >
+                                            Ajouter
+                                        </Button>
+                                    </div>
+                                </div>
+
                                 <div className="flex justify-end gap-2 border-t border-zinc-900 pt-3">
                                     <Button
                                         type="button"
@@ -932,6 +1226,93 @@ export function CampaignDetailTracker({
                                     </Button>
                                 </div>
                             </form>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* Modal de détails du rendez-vous */}
+            {isApptModalOpen && selectedAppointmentDetails && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <Card className="bg-[#16171e] border-zinc-800 shadow-2xl max-w-md w-full">
+                        <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/15">
+                            <CardTitle className="text-xs font-bold text-white uppercase tracking-wider text-purple-400">
+                                Détails du rendez-vous
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span className="text-[10px] text-zinc-500 uppercase font-bold block">Unité</span>
+                                    <span className="text-sm font-extrabold text-white">
+                                        Unit {selectedAppointmentDetails.unit?.door?.door_number || '-'}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] text-zinc-500 uppercase font-bold block">Participation</span>
+                                    <Badge variant="outline" className={`text-[9px] font-bold px-2 py-0.5 mt-0.5 ${getStatusBadge(selectedAppointmentDetails.unit?.participation)}`}>
+                                        {getStatusLabel(selectedAppointmentDetails.unit?.participation)}
+                                    </Badge>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-zinc-900 pt-3 space-y-2">
+                                <div>
+                                    <span className="text-[10px] text-zinc-500 uppercase font-bold block">Résident / Contact sur place</span>
+                                    <span className="text-xs font-semibold text-zinc-200 block">
+                                        {selectedAppointmentDetails.unit?.contact_name || selectedAppointmentDetails.unit?.resident?.full_name || 'Non défini'}
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-xxs font-mono text-zinc-400">
+                                    <div>
+                                        <span className="text-[9px] text-zinc-550 uppercase font-bold block">Email</span>
+                                        <span className="truncate block">
+                                            {selectedAppointmentDetails.unit?.contact_email || selectedAppointmentDetails.unit?.resident?.email || '-'}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[9px] text-zinc-550 uppercase font-bold block">Téléphone</span>
+                                        <span>
+                                            {selectedAppointmentDetails.unit?.contact_phone || selectedAppointmentDetails.unit?.resident?.phone || '-'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-zinc-900 pt-3">
+                                <span className="text-[10px] text-zinc-500 uppercase font-bold block">Date & Plage horaire</span>
+                                <div className="flex items-center gap-1.5 font-mono text-xs text-zinc-205 text-zinc-200 mt-1">
+                                    <Calendar className="h-4 w-4 text-purple-400" />
+                                    <span>
+                                        {new Date(selectedAppointmentDetails.appointment?.appointment_date).toLocaleDateString('fr-CA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                    </span>
+                                </div>
+                                <span className="text-xxs text-zinc-400 font-mono block mt-1">
+                                    Heure : {selectedAppointmentDetails.appointment?.start_time?.substring(0, 5)} à {selectedAppointmentDetails.appointment?.end_time?.substring(0, 5)}
+                                </span>
+                            </div>
+
+                            {selectedAppointmentDetails.appointment?.notes && (
+                                <div className="border-t border-zinc-900 pt-3">
+                                    <span className="text-[10px] text-zinc-505 text-zinc-500 uppercase font-bold block">Notes du résident</span>
+                                    <p className="text-xs text-zinc-400 italic bg-zinc-950/40 p-2.5 rounded-lg border border-zinc-900 mt-1 leading-relaxed">
+                                        {selectedAppointmentDetails.appointment?.notes}
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className="flex justify-end border-t border-zinc-900 pt-3">
+                                <Button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsApptModalOpen(false)
+                                        setSelectedAppointmentDetails(null)
+                                    }}
+                                    className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-xxs font-bold h-8 px-4 rounded-xl hover:bg-zinc-800 cursor-pointer"
+                                >
+                                    Fermer
+                                </Button>
+                            </div>
                         </CardContent>
                     </Card>
                 </div>

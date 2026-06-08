@@ -2,9 +2,9 @@
 // src/components/features/maintenance/NewCampaignForm.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createCampaignAction } from '@/actions/maintenance'
+import { createCampaignAction, getContractorServicesAction, createAndLinkServiceAction } from '@/actions/maintenance'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,14 +21,17 @@ import {
     Activity, 
     Hammer, 
     Building2,
-    Users
+    Users,
+    Search,
+    Plus,
+    XCircle
 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export function NewCampaignForm({ 
     clients, 
     contractors, 
-    services 
+    services: initialServices 
 }: { 
     clients: Array<{ id: string; company_name: string | null; full_name: string }>
     contractors: Array<{ id: string; full_name: string }>
@@ -50,11 +53,49 @@ export function NewCampaignForm({
     const [selectedServices, setSelectedServices] = useState<string[]>([])
     const [surveyRequired, setSurveyRequired] = useState(false)
 
+    // Services loading & filtering states
+    const [filteredContractorServices, setFilteredContractorServices] = useState<any[]>([])
+    const [serviceSearch, setServiceSearch] = useState('')
+
+    // Inline service creation states
+    const [showCreateService, setShowCreateService] = useState(false)
+    const [newSvcName, setNewSvcName] = useState('')
+    const [newSvcCategory, setNewSvcCategory] = useState('Plomberie')
+    const [newSvcDuration, setNewSvcDuration] = useState('30')
+    const [newSvcPrice, setNewSvcPrice] = useState('')
+    const [newSvcDescription, setNewSvcDescription] = useState('')
+    const [newSvcPhotosReq, setNewSvcPhotosReq] = useState(false)
+    const [newSvcReportReq, setNewSvcReportReq] = useState(false)
+    const [creatingService, setCreatingService] = useState(false)
+
     // Availability settings state
     const [workStart, setWorkStart] = useState('08:00')
     const [workEnd, setWorkEnd] = useState('17:00')
     const [techsCount, setTechsCount] = useState('1')
     const [buffer, setBuffer] = useState('10')
+    const [breakPeriods, setBreakPeriods] = useState<Array<{ start: string; end: string }>>([
+        { start: '12:00', end: '13:00' } // default lunch break
+    ])
+    const [newBreakStart, setNewBreakStart] = useState('')
+    const [newBreakEnd, setNewBreakEnd] = useState('')
+
+    // Fetch contractor services dynamically
+    useEffect(() => {
+        const fetchServices = async () => {
+            if (!contractorId) {
+                setFilteredContractorServices([])
+                return
+            }
+            try {
+                const res = await getContractorServicesAction(contractorId)
+                setFilteredContractorServices(res || [])
+            } catch (err) {
+                console.error("Error fetching contractor services:", err)
+                toast.error("Erreur lors de la récupération des services du contracteur.")
+            }
+        }
+        fetchServices()
+    }, [contractorId])
 
     const handleServiceToggle = (sid: string) => {
         setSelectedServices(prev => 
@@ -62,11 +103,90 @@ export function NewCampaignForm({
         )
     }
 
+    // Filter services based on search
+    const displayedServices = filteredContractorServices.filter(svc => 
+        svc.name.toLowerCase().includes(serviceSearch.toLowerCase()) ||
+        (svc.category && svc.category.toLowerCase().includes(serviceSearch.toLowerCase()))
+    )
+
     // Calculated total duration for information purposes
     const totalDuration = selectedServices.reduce((acc, sid) => {
-        const svc = services.find(s => s.id === sid)
+        const svc = filteredContractorServices.find(s => s.id === sid)
         return acc + (svc ? svc.duration : 0)
     }, 0)
+
+    const handleAddBreak = () => {
+        if (!newBreakStart || !newBreakEnd) {
+            toast.error("Veuillez saisir une heure de début et de fin.")
+            return
+        }
+        if (newBreakStart >= newBreakEnd) {
+            toast.error("L'heure de début doit être antérieure à l'heure de fin.")
+            return
+        }
+        const exists = breakPeriods.some(b => b.start === newBreakStart && b.end === newBreakEnd)
+        if (exists) {
+            toast.error("Cette plage horaire existe déjà.")
+            return
+        }
+        setBreakPeriods(prev => [...prev, { start: newBreakStart, end: newBreakEnd }].sort((a, b) => a.start.localeCompare(b.start)))
+        setNewBreakStart('')
+        setNewBreakEnd('')
+        toast.success("Plage réservée ajoutée.")
+    }
+
+    const handleRemoveBreak = (idx: number) => {
+        setBreakPeriods(prev => prev.filter((_, i) => i !== idx))
+        toast.success("Plage réservée retirée.")
+    }
+
+    const handleCreateService = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!contractorId) {
+            toast.error("Veuillez sélectionner un entrepreneur d'abord.")
+            return
+        }
+        if (!newSvcName.trim()) {
+            toast.error("Veuillez saisir le nom du service.")
+            return
+        }
+        if (!newSvcDuration.trim() || Number(newSvcDuration) <= 0) {
+            toast.error("Veuillez saisir une durée valide en minutes.")
+            return
+        }
+
+        setCreatingService(true)
+        try {
+            const newSvc = await createAndLinkServiceAction(contractorId, {
+                name: newSvcName.trim(),
+                description: newSvcDescription.trim() || null,
+                duration: Number(newSvcDuration),
+                price: newSvcPrice ? Number(newSvcPrice) : null,
+                category: newSvcCategory,
+                photos_required: newSvcPhotosReq,
+                report_required: newSvcReportReq
+            })
+
+            toast.success("Nouveau service créé et associé à l'entrepreneur.")
+            
+            // Add to list and select it
+            setFilteredContractorServices(prev => [...prev, newSvc])
+            setSelectedServices(prev => [...prev, newSvc.id])
+            
+            // Reset fields
+            setNewSvcName('')
+            setNewSvcPrice('')
+            setNewSvcDescription('')
+            setNewSvcDuration('30')
+            setNewSvcPhotosReq(false)
+            setNewSvcReportReq(false)
+            setShowCreateService(false)
+        } catch (err) {
+            toast.error("Erreur lors de la création : " + (err as Error).message)
+        } finally {
+            setCreatingService(false)
+        }
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -107,11 +227,11 @@ export function NewCampaignForm({
                 pricing_type: pricingType,
                 services: selectedServices,
                 survey_required: surveyRequired,
-                availability_settings: surveyRequired ? null : {
+                availability_settings: {
                     workingHours: { start: workStart, end: workEnd },
                     techniciansCount: Number(techsCount),
                     bufferMinutes: Number(buffer),
-                    breakPeriods: [{ start: '12:00', end: '13:00' }] // default lunch break
+                    breakPeriods: breakPeriods
                 }
             })
 
@@ -267,7 +387,7 @@ export function NewCampaignForm({
                 </CardContent>
             </Card>
 
-            {/* Section 2: Services Library Selection */}
+            {/* Section 2: Services Selection (Contractor Filtered + Search + Create) */}
             <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
                 <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10 flex flex-row justify-between items-center">
                     <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
@@ -280,14 +400,166 @@ export function NewCampaignForm({
                         </Badge>
                     )}
                 </CardHeader>
-                <CardContent className="pt-4">
-                    {services.length === 0 ? (
-                        <p className="text-xs italic text-zinc-500 py-4 text-center">
-                            Aucun service configuré dans la bibliothèque. Créez-en d'abord.
+                <CardContent className="pt-4 space-y-4">
+                    {/* Controls Bar */}
+                    <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
+                        <div className="relative w-full sm:max-w-xs">
+                            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-500" />
+                            <Input
+                                placeholder="Rechercher un service..."
+                                value={serviceSearch}
+                                onChange={(e) => setServiceSearch(e.target.value)}
+                                className="bg-[#121318] border-zinc-850 h-8 text-xs pl-8 text-white focus-visible:ring-purple-650"
+                            />
+                        </div>
+                        
+                        <Button
+                            type="button"
+                            disabled={!contractorId}
+                            onClick={() => setShowCreateService(true)}
+                            className="bg-purple-650 hover:bg-purple-700 text-white font-bold h-8 px-4 rounded-xl text-xxs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Plus className="h-3.5 w-3.5" />
+                            Nouveau Service
+                        </Button>
+                    </div>
+
+                    {/* Inline Create Service Modal */}
+                    {showCreateService && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                            <Card className="bg-[#16171e] border-zinc-800 shadow-2xl max-w-md w-full">
+                                <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/15">
+                                    <CardTitle className="text-xs font-bold text-white uppercase tracking-wider text-purple-400">
+                                        Nouveau service entrepreneur
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="pt-4">
+                                    <form onSubmit={handleCreateService} className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Nom du service *</Label>
+                                            <Input
+                                                value={newSvcName}
+                                                onChange={(e) => setNewSvcName(e.target.value)}
+                                                placeholder="Ex: Remplacement chauffe-eau"
+                                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                                required
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Catégorie</Label>
+                                                <SearchableSelect
+                                                    value={newSvcCategory}
+                                                    onChange={setNewSvcCategory}
+                                                    options={[
+                                                        { value: 'Plomberie', label: 'Plomberie' },
+                                                        { value: 'Fenêtres', label: 'Fenêtres' },
+                                                        { value: 'Portes patio', label: 'Portes patio' },
+                                                        { value: 'Moustiquaires', label: 'Moustiquaires' },
+                                                        { value: 'Ventilation', label: 'Ventilation' },
+                                                        { value: 'Électricité', label: 'Électricité' },
+                                                        { value: 'Sécurité', label: 'Sécurité' },
+                                                        { value: 'Balcon', label: 'Bâtiment' },
+                                                        { value: 'Administratif', label: 'Administratif' }
+                                                    ]}
+                                                    placeholder="Sélectionner..."
+                                                    searchPlaceholder="Rechercher..."
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Durée (minutes) *</Label>
+                                                <Input
+                                                    type="number"
+                                                    min="1"
+                                                    value={newSvcDuration}
+                                                    onChange={(e) => setNewSvcDuration(e.target.value)}
+                                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Prix (Optionnel)</Label>
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={newSvcPrice}
+                                                    onChange={(e) => setNewSvcPrice(e.target.value)}
+                                                    placeholder="0.00"
+                                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-2 justify-center pt-5">
+                                                <label className="flex items-center gap-2 text-xxs font-bold text-zinc-400 cursor-pointer select-none">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={newSvcPhotosReq}
+                                                        onChange={(e) => setNewSvcPhotosReq(e.target.checked)}
+                                                        className="h-3.5 w-3.5 accent-purple-650 rounded bg-[#121318] border-zinc-855"
+                                                    />
+                                                    Photos requises
+                                                </label>
+                                                <label className="flex items-center gap-2 text-xxs font-bold text-zinc-400 cursor-pointer select-none">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={newSvcReportReq}
+                                                        onChange={(e) => setNewSvcReportReq(e.target.checked)}
+                                                        className="h-3.5 w-3.5 accent-purple-650 rounded bg-[#121318] border-zinc-855"
+                                                    />
+                                                    Rapport requis
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Description</Label>
+                                            <Textarea
+                                                value={newSvcDescription}
+                                                onChange={(e) => setNewSvcDescription(e.target.value)}
+                                                placeholder="Description détaillée du service..."
+                                                rows={2}
+                                                className="bg-[#121318] border-zinc-850 text-xs text-white py-1.5"
+                                            />
+                                        </div>
+
+                                        <div className="flex justify-end gap-2 border-t border-zinc-900 pt-3">
+                                            <Button
+                                                type="button"
+                                                onClick={() => setShowCreateService(false)}
+                                                className="bg-transparent border border-zinc-850 text-zinc-400 text-xxs font-bold h-8 px-4 rounded-xl hover:bg-zinc-900 cursor-pointer"
+                                            >
+                                                Fermer
+                                            </Button>
+                                            <Button
+                                                type="submit"
+                                                disabled={creatingService}
+                                                className="bg-purple-650 hover:bg-purple-700 text-white font-bold h-8 px-5 rounded-xl shadow cursor-pointer text-xxs transition-all"
+                                            >
+                                                {creatingService ? 'Création...' : 'Créer le service'}
+                                            </Button>
+                                        </div>
+                                    </form>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
+
+                    {/* Services Selection List */}
+                    {!contractorId ? (
+                        <p className="text-xs italic text-zinc-550 py-4 text-center">
+                            Veuillez sélectionner un entrepreneur pour voir ses services.
+                        </p>
+                    ) : displayedServices.length === 0 ? (
+                        <p className="text-xs italic text-zinc-550 py-4 text-center">
+                            Aucun service trouvé pour cet entrepreneur.
                         </p>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[250px] overflow-y-auto pr-1">
-                            {services.map(svc => {
+                            {displayedServices.map(svc => {
                                 const isChecked = selectedServices.includes(svc.id)
                                 return (
                                     <div 
@@ -327,70 +599,114 @@ export function NewCampaignForm({
                 </CardContent>
             </Card>
 
-            {/* Section 3: Scheduling Settings */}
-            {!surveyRequired ? (
-                <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
-                    <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10">
-                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
-                            <Settings className="h-4 w-4" />
-                            Planification & Capacité
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-4 space-y-4">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                            <div className="space-y-2">
-                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Début de journée</Label>
-                                <Input
-                                    type="time"
-                                    value={workStart}
-                                    onChange={(e) => setWorkStart(e.target.value)}
-                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Fin de journée</Label>
-                                <Input
-                                    type="time"
-                                    value={workEnd}
-                                    onChange={(e) => setWorkEnd(e.target.value)}
-                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Techniciens (Équipes)</Label>
-                                <Input
-                                    type="number"
-                                    min="1"
-                                    value={techsCount}
-                                    onChange={(e) => setTechsCount(e.target.value)}
-                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Zone tampon / Marge de sécurité (min)</Label>
-                                <Input
-                                    type="number"
-                                    min="0"
-                                    value={buffer}
-                                    onChange={(e) => setBuffer(e.target.value)}
-                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
-                                />
-                            </div>
+            {/* Section 3: Scheduling Settings (Always available for configuration) */}
+            <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
+                <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10">
+                    <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
+                        <Settings className="h-4 w-4" />
+                        Planification & Capacité {surveyRequired && "(Phase 2)"}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div className="space-y-2">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Début de journée</Label>
+                            <Input
+                                type="time"
+                                value={workStart}
+                                onChange={(e) => setWorkStart(e.target.value)}
+                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Fin de journée</Label>
+                            <Input
+                                type="time"
+                                value={workEnd}
+                                onChange={(e) => setWorkEnd(e.target.value)}
+                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Techniciens (Capacité simultanée)</Label>
+                            <Input
+                                type="number"
+                                min="1"
+                                value={techsCount}
+                                onChange={(e) => setTechsCount(e.target.value)}
+                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Zone tampon (min)</Label>
+                            <Input
+                                type="number"
+                                min="0"
+                                value={buffer}
+                                onChange={(e) => setBuffer(e.target.value)}
+                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                            />
+                        </div>
+                    </div>
+                    
+                    {/* Blocked Hours / Breaks Section */}
+                    <div className="border-t border-zinc-900 pt-4 space-y-3">
+                        <div className="space-y-0.5">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block">
+                                Plages horaires bloquées / réservées (ex: dîner, pauses)
+                            </Label>
+                            <p className="text-[10px] text-zinc-500 font-medium">
+                                Bloquez des plages horaires pour empêcher les résidents de réserver pendant ces périodes.
+                            </p>
                         </div>
                         
-                        <p className="text-xs text-zinc-500 italic mt-2 font-medium">
-                            * Note : Une pause déjeuner est automatiquement configurée par défaut de 12:00 à 13:00 pour toutes les équipes.
-                        </p>
-                    </CardContent>
-                </Card>
-            ) : (
-                <Card className="bg-[#16171e]/40 border-zinc-850/50 shadow-md border-dashed">
-                    <CardContent className="p-6 text-center text-zinc-500 text-xs">
-                        <Settings className="h-5 w-5 text-zinc-600 mx-auto mb-2" />
-                        Les dates de début/fin de campagne et les paramètres de planification (heures, équipes, zones tampons) seront configurés à l'étape suivante, lors de l'activation de la phase de planification (Phase 2).
-                    </CardContent>
-                </Card>
-            )}
+                        {/* Current list of breaks */}
+                        <div className="flex flex-wrap gap-2 pt-1">
+                            {breakPeriods.length === 0 ? (
+                                <p className="text-xxs text-zinc-550 italic">Aucune plage bloquée configurée.</p>
+                            ) : (
+                                breakPeriods.map((bp, idx) => (
+                                    <Badge key={idx} variant="outline" className="flex items-center gap-1.5 bg-zinc-950 text-zinc-300 border-zinc-850 py-1 px-2.5 rounded-lg">
+                                        <Clock className="h-3 w-3 text-purple-400" />
+                                        <span>{bp.start} - {bp.end}</span>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => handleRemoveBreak(idx)}
+                                            className="text-zinc-500 hover:text-red-400 transition-colors focus:outline-none font-bold text-xs"
+                                        >
+                                            ×
+                                        </button>
+                                    </Badge>
+                                ))
+                            )}
+                        </div>
+
+                        {/* Block new break form */}
+                        <div className="flex items-center gap-2 max-w-sm pt-1">
+                            <Input
+                                type="time"
+                                value={newBreakStart}
+                                onChange={(e) => setNewBreakStart(e.target.value)}
+                                className="bg-[#121318] border-zinc-850 h-8 text-xs text-white"
+                            />
+                            <span className="text-zinc-500 text-xxs font-bold">à</span>
+                            <Input
+                                type="time"
+                                value={newBreakEnd}
+                                onChange={(e) => setNewBreakEnd(e.target.value)}
+                                className="bg-[#121318] border-zinc-850 h-8 text-xs text-white"
+                            />
+                            <Button
+                                type="button"
+                                onClick={handleAddBreak}
+                                className="bg-purple-900/30 hover:bg-purple-800/40 text-purple-400 border border-purple-800/40 h-8 px-3 rounded-lg text-xxs"
+                            >
+                                Bloquer
+                            </Button>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Action Bar */}
             <div className="flex justify-end gap-3 pt-2">
@@ -412,4 +728,3 @@ export function NewCampaignForm({
         </form>
     )
 }
-
