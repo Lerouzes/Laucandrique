@@ -80,6 +80,7 @@ export function NewCampaignForm({
     const [editSvcPhotosReq, setEditSvcPhotosReq] = useState(false)
     const [editSvcReportReq, setEditSvcReportReq] = useState(false)
     const [savingService, setSavingService] = useState(false)
+    const [configureScheduling, setConfigureScheduling] = useState(false)
 
     const handleEditService = (svc: any) => {
         setEditingService(svc)
@@ -298,6 +299,26 @@ export function NewCampaignForm({
             }
         }
 
+        const needsScheduling = !surveyRequired || (surveyRequired && configureScheduling)
+        if (needsScheduling) {
+            if (!workStart || !workEnd) {
+                toast.error("Veuillez renseigner les heures de début et de fin de journée.")
+                return
+            }
+            if (workStart >= workEnd) {
+                toast.error("L'heure de début de journée doit être antérieure à l'heure de fin.")
+                return
+            }
+            if (!techsCount || Number(techsCount) <= 0) {
+                toast.error("Veuillez saisir un nombre valide de techniciens (minimum 1).")
+                return
+            }
+            if (buffer === '' || Number(buffer) < 0) {
+                toast.error("Veuillez saisir une zone tampon valide (minimum 0).")
+                return
+            }
+        }
+
         setLoading(true)
         try {
             const campaign = await createCampaignAction({
@@ -312,12 +333,12 @@ export function NewCampaignForm({
                 pricing_type: pricingType,
                 services: selectedServices,
                 survey_required: surveyRequired,
-                availability_settings: {
+                availability_settings: needsScheduling ? {
                     workingHours: { start: workStart, end: workEnd },
                     techniciansCount: Number(techsCount),
                     bufferMinutes: Number(buffer),
                     breakPeriods: breakPeriods
-                }
+                } : null
             })
 
             toast.success("Campagne de maintenance créée avec succès.")
@@ -829,113 +850,134 @@ export function NewCampaignForm({
                 </CardContent>
             </Card>
 
-            {/* Section 3: Scheduling Settings (Always available for configuration) */}
+            {/* Section 3: Scheduling Settings */}
             <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
-                <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10">
+                <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
                         <Settings className="h-4 w-4" />
                         Planification & Capacité {surveyRequired && "(Phase 2)"}
                     </CardTitle>
+                    {surveyRequired && (
+                        <label className="flex items-center gap-2 text-xxs font-bold text-zinc-400 cursor-pointer select-none">
+                            <input 
+                                type="checkbox" 
+                                checked={configureScheduling}
+                                onChange={(e) => setConfigureScheduling(e.target.checked)}
+                                className="h-3.5 w-3.5 accent-purple-650 rounded bg-[#121318] border-zinc-855"
+                            />
+                            Activer la planification maintenant
+                        </label>
+                    )}
                 </CardHeader>
-                <CardContent className="pt-4 space-y-4">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Début de journée</Label>
-                            <Input
-                                type="time"
-                                value={workStart}
-                                onChange={(e) => setWorkStart(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Fin de journée</Label>
-                            <Input
-                                type="time"
-                                value={workEnd}
-                                onChange={(e) => setWorkEnd(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Techniciens (Capacité simultanée)</Label>
-                            <Input
-                                type="number"
-                                min="1"
-                                value={techsCount}
-                                onChange={(e) => setTechsCount(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Zone tampon (min)</Label>
-                            <Input
-                                type="number"
-                                min="0"
-                                value={buffer}
-                                onChange={(e) => setBuffer(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
-                            />
-                        </div>
-                    </div>
-                    
-                    {/* Blocked Hours / Breaks Section */}
-                    <div className="border-t border-zinc-900 pt-4 space-y-3">
-                        <div className="space-y-0.5">
-                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block">
-                                Plages horaires bloquées / réservées (ex: dîner, pauses)
-                            </Label>
-                            <p className="text-[10px] text-zinc-500 font-medium">
-                                Bloquez des plages horaires pour empêcher les résidents de réserver pendant ces périodes.
-                            </p>
+                {(!surveyRequired || configureScheduling) ? (
+                    <CardContent className="pt-4 space-y-4 animate-fade-in">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div className="space-y-2">
+                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Début de journée *</Label>
+                                <Input
+                                    type="time"
+                                    value={workStart}
+                                    onChange={(e) => setWorkStart(e.target.value)}
+                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                    required={!surveyRequired || configureScheduling}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Fin de journée *</Label>
+                                <Input
+                                    type="time"
+                                    value={workEnd}
+                                    onChange={(e) => setWorkEnd(e.target.value)}
+                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                    required={!surveyRequired || configureScheduling}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Techniciens (Capacité) *</Label>
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    value={techsCount}
+                                    onChange={(e) => setTechsCount(e.target.value)}
+                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                    required={!surveyRequired || configureScheduling}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Zone tampon (min) *</Label>
+                                <Input
+                                    type="number"
+                                    min="0"
+                                    value={buffer}
+                                    onChange={(e) => setBuffer(e.target.value)}
+                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                    required={!surveyRequired || configureScheduling}
+                                />
+                            </div>
                         </div>
                         
-                        {/* Current list of breaks */}
-                        <div className="flex flex-wrap gap-2 pt-1">
-                            {breakPeriods.length === 0 ? (
-                                <p className="text-xxs text-zinc-550 italic">Aucune plage bloquée configurée.</p>
-                            ) : (
-                                breakPeriods.map((bp, idx) => (
-                                    <Badge key={idx} variant="outline" className="flex items-center gap-1.5 bg-zinc-950 text-zinc-300 border-zinc-850 py-1 px-2.5 rounded-lg">
-                                        <Clock className="h-3 w-3 text-purple-400" />
-                                        <span>{bp.start} - {bp.end}</span>
-                                        <button 
-                                            type="button" 
-                                            onClick={() => handleRemoveBreak(idx)}
-                                            className="text-zinc-500 hover:text-red-400 transition-colors focus:outline-none font-bold text-xs"
-                                        >
-                                            ×
-                                        </button>
-                                    </Badge>
-                                ))
-                            )}
-                        </div>
+                        {/* Blocked Hours / Breaks Section */}
+                        <div className="border-t border-zinc-900 pt-4 space-y-3">
+                            <div className="space-y-0.5">
+                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block">
+                                    Plages horaires bloquées / réservées (ex: dîner, pauses)
+                                </Label>
+                                <p className="text-[10px] text-zinc-500 font-medium">
+                                    Bloquez des plages horaires pour empêcher les résidents de réserver pendant ces périodes.
+                                </p>
+                            </div>
+                            
+                            {/* Current list of breaks */}
+                            <div className="flex flex-wrap gap-2 pt-1">
+                                {breakPeriods.length === 0 ? (
+                                    <p className="text-xxs text-zinc-550 italic">Aucune plage bloquée configurée.</p>
+                                ) : (
+                                    breakPeriods.map((bp, idx) => (
+                                        <Badge key={idx} variant="outline" className="flex items-center gap-1.5 bg-zinc-950 text-zinc-300 border-zinc-850 py-1 px-2.5 rounded-lg">
+                                            <Clock className="h-3 w-3 text-purple-400" />
+                                            <span>{bp.start} - {bp.end}</span>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => handleRemoveBreak(idx)}
+                                                className="text-zinc-500 hover:text-red-400 transition-colors focus:outline-none font-bold text-xs"
+                                            >
+                                                ×
+                                            </button>
+                                        </Badge>
+                                    ))
+                                )}
+                            </div>
 
-                        {/* Block new break form */}
-                        <div className="flex items-center gap-2 max-w-sm pt-1">
-                            <Input
-                                type="time"
-                                value={newBreakStart}
-                                onChange={(e) => setNewBreakStart(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-8 text-xs text-white"
-                            />
-                            <span className="text-zinc-500 text-xxs font-bold">à</span>
-                            <Input
-                                type="time"
-                                value={newBreakEnd}
-                                onChange={(e) => setNewBreakEnd(e.target.value)}
-                                className="bg-[#121318] border-zinc-850 h-8 text-xs text-white"
-                            />
-                            <Button
-                                type="button"
-                                onClick={handleAddBreak}
-                                className="bg-purple-900/30 hover:bg-purple-800/40 text-purple-400 border border-purple-800/40 h-8 px-3 rounded-lg text-xxs"
-                            >
-                                Bloquer
-                            </Button>
+                            {/* Block new break form */}
+                            <div className="flex items-center gap-2 max-w-sm pt-1">
+                                <Input
+                                    type="time"
+                                    value={newBreakStart}
+                                    onChange={(e) => setNewBreakStart(e.target.value)}
+                                    className="bg-[#121318] border-zinc-850 h-8 text-xs text-white"
+                                />
+                                <span className="text-zinc-550 text-xxs font-bold">à</span>
+                                <Input
+                                    type="time"
+                                    value={newBreakEnd}
+                                    onChange={(e) => setNewBreakEnd(e.target.value)}
+                                    className="bg-[#121318] border-zinc-850 h-8 text-xs text-white"
+                                />
+                                <Button
+                                    type="button"
+                                    onClick={handleAddBreak}
+                                    className="bg-purple-900/30 hover:bg-purple-800/40 text-purple-400 border border-purple-800/40 h-8 px-3 rounded-lg text-xxs"
+                                >
+                                    Bloquer
+                                </Button>
+                            </div>
                         </div>
-                    </div>
-                </CardContent>
+                    </CardContent>
+                ) : (
+                    <CardContent className="pt-4 pb-6 text-center text-xs text-zinc-500 italic bg-[#121318]/20 rounded-b-xl border-t border-zinc-900/50">
+                        La planification (Phase 2) n'est pas activée. Vous pourrez la configurer ultérieurement lorsque vous lancerez la phase de planification depuis le suivi de la campagne.
+                    </CardContent>
+                )}
             </Card>
 
             {/* Action Bar */}
