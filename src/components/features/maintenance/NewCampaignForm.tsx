@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createCampaignAction, getContractorServicesAction, createAndLinkServiceAction } from '@/actions/maintenance'
+import { createCampaignAction, getContractorServicesAction, createAndLinkServiceAction, saveServiceAction, upsertContractorServicePricingAction } from '@/actions/maintenance'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,7 +24,8 @@ import {
     Users,
     Search,
     Plus,
-    XCircle
+    XCircle,
+    Edit
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -67,6 +68,90 @@ export function NewCampaignForm({
     const [newSvcPhotosReq, setNewSvcPhotosReq] = useState(false)
     const [newSvcReportReq, setNewSvcReportReq] = useState(false)
     const [creatingService, setCreatingService] = useState(false)
+
+    // Inline service editing states
+    const [showEditService, setShowEditService] = useState(false)
+    const [editingService, setEditingService] = useState<any>(null)
+    const [editSvcName, setEditSvcName] = useState('')
+    const [editSvcCategory, setEditSvcCategory] = useState('Plomberie')
+    const [editSvcDuration, setEditSvcDuration] = useState('30')
+    const [editSvcPrice, setEditSvcPrice] = useState('')
+    const [editSvcDescription, setEditSvcDescription] = useState('')
+    const [editSvcPhotosReq, setEditSvcPhotosReq] = useState(false)
+    const [editSvcReportReq, setEditSvcReportReq] = useState(false)
+    const [savingService, setSavingService] = useState(false)
+
+    const handleEditService = (svc: any) => {
+        setEditingService(svc)
+        setEditSvcName(svc.name)
+        setEditSvcCategory(svc.category || 'Plomberie')
+        setEditSvcDuration(String(svc.duration))
+        setEditSvcPrice(svc.custom_price !== null ? String(svc.custom_price) : String(svc.price || 0))
+        setEditSvcDescription(svc.description || '')
+        setEditSvcPhotosReq(!!svc.photos_required)
+        setEditSvcReportReq(!!svc.report_required)
+        setShowEditService(true)
+    }
+
+    const handleSaveEditedService = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!editingService) return
+
+        if (!editSvcName.trim()) {
+            toast.error("Veuillez saisir le nom du service.")
+            return
+        }
+        if (!editSvcDuration.trim() || Number(editSvcDuration) <= 0) {
+            toast.error("Veuillez saisir une durée valide en minutes.")
+            return
+        }
+
+        setSavingService(true)
+        try {
+            // 1. Update global service details
+            const updatedSvc = await saveServiceAction({
+                id: editingService.id,
+                name: editSvcName.trim(),
+                description: editSvcDescription.trim() || null,
+                duration: Number(editSvcDuration),
+                category: editSvcCategory,
+                photos_required: editSvcPhotosReq,
+                report_required: editSvcReportReq,
+                price: editingService.has_custom ? editingService.price : (editSvcPrice ? Number(editSvcPrice) : null)
+            })
+
+            // 2. Update contractor custom price override
+            let finalCustomPrice = editingService.custom_price
+            if (contractorId) {
+                const newPriceVal = editSvcPrice ? Number(editSvcPrice) : null
+                await upsertContractorServicePricingAction(contractorId, editingService.id, newPriceVal, editingService.pricing_note || '')
+                finalCustomPrice = newPriceVal
+            }
+
+            toast.success("Service mis à jour avec succès.")
+
+            // Map updated service to match contractor service object structure
+            const mappedUpdatedSvc = {
+                ...updatedSvc,
+                custom_price: finalCustomPrice,
+                pricing_note: editingService.pricing_note,
+                has_custom: finalCustomPrice !== null,
+                pricing_id: editingService.pricing_id
+            }
+
+            // Update state
+            setFilteredContractorServices(prev => 
+                prev.map(s => s.id === editingService.id ? mappedUpdatedSvc : s)
+            )
+
+            setShowEditService(false)
+            setEditingService(null)
+        } catch (err) {
+            toast.error("Erreur lors de la modification : " + (err as Error).message)
+        } finally {
+            setSavingService(false)
+        }
+    }
 
     // Availability settings state
     const [workStart, setWorkStart] = useState('08:00')
@@ -548,6 +633,133 @@ export function NewCampaignForm({
                         </div>
                     )}
 
+                    {/* Inline Edit Service Modal */}
+                    {showEditService && editingService && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                            <Card className="bg-[#16171e] border-zinc-800 shadow-2xl max-w-md w-full animate-fade-in">
+                                <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/15">
+                                    <CardTitle className="text-xs font-bold text-white uppercase tracking-wider text-purple-400">
+                                        Modifier le service entrepreneur
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="pt-4">
+                                    <form onSubmit={handleSaveEditedService} className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Nom du service *</Label>
+                                            <Input
+                                                value={editSvcName}
+                                                onChange={(e) => setEditSvcName(e.target.value)}
+                                                placeholder="Ex: Remplacement chauffe-eau"
+                                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                                required
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Catégorie</Label>
+                                                <SearchableSelect
+                                                    value={editSvcCategory}
+                                                    onChange={setEditSvcCategory}
+                                                    options={[
+                                                        { value: 'Plomberie', label: 'Plomberie' },
+                                                        { value: 'Fenêtres', label: 'Fenêtres' },
+                                                        { value: 'Portes patio', label: 'Portes patio' },
+                                                        { value: 'Moustiquaires', label: 'Moustiquaires' },
+                                                        { value: 'Ventilation', label: 'Ventilation' },
+                                                        { value: 'Électricité', label: 'Électricité' },
+                                                        { value: 'Sécurité', label: 'Sécurité' },
+                                                        { value: 'Balcon', label: 'Bâtiment' },
+                                                        { value: 'Administratif', label: 'Administratif' }
+                                                    ]}
+                                                    placeholder="Sélectionner..."
+                                                    searchPlaceholder="Rechercher..."
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Durée (minutes) *</Label>
+                                                <Input
+                                                    type="number"
+                                                    min="1"
+                                                    value={editSvcDuration}
+                                                    onChange={(e) => setEditSvcDuration(e.target.value)}
+                                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Prix (Optionnel)</Label>
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={editSvcPrice}
+                                                    onChange={(e) => setEditSvcPrice(e.target.value)}
+                                                    placeholder="0.00"
+                                                    className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-2 justify-center pt-5">
+                                                <label className="flex items-center gap-2 text-xxs font-bold text-zinc-400 cursor-pointer select-none">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={editSvcPhotosReq}
+                                                        onChange={(e) => setEditSvcPhotosReq(e.target.checked)}
+                                                        className="h-3.5 w-3.5 accent-purple-650 rounded bg-[#121318] border-zinc-855"
+                                                    />
+                                                    Photos requises
+                                                </label>
+                                                <label className="flex items-center gap-2 text-xxs font-bold text-zinc-400 cursor-pointer select-none">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={editSvcReportReq}
+                                                        onChange={(e) => setEditSvcReportReq(e.target.checked)}
+                                                        className="h-3.5 w-3.5 accent-purple-650 rounded bg-[#121318] border-zinc-855"
+                                                    />
+                                                    Rapport requis
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Description</Label>
+                                            <Textarea
+                                                value={editSvcDescription}
+                                                onChange={(e) => setEditSvcDescription(e.target.value)}
+                                                placeholder="Description détaillée du service..."
+                                                rows={2}
+                                                className="bg-[#121318] border-zinc-850 text-xs text-white py-1.5"
+                                            />
+                                        </div>
+
+                                        <div className="flex justify-end gap-2 border-t border-zinc-900 pt-3">
+                                            <Button
+                                                type="button"
+                                                onClick={() => {
+                                                    setShowEditService(false)
+                                                    setEditingService(null)
+                                                }}
+                                                className="bg-transparent border border-zinc-850 text-zinc-400 text-xxs font-bold h-8 px-4 rounded-xl hover:bg-zinc-900 cursor-pointer"
+                                            >
+                                                Annuler
+                                            </Button>
+                                            <Button
+                                                type="submit"
+                                                disabled={savingService}
+                                                className="bg-purple-650 hover:bg-purple-700 text-white font-bold h-8 px-5 rounded-xl shadow cursor-pointer text-xxs transition-all"
+                                            >
+                                                {savingService ? 'Modification...' : 'Modifier le service'}
+                                            </Button>
+                                        </div>
+                                    </form>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
+
                     {/* Services Selection List */}
                     {!contractorId ? (
                         <p className="text-xs italic text-zinc-550 py-4 text-center">
@@ -565,32 +777,50 @@ export function NewCampaignForm({
                                     <div 
                                         key={svc.id} 
                                         onClick={() => handleServiceToggle(svc.id)}
-                                        className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                                        className={`flex items-start justify-between p-3 rounded-xl border transition-all cursor-pointer ${
                                             isChecked 
                                                 ? 'bg-purple-950/10 border-purple-900/40 text-white' 
                                                 : 'bg-[#121318]/50 border-zinc-850 hover:border-zinc-800 text-zinc-400'
                                         }`}
                                     >
-                                        <div className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center transition-all ${
-                                            isChecked 
-                                                ? 'bg-purple-600 border-purple-500 text-white' 
-                                                : 'border-zinc-700'
-                                        }`}>
-                                            {isChecked && <Check className="h-3 w-3" />}
-                                        </div>
-                                        <div className="space-y-1">
-                                            <span className={`font-semibold block text-xs ${isChecked ? 'text-zinc-200' : 'text-zinc-400'}`}>
-                                                {svc.name}
-                                            </span>
-                                            <div className="flex items-center gap-2 text-xs text-zinc-500 font-medium">
-                                                <Badge variant="outline" className="text-[10px] border-zinc-800/50">
-                                                    {svc.category}
-                                                </Badge>
-                                                <span className="flex items-center gap-0.5">
-                                                    <Clock className="h-3.5 w-3.5" /> {svc.duration} min
+                                        <div className="flex items-start gap-3">
+                                            <div className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center transition-all ${
+                                                isChecked 
+                                                    ? 'bg-purple-600 border-purple-500 text-white' 
+                                                    : 'border-zinc-700'
+                                            }`}>
+                                                {isChecked && <Check className="h-3 w-3" />}
+                                            </div>
+                                            <div className="space-y-1 text-left">
+                                                <span className={`font-semibold block text-xs ${isChecked ? 'text-zinc-200' : 'text-zinc-400'}`}>
+                                                    {svc.name}
                                                 </span>
+                                                <div className="flex items-center gap-2 text-xs text-zinc-500 font-medium flex-wrap">
+                                                    <Badge variant="outline" className="text-[10px] border-zinc-800/50">
+                                                        {svc.category}
+                                                    </Badge>
+                                                    <span className="flex items-center gap-0.5">
+                                                        <Clock className="h-3.5 w-3.5" /> {svc.duration} min
+                                                    </span>
+                                                    {svc.custom_price !== null && (
+                                                        <Badge variant="outline" className="text-[10px] border-purple-800/50 text-purple-400 bg-purple-950/10">
+                                                            {svc.custom_price > 0 ? `$${svc.custom_price}` : 'Gratuit'}
+                                                        </Badge>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleEditService(svc)
+                                            }}
+                                            className="h-7 w-7 text-zinc-550 hover:text-purple-400 hover:bg-purple-500/10 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+                                        >
+                                            <Edit className="h-3.5 w-3.5" />
+                                        </button>
                                     </div>
                                 )
                             })}

@@ -5,6 +5,7 @@ import {
     getCampaignsAction 
 } from '@/actions/maintenance'
 import Link from 'next/link'
+import { SearchableCampaignsList } from '@/components/features/maintenance/SearchableCampaignsList'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { 
@@ -148,52 +149,7 @@ export default async function MaintenanceDashboardPage() {
                 
                 {/* Campaigns List (Left - 2 Columns) */}
                 <div className="lg:col-span-2 space-y-4">
-                    <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                        <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/10">
-                            <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                                <Calendar className="h-4 w-4 text-purple-400" />
-                                Campagnes actives & récentes
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            {campaigns.length === 0 ? (
-                                <div className="p-8 text-center text-xs text-zinc-500">
-                                    Aucune campagne créée pour le moment.
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-zinc-900">
-                                    {campaigns.map(c => (
-                                        <Link 
-                                            key={c.id} 
-                                            href={`/maintenance-hub/campaigns/${c.id}`}
-                                            className="flex items-center justify-between p-4 hover:bg-zinc-900/20 transition-all group"
-                                        >
-                                            <div className="space-y-1 pr-4 text-xs">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-semibold text-xs text-zinc-100 group-hover:text-purple-400 transition-colors">
-                                                        {c.name}
-                                                    </span>
-                                                    <Badge variant="outline" className={`text-[10px] font-extrabold uppercase px-1.5 py-0.5 ${getStatusBadge(c.status)}`}>
-                                                        {getStatusLabel(c.status)}
-                                                    </Badge>
-                                                </div>
-                                                <p className="text-xs text-zinc-400 line-clamp-1">
-                                                    {c.clients?.company_name || c.clients?.full_name} · du {new Date(c.start_date).toLocaleDateString('fr-CA')} au {new Date(c.end_date).toLocaleDateString('fr-CA')}
-                                                </p>
-                                            </div>
-                                            <div className="flex items-center gap-4 text-right">
-                                                <div className="text-xs hidden sm:block">
-                                                    <span className="text-zinc-550 uppercase block font-bold text-[9px] tracking-wider">Contracteur</span>
-                                                    <span className="text-zinc-300 font-semibold">{c.contractors?.full_name || 'Non assigné'}</span>
-                                                </div>
-                                                <ChevronRight className="h-4 w-4 text-zinc-600 group-hover:text-zinc-400 group-hover:translate-x-0.5 transition-all" />
-                                            </div>
-                                        </Link>
-                                    ))}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                    <SearchableCampaignsList campaigns={campaigns} />
                 </div>
 
                 {/* Team Management Stats (Right - 1 Column) */}
