@@ -14,7 +14,8 @@ import {
     getCampaignDetailsAction,
     advanceCampaignPhaseAction,
     deleteCampaignAction,
-    updateCampaignSettingsAction
+    updateCampaignSettingsAction,
+    updateCampaignNotesAction
 } from '@/actions/maintenance'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -44,7 +45,10 @@ import {
     AlertTriangle,
     Eye,
     ChevronRight,
-    Wrench
+    Wrench,
+    Save,
+    FileText,
+    Download
 } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -66,6 +70,8 @@ export function CampaignDetailTracker({
     const [statusFilter, setStatusFilter] = useState('All')
     const [updatingStatus, setUpdatingStatus] = useState(false)
     const [advancingPhase, setAdvancingPhase] = useState(false)
+    const [campaignNotes, setCampaignNotes] = useState(campaign.notes || '')
+    const [savingNotes, setSavingNotes] = useState(false)
 
     // Deletion states
     const [showDeleteConfirm1, setShowDeleteConfirm1] = useState(false)
@@ -348,6 +354,7 @@ export function CampaignDetailTracker({
         switch (status) {
             case 'interested': return 'Intéressé'
             case 'not_interested': return 'Refusé'
+            case 'completed_elsewhere': return 'Déjà effectué'
             case 'completed': return 'Complété'
             case 'more_info': return 'Plus d\'infos'
             default: return 'En attente'
@@ -360,6 +367,8 @@ export function CampaignDetailTracker({
                 return 'bg-purple-950/40 text-purple-300 border-purple-800/40'
             case 'not_interested':
                 return 'bg-rose-950/40 text-rose-400 border-rose-900/40'
+            case 'completed_elsewhere':
+                return 'bg-blue-950/45 text-blue-300 border-blue-800/40'
             case 'completed':
                 return 'bg-emerald-950/40 text-emerald-400 border-emerald-900/40'
             case 'more_info':
@@ -367,6 +376,89 @@ export function CampaignDetailTracker({
             default:
                 return 'bg-zinc-900/40 text-zinc-400 border-zinc-800'
         }
+    }
+
+    const handleSaveNotes = async () => {
+        setSavingNotes(true)
+        try {
+            await updateCampaignNotesAction(campaign.id, campaignNotes)
+            toast.success("Notes de la campagne enregistrées.")
+            router.refresh()
+        } catch (err) {
+            toast.error("Erreur lors de l'enregistrement des notes: " + (err as Error).message)
+        } finally {
+            setSavingNotes(false)
+        }
+    }
+
+    const handleExportExcel = () => {
+        const escapeCSV = (val: any) => {
+            if (val === null || val === undefined) return '';
+            const str = String(val);
+            if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        };
+
+        const headers = [
+            "Unité",
+            "Résident (Nom)",
+            "Résident (Courriel)",
+            "Résident (Téléphone)",
+            "Statut de Participation",
+            "Contact Nom",
+            "Contact Courriel",
+            "Contact Téléphone",
+            "Date de réalisation",
+            "Nom de l'entrepreneur",
+            "Consignes résident"
+        ]
+
+        const isPhase2 = campaign.current_phase === 'scheduling'
+        if (isPhase2) {
+            headers.push("Date Rendez-vous", "Heure Début", "Heure Fin", "Statut RDV")
+        }
+
+        const rows = units.map(u => {
+            const row = [
+                u.door?.door_number || '',
+                u.resident?.full_name || '',
+                u.resident?.email || '',
+                u.resident?.phone || '',
+                getStatusLabel(u.participation),
+                u.contact_name || u.resident?.full_name || '',
+                u.contact_email || u.resident?.email || '',
+                u.contact_phone || u.resident?.phone || '',
+                u.completed_elsewhere_date || '',
+                u.completed_elsewhere_contractor || '',
+                u.resident_notes || ''
+            ]
+            if (isPhase2) {
+                row.push(
+                    u.appointment?.appointment_date || '',
+                    u.appointment?.start_time ? u.appointment.start_time.substring(0, 5) : '',
+                    u.appointment?.end_time ? u.appointment.end_time.substring(0, 5) : '',
+                    u.appointment?.status || ''
+                )
+            }
+            return row
+        })
+
+        const csvContent = [
+            headers.map(escapeCSV).join(','),
+            ...rows.map(row => row.map(escapeCSV).join(','))
+        ].join('\n')
+
+        const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.setAttribute('download', `reponses_campagne_${campaign.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.csv`)
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        toast.success("Liste exportée avec succès.")
     }
 
     return (
@@ -552,29 +644,58 @@ export function CampaignDetailTracker({
                     </Card>
                 </div>
 
-                {/* Reminders & Import controls */}
-                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Outils & Gestion des contacts</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-2 space-y-3">
-                        <Button
-                            onClick={() => setShowImportModal(true)}
-                            className="w-full bg-purple-900/40 hover:bg-purple-800/40 text-purple-400 border border-purple-800/40 text-xs font-bold h-10 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                        >
-                            <FileSpreadsheet className="h-4 w-4" />
-                            Importer la liste des résidents (Excel)
-                        </Button>
-                        <Button
-                            onClick={handleTriggerReminders}
-                            disabled={pendingCount === 0}
-                            className="w-full bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 text-zinc-300 text-xs font-bold h-10 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                        >
-                            <Send className="h-4 w-4 text-zinc-500" />
-                            Relancer les résidents ({pendingCount})
-                        </Button>
-                    </CardContent>
-                </Card>
+                {/* Sidebar column: Outils & Notes */}
+                <div className="space-y-6">
+                    <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Outils & Gestion des contacts</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-2 space-y-3">
+                            <Button
+                                onClick={() => setShowImportModal(true)}
+                                className="w-full bg-purple-900/40 hover:bg-purple-800/40 text-purple-400 border border-purple-800/40 text-xs font-bold h-10 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                            >
+                                <FileSpreadsheet className="h-4 w-4" />
+                                Importer la liste des résidents (Excel)
+                            </Button>
+                            <Button
+                                onClick={handleTriggerReminders}
+                                disabled={pendingCount === 0}
+                                className="w-full bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 text-zinc-300 text-xs font-bold h-10 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                            >
+                                <Send className="h-4 w-4 text-zinc-500" />
+                                Relancer les résidents ({pendingCount})
+                            </Button>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                            <CardTitle className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
+                                <FileText className="h-4 w-4 text-purple-450" />
+                                Notes internes / Commentaires
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-2 space-y-3">
+                            <Textarea
+                                value={campaignNotes}
+                                onChange={(e) => setCampaignNotes(e.target.value)}
+                                placeholder="Ajoutez des notes ou commentaires pour les futures instructions de cette campagne..."
+                                rows={4}
+                                className="bg-[#121318] border-zinc-850 text-xs text-white py-2 focus-visible:ring-purple-650"
+                            />
+                            <div className="flex justify-end">
+                                <Button
+                                    onClick={handleSaveNotes}
+                                    disabled={savingNotes}
+                                    className="bg-purple-650 hover:bg-purple-700 text-white font-bold text-xs h-8 px-4 rounded-lg flex items-center gap-1.5 shadow transition-all cursor-pointer"
+                                >
+                                    {savingNotes ? 'Enregistrement...' : <><Save className="h-3.5 w-3.5" /> Enregistrer</>}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
 
             </div>
 
@@ -716,6 +837,13 @@ export function CampaignDetailTracker({
                                 searchPlaceholder="Rechercher..."
                                 className="h-10 w-48"
                             />
+                            <Button
+                                onClick={handleExportExcel}
+                                className="bg-emerald-650 hover:bg-emerald-700 text-white font-bold h-10 px-4 rounded-xl flex items-center gap-1.5 transition-all text-xs cursor-pointer shadow-sm shrink-0"
+                            >
+                                <Download className="h-4 w-4" />
+                                Exporter Excel
+                            </Button>
                         </div>
                     )}
                 </CardHeader>

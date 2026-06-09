@@ -1186,6 +1186,22 @@ export async function updateCampaignSettingsAction(
     return data
 }
 
+export async function updateCampaignNotesAction(campaignId: string, notes: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('maintenance_campaigns')
+        .update({ notes, updated_at: new Date().toISOString() })
+        .eq('id', campaignId)
+        .select()
+        .single()
+
+    if (error) throw new Error(error.message)
+    revalidatePath(`/maintenance-hub/campaigns/${campaignId}`)
+    revalidatePath('/maintenance-hub')
+    return data
+}
+
+
 export async function setContractorDayStatusAction(
     token: string,
     campaignId: string,
