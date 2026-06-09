@@ -365,8 +365,48 @@ export function ResidentInvitePortal({
     const isCutoffActive = isCutoffPassed()
     const rescheduleAllowed = campaign.allow_reschedule !== false && !isDeadlinePassed && !isCutoffActive
 
+    if (campaign.status === 'cancelled') {
+        return (
+            <div className="max-w-2xl w-full mx-auto space-y-6 text-xs text-zinc-300">
+                {/* Branding Header & Language Selector */}
+                <div className="flex justify-between items-center bg-[#16171e]/70 border border-zinc-800/80 p-4 rounded-2xl shadow-xl">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-purple-900/30 border border-purple-800/40 flex items-center justify-center shrink-0">
+                            <Wrench className="h-5 w-5 text-purple-400" />
+                        </div>
+                        <div>
+                            <h1 className="text-xs font-extrabold text-white uppercase tracking-wider">{t.portalTitle}</h1>
+                            <p className="text-[10px] text-zinc-400 mt-0.5">{t.portalSubtitle}</p>
+                        </div>
+                    </div>
+                    
+                    <button
+                        type="button"
+                        onClick={() => setLang(l => l === 'fr' ? 'en' : 'fr')}
+                        className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl border border-zinc-800 bg-[#121318] hover:bg-zinc-900 text-xxs font-bold text-zinc-300 transition-all cursor-pointer shadow-sm shrink-0"
+                    >
+                        <Globe className="h-3.5 w-3.5 text-purple-400" />
+                        <span>{lang === 'fr' ? 'EN' : 'FR'}</span>
+                    </button>
+                </div>
+
+                <div className="flex flex-col items-center justify-center p-8 bg-[#16171e]/70 border border-zinc-800/80 rounded-2xl text-center space-y-4 shadow-xl">
+                    <div className="h-12 w-12 rounded-xl flex items-center justify-center bg-rose-950/30 border border-rose-800/50">
+                        <XCircle className="h-6 w-6 text-rose-450" />
+                    </div>
+                    <div className="space-y-1">
+                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">{t.cancelledTitle}</h2>
+                        <p className="text-zinc-400 text-xxs leading-relaxed font-normal max-w-sm">
+                            {t.cancelledDesc}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
     return (
-        <div className="max-w-2xl w-full space-y-6 text-xs text-zinc-300">
+        <div className="max-w-5xl w-full space-y-6 text-xs text-zinc-300">
             
             {/* Branding Header & Language Selector */}
             <div className="flex justify-between items-center bg-[#16171e]/70 border border-zinc-800/80 p-4 rounded-2xl shadow-xl">
@@ -403,7 +443,11 @@ export function ResidentInvitePortal({
                 </div>
             )}
 
-            {/* Sibling Campaigns Switcher */}
+            {/* Two-Column Responsive Grid Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Left Column: Sibling Switcher, Client Card, Contractor Card, Services */}
+                <div className="lg:col-span-5 space-y-6">
+                    {/* Sibling Campaigns Switcher */}
             {siblingCampaigns.length > 1 && (
                 <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
                     <CardHeader className="pb-2.5 border-b border-zinc-900 bg-zinc-950/15">
@@ -480,7 +524,7 @@ export function ResidentInvitePortal({
             )}
 
             {/* Syndicate & Contractor Info Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
                 {/* Syndicate & Campaign Details */}
                 <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
                     <CardHeader className="pb-2.5 border-b border-zinc-900 bg-zinc-950/10 flex flex-row justify-between items-center">
@@ -589,20 +633,10 @@ export function ResidentInvitePortal({
                 </CardContent>
             </Card>
 
-            {campaign.status === 'cancelled' ? (
-                <div className="flex flex-col items-center justify-center p-8 bg-[#16171e]/70 border border-zinc-800/80 rounded-2xl text-center space-y-4 shadow-xl">
-                    <div className="h-12 w-12 rounded-xl flex items-center justify-center bg-rose-950/30 border border-rose-800/50">
-                        <XCircle className="h-6 w-6 text-rose-450" />
-                    </div>
-                    <div className="space-y-1">
-                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">{t.cancelledTitle}</h2>
-                        <p className="text-zinc-400 text-xxs leading-relaxed font-normal max-w-sm">
-                            {t.cancelledDesc}
-                        </p>
-                    </div>
                 </div>
-            ) : (
-                <>
+
+                {/* Right Column: Participation & Booking Forms */}
+                <div className="lg:col-span-7 space-y-6">
                     {/* Participation Form */}
                     <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                         <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/15 flex flex-row items-center justify-between">
@@ -929,8 +963,8 @@ export function ResidentInvitePortal({
                             </CardContent>
                         </Card>
                     )}
-                </>
-            )}
+                    </div>
+                </div>
 
             <ConfirmationDialog
                 open={showConfirmDialog}
