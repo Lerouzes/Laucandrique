@@ -31,7 +31,8 @@ import {
     Phone,
     Mail,
     Activity,
-    MapPin
+    MapPin,
+    Paperclip
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -204,6 +205,8 @@ export function ResidentInvitePortal({
     const [contactEmail, setContactEmail] = useState(unit.contact_email || resident?.email || '')
     const [contactPhone, setContactPhone] = useState(unit.contact_phone || resident?.phone || '')
     const [residentNotes, setResidentNotes] = useState(unit.resident_notes || '')
+    const [completedElsewhereDate, setCompletedElsewhereDate] = useState(unit.completed_elsewhere_date || '')
+    const [completedElsewhereContractor, setCompletedElsewhereContractor] = useState(unit.completed_elsewhere_contractor || '')
     const [appointment, setAppointment] = useState<any>(initialAppointment)
     const [availableSlots, setAvailableSlots] = useState<Record<string, string[]>>(initialSlots)
 
@@ -215,8 +218,12 @@ export function ResidentInvitePortal({
     const [showSuccessBanner, setShowSuccessBanner] = useState(false)
 
     // Deadline check
-    const isDeadlinePassed = campaign.response_deadline_date
-        ? new Date().getTime() > new Date(campaign.response_deadline_date).getTime()
+    const activeDeadline = campaign.current_phase === 'survey'
+        ? campaign.survey_deadline
+        : (campaign.scheduling_deadline || campaign.response_deadline_date)
+
+    const isDeadlinePassed = activeDeadline
+        ? new Date().getTime() > new Date(activeDeadline).getTime()
         : false
 
     const [isEditing, setIsEditing] = useState(unit.participation === 'pending' && !isDeadlinePassed)
@@ -231,7 +238,8 @@ export function ResidentInvitePortal({
             toast.error(t.selectParticipationErr)
             return
         }
-        if (!contactName.trim()) {
+        const isOptOut = participation === 'not_interested' || participation === 'completed_elsewhere'
+        if (!isOptOut && !contactName.trim()) {
             toast.error(t.contactNameErr)
             return
         }
@@ -247,7 +255,9 @@ export function ResidentInvitePortal({
                 contact_name: contactName.trim(),
                 contact_email: contactEmail.trim(),
                 contact_phone: contactPhone.trim(),
-                resident_notes: residentNotes.trim()
+                resident_notes: residentNotes.trim(),
+                completed_elsewhere_date: participation === 'completed_elsewhere' ? (completedElsewhereDate || null) : null,
+                completed_elsewhere_contractor: participation === 'completed_elsewhere' ? (completedElsewhereContractor.trim() || null) : null
             })
 
             setShowSuccessBanner(true)
@@ -285,7 +295,9 @@ export function ResidentInvitePortal({
                 contact_name: contactName.trim(),
                 contact_email: contactEmail.trim(),
                 contact_phone: contactPhone.trim(),
-                resident_notes: residentNotes.trim()
+                resident_notes: residentNotes.trim(),
+                completed_elsewhere_date: null,
+                completed_elsewhere_contractor: null
             })
 
             const appt = await scheduleAppointmentAction(
@@ -542,9 +554,28 @@ export function ResidentInvitePortal({
                             <span className="text-[10px] text-purple-400/80 font-bold block mt-0.5">{campaign.name}</span>
                         </div>
                         {campaign.description && (
-                            <p className="text-zinc-400 leading-relaxed text-[11px] border-l-2 border-purple-900/60 pl-2 py-0.5">
-                                {campaign.description}
-                            </p>
+                            <div className="border-l-2 border-purple-900/60 pl-2 py-0.5 space-y-1">
+                                {parseMarkdown(campaign.description)}
+                            </div>
+                        )}
+                        {campaign.attachments && campaign.attachments.length > 0 && (
+                            <div className="border-t border-zinc-900/60 pt-3 mt-3 space-y-2">
+                                <span className="text-[10px] font-bold text-zinc-405 text-zinc-400 uppercase tracking-wider block">Documents joints</span>
+                                <div className="flex flex-wrap gap-2">
+                                    {campaign.attachments.map((file: any, i: number) => (
+                                        <a
+                                            key={i}
+                                            href={file.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-zinc-800 bg-zinc-950/40 hover:bg-zinc-900/40 text-purple-400 hover:text-purple-300 font-medium transition-all"
+                                        >
+                                            <Paperclip className="h-3.5 w-3.5" />
+                                            <span className="truncate max-w-[200px]">{file.name}</span>
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
                         )}
                         <div className="space-y-1 text-zinc-450 border-t border-zinc-900 pt-2 text-[10px]">
                             {(client?.address || client?.city) && (
@@ -704,7 +735,12 @@ export function ResidentInvitePortal({
                                 {/* Contact details - Responsive Grid to prevent awkward label wrapping */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-zinc-900 pt-3">
                                     <div className="space-y-2">
-                                        <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">{t.contactPerson}</Label>
+                                        <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">
+                                            {participation === 'not_interested' || participation === 'completed_elsewhere'
+                                                ? (lang === 'fr' ? 'Contact sur place' : 'On-site contact')
+                                                : t.contactPerson
+                                            }
+                                        </Label>
                                         <Input
                                             disabled={isFieldsLocked}
                                             value={contactName}
@@ -732,6 +768,36 @@ export function ResidentInvitePortal({
                                         />
                                     </div>
                                 </div>
+
+                                {/* Conditionally render completed elsewhere fields */}
+                                {participation === 'completed_elsewhere' && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-zinc-900 pt-3 animate-fade-in">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">
+                                                {lang === 'fr' ? 'Date de réalisation' : 'Completion Date'}
+                                            </Label>
+                                            <Input
+                                                type="date"
+                                                disabled={isFieldsLocked}
+                                                value={completedElsewhereDate}
+                                                onChange={(e) => setCompletedElsewhereDate(e.target.value)}
+                                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">
+                                                {lang === 'fr' ? "Nom de l'entrepreneur" : 'Contractor Name'}
+                                            </Label>
+                                            <Input
+                                                disabled={isFieldsLocked}
+                                                value={completedElsewhereContractor}
+                                                onChange={(e) => setCompletedElsewhereContractor(e.target.value)}
+                                                placeholder="Ex: Plomberie ABC Inc."
+                                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="space-y-2">
                                     <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">{t.residentNotesLabel}</Label>
@@ -797,6 +863,17 @@ export function ResidentInvitePortal({
                                                 <p className="text-xs text-zinc-400 leading-relaxed">
                                                     {t.phaseSurveyDesc}
                                                 </p>
+                                                {campaign.survey_deadline && (
+                                                    <p className="text-xs font-bold text-amber-400 mt-2 flex items-center gap-1">
+                                                        <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                                                        <span>
+                                                            {lang === 'fr' 
+                                                                ? `Date limite pour répondre : ${new Date(campaign.survey_deadline).toLocaleDateString('fr-CA')}`
+                                                                : `Deadline to respond: ${new Date(campaign.survey_deadline).toLocaleDateString('en-US')}`
+                                                            }
+                                                        </span>
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -871,6 +948,17 @@ export function ResidentInvitePortal({
                                     </div>
                                 ) : (
                                     <div className="space-y-4 text-xs">
+                                        {campaign.scheduling_deadline && (
+                                            <div className="p-3 bg-amber-500/10 border border-amber-500/25 rounded-xl text-amber-300 flex items-center gap-2">
+                                                <Clock className="h-4 w-4 shrink-0 text-amber-400" />
+                                                <span className="font-bold text-xxs uppercase">
+                                                    {lang === 'fr' 
+                                                        ? `Date limite pour choisir : ${new Date(campaign.scheduling_deadline).toLocaleDateString('fr-CA')}`
+                                                        : `Deadline to schedule: ${new Date(campaign.scheduling_deadline).toLocaleDateString('en-US')}`
+                                                    }
+                                                </span>
+                                            </div>
+                                        )}
                                         
                                         {/* Date Selector */}
                                         <div className="space-y-2">
@@ -979,4 +1067,48 @@ export function ResidentInvitePortal({
             />
         </div>
     )
+}
+
+function parseMarkdown(text: string) {
+    if (!text) return null
+    
+    const lines = text.split('\n')
+    return lines.map((line, idx) => {
+        if (line.startsWith('### ')) {
+            return <h4 key={idx} className="text-zinc-150 font-bold text-xs mt-3 mb-1 uppercase tracking-wide">{line.substring(4)}</h4>
+        }
+        if (line.startsWith('## ')) {
+            return <h3 key={idx} className="text-zinc-200 font-bold text-sm mt-3 mb-1 uppercase tracking-wide">{line.substring(3)}</h3>
+        }
+        if (line.startsWith('# ')) {
+            return <h2 key={idx} className="text-white font-bold text-base mt-4 mb-2 uppercase tracking-wide">{line.substring(2)}</h2>
+        }
+        
+        if (line.trim().startsWith('- ')) {
+            const content = line.trim().substring(2)
+            return (
+                <ul key={idx} className="list-disc list-inside pl-2 text-zinc-350 space-y-0.5 my-1">
+                    <li>{parseInlineMarkdown(content)}</li>
+                </ul>
+            )
+        }
+        
+        if (!line.trim()) {
+            return <div key={idx} className="h-2" />
+        }
+        
+        return <p key={idx} className="text-zinc-400 my-1 leading-relaxed text-[11px]">{parseInlineMarkdown(line)}</p>
+    })
+}
+
+function parseInlineMarkdown(text: string) {
+    const parts = text.split('**')
+    if (parts.length <= 1) return text
+    
+    return parts.map((part, i) => {
+        if (i % 2 === 1) {
+            return <strong key={i} className="text-zinc-200 font-bold">{part}</strong>
+        }
+        return part
+    })
 }

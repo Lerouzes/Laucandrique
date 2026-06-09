@@ -113,6 +113,9 @@ export async function createCampaignAction(data: {
     services: string[] // Array of service IDs
     availability_settings?: any
     survey_required?: boolean
+    survey_deadline?: string | null
+    scheduling_deadline?: string | null
+    attachments?: any[] | null
 }) {
     const supabase = await createClient()
 
@@ -137,7 +140,10 @@ export async function createCampaignAction(data: {
             },
             status: 'draft',
             survey_required: !!data.survey_required,
-            current_phase: data.survey_required ? 'survey' : 'scheduling'
+            current_phase: data.survey_required ? 'survey' : 'scheduling',
+            survey_deadline: data.survey_deadline || null,
+            scheduling_deadline: data.scheduling_deadline || null,
+            attachments: data.attachments || []
         })
         .select()
         .single()
@@ -603,6 +609,8 @@ export async function submitParticipationAction(
         contact_email: string
         contact_phone: string
         resident_notes?: string
+        completed_elsewhere_date?: string | null
+        completed_elsewhere_contractor?: string | null
     }
 ) {
     const supabase = await createClient()
@@ -614,6 +622,8 @@ export async function submitParticipationAction(
             contact_email: contactInfo.contact_email,
             contact_phone: contactInfo.contact_phone,
             resident_notes: contactInfo.resident_notes || null,
+            completed_elsewhere_date: contactInfo.completed_elsewhere_date || null,
+            completed_elsewhere_contractor: contactInfo.completed_elsewhere_contractor || null,
             updated_at: new Date().toISOString()
         })
         .eq('invite_token', token)
@@ -1108,6 +1118,7 @@ export async function advanceCampaignPhaseAction(
         start_date: string
         end_date: string
         availability_settings?: any
+        scheduling_deadline?: string | null
     }
 ) {
     const supabase = await createClient()
@@ -1122,6 +1133,9 @@ export async function advanceCampaignPhaseAction(
         updatePayload.end_date = schedulingData.end_date
         if (schedulingData.availability_settings) {
             updatePayload.availability_settings = schedulingData.availability_settings
+        }
+        if (schedulingData.scheduling_deadline !== undefined) {
+            updatePayload.scheduling_deadline = schedulingData.scheduling_deadline
         }
     }
 

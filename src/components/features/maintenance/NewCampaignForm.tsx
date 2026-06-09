@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createCampaignAction, getContractorServicesAction, createAndLinkServiceAction, saveServiceAction, upsertContractorServicePricingAction } from '@/actions/maintenance'
+import { createClient } from '@/utils/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,7 +26,8 @@ import {
     Search,
     Plus,
     XCircle,
-    Edit
+    Edit,
+    Paperclip
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -53,6 +55,9 @@ export function NewCampaignForm({
     const [pricingType, setPricingType] = useState<'hidden' | 'visible' | 'free'>('free')
     const [selectedServices, setSelectedServices] = useState<string[]>([])
     const [surveyRequired, setSurveyRequired] = useState(false)
+    const [surveyDeadline, setSurveyDeadline] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10))
+    const [attachments, setAttachments] = useState<Array<{ name: string; url: string }>>([])
+    const [uploading, setUploading] = useState(false)
 
     // Services loading & filtering states
     const [filteredContractorServices, setFilteredContractorServices] = useState<any[]>([])
@@ -274,6 +279,72 @@ export function NewCampaignForm({
         }
     }
 
+    const insertFormat = (formatType: 'bold' | 'header' | 'bullet') => {
+        const textarea = document.getElementById('campaign-description') as HTMLTextAreaElement
+        if (!textarea) return
+
+        const startPos = textarea.selectionStart
+        const endPos = textarea.selectionEnd
+        const text = textarea.value
+        let insertedText = ''
+        let cursorOffset = 0
+
+        if (formatType === 'bold') {
+            insertedText = '**texte**'
+            cursorOffset = 2
+        } else if (formatType === 'header') {
+            insertedText = '\n### Titre\n'
+            cursorOffset = 5
+        } else if (formatType === 'bullet') {
+            insertedText = '\n- Élément\n'
+            cursorOffset = 3
+        }
+
+        const newText = text.substring(0, startPos) + insertedText + text.substring(endPos)
+        setDescription(newText)
+
+        setTimeout(() => {
+            textarea.focus()
+            textarea.setSelectionRange(startPos + cursorOffset, startPos + insertedText.length - (formatType === 'bold' ? 2 : 0))
+        }, 0)
+    }
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0]
+            setUploading(true)
+            try {
+                const supabase = createClient()
+                const fileExt = file.name.split('.').pop()
+                const fileName = `campaign_attachments/${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`
+                
+                const { error: uploadError } = await supabase.storage
+                    .from('quote-images')
+                    .upload(fileName, file)
+
+                if (uploadError) throw uploadError
+
+                const { data: publicUrlData } = supabase.storage
+                    .from('quote-images')
+                    .getPublicUrl(fileName)
+
+                setAttachments(prev => [...prev, { name: file.name, url: publicUrlData.publicUrl }])
+                toast.success("Fichier téléversé avec succès.")
+            } catch (err: any) {
+                console.error("Error uploading file:", err)
+                toast.error("Erreur lors du téléversement : " + err.message)
+            } finally {
+                setUploading(false)
+            }
+        }
+        e.target.value = ''
+    }
+
+    const handleRemoveAttachment = (index: number) => {
+        setAttachments(prev => prev.filter((_, i) => i !== index))
+        toast.success("Pièce jointe retirée.")
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
@@ -333,6 +404,8 @@ export function NewCampaignForm({
                 pricing_type: pricingType,
                 services: selectedServices,
                 survey_required: surveyRequired,
+                survey_deadline: surveyRequired ? surveyDeadline : null,
+                attachments: attachments,
                 availability_settings: needsScheduling ? {
                     workingHours: { start: workStart, end: workEnd },
                     techniciansCount: Number(techsCount),
@@ -385,14 +458,80 @@ export function NewCampaignForm({
                     </div>
 
                     <div className="space-y-2">
-                        <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Description de la campagne</Label>
+                        <div className="flex justify-between items-center">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Description de la campagne</Label>
+                            <div className="flex items-center gap-1 bg-[#121318] p-0.5 rounded-lg border border-zinc-850">
+                                <button
+                                    type="button"
+                                    onClick={() => insertFormat('bold')}
+                                    className="px-2 py-1 text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-all cursor-pointer"
+                                    title="Gras"
+                                >
+                                    G
+                                </button>
+                                <span className="text-zinc-850 font-light">|</span>
+                                <button
+                                    type="button"
+                                    onClick={() => insertFormat('header')}
+                                    className="px-2 py-1 text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-all cursor-pointer"
+                                    title="Titre"
+                                >
+                                    H3
+                                </button>
+                                <span className="text-zinc-850 font-light">|</span>
+                                <button
+                                    type="button"
+                                    onClick={() => insertFormat('bullet')}
+                                    className="px-2 py-1 text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-all cursor-pointer"
+                                    title="Liste à puces"
+                                >
+                                    • Liste
+                                </button>
+                            </div>
+                        </div>
                         <Textarea
+                            id="campaign-description"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="Informations transmises aux résidents concernant les interventions..."
-                            rows={3}
+                            rows={4}
                             className="bg-[#121318] border-zinc-850 text-xs text-white py-2"
                         />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block">Documents et images joints (Optionnel)</Label>
+                        <div className="border border-zinc-850 border-dashed rounded-xl p-4 bg-[#121318]/20 flex flex-col items-center gap-3">
+                            <div className="flex flex-wrap gap-2 w-full justify-start">
+                                {attachments.length === 0 ? (
+                                    <p className="text-xxs text-zinc-550 italic w-full text-center py-2">Aucun document joint pour le moment.</p>
+                                ) : (
+                                    attachments.map((file, idx) => (
+                                        <Badge key={idx} variant="outline" className="flex items-center gap-2 bg-[#121318] text-zinc-300 border-zinc-855 py-1.5 px-3 rounded-lg max-w-xs truncate">
+                                            <Paperclip className="h-3 w-3 text-purple-400 shrink-0" />
+                                            <span className="truncate max-w-[150px]">{file.name}</span>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => handleRemoveAttachment(idx)}
+                                                className="text-zinc-550 hover:text-red-400 transition-colors focus:outline-none font-bold text-sm ml-1 shrink-0"
+                                            >
+                                                ×
+                                            </button>
+                                        </Badge>
+                                    ))
+                                )}
+                            </div>
+                            <label className="bg-purple-900/20 hover:bg-purple-800/30 text-purple-400 border border-purple-800/40 text-xxs font-bold py-1.5 px-3 rounded-lg cursor-pointer transition-all flex items-center gap-1">
+                                {uploading ? 'Téléversement...' : <><Plus className="h-3.5 w-3.5" /> Ajouter un fichier (PDF, image)</>}
+                                <input
+                                    type="file"
+                                    className="hidden"
+                                    accept=".pdf,image/*"
+                                    onChange={handleFileUpload}
+                                    disabled={uploading}
+                                />
+                            </label>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -490,6 +629,24 @@ export function NewCampaignForm({
                             </p>
                         </div>
                     </div>
+
+                    {surveyRequired && (
+                        <div className="space-y-2 border-t border-zinc-900 pt-4 animate-fade-in">
+                            <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block">
+                                Date limite pour répondre au sondage *
+                            </Label>
+                            <Input
+                                type="date"
+                                value={surveyDeadline}
+                                onChange={(e) => setSurveyDeadline(e.target.value)}
+                                className="bg-[#121318] border-zinc-850 h-10 text-xs text-white max-w-xs"
+                                required={surveyRequired}
+                            />
+                            <p className="text-[10px] text-zinc-500 font-medium">
+                                Les copropriétaires devront donner leur réponse au sondage avant cette date.
+                            </p>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 

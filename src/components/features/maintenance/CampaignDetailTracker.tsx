@@ -125,6 +125,9 @@ export function CampaignDetailTracker({
     )
     const [transNewBreakStart, setTransNewBreakStart] = useState('')
     const [transNewBreakEnd, setTransNewBreakEnd] = useState('')
+    const [transSchedulingDeadline, setTransSchedulingDeadline] = useState(
+        campaign.scheduling_deadline ? new Date(campaign.scheduling_deadline).toISOString().substring(0, 10) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10)
+    )
     const [savingTransition, setSavingTransition] = useState(false)
 
     // View mode and appointment detail modal state
@@ -171,6 +174,7 @@ export function CampaignDetailTracker({
             await advanceCampaignPhaseAction(campaign.id, {
                 start_date: transStartDate,
                 end_date: transEndDate,
+                scheduling_deadline: transSchedulingDeadline || null,
                 availability_settings: {
                     workingHours: { start: transWorkStart, end: transWorkEnd },
                     techniciansCount: Number(transTechsCount),
@@ -1081,7 +1085,7 @@ export function CampaignDetailTracker({
                         </CardHeader>
                         <CardContent className="pt-4">
                             <form onSubmit={handleConfirmTransition} className="space-y-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div className="space-y-2">
                                         <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Date de début *</Label>
                                         <Input
@@ -1099,6 +1103,16 @@ export function CampaignDetailTracker({
                                             required
                                             value={transEndDate}
                                             onChange={(e) => setTransEndDate(e.target.value)}
+                                            className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Date limite réponse *</Label>
+                                        <Input
+                                            type="date"
+                                            required
+                                            value={transSchedulingDeadline}
+                                            onChange={(e) => setTransSchedulingDeadline(e.target.value)}
                                             className="bg-[#121318] border-zinc-850 h-10 text-xs text-white"
                                         />
                                     </div>
