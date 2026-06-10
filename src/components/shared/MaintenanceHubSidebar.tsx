@@ -9,7 +9,8 @@ import {
     RefreshCw,
     Wrench,
     Plus,
-    Building2
+    Building2,
+    Mail
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -21,6 +22,7 @@ const navItems = [
     { name: 'Tableau de bord', href: '/maintenance-hub', icon: LayoutDashboard },
     { name: 'Entrepreneurs', href: '/maintenance-hub/contractors', icon: Building2 },
     { name: 'Nouvelle Campagne', href: '/maintenance-hub/campaigns/new', icon: Plus },
+    { name: 'Paramètres e-mails', href: '/maintenance-hub/settings', icon: Mail },
 ]
 
 export function MaintenanceHubSidebar({ profile }: { profile: Profile | null }) {

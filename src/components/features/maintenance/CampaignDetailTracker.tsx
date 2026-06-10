@@ -15,7 +15,9 @@ import {
     advanceCampaignPhaseAction,
     deleteCampaignAction,
     updateCampaignSettingsAction,
-    updateCampaignNotesAction
+    updateCampaignNotesAction,
+    triggerCampaignRemindersAction,
+    sendSingleResidentEmailAction
 } from '@/actions/maintenance'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -48,7 +50,9 @@ import {
     Wrench,
     Save,
     FileText,
-    Download
+    Download,
+    Mail,
+    Loader2
 } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -211,6 +215,8 @@ export function CampaignDetailTracker({
 
     // Copy indicator state
     const [copiedToken, setCopiedToken] = useState<string | null>(null)
+    const [sendingEmails, setSendingEmails] = useState<Record<string, boolean>>({})
+    const [sendingReminders, setSendingReminders] = useState(false)
 
     // Stats calculations
     const totalUnits = units.length
@@ -263,8 +269,45 @@ export function CampaignDetailTracker({
         setTimeout(() => setCopiedToken(null), 2000)
     }
 
-    const handleTriggerReminders = () => {
-        toast.success(`Rappels automatiques déclenchés pour les ${pendingCount} unités en attente.`)
+    const getAutoDetectedTemplateKey = (unit: any, currentPhase: 'survey' | 'scheduling') => {
+        if (currentPhase === 'survey') {
+            if (unit.participation === 'pending') {
+                return 'new_campaign'
+            } else {
+                return 'participation_reminder'
+            }
+        } else { // scheduling
+            if (!unit.appointment) {
+                return 'scheduling_invite'
+            } else {
+                return 'booking_confirmation'
+            }
+        }
+    }
+
+    const handleSendIndividualEmail = async (unitId: string, templateKey: any) => {
+        setSendingEmails(prev => ({ ...prev, [unitId]: true }))
+        try {
+            await sendSingleResidentEmailAction(unitId, templateKey)
+            toast.success(`Courriel de type "${templateKey}" envoyé avec succès.`)
+        } catch (err: any) {
+            toast.error(`Erreur d'envoi du courriel : ${err.message}`)
+        } finally {
+            setSendingEmails(prev => ({ ...prev, [unitId]: false }))
+        }
+    }
+
+    const handleTriggerReminders = async () => {
+        setSendingReminders(true)
+        try {
+            const res = await triggerCampaignRemindersAction(campaign.id)
+            toast.success(`Rappels terminés : ${res.sentCount} envoyés, ${res.failedCount} échecs.`)
+            router.refresh()
+        } catch (err: any) {
+            toast.error("Erreur lors du déclenchement des rappels : " + err.message)
+        } finally {
+            setSendingReminders(false)
+        }
     }
 
     const handleImportResidents = async () => {
@@ -660,11 +703,20 @@ export function CampaignDetailTracker({
                             </Button>
                             <Button
                                 onClick={handleTriggerReminders}
-                                disabled={pendingCount === 0}
+                                disabled={pendingCount === 0 || sendingReminders}
                                 className="w-full bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 text-zinc-300 text-xs font-bold h-10 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors"
                             >
-                                <Send className="h-4 w-4 text-zinc-500" />
-                                Relancer les résidents ({pendingCount})
+                                {sendingReminders ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
+                                        Envoi en cours...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Send className="h-4 w-4 text-zinc-500" />
+                                        Relancer les résidents ({pendingCount})
+                                    </>
+                                )}
                             </Button>
                         </CardContent>
                     </Card>
@@ -913,6 +965,29 @@ export function CampaignDetailTracker({
                                                 </td>
                                                 <td className="p-3 text-right">
                                                     <div className="flex justify-end gap-1">
+                                                        {u.contact_email || u.resident?.email ? (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => {
+                                                                    const templateKey = getAutoDetectedTemplateKey(u, campaign.current_phase)
+                                                                    handleSendIndividualEmail(u.id, templateKey)
+                                                                }}
+                                                                disabled={sendingEmails[u.id]}
+                                                                className="h-8 w-8 text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg cursor-pointer"
+                                                                title={`Envoyer le courriel approprié (${getAutoDetectedTemplateKey(u, campaign.current_phase)})`}
+                                                            >
+                                                                {sendingEmails[u.id] ? (
+                                                                    <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                                                                ) : (
+                                                                    <Mail className="h-4 w-4 text-purple-400/80 hover:text-purple-400" />
+                                                                )}
+                                                            </Button>
+                                                        ) : (
+                                                            <span className="h-8 w-8 flex items-center justify-center text-zinc-800 opacity-30" title="Pas d'adresse courriel">
+                                                                <Mail className="h-4 w-4" />
+                                                            </span>
+                                                        )}
                                                         <Link
                                                             href={`/maintenance/invite/${u.invite_token}`}
                                                             target="_blank"
@@ -1442,6 +1517,38 @@ export function CampaignDetailTracker({
                                     </p>
                                 </div>
                             )}
+
+                            <div className="border-t border-zinc-900 pt-3 space-y-2">
+                                <span className="text-[10px] text-zinc-500 uppercase font-bold block">Renvoyer des notifications</span>
+                                <div className="flex gap-2">
+                                    <Button
+                                        type="button"
+                                        disabled={sendingEmails[selectedAppointmentDetails.unit?.id] || (!selectedAppointmentDetails.unit?.contact_email && !selectedAppointmentDetails.unit?.resident?.email)}
+                                        onClick={() => handleSendIndividualEmail(selectedAppointmentDetails.unit?.id, 'booking_confirmation')}
+                                        className="flex-1 bg-purple-900/40 hover:bg-purple-800/40 text-purple-405 text-purple-400 border border-purple-800/40 text-[10px] font-bold h-8 px-2 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                                    >
+                                        {sendingEmails[selectedAppointmentDetails.unit?.id] ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                            <Mail className="h-3.5 w-3.5" />
+                                        )}
+                                        Confirmation
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        disabled={sendingEmails[selectedAppointmentDetails.unit?.id] || (!selectedAppointmentDetails.unit?.contact_email && !selectedAppointmentDetails.unit?.resident?.email)}
+                                        onClick={() => handleSendIndividualEmail(selectedAppointmentDetails.unit?.id, 'service_incoming')}
+                                        className="flex-1 bg-amber-950/20 hover:bg-amber-900/20 text-amber-500 border border-amber-800/40 text-[10px] font-bold h-8 px-2 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                                    >
+                                        {sendingEmails[selectedAppointmentDetails.unit?.id] ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                            <Mail className="h-3.5 w-3.5" />
+                                        )}
+                                        Rappel Intervention
+                                    </Button>
+                                </div>
+                            </div>
 
                             <div className="flex justify-end border-t border-zinc-900 pt-3">
                                 <Button

@@ -4,6 +4,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sendMaintenanceEmail } from '@/utils/maintenance-email'
 
 // ==========================================
 // 1. SERVICE LIBRARY ACTIONS
@@ -205,6 +206,26 @@ export async function updateCampaignStatusAction(id: string, status: 'draft' | '
         .single()
 
     if (error) throw new Error(error.message)
+
+    // Trigger launch e-mails when campaign is activated
+    if (status === 'active') {
+        try {
+            const { data: units } = await supabase
+                .from('maintenance_campaign_units')
+                .select('id')
+                .eq('campaign_id', id)
+            if (units) {
+                for (const unit of units) {
+                    await sendSingleResidentEmailAction(unit.id, 'new_campaign').catch(err => {
+                        console.error(`Error sending launch email for unit ${unit.id}:`, err)
+                    })
+                }
+            }
+        } catch (e) {
+            console.error("Error launching campaign emails:", e)
+        }
+    }
+
     revalidatePath(`/maintenance-hub/campaigns/${id}`)
     revalidatePath('/maintenance-hub')
     return data
@@ -725,6 +746,15 @@ export async function scheduleAppointmentAction(
         .update({ participation: 'interested' })
         .eq('id', unit.id)
 
+    // Trigger booking confirmation email to resident
+    try {
+        await sendSingleResidentEmailAction(unit.id, 'booking_confirmation').catch(err => {
+            console.error(`Error sending booking confirmation email for unit ${unit.id}:`, err)
+        })
+    } catch (e) {
+        console.error("Error launching booking confirmation email:", e)
+    }
+
     revalidatePath(`/maintenance-hub/campaigns/${unit.campaign_id}`)
     return result
 }
@@ -1147,6 +1177,25 @@ export async function advanceCampaignPhaseAction(
         .single()
 
     if (error) throw new Error(error.message)
+
+    // Trigger scheduling invite email to all interested co-owners
+    try {
+        const { data: units } = await supabase
+            .from('maintenance_campaign_units')
+            .select('id, participation')
+            .eq('campaign_id', campaignId)
+            .eq('participation', 'interested')
+        if (units) {
+            for (const unit of units) {
+                await sendSingleResidentEmailAction(unit.id, 'scheduling_invite').catch(err => {
+                    console.error(`Error sending scheduling invite for unit ${unit.id}:`, err)
+                })
+            }
+        }
+    } catch (e) {
+        console.error("Error launching scheduling phase emails:", e)
+    }
+
     revalidatePath(`/maintenance-hub/campaigns/${campaignId}`)
     revalidatePath('/maintenance-hub')
     return data
@@ -1587,4 +1636,262 @@ export async function getOrCreateContractorTokenAction(contractorId: string) {
         .insert({ contractor_id: contractorId, token })
     if (error) throw new Error(error.message)
     return token
+}
+
+export async function getEmailSettingsAction() {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('maintenance_email_settings')
+        .select('*')
+        .single()
+    if (error) throw new Error(error.message)
+    return data
+}
+
+export async function updateEmailSettingsAction(settings: {
+    resend_api_key: string
+    sender_email: string
+    is_enabled: boolean
+}) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('maintenance_email_settings')
+        .update({
+            resend_api_key: settings.resend_api_key,
+            sender_email: settings.sender_email,
+            is_enabled: settings.is_enabled,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', '00000000-0000-0000-0000-000000000000')
+        .select()
+        .single()
+
+    if (error) throw new Error(error.message)
+    revalidatePath('/maintenance-hub/settings')
+    return data
+}
+
+export async function getEmailTemplatesAction() {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('maintenance_email_templates')
+        .select('*')
+        .order('name', { ascending: true })
+    if (error) throw new Error(error.message)
+    return data
+}
+
+export async function updateEmailTemplateAction(
+    id: string,
+    data: { subject: string; html_content: string }
+) {
+    const supabase = await createClient()
+    const { data: updated, error } = await supabase
+        .from('maintenance_email_templates')
+        .update({
+            subject: data.subject,
+            html_content: data.html_content,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single()
+
+    if (error) throw new Error(error.message)
+    revalidatePath('/maintenance-hub/settings')
+    return updated
+}
+
+export async function updateEmailMappingAction(mapping: Record<string, string>) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('maintenance_email_settings')
+        .update({
+            mapping,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', '00000000-0000-0000-0000-000000000000')
+        .select()
+        .single()
+
+    if (error) throw new Error(error.message)
+    revalidatePath('/maintenance-hub/settings')
+    return data
+}
+
+export async function sendSingleResidentEmailAction(
+    unitId: string, 
+    templateKey: 'new_campaign' | 'participation_reminder' | 'scheduling_invite' | 'scheduling_reminder' | 'service_incoming' | 'booking_confirmation'
+) {
+    const supabase = await createClient()
+
+    // 1. Fetch unit details
+    const { data: unit, error: unitErr } = await supabase
+        .from('maintenance_campaign_units')
+        .select('*, door:doors(*), campaign:maintenance_campaigns(*)')
+        .eq('id', unitId)
+        .single()
+
+    if (unitErr || !unit) {
+        throw new Error(unitErr?.message || "Unit details not found.")
+    }
+
+    // Fetch resident for this door
+    const { data: resident } = await supabase
+        .from('maintenance_residents')
+        .select('*')
+        .eq('door_id', unit.door_id)
+        .maybeSingle()
+
+    // Determine recipient email (contact email if defined, otherwise resident email)
+    const recipientEmail = unit.contact_email || resident?.email
+    if (!recipientEmail) {
+        throw new Error("No recipient email found for this unit.")
+    }
+
+    // Determine deadline string
+    let deadlineStr = ''
+    const campaign = unit.campaign
+    if (campaign) {
+        const deadlineDate = campaign.current_phase === 'survey' 
+            ? campaign.survey_deadline 
+            : (campaign.scheduling_deadline || campaign.response_deadline_date)
+        if (deadlineDate) {
+            deadlineStr = new Date(deadlineDate).toLocaleDateString('fr-CA')
+        }
+    }
+
+    // Fetch appointment if defined
+    const { data: appt } = await supabase
+        .from('maintenance_appointments')
+        .select('*')
+        .eq('campaign_id', unit.campaign_id)
+        .eq('door_id', unit.door_id)
+        .maybeSingle()
+
+    // Fetch contractor if defined
+    let contractorName = 'Non défini'
+    if (campaign?.contractor_id) {
+        const { data: contractor } = await supabase
+            .from('contractors')
+            .select('company_name, full_name')
+            .eq('id', campaign.contractor_id)
+            .maybeSingle()
+        if (contractor) {
+            contractorName = contractor.company_name || contractor.full_name
+        }
+    }
+
+    // Fetch services list
+    let servicesList = ''
+    const { data: svcJoins } = await supabase
+        .from('maintenance_campaign_services')
+        .select('service:maintenance_services(name)')
+        .eq('campaign_id', unit.campaign_id)
+    if (svcJoins && svcJoins.length > 0) {
+        servicesList = svcJoins.map((s: any) => s.service?.name).filter(Boolean).join(', ')
+    }
+
+    // Pricing type
+    let pricing = ''
+    if (campaign?.pricing_type === 'free') {
+        pricing = 'Gratuit (Pris en charge par le syndicat)'
+    } else if (campaign?.pricing_type === 'visible') {
+        pricing = "Facturé à l'unité (Détails sur place)"
+    } else {
+        pricing = 'Masqué'
+    }
+
+    // Setup variables
+    const variables: Record<string, string> = {
+        resident_name: unit.contact_name || resident?.full_name || 'Résident',
+        unit_number: unit.door?.door_number || 'N/A',
+        campaign_name: campaign?.name || 'Campagne de maintenance',
+        invite_token: unit.invite_token,
+        deadline: deadlineStr,
+        appointment_date: appt?.appointment_date ? new Date(appt.appointment_date + 'T00:00:00').toLocaleDateString('fr-CA') : '',
+        start_time: appt?.start_time ? appt.start_time.substring(0, 5) : '',
+        end_time: appt?.end_time ? appt.end_time.substring(0, 5) : '',
+        contractor_name: contractorName,
+        services_list: servicesList,
+        pricing: pricing,
+        notes: appt?.notes || unit.resident_notes || ''
+    }
+
+    const res = await sendMaintenanceEmail({
+        recipientEmail,
+        templateKey,
+        variables
+    })
+
+    if (!res.success) {
+        throw new Error(res.message)
+    }
+
+    return res
+}
+
+export async function triggerCampaignRemindersAction(campaignId: string) {
+    const supabase = await createClient()
+
+    // 1. Fetch campaign
+    const { data: campaign, error: campaignErr } = await supabase
+        .from('maintenance_campaigns')
+        .select('*')
+        .eq('id', campaignId)
+        .single()
+
+    if (campaignErr || !campaign) {
+        throw new Error(campaignErr?.message || "Campaign not found.")
+    }
+
+    // 2. Fetch all campaign units
+    const { data: units, error: unitsErr } = await supabase
+        .from('maintenance_campaign_units')
+        .select('*')
+        .eq('campaign_id', campaignId)
+
+    if (unitsErr || !units) {
+        throw new Error(unitsErr?.message || "Campaign units not found.")
+    }
+
+    let sentCount = 0
+    let failedCount = 0
+
+    // Check phase
+    if (campaign.current_phase === 'survey') {
+        // Send participation_reminder to pending / more_info units
+        const targets = units.filter(u => u.participation === 'pending' || u.participation === 'more_info')
+        for (const target of targets) {
+            try {
+                await sendSingleResidentEmailAction(target.id, 'participation_reminder')
+                sentCount++
+            } catch (err) {
+                console.error(`Failed to send participation reminder for unit ${target.id}:`, err)
+                failedCount++
+            }
+        }
+    } else if (campaign.current_phase === 'scheduling') {
+        // Send scheduling_reminder to interested units who have no appointment yet
+        const { data: appts } = await supabase
+            .from('maintenance_appointments')
+            .select('door_id')
+            .eq('campaign_id', campaignId)
+
+        const apptDoorIds = new Set((appts || []).map(a => a.door_id))
+        const targets = units.filter(u => u.participation === 'interested' && !apptDoorIds.has(u.door_id))
+
+        for (const target of targets) {
+            try {
+                await sendSingleResidentEmailAction(target.id, 'scheduling_reminder')
+                sentCount++
+            } catch (err) {
+                console.error(`Failed to send scheduling reminder for unit ${target.id}:`, err)
+                failedCount++
+            }
+        }
+    }
+
+    revalidatePath(`/maintenance-hub/campaigns/${campaignId}`)
+    return { sentCount, failedCount }
 }
