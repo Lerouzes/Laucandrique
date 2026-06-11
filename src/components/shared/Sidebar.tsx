@@ -69,6 +69,15 @@ export function SidebarContent({ profile }: { profile: Profile | null }) {
                                 <Wrench className="h-3.5 w-3.5 text-amber-400" />
                                 Hub de Maintenance
                             </Link>
+                            <Link 
+                                href="/global-settings"
+                                onClick={() => setIsSwitcherOpen(false)}
+                                className="flex items-center gap-2 p-3 text-xs text-white/70 hover:text-white hover:bg-white/15 transition-all"
+                            >
+                                <Settings className="h-3.5 w-3.5 text-indigo-400" />
+                                Configuration Globale
+                            </Link>
+
                         </div>
                     )}
                 </div>

@@ -10,7 +10,8 @@ import {
     Wrench,
     Plus,
     Building2,
-    Mail
+    Mail,
+    Settings
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -83,6 +84,16 @@ export function MaintenanceHubSidebar({ profile }: { profile: Profile | null }) 
                                 <Layers className="h-3.5 w-3.5 text-purple-400" />
                                 Gestion d'Équipe
                             </Link>
+                            {isMasterOrDirection && (
+                                <Link 
+                                    href="/global-settings"
+                                    onClick={() => setIsSwitcherOpen(false)}
+                                    className="flex items-center gap-2 p-3 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-all"
+                                >
+                                    <Settings className="h-3.5 w-3.5 text-indigo-400" />
+                                    Configuration Globale
+                                </Link>
+                            )}
                             <div className="flex items-center gap-2 p-3 text-xs text-amber-500 font-bold bg-amber-950/15">
                                 <Wrench className="h-3.5 w-3.5 text-amber-500" />
                                 Hub de Maintenance (Actif)
@@ -91,6 +102,7 @@ export function MaintenanceHubSidebar({ profile }: { profile: Profile | null }) 
                     )}
                 </div>
             )}
+
 
             {/* Nav list */}
             <nav className="flex-1 space-y-1.5 px-3 py-4 overflow-y-auto">
