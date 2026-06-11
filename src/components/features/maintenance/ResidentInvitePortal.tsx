@@ -33,7 +33,9 @@ import {
     Activity,
     MapPin,
     Paperclip,
-    Loader2
+    Loader2,
+    Info,
+    ArrowRight
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -380,7 +382,7 @@ export function ResidentInvitePortal({
 
     if (campaign.status === 'cancelled') {
         return (
-            <div className="max-w-2xl w-full mx-auto space-y-6 text-sm text-zinc-300">
+            <div className="max-w-2xl w-full mx-auto space-y-6 text-base text-zinc-300">
                 {/* Branding Header & Language Selector */}
                 <div className="flex justify-between items-center bg-[#16171e]/70 border border-zinc-800/80 p-4 rounded-2xl shadow-xl">
                     <div className="flex items-center gap-3">
@@ -388,15 +390,15 @@ export function ResidentInvitePortal({
                             <Wrench className="h-5 w-5 text-purple-400" />
                         </div>
                         <div>
-                            <h1 className="text-sm font-extrabold text-white uppercase tracking-wider">{t.portalTitle}</h1>
-                            <p className="text-[10px] text-zinc-400 mt-0.5">{t.portalSubtitle}</p>
+                            <h1 className="text-base font-extrabold text-white uppercase tracking-wider">{t.portalTitle}</h1>
+                            <p className="text-xs text-zinc-400 mt-0.5">{t.portalSubtitle}</p>
                         </div>
                     </div>
                     
                     <button
                         type="button"
                         onClick={() => setLang(l => l === 'fr' ? 'en' : 'fr')}
-                        className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl border border-zinc-800 bg-[#121318] hover:bg-zinc-900 text-xs font-bold text-zinc-300 transition-all cursor-pointer shadow-sm shrink-0"
+                        className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl border border-zinc-800 bg-[#121318] hover:bg-zinc-900 text-sm font-bold text-zinc-300 transition-all cursor-pointer shadow-sm shrink-0"
                     >
                         <Globe className="h-3.5 w-3.5 text-purple-400" />
                         <span>{lang === 'fr' ? 'EN' : 'FR'}</span>
@@ -408,8 +410,8 @@ export function ResidentInvitePortal({
                         <XCircle className="h-6 w-6 text-rose-450" />
                     </div>
                     <div className="space-y-1">
-                        <h2 className="text-base font-bold text-white uppercase tracking-wider">{t.cancelledTitle}</h2>
-                        <p className="text-zinc-400 text-xs leading-relaxed font-normal max-w-sm">
+                        <h2 className="text-lg font-bold text-white uppercase tracking-wider">{t.cancelledTitle}</h2>
+                        <p className="text-zinc-400 text-sm leading-relaxed font-normal max-w-sm">
                             {t.cancelledDesc}
                         </p>
                     </div>
@@ -419,7 +421,7 @@ export function ResidentInvitePortal({
     }
 
     return (
-        <div className="max-w-5xl w-full space-y-6 text-sm text-zinc-300">
+        <div className="max-w-5xl w-full space-y-6 text-base text-zinc-300">
             
             {/* Branding Header & Language Selector */}
             <div className="flex justify-between items-center bg-[#16171e]/70 border border-zinc-800/80 p-4 rounded-2xl shadow-xl">
@@ -428,15 +430,15 @@ export function ResidentInvitePortal({
                         <Wrench className="h-5 w-5 text-purple-400" />
                     </div>
                     <div>
-                        <h1 className="text-sm font-extrabold text-white uppercase tracking-wider">{t.portalTitle}</h1>
-                        <p className="text-[10px] text-zinc-400 mt-0.5">{t.portalSubtitle}</p>
+                        <h1 className="text-base font-extrabold text-white uppercase tracking-wider">{t.portalTitle}</h1>
+                        <p className="text-xs text-zinc-400 mt-0.5">{t.portalSubtitle}</p>
                     </div>
                 </div>
                 
                 <button
                     type="button"
                     onClick={() => setLang(l => l === 'fr' ? 'en' : 'fr')}
-                    className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl border border-zinc-800 bg-[#121318] hover:bg-zinc-900 text-xs font-bold text-zinc-300 transition-all cursor-pointer shadow-sm shrink-0"
+                    className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl border border-zinc-800 bg-[#121318] hover:bg-zinc-900 text-sm font-bold text-zinc-300 transition-all cursor-pointer shadow-sm shrink-0"
                 >
                     <Globe className="h-3.5 w-3.5 text-purple-400" />
                     <span>{lang === 'fr' ? 'EN' : 'FR'}</span>
@@ -448,8 +450,8 @@ export function ResidentInvitePortal({
                 <div className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-red-300 shadow-md">
                     <AlertTriangle className="h-5 w-5 text-red-400 shrink-0" />
                     <div>
-                        <span className="font-bold text-sm">{t.deadlinePassed}</span>
-                        <p className="text-xs text-zinc-400 mt-0.5">
+                        <span className="font-bold text-base">{t.deadlinePassed}</span>
+                        <p className="text-sm text-zinc-400 mt-0.5">
                             {t.deadlinePassedDesc.replace('{date}', new Date(campaign.response_deadline_date).toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-US'))}
                         </p>
                     </div>
@@ -460,16 +462,61 @@ export function ResidentInvitePortal({
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                 {/* Left Column: Sibling Switcher, Client Card, Contractor Card, Services */}
                 <div className="lg:col-span-5 space-y-6">
+                    {/* Campaign details & files */}
+                    <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
+                        <CardHeader className="pb-2.5 border-b border-zinc-900 bg-zinc-950/15">
+                            <CardTitle className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
+                                <Info className="h-4 w-4" />
+                                {lang === 'fr' ? 'À propos de cette campagne' : 'About this campaign'}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-3 space-y-3.5">
+                            {campaign.description ? (
+                                <div className="text-zinc-200 text-sm leading-relaxed space-y-1.5">
+                                    {parseMarkdown(campaign.description)}
+                                </div>
+                            ) : (
+                                <p className="text-zinc-500 italic text-sm">
+                                    {lang === 'fr' ? 'Aucune description fournie.' : 'No description provided.'}
+                                </p>
+                            )}
+                            {campaign.attachments && campaign.attachments.length > 0 && (
+                                <div className="border-t border-zinc-900 pt-3 mt-1">
+                                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block mb-2">
+                                        {lang === 'fr' ? 'Documents joints' : 'Attached documents'}
+                                    </span>
+                                    <div className="flex flex-col gap-2">
+                                        {campaign.attachments.map((file: any, i: number) => (
+                                            <a
+                                                key={i}
+                                                href={file.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center justify-between py-2 px-3 rounded-lg border border-zinc-800 bg-zinc-950/40 hover:bg-zinc-900/40 text-purple-400 hover:text-purple-300 font-bold transition-all text-sm"
+                                            >
+                                                <div className="flex items-center gap-2 truncate">
+                                                    <Paperclip className="h-3.5 w-3.5 shrink-0 text-purple-400" />
+                                                    <span className="truncate max-w-[200px]">{file.name}</span>
+                                                </div>
+                                                <ArrowRight className="h-3.5 w-3.5 text-zinc-550" />
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
                     {/* Sibling Campaigns Switcher */}
             {siblingCampaigns.length > 1 && (
                 <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
                     <CardHeader className="pb-2.5 border-b border-zinc-900 bg-zinc-950/15">
-                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
+                        <CardTitle className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
                             <Activity className="h-4 w-4" />
                             {t.campaignSwitcher}
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="pt-3 space-y-2 text-xs">
+                    <CardContent className="pt-3 space-y-2 text-sm">
                         <div className="flex flex-col gap-2">
                             {siblingCampaigns.map((sib: any) => {
                                 const isCurrent = sib.invite_token === token
@@ -484,9 +531,9 @@ export function ResidentInvitePortal({
                                     >
                                         <div className="space-y-1">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <span className="font-extrabold text-sm">{sib.campaign_name}</span>
+                                                <span className="font-extrabold text-base">{sib.campaign_name}</span>
                                                 {isCurrent && (
-                                                    <Badge className="bg-purple-900/50 border border-purple-700 text-purple-200 text-[9px] font-bold px-1.5 py-0.2 rounded-md shrink-0">
+                                                    <Badge className="bg-purple-900/50 border border-purple-700 text-purple-200 text-xs font-bold px-1.5 py-0.2 rounded-md shrink-0">
                                                         {t.currentCampaignBadge}
                                                     </Badge>
                                                 )}
@@ -496,13 +543,13 @@ export function ResidentInvitePortal({
                                                         : sib.campaign_status === 'completed'
                                                         ? 'bg-blue-950/30 border border-blue-800 text-blue-300'
                                                         : 'bg-zinc-800 border border-zinc-700 text-zinc-400'
-                                                } text-[9px] font-bold px-1.5 py-0.2 rounded-md shrink-0`}>
+                                                } text-xs font-bold px-1.5 py-0.2 rounded-md shrink-0`}>
                                                     {sib.campaign_status === 'active' ? (lang === 'fr' ? 'Active' : 'Active') : 
                                                      sib.campaign_status === 'completed' ? (lang === 'fr' ? 'Complétée' : 'Completed') : 
                                                      (lang === 'fr' ? 'Annulée' : 'Cancelled')}
                                                 </Badge>
                                             </div>
-                                            <div className="text-[10px] text-zinc-400 flex flex-wrap gap-x-3 gap-y-1">
+                                            <div className="text-xs text-zinc-400 flex flex-wrap gap-x-3 gap-y-1">
                                                 {sib.start_date && (
                                                     <span>
                                                         {lang === 'fr' ? 'Période: ' : 'Period: '}
@@ -523,7 +570,7 @@ export function ResidentInvitePortal({
                                             <Button
                                                 size="sm"
                                                 onClick={() => window.location.href = `/maintenance/invite/${sib.invite_token}`}
-                                                className="bg-purple-900/60 hover:bg-purple-800 border border-purple-700 text-white font-bold text-xs h-7 rounded-lg px-3 shrink-0 self-end sm:self-center cursor-pointer transition-all"
+                                                className="bg-purple-900/60 hover:bg-purple-800 border border-purple-700 text-white font-bold text-sm h-7 rounded-lg px-3 shrink-0 self-end sm:self-center cursor-pointer transition-all"
                                             >
                                                 {t.switchCampaignBtn}
                                             </Button>
@@ -541,44 +588,19 @@ export function ResidentInvitePortal({
                 {/* Syndicate & Campaign Details */}
                 <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
                     <CardHeader className="pb-2.5 border-b border-zinc-900 bg-zinc-950/10 flex flex-row justify-between items-center">
-                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <CardTitle className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                             <Building2 className="h-4 w-4 text-purple-400" />
                             {t.syndicateInfo}
                         </CardTitle>
-                        <Badge className="bg-purple-950/30 border border-purple-800 text-purple-300 text-[10px] font-bold px-2 py-0.5 rounded-lg shrink-0">
+                        <Badge className="bg-purple-950/30 border border-purple-800 text-purple-300 text-xs font-bold px-2 py-0.5 rounded-lg shrink-0">
                             {t.unitNum} {unit.door?.door_number}
                         </Badge>
                     </CardHeader>
-                    <CardContent className="pt-3 space-y-2.5 text-xs">
+                    <CardContent className="pt-3 space-y-2.5 text-sm">
                         <div>
-                            <span className="font-extrabold text-zinc-200 text-sm block uppercase">{client?.company_name || client?.full_name}</span>
-                            <span className="text-[10px] text-purple-400/80 font-bold block mt-0.5">{campaign.name}</span>
+                            <span className="font-extrabold text-zinc-200 text-base block uppercase">{client?.company_name || client?.full_name}</span>
                         </div>
-                        {campaign.description && (
-                            <div className="border-l-2 border-purple-900/60 pl-2 py-0.5 space-y-1">
-                                {parseMarkdown(campaign.description)}
-                            </div>
-                        )}
-                        {campaign.attachments && campaign.attachments.length > 0 && (
-                            <div className="border-t border-zinc-900/60 pt-3 mt-3 space-y-2">
-                                <span className="text-[10px] font-bold text-zinc-405 text-zinc-400 uppercase tracking-wider block">Documents joints</span>
-                                <div className="flex flex-wrap gap-2">
-                                    {campaign.attachments.map((file: any, i: number) => (
-                                        <a
-                                            key={i}
-                                            href={file.url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-zinc-800 bg-zinc-950/40 hover:bg-zinc-900/40 text-purple-400 hover:text-purple-300 font-medium transition-all"
-                                        >
-                                            <Paperclip className="h-3.5 w-3.5" />
-                                            <span className="truncate max-w-[200px]">{file.name}</span>
-                                        </a>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        <div className="space-y-1 text-zinc-450 border-t border-zinc-900 pt-2 text-[10px]">
+                        <div className="space-y-1 text-zinc-450 border-t border-zinc-900 pt-2 text-xs">
                             {(client?.address || client?.city) && (
                                 <div className="flex items-center gap-1.5">
                                     <MapPin className="h-3.5 w-3.5 text-zinc-550 shrink-0" />
@@ -598,18 +620,18 @@ export function ResidentInvitePortal({
                 {/* Contractor Card */}
                 <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
                     <CardHeader className="pb-2.5 border-b border-zinc-900 bg-zinc-950/10">
-                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <CardTitle className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                             <Wrench className="h-4 w-4 text-purple-400" />
                             {t.contractorTitle}
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="pt-3 space-y-2.5 text-xs">
+                    <CardContent className="pt-3 space-y-2.5 text-sm">
                         {contractor ? (
                             <>
                                 <div>
-                                    <span className="font-extrabold text-zinc-200 text-sm block uppercase">{contractor.company_name || contractor.full_name}</span>
+                                    <span className="font-extrabold text-zinc-200 text-base block uppercase">{contractor.company_name || contractor.full_name}</span>
                                 </div>
-                                <div className="space-y-1 text-zinc-450 text-[10px]">
+                                <div className="space-y-1 text-zinc-450 text-xs">
                                     {contractor.phone && (
                                         <div className="flex items-center gap-1.5">
                                             <Phone className="h-3.5 w-3.5 text-zinc-550 shrink-0" />
@@ -629,7 +651,7 @@ export function ResidentInvitePortal({
                                             href={contractor.website.startsWith('http') ? contractor.website : `https://${contractor.website}`} 
                                             target="_blank" 
                                             rel="noopener noreferrer"
-                                            className="text-xs text-purple-400 hover:text-purple-300 font-bold underline inline-flex items-center gap-1.5"
+                                            className="text-sm text-purple-400 hover:text-purple-300 font-bold underline inline-flex items-center gap-1.5"
                                         >
                                             <Globe className="h-3.5 w-3.5 shrink-0" />
                                             {t.websiteLink}
@@ -648,17 +670,24 @@ export function ResidentInvitePortal({
 
             {/* Campaign Services Summary */}
             <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
-                <CardContent className="p-4">
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-2">
+                <CardContent className="p-4 space-y-3">
+                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">
                         {t.servicesTitle}
                     </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2.5">
                         {services.map((s: any) => (
-                            <div key={s.id} className="p-3 bg-zinc-950/40 border border-zinc-850 rounded-xl flex justify-between items-center text-zinc-350">
-                                <span className="font-semibold text-xs">{s.name}</span>
-                                <span className="font-mono text-zinc-500 text-xs flex items-center gap-1 shrink-0">
-                                    <Clock className="h-3 w-3" /> {s.duration} min
-                                </span>
+                            <div key={s.id} className="p-3.5 bg-zinc-950/45 border border-zinc-850/80 rounded-xl flex flex-col gap-1.5 text-zinc-300 shadow-sm animate-in fade-in duration-200">
+                                <div className="flex justify-between items-start">
+                                    <span className="font-bold text-base text-white">{s.name}</span>
+                                    <span className="font-mono text-zinc-500 text-sm flex items-center gap-1.5 shrink-0 bg-zinc-900/60 py-0.5 px-2 rounded-md border border-zinc-850">
+                                        <Clock className="h-3.5 w-3.5 text-purple-400" /> {s.duration} min
+                                    </span>
+                                </div>
+                                {s.description && (
+                                    <p className="text-sm text-zinc-400 leading-relaxed pt-0.5 border-t border-zinc-900/40 mt-0.5">
+                                        {s.description}
+                                    </p>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -672,12 +701,12 @@ export function ResidentInvitePortal({
                     {/* Participation Form */}
                     <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                         <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/15 flex flex-row items-center justify-between">
-                            <CardTitle className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
+                            <CardTitle className="text-lg font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
                                 <User className="h-4 w-4" />
                                 {t.participationTitle}
                             </CardTitle>
                             {!isEditing && participation !== 'pending' && (
-                                <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                                <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
                                     <Check className="h-3 w-3" />
                                     {t.confirmedBadge}
                                 </Badge>
@@ -688,17 +717,17 @@ export function ResidentInvitePortal({
                                 {showSuccessBanner && (
                                     <div className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-emerald-300 transition-all duration-300">
                                         <CheckCircle className="h-4.5 w-4.5 text-emerald-450 shrink-0" />
-                                        <span className="font-semibold text-sm">{t.saveSuccess}</span>
+                                        <span className="font-semibold text-base">{t.saveSuccess}</span>
                                     </div>
                                 )}
                                 <div className="space-y-2">
-                                    <Label className="text-sm text-zinc-400 font-semibold uppercase tracking-wider">{t.statusLabel}</Label>
+                                    <Label className="text-base text-zinc-400 font-semibold uppercase tracking-wider">{t.statusLabel}</Label>
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                         <button
                                             type="button"
                                             disabled={isFieldsLocked}
                                             onClick={() => setParticipation('interested')}
-                                            className={`py-2.5 px-3.5 rounded-xl border font-bold text-sm transition-all cursor-pointer ${
+                                            className={`py-2.5 px-3.5 rounded-xl border font-bold text-base transition-all cursor-pointer ${
                                                 participation === 'interested' 
                                                     ? 'bg-purple-950/30 border-purple-500 text-white shadow-md' 
                                                     : 'bg-zinc-900/35 border-zinc-850 text-zinc-400 hover:border-zinc-700'
@@ -710,7 +739,7 @@ export function ResidentInvitePortal({
                                             type="button"
                                             disabled={isFieldsLocked}
                                             onClick={() => setParticipation('not_interested')}
-                                            className={`py-2.5 px-3.5 rounded-xl border font-bold text-sm transition-all cursor-pointer ${
+                                            className={`py-2.5 px-3.5 rounded-xl border font-bold text-base transition-all cursor-pointer ${
                                                 participation === 'not_interested' 
                                                     ? 'bg-rose-950/30 border-rose-500 text-white shadow-md' 
                                                     : 'bg-zinc-900/35 border-zinc-855 border-zinc-850 text-zinc-400 hover:border-zinc-700'
@@ -722,7 +751,7 @@ export function ResidentInvitePortal({
                                             type="button"
                                             disabled={isFieldsLocked}
                                             onClick={() => setParticipation('completed_elsewhere')}
-                                            className={`py-2.5 px-3.5 rounded-xl border font-bold text-sm transition-all cursor-pointer ${
+                                            className={`py-2.5 px-3.5 rounded-xl border font-bold text-base transition-all cursor-pointer ${
                                                 participation === 'completed_elsewhere' 
                                                     ? 'bg-blue-950/30 border-blue-500 text-white shadow-md' 
                                                     : 'bg-zinc-900/35 border-zinc-850 text-zinc-400 hover:border-zinc-700'
@@ -736,7 +765,7 @@ export function ResidentInvitePortal({
                                 {/* Contact details - Responsive Grid to prevent awkward label wrapping */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-zinc-900 pt-3">
                                     <div className="space-y-2">
-                                        <Label className="text-sm text-zinc-400 font-semibold uppercase tracking-wider">
+                                        <Label className="text-base text-zinc-400 font-semibold uppercase tracking-wider">
                                             {participation === 'not_interested' || participation === 'completed_elsewhere'
                                                 ? (lang === 'fr' ? 'Contact sur place' : 'On-site contact')
                                                 : t.contactPerson
@@ -746,26 +775,26 @@ export function ResidentInvitePortal({
                                             disabled={isFieldsLocked}
                                             value={contactName}
                                             onChange={(e) => setContactName(e.target.value)}
-                                            className="bg-[#121318] border-zinc-850 h-10 text-sm text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                                            className="bg-[#121318] border-zinc-850 h-10 text-base text-white disabled:opacity-60 disabled:cursor-not-allowed"
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-sm text-zinc-400 font-semibold uppercase tracking-wider">{t.contactEmail}</Label>
+                                        <Label className="text-base text-zinc-400 font-semibold uppercase tracking-wider">{t.contactEmail}</Label>
                                         <Input
                                             type="email"
                                             disabled={isFieldsLocked}
                                             value={contactEmail}
                                             onChange={(e) => setContactEmail(e.target.value)}
-                                            className="bg-[#121318] border-zinc-850 h-10 text-sm text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                                            className="bg-[#121318] border-zinc-850 h-10 text-base text-white disabled:opacity-60 disabled:cursor-not-allowed"
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-sm text-zinc-400 font-semibold uppercase tracking-wider">{t.contactPhone}</Label>
+                                        <Label className="text-base text-zinc-400 font-semibold uppercase tracking-wider">{t.contactPhone}</Label>
                                         <Input
                                             disabled={isFieldsLocked}
                                             value={contactPhone}
                                             onChange={(e) => setContactPhone(e.target.value)}
-                                            className="bg-[#121318] border-zinc-850 h-10 text-sm text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                                            className="bg-[#121318] border-zinc-850 h-10 text-base text-white disabled:opacity-60 disabled:cursor-not-allowed"
                                         />
                                     </div>
                                 </div>
@@ -774,7 +803,7 @@ export function ResidentInvitePortal({
                                 {participation === 'completed_elsewhere' && (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-zinc-900 pt-3 animate-fade-in">
                                         <div className="space-y-2">
-                                            <Label className="text-sm text-zinc-400 font-semibold uppercase tracking-wider">
+                                            <Label className="text-base text-zinc-400 font-semibold uppercase tracking-wider">
                                                 {lang === 'fr' ? 'Date de réalisation' : 'Completion Date'}
                                             </Label>
                                             <Input
@@ -782,11 +811,11 @@ export function ResidentInvitePortal({
                                                 disabled={isFieldsLocked}
                                                 value={completedElsewhereDate}
                                                 onChange={(e) => setCompletedElsewhereDate(e.target.value)}
-                                                className="bg-[#121318] border-zinc-850 h-10 text-sm text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                                                className="bg-[#121318] border-zinc-850 h-10 text-base text-white disabled:opacity-60 disabled:cursor-not-allowed"
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label className="text-sm text-zinc-400 font-semibold uppercase tracking-wider">
+                                            <Label className="text-base text-zinc-400 font-semibold uppercase tracking-wider">
                                                 {lang === 'fr' ? "Nom de l'entrepreneur" : 'Contractor Name'}
                                             </Label>
                                             <Input
@@ -794,39 +823,39 @@ export function ResidentInvitePortal({
                                                 value={completedElsewhereContractor}
                                                 onChange={(e) => setCompletedElsewhereContractor(e.target.value)}
                                                 placeholder="Ex: Plomberie ABC Inc."
-                                                className="bg-[#121318] border-zinc-850 h-10 text-sm text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                                                className="bg-[#121318] border-zinc-850 h-10 text-base text-white disabled:opacity-60 disabled:cursor-not-allowed"
                                             />
                                         </div>
                                     </div>
                                 )}
 
                                 <div className="space-y-2">
-                                    <Label className="text-sm text-zinc-400 font-semibold uppercase tracking-wider">{t.residentNotesLabel}</Label>
+                                    <Label className="text-base text-zinc-400 font-semibold uppercase tracking-wider">{t.residentNotesLabel}</Label>
                                     <Textarea
                                         disabled={isFieldsLocked}
                                         value={residentNotes}
                                         onChange={(e) => setResidentNotes(e.target.value)}
                                         placeholder={t.residentNotesPlaceholder}
                                         rows={2}
-                                        className="bg-[#121318] border-zinc-850 text-sm text-white py-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                                        className="bg-[#121318] border-zinc-850 text-base text-white py-2 disabled:opacity-60 disabled:cursor-not-allowed"
                                     />
                                 </div>
 
                                 <div className="flex justify-end pt-1">
                                     {isFieldsLocked ? (
                                         isDeadlinePassed ? (
-                                            <span className="text-xs text-zinc-500 italic">
+                                            <span className="text-sm text-zinc-500 italic">
                                                 {t.deadlinePassed}
                                             </span>
                                         ) : hasAppointment ? (
-                                            <span className="text-xs text-zinc-400 italic">
+                                            <span className="text-sm text-zinc-400 italic">
                                                 {t.lockedAptMsg}
                                             </span>
                                         ) : (
                                             <Button
                                                 type="button"
                                                 onClick={() => setIsEditing(true)}
-                                                className="bg-zinc-800 hover:bg-zinc-750 text-zinc-200 font-bold h-10 px-5 rounded-xl cursor-pointer text-sm"
+                                                className="bg-zinc-800 hover:bg-zinc-750 text-zinc-200 font-bold h-10 px-5 rounded-xl cursor-pointer text-base"
                                             >
                                                 {t.editInfoBtn}
                                             </Button>
@@ -835,7 +864,7 @@ export function ResidentInvitePortal({
                                         <Button
                                             type="submit"
                                             disabled={saving}
-                                            className="bg-purple-650 hover:bg-purple-700 text-white font-bold h-10 px-5 rounded-xl shadow cursor-pointer flex items-center gap-1.5 transition-all text-sm"
+                                            className="bg-purple-650 hover:bg-purple-700 text-white font-bold h-10 px-5 rounded-xl shadow cursor-pointer flex items-center gap-1.5 transition-all text-base"
                                         >
                                             {saving ? t.savingBtn : <><Send className="h-4 w-4" /> {t.savePrefBtn}</>}
                                         </Button>
@@ -849,23 +878,23 @@ export function ResidentInvitePortal({
                     {isParticipating ? (
                         <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                             <CardHeader className="pb-3 border-b border-zinc-900 bg-zinc-950/15">
-                                <CardTitle className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
+                                <CardTitle className="text-lg font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
                                     <Calendar className="h-4 w-4" />
                                     {t.bookingTitle}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="pt-4 space-y-4">
                                 {campaign.current_phase === 'survey' ? (
-                                    <div className="p-4 bg-purple-950/10 border border-purple-900/30 rounded-xl space-y-2 text-sm">
+                                    <div className="p-4 bg-purple-950/10 border border-purple-900/30 rounded-xl space-y-2 text-base">
                                         <div className="flex items-start gap-3">
                                             <Clock className="h-5 w-5 text-purple-400 shrink-0 mt-0.5" />
                                             <div className="space-y-1">
-                                                <span className="font-extrabold text-purple-300 text-sm block">{t.phaseSurveyTitle}</span>
-                                                <p className="text-sm text-zinc-400 leading-relaxed">
+                                                <span className="font-extrabold text-purple-300 text-base block">{t.phaseSurveyTitle}</span>
+                                                <p className="text-base text-zinc-400 leading-relaxed">
                                                     {t.phaseSurveyDesc}
                                                 </p>
                                                 {campaign.survey_deadline && (
-                                                    <p className="text-sm font-bold text-amber-400 mt-2 flex items-center gap-1">
+                                                    <p className="text-base font-bold text-amber-400 mt-2 flex items-center gap-1">
                                                         <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
                                                         <span>
                                                             {lang === 'fr' 
@@ -879,12 +908,12 @@ export function ResidentInvitePortal({
                                         </div>
                                     </div>
                                 ) : appointment ? (
-                                    <div className="p-4 bg-emerald-950/10 border border-emerald-900/40 rounded-xl space-y-3 text-sm">
+                                    <div className="p-4 bg-emerald-950/10 border border-emerald-900/40 rounded-xl space-y-3 text-base">
                                         <div className="flex items-start gap-3">
                                             <CheckCircle className="h-5 w-5 text-emerald-450 shrink-0 mt-0.5" />
                                             <div className="space-y-1">
-                                                <span className="font-extrabold text-zinc-150 text-sm block">{t.apptPlanned}</span>
-                                                <p className="text-sm text-zinc-400">
+                                                <span className="font-extrabold text-zinc-150 text-base block">{t.apptPlanned}</span>
+                                                <p className="text-base text-zinc-400">
                                                     {t.apptOn} <strong className="text-zinc-200">{new Date(appointment.appointment_date).toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-US')}</strong> {t.apptFrom} <strong className="text-zinc-200">{appointment.start_time.substring(0, 5)}</strong> {t.apptTo} <strong className="text-zinc-200">{appointment.end_time.substring(0, 5)}</strong>.
                                                 </p>
                                             </div>
@@ -893,7 +922,7 @@ export function ResidentInvitePortal({
                                         {/* Contractor Daily Progress Tracker */}
                                         <div className="mt-3 p-3 bg-zinc-950/50 border border-zinc-850 rounded-xl space-y-2">
                                             <div className="flex items-center justify-between">
-                                                <span className="text-[10px] font-bold text-zinc-450 uppercase tracking-wider flex items-center gap-1.5">
+                                                <span className="text-xs font-bold text-zinc-450 uppercase tracking-wider flex items-center gap-1.5">
                                                     <Activity className="h-3.5 w-3.5 text-purple-400 animate-pulse" />
                                                     {t.contractorProgressTitle}
                                                 </span>
@@ -904,7 +933,7 @@ export function ResidentInvitePortal({
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="text-xs text-zinc-400 leading-relaxed font-medium">
+                                            <p className="text-sm text-zinc-400 leading-relaxed font-medium">
                                                 {isDayStarted && t.contractorActiveMsg.replace('{position}', String(getQueuePosition()))}
                                                 {!isDayStarted && !isDayFinished && t.contractorNotStartedMsg}
                                                 {isDayFinished && t.contractorFinishedMsg}
@@ -917,20 +946,20 @@ export function ResidentInvitePortal({
                                                     <Button
                                                         onClick={handleCancelAppointment}
                                                         disabled={booking}
-                                                        className="bg-transparent border border-zinc-800 hover:border-zinc-700 text-rose-400 hover:text-rose-300 text-sm font-bold h-8 px-3 rounded-lg cursor-pointer"
+                                                        className="bg-transparent border border-zinc-800 hover:border-zinc-700 text-rose-400 hover:text-rose-300 text-base font-bold h-8 px-3 rounded-lg cursor-pointer"
                                                     >
                                                         {t.cancelApptBtn}
                                                     </Button>
                                                     <Button
                                                         onClick={() => setAppointment(null)} // resets view to scheduler mode
                                                         disabled={booking}
-                                                        className="bg-purple-900/40 hover:bg-purple-800/40 text-purple-450 hover:text-purple-300 text-sm font-bold h-8 px-3.5 rounded-lg border border-purple-800/45 cursor-pointer"
+                                                        className="bg-purple-900/40 hover:bg-purple-800/40 text-purple-450 hover:text-purple-300 text-base font-bold h-8 px-3.5 rounded-lg border border-purple-800/45 cursor-pointer"
                                                     >
                                                         {t.rescheduleBtn}
                                                     </Button>
                                                 </>
                                             ) : (
-                                                <div className="w-full text-left text-xs text-zinc-500 italic mt-1 space-y-1">
+                                                <div className="w-full text-left text-sm text-zinc-500 italic mt-1 space-y-1">
                                                     {campaign.allow_reschedule === false && (
                                                         <div className="flex items-center gap-1 text-amber-500/70 font-semibold">
                                                             <AlertTriangle className="h-3 w-3" />
@@ -948,11 +977,11 @@ export function ResidentInvitePortal({
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="space-y-4 text-sm">
+                                    <div className="space-y-4 text-base">
                                         {campaign.scheduling_deadline && (
                                             <div className="p-3 bg-amber-500/10 border border-amber-500/25 rounded-xl text-amber-300 flex items-center gap-2">
                                                 <Clock className="h-4 w-4 shrink-0 text-amber-400" />
-                                                <span className="font-bold text-xs uppercase">
+                                                <span className="font-bold text-sm uppercase">
                                                     {lang === 'fr' 
                                                         ? `Date limite pour choisir : ${new Date(campaign.scheduling_deadline).toLocaleDateString('fr-CA')}`
                                                         : `Deadline to schedule: ${new Date(campaign.scheduling_deadline).toLocaleDateString('en-US')}`
@@ -966,9 +995,9 @@ export function ResidentInvitePortal({
                                             
                                             {/* Left Column: Date Picker (md:col-span-5) */}
                                             <div className="md:col-span-5 space-y-3">
-                                                <Label className="text-xs text-zinc-400 font-bold uppercase tracking-wider block">{t.chooseDateLabel}</Label>
+                                                <Label className="text-sm text-zinc-400 font-bold uppercase tracking-wider block">{t.chooseDateLabel}</Label>
                                                 {dates.length === 0 ? (
-                                                    <p className="text-xs italic text-zinc-500 py-2">
+                                                    <p className="text-sm italic text-zinc-500 py-2">
                                                         {t.noDateAvail}
                                                     </p>
                                                 ) : (
@@ -996,16 +1025,16 @@ export function ResidentInvitePortal({
                                                                     } ${isDeadlinePassed ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                                 >
                                                                     <div className="flex flex-col items-center justify-center shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-lg bg-zinc-905 bg-zinc-900 border border-zinc-800 text-center">
-                                                                        <span className="text-[9px] font-bold text-zinc-500 uppercase leading-none">{weekday}</span>
-                                                                        <span className="text-xs md:text-sm font-extrabold text-white leading-tight mt-0.5">{dayNum}</span>
+                                                                        <span className="text-xs font-bold text-zinc-500 uppercase leading-none">{weekday}</span>
+                                                                        <span className="text-sm md:text-base font-extrabold text-white leading-tight mt-0.5">{dayNum}</span>
                                                                     </div>
                                                                     <div className="md:block hidden">
-                                                                        <span className="text-xs font-bold text-zinc-300 capitalize">{month}</span>
-                                                                        <span className="text-[10px] text-zinc-500 block mt-0.5">
+                                                                        <span className="text-sm font-bold text-zinc-300 capitalize">{month}</span>
+                                                                        <span className="text-xs text-zinc-500 block mt-0.5">
                                                                             {(availableSlots[date] || []).length} {lang === 'fr' ? 'créneaux' : 'slots'}
                                                                         </span>
                                                                     </div>
-                                                                    <div className="md:hidden block text-[9px] font-bold text-zinc-500 mt-1 uppercase">
+                                                                    <div className="md:hidden block text-xs font-bold text-zinc-500 mt-1 uppercase">
                                                                         {month}
                                                                     </div>
                                                                 </button>
@@ -1017,14 +1046,14 @@ export function ResidentInvitePortal({
 
                                             {/* Right Column: Time Slots Picker (md:col-span-7) */}
                                             <div className="md:col-span-7 border-t md:border-t-0 md:border-l border-zinc-900 pt-4 md:pt-0 md:pl-6 space-y-3 flex flex-col justify-start">
-                                                <Label className="text-xs text-zinc-400 font-bold uppercase tracking-wider block">
+                                                <Label className="text-sm text-zinc-400 font-bold uppercase tracking-wider block">
                                                     {t.chooseSlotLabel.replace('{duration}', String(totalDuration))}
                                                 </Label>
 
                                                 {!selectedDate ? (
                                                     <div className="flex-grow flex flex-col items-center justify-center text-center p-6 bg-zinc-950/25 border border-dashed border-zinc-850 rounded-2xl min-h-[150px]">
                                                         <Clock className="h-6 w-6 text-zinc-650 text-zinc-500 mb-2" />
-                                                        <p className="text-xs text-zinc-500 font-medium">
+                                                        <p className="text-sm text-zinc-500 font-medium">
                                                             {lang === 'fr' 
                                                                 ? "Veuillez sélectionner une date à gauche."
                                                                 : "Please select a date on the left."}
@@ -1033,7 +1062,7 @@ export function ResidentInvitePortal({
                                                 ) : (
                                                     <div className="flex-grow space-y-2 max-h-[350px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-800">
                                                         {(availableSlots[selectedDate] || []).length === 0 ? (
-                                                            <p className="text-xs italic text-zinc-500 py-4 text-center">
+                                                            <p className="text-sm italic text-zinc-500 py-4 text-center">
                                                                 {lang === 'fr' ? 'Aucun créneau disponible pour cette journée.' : 'No slots available for this day.'}
                                                             </p>
                                                         ) : (
@@ -1048,7 +1077,7 @@ export function ResidentInvitePortal({
                                                                             type="button"
                                                                             disabled={isDeadlinePassed}
                                                                             onClick={() => setSelectedSlot(slot)}
-                                                                            className={`flex-1 py-3 px-4 rounded-xl border text-center font-mono font-bold text-xs transition-all cursor-pointer ${
+                                                                            className={`flex-1 py-3 px-4 rounded-xl border text-center font-mono font-bold text-sm transition-all cursor-pointer ${
                                                                                 isSelected 
                                                                                     ? 'bg-purple-950/20 border-purple-500 text-white shadow' 
                                                                                     : 'bg-[#121318] border-zinc-850 hover:border-zinc-800 text-zinc-350'
@@ -1062,7 +1091,7 @@ export function ResidentInvitePortal({
                                                                             <Button
                                                                                 onClick={handleBookAppointment}
                                                                                 disabled={booking || isDeadlinePassed}
-                                                                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 px-5 rounded-xl shadow cursor-pointer flex items-center justify-center gap-1.5 shrink-0 transition-all duration-300 animate-slide-in-right text-xs"
+                                                                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 px-5 rounded-xl shadow cursor-pointer flex items-center justify-center gap-1.5 shrink-0 transition-all duration-300 animate-slide-in-right text-sm"
                                                                             >
                                                                                 {booking ? (
                                                                                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1108,7 +1137,7 @@ export function ResidentInvitePortal({
                         </Card>
                     ) : (
                         <Card className="bg-[#16171e]/70 border-zinc-850 shadow-md">
-                            <CardContent className="p-6 text-center text-zinc-500 text-sm">
+                            <CardContent className="p-6 text-center text-zinc-500 text-base">
                                 <XCircle className="h-5 w-5 text-zinc-605 mx-auto mb-2" />
                                 {participation === 'not_interested' ? t.optOutMsg : t.optOutCompletedElsewhereMsg}
                             </CardContent>
@@ -1138,10 +1167,10 @@ function parseMarkdown(text: string) {
     const lines = text.split('\n')
     return lines.map((line, idx) => {
         if (line.startsWith('### ')) {
-            return <h4 key={idx} className="text-zinc-150 font-bold text-sm mt-3 mb-1 uppercase tracking-wide">{line.substring(4)}</h4>
+            return <h4 key={idx} className="text-zinc-150 font-bold text-base mt-3 mb-1 uppercase tracking-wide">{line.substring(4)}</h4>
         }
         if (line.startsWith('## ')) {
-            return <h3 key={idx} className="text-zinc-200 font-bold text-base mt-3 mb-1 uppercase tracking-wide">{line.substring(3)}</h3>
+            return <h3 key={idx} className="text-zinc-200 font-bold text-lg mt-3 mb-1 uppercase tracking-wide">{line.substring(3)}</h3>
         }
         if (line.startsWith('# ')) {
             return <h2 key={idx} className="text-white font-bold text-lg mt-4 mb-2 uppercase tracking-wide">{line.substring(2)}</h2>
@@ -1160,7 +1189,7 @@ function parseMarkdown(text: string) {
             return <div key={idx} className="h-2" />
         }
         
-        return <p key={idx} className="text-zinc-400 my-1 leading-relaxed text-[11px]">{parseInlineMarkdown(line)}</p>
+        return <p key={idx} className="text-zinc-400 my-1 leading-relaxed text-xs">{parseInlineMarkdown(line)}</p>
     })
 }
 

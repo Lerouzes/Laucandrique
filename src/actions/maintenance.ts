@@ -1885,14 +1885,35 @@ export async function sendSingleResidentEmailAction(
 
     // Fetch contractor if defined
     let contractorName = 'Non défini'
+    let contractorCompanyName = 'Non défini'
+    let contractorPhone = 'Non défini'
+    let contractorEmail = 'Non défini'
     if (campaign?.contractor_id) {
         const { data: contractor } = await supabase
             .from('contractors')
-            .select('company_name, full_name')
+            .select('company_name, full_name, phone, email')
             .eq('id', campaign.contractor_id)
             .maybeSingle()
         if (contractor) {
             contractorName = contractor.company_name || contractor.full_name
+            contractorCompanyName = contractor.company_name || contractor.full_name
+            contractorPhone = contractor.phone || 'Non défini'
+            contractorEmail = contractor.email || 'Non défini'
+        }
+    }
+
+    // Fetch client (syndicate) if campaign is defined
+    let syndicateName = 'Non défini'
+    let clientAddress = 'Non défini'
+    if (campaign?.client_id) {
+        const { data: client } = await supabase
+            .from('clients')
+            .select('company_name, full_name, address, city')
+            .eq('id', campaign.client_id)
+            .maybeSingle()
+        if (client) {
+            syndicateName = client.company_name || client.full_name || 'Non défini'
+            clientAddress = [client.address, client.city].filter(Boolean).join(', ') || 'Non défini'
         }
     }
 
@@ -1927,6 +1948,11 @@ export async function sendSingleResidentEmailAction(
         start_time: appt?.start_time ? appt.start_time.substring(0, 5) : '',
         end_time: appt?.end_time ? appt.end_time.substring(0, 5) : '',
         contractor_name: contractorName,
+        contractor_company_name: contractorCompanyName,
+        contractor_phone: contractorPhone,
+        contractor_email: contractorEmail,
+        syndicate_name: syndicateName,
+        client_address: clientAddress,
         services_list: servicesList,
         pricing: pricing,
         notes: appt?.notes || unit.resident_notes || ''
@@ -1935,7 +1961,8 @@ export async function sendSingleResidentEmailAction(
     const res = await sendMaintenanceEmail({
         recipientEmail,
         templateKey,
-        variables
+        variables,
+        attachments: campaign?.attachments || undefined
     })
 
     if (!res.success) {

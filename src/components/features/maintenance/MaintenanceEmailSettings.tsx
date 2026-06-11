@@ -2,7 +2,7 @@
 // src/components/features/maintenance/MaintenanceEmailSettings.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -68,6 +68,11 @@ const VARIABLES_LIST = [
     { name: '{{start_time}}', desc: 'Heure de début du rendez-vous (ex: 08:30).' },
     { name: '{{end_time}}', desc: 'Heure de fin estimée du rendez-vous (ex: 09:30).' },
     { name: '{{contractor_name}}', desc: 'Nom de l\'entrepreneur assigné aux travaux.' },
+    { name: '{{contractor_company_name}}', desc: 'Nom de l\'entreprise de l\'entrepreneur en charge.' },
+    { name: '{{contractor_phone}}', desc: 'Téléphone de l\'entrepreneur.' },
+    { name: '{{contractor_email}}', desc: 'Courriel de l\'entrepreneur.' },
+    { name: '{{syndicate_name}}', desc: 'Nom du syndicat de copropriété.' },
+    { name: '{{client_address}}', desc: 'Adresse du syndicat de copropriété.' },
     { name: '{{services_list}}', desc: 'Liste des services requis séparés par des virgules.' },
     { name: '{{pricing}}', desc: 'Texte descriptif de la tarification applicable.' },
     { name: '{{notes}}', desc: 'Consignes de rendez-vous ou notes de contact.' },
@@ -78,6 +83,16 @@ export function MaintenanceEmailSettings({
     initialTemplates
 }: MaintenanceEmailSettingsProps) {
     const [activeTab, setActiveTab] = useState<'config' | 'templates' | 'mappings'>('config')
+
+    // Refs for variable insertion
+    const subjectRef = useRef<HTMLInputElement>(null)
+    const htmlRef = useRef<HTMLTextAreaElement>(null)
+
+    // Editor & Insertion tracking
+    const [focusedInput, setFocusedInput] = useState<'subject' | 'html' | null>(null)
+    const [selectionStart, setSelectionStart] = useState<number>(0)
+    const [selectionEnd, setSelectionEnd] = useState<number>(0)
+    const [editorMode, setEditorMode] = useState<'code' | 'preview'>('code')
 
     // API settings states
     const [apiKey, setApiKey] = useState(initialSettings?.resend_api_key || '')
@@ -95,6 +110,84 @@ export function MaintenanceEmailSettings({
     const [templateSubject, setTemplateSubject] = useState(activeTemplate?.subject || '')
     const [templateHtml, setTemplateHtml] = useState(activeTemplate?.html_content || '')
     const [isSavingTemplate, setIsSavingTemplate] = useState(false)
+
+    // Helper to insert variables at cursor position
+    const insertVariable = (variableName: string) => {
+        if (focusedInput === 'subject' && subjectRef.current) {
+            const input = subjectRef.current
+            const start = input.selectionStart ?? selectionStart
+            const end = input.selectionEnd ?? selectionEnd
+            const newValue = templateSubject.substring(0, start) + variableName + templateSubject.substring(end)
+            setTemplateSubject(newValue)
+            setTimeout(() => {
+                input.focus()
+                input.setSelectionRange(start + variableName.length, start + variableName.length)
+            }, 50)
+        } else if (focusedInput === 'html' && htmlRef.current) {
+            const textarea = htmlRef.current
+            const start = textarea.selectionStart ?? selectionStart
+            const end = textarea.selectionEnd ?? selectionEnd
+            const newValue = templateHtml.substring(0, start) + variableName + templateHtml.substring(end)
+            setTemplateHtml(newValue)
+            setTimeout(() => {
+                textarea.focus()
+                textarea.setSelectionRange(start + variableName.length, start + variableName.length)
+            }, 50)
+        } else {
+            setTemplateHtml(prev => prev + variableName)
+        }
+    }
+
+    // Drag-and-drop drop handler
+    const handleDrop = (e: React.DragEvent<HTMLInputElement | HTMLTextAreaElement>, inputType: 'subject' | 'html') => {
+        e.preventDefault()
+        const variable = e.dataTransfer.getData('text/plain')
+        if (!variable) return
+
+        const target = e.currentTarget
+        let dropIndex = target.value.length
+        if (typeof target.selectionStart === 'number') {
+            dropIndex = target.selectionStart
+        }
+
+        if (inputType === 'subject') {
+            const newValue = templateSubject.substring(0, dropIndex) + variable + templateSubject.substring(dropIndex)
+            setTemplateSubject(newValue)
+        } else {
+            const newValue = templateHtml.substring(0, dropIndex) + variable + templateHtml.substring(dropIndex)
+            setTemplateHtml(newValue)
+        }
+    }
+
+    // Visual preview variable compilation helper
+    const getPreviewHtml = (html: string) => {
+        let preview = html
+        const samples: Record<string, string> = {
+            resident_name: 'Jean Tremblay',
+            unit_number: 'Apt 402',
+            campaign_name: 'Inspection annuelle des gicleurs',
+            invite_link: 'https://laucandrique.com/maintenance/invite/sample-token',
+            deadline: '2026-06-30',
+            appointment_date: '2026-06-25',
+            start_time: '09:00',
+            end_time: '10:00',
+            contractor_name: 'Plomberie Pro Inc.',
+            contractor_company_name: 'Plomberie Pro Inc.',
+            contractor_phone: '514-555-0199',
+            contractor_email: 'service@plomberiepro.com',
+            syndicate_name: 'Syndicat Condos Laucandrique',
+            client_address: '1234 Rue des Copropriétaires, Montréal, QC',
+            services_list: 'Inspection des gicleurs, Remplacement de têtes',
+            pricing: 'Gratuit (Pris en charge par le syndicat)',
+            notes: 'Veuillez dégager l\'accès aux gicleurs dans les placards.',
+        }
+        Object.entries(samples).forEach(([key, val]) => {
+            const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g')
+            preview = preview.replace(regex, val)
+        })
+        preview = preview.replace(/{{#notes}}([\s\S]*?){{\/notes}}/g, '$1')
+        return preview
+    }
 
     // Mapping states
     const [mapping, setMapping] = useState<Record<string, string>>(
@@ -348,9 +441,30 @@ export function MaintenanceEmailSettings({
                                 <CardHeader className="border-b border-zinc-900 bg-zinc-950/10">
                                     <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center justify-between">
                                         <span>Modifier : {activeTemplate.name}</span>
-                                        <span className="text-[10px] bg-zinc-850 text-zinc-400 font-mono py-0.5 px-2 rounded-full lowercase">
-                                            html
-                                        </span>
+                                        <div className="flex bg-zinc-950 p-0.5 rounded-lg border border-zinc-850 gap-0.5 shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditorMode('code')}
+                                                className={cn(
+                                                    "px-2.5 py-1 text-[10px] font-bold uppercase rounded-md transition-all flex items-center gap-1 cursor-pointer",
+                                                    editorMode === 'code' ? "bg-purple-950/40 border border-purple-800/40 text-purple-300 shadow-sm" : "text-zinc-500 hover:text-zinc-300"
+                                                )}
+                                            >
+                                                <Code className="h-3 w-3" />
+                                                Code HTML
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditorMode('preview')}
+                                                className={cn(
+                                                    "px-2.5 py-1 text-[10px] font-bold uppercase rounded-md transition-all flex items-center gap-1 cursor-pointer",
+                                                    editorMode === 'preview' ? "bg-purple-950/40 border border-purple-800/40 text-purple-300 shadow-sm" : "text-zinc-500 hover:text-zinc-300"
+                                                )}
+                                            >
+                                                <Eye className="h-3 w-3" />
+                                                Visuel
+                                            </button>
+                                        </div>
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="pt-6 space-y-4">
@@ -361,8 +475,16 @@ export function MaintenanceEmailSettings({
                                         </Label>
                                         <Input
                                             id="tpl_subject"
+                                            ref={subjectRef}
                                             value={templateSubject}
                                             onChange={(e) => setTemplateSubject(e.target.value)}
+                                            onFocus={() => setFocusedInput('subject')}
+                                            onSelect={(e) => {
+                                                setSelectionStart(e.currentTarget.selectionStart ?? 0)
+                                                setSelectionEnd(e.currentTarget.selectionEnd ?? 0)
+                                            }}
+                                            onDragOver={(e) => e.preventDefault()}
+                                            onDrop={(e) => handleDrop(e, 'subject')}
                                             className="bg-zinc-900/50 border-zinc-800 text-zinc-100 focus:border-zinc-700 text-xs font-semibold"
                                         />
                                     </div>
@@ -372,13 +494,31 @@ export function MaintenanceEmailSettings({
                                         <Label htmlFor="tpl_html" className="text-xs font-bold text-zinc-300">
                                             Corps HTML
                                         </Label>
-                                        <Textarea
-                                            id="tpl_html"
-                                            value={templateHtml}
-                                            onChange={(e) => setTemplateHtml(e.target.value)}
-                                            rows={20}
-                                            className="bg-zinc-900/50 border-zinc-800 text-zinc-100 focus:border-zinc-700 text-xxs font-mono leading-relaxed"
-                                        />
+                                        {editorMode === 'code' ? (
+                                            <Textarea
+                                                id="tpl_html"
+                                                ref={htmlRef}
+                                                value={templateHtml}
+                                                onChange={(e) => setTemplateHtml(e.target.value)}
+                                                onFocus={() => setFocusedInput('html')}
+                                                onSelect={(e) => {
+                                                    setSelectionStart(e.currentTarget.selectionStart ?? 0)
+                                                    setSelectionEnd(e.currentTarget.selectionEnd ?? 0)
+                                                }}
+                                                onDragOver={(e) => e.preventDefault()}
+                                                onDrop={(e) => handleDrop(e, 'html')}
+                                                rows={20}
+                                                className="bg-zinc-900/50 border-zinc-800 text-zinc-100 focus:border-zinc-700 text-xxs font-mono leading-relaxed animate-in fade-in duration-200"
+                                            />
+                                        ) : (
+                                            <div className="w-full bg-white rounded-xl border border-zinc-800 overflow-hidden shadow-inner animate-in fade-in duration-200">
+                                                <iframe
+                                                    title="Aperçu du courriel"
+                                                    srcDoc={getPreviewHtml(templateHtml)}
+                                                    className="w-full h-[500px] bg-white border-none"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 </CardContent>
                                 <CardFooter className="border-t border-zinc-900 bg-zinc-950/10 flex justify-end">
@@ -423,9 +563,20 @@ export function MaintenanceEmailSettings({
                                 </p>
                                 <div className="space-y-3 divide-y divide-zinc-850/50">
                                     {VARIABLES_LIST.map(v => (
-                                        <div key={v.name} className="pt-2 text-xxs first:pt-0">
-                                            <code className="text-amber-400 font-bold block mb-0.5">{v.name}</code>
-                                            <span className="text-zinc-450 block">{v.desc}</span>
+                                        <div
+                                            key={v.name}
+                                            draggable
+                                            onDragStart={(e) => {
+                                                e.dataTransfer.setData('text/plain', v.name)
+                                            }}
+                                            onClick={() => insertVariable(v.name)}
+                                            className="pt-2 text-xxs first:pt-0 cursor-grab active:cursor-grabbing hover:bg-zinc-900 p-1.5 rounded-lg transition-colors group flex flex-col"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <code className="text-amber-400 font-bold block mb-0.5 group-hover:text-amber-300">{v.name}</code>
+                                                <span className="text-[9px] text-zinc-550 opacity-0 group-hover:opacity-100 transition-opacity">Glisser / Cliquer</span>
+                                            </div>
+                                            <span className="text-zinc-450 block leading-normal">{v.desc}</span>
                                         </div>
                                     ))}
                                 </div>

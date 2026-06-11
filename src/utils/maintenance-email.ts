@@ -6,12 +6,14 @@ interface SendEmailParams {
     recipientEmail: string
     templateKey: 'new_campaign' | 'participation_reminder' | 'scheduling_invite' | 'scheduling_reminder' | 'service_incoming' | 'booking_confirmation'
     variables: Record<string, string>
+    attachments?: { name: string; url: string }[]
 }
 
 export async function sendMaintenanceEmail({
     recipientEmail,
     templateKey,
-    variables
+    variables,
+    attachments
 }: SendEmailParams): Promise<{ success: boolean; message: string }> {
     const supabase = await createClient()
 
@@ -96,18 +98,27 @@ export async function sendMaintenanceEmail({
     // 6. Execute POST request to Resend API
     try {
         const sender = settings.sender_email || 'notifications@laucandrique.com'
+        const payload: any = {
+            from: sender,
+            to: recipientEmail,
+            subject: subject,
+            html: htmlContent
+        }
+
+        if (attachments && attachments.length > 0) {
+            payload.attachments = attachments.map(att => ({
+                filename: att.name,
+                path: att.url
+            }))
+        }
+
         const res = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${settings.resend_api_key}`
             },
-            body: JSON.stringify({
-                from: sender,
-                to: recipientEmail,
-                subject: subject,
-                html: htmlContent
-            })
+            body: JSON.stringify(payload)
         })
 
         if (!res.ok) {
