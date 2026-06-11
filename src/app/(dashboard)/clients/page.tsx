@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic'
 import { getClients } from '@/actions/clients'
 import { ClientsTable } from '@/components/features/clients/ClientsTable'
 import { ClientFormDialog } from '@/components/features/clients/ClientFormDialog'
-import { ClientExcelImport } from '@/components/features/clients/ClientExcelImport'
 import { ClientsSearch } from '@/components/features/clients/ClientsSearch'
 import { getManagers } from '@/actions/managers'
 
@@ -35,7 +34,6 @@ export default async function ClientsPage({
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <ClientExcelImport managers={managers} existingClients={clients} />
                     <ClientFormDialog managers={managers} />
                 </div>
             </div>
@@ -50,3 +48,4 @@ export default async function ClientsPage({
         </div>
     )
 }
+
