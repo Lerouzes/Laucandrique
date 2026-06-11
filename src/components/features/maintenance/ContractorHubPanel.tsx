@@ -1,13 +1,13 @@
 // @ts-nocheck
 'use client'
 
-import { useState, useTransition, useRef } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import {
   DollarSign, Plus, Trash2, Check, X, ChevronDown, ChevronUp,
   Clock, Tag, CheckSquare, Square, Loader2, ExternalLink, Copy,
   Wrench, ListChecks, Building, CalendarRange, Library, PlusCircle,
-  Camera, FileText, Search, CornerDownLeft
+  Camera, FileText, Search, CornerDownLeft, Users
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,9 @@ import {
   addContractorChecklistItemAction,
   toggleContractorChecklistItemAction,
   deleteContractorChecklistItemAction,
+  getContractorMembersAction,
+  saveContractorMemberAction,
+  deleteContractorMemberAction,
 } from '@/actions/maintenance'
 import { toast } from 'sonner'
 
@@ -415,6 +418,239 @@ function ChecklistPanel({ contractorId, initial }: { contractorId: string; initi
   )
 }
 
+// ─── MEMBERS PANEL ───────────────────────────────────────────────────────────
+function MembersPanel({
+  contractorId,
+  members,
+  onUpdate
+}: {
+  contractorId: string
+  members: any[]
+  onUpdate: () => void
+}) {
+  const [editingMember, setEditingMember] = useState<any | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [name, setName] = useState('')
+  const [role, setRole] = useState<'owner' | 'team_leader' | 'employee'>('employee')
+  const [password, setPassword] = useState('')
+  const [team, setTeam] = useState<'team_1' | 'team_2' | ''>('')
+  const [isPending, startTransition] = useTransition()
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
+
+  const resetForm = () => {
+    setName('')
+    setRole('employee')
+    setPassword('')
+    setTeam('')
+    setEditingMember(null)
+    setShowForm(false)
+  }
+
+  const handleEdit = (m: any) => {
+    setEditingMember(m)
+    setName(m.name)
+    setRole(m.role)
+    setPassword('') // empty password field means "keep unchanged"
+    setTeam(m.team || '')
+    setShowForm(true)
+  }
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return toast.error("Le nom est requis.")
+    if (!editingMember && !password.trim()) return toast.error("Le mot de passe est requis pour un nouveau membre.")
+
+    startTransition(async () => {
+      try {
+        await saveContractorMemberAction({
+          id: editingMember?.id,
+          contractor_id: contractorId,
+          name: name.trim(),
+          role,
+          password: password ? password : undefined,
+          team: team ? (team as 'team_1' | 'team_2') : null
+        })
+        toast.success(editingMember ? "Membre mis à jour avec succès." : "Membre créé avec succès.")
+        resetForm()
+        onUpdate()
+      } catch (err: any) {
+        toast.error(err.message)
+      }
+    })
+  }
+
+  const handleDelete = (id: string) => {
+    startTransition(async () => {
+      try {
+        await deleteContractorMemberAction(id)
+        toast.success("Membre supprimé.")
+        setConfirmingDeleteId(null)
+        onUpdate()
+      } catch (err: any) {
+        toast.error(err.message)
+      }
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Add member button or form */}
+      {!showForm ? (
+        <button
+          onClick={() => setShowForm(true)}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-zinc-700 text-zinc-500 hover:border-amber-700 hover:text-amber-400 text-xs font-semibold transition-all"
+        >
+          <PlusCircle className="h-4 w-4" /> Ajouter un membre
+        </button>
+      ) : (
+        <div className="rounded-xl border border-amber-900/40 bg-amber-950/10 p-4 space-y-3">
+          <div className="flex items-center justify-between mb-1">
+            <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+              {editingMember ? "Modifier le membre" : "Nouveau membre"}
+            </h4>
+            <button type="button" onClick={resetForm} className="text-zinc-500 hover:text-zinc-200 p-1">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <form onSubmit={submit} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <Label className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 block">Nom complet *</Label>
+                <Input
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="Ex: John Doe"
+                  className="h-8 text-xs bg-zinc-950 border-zinc-700"
+                  required
+                />
+              </div>
+              <div>
+                <Label className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 block">Rôle *</Label>
+                <select
+                  value={role}
+                  onChange={e => setRole(e.target.value as any)}
+                  className="w-full h-8 text-xs rounded-md border border-zinc-700 bg-zinc-950 px-2 text-zinc-200"
+                >
+                  <option value="owner">Propriétaire (Owner)</option>
+                  <option value="team_leader">Chef d'équipe (Team Leader)</option>
+                  <option value="employee">Employé (Employee)</option>
+                </select>
+              </div>
+              <div>
+                <Label className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 block">Équipe</Label>
+                <select
+                  value={team}
+                  onChange={e => setTeam(e.target.value as any)}
+                  className="w-full h-8 text-xs rounded-md border border-zinc-700 bg-zinc-950 px-2 text-zinc-200"
+                >
+                  <option value="">Aucune</option>
+                  <option value="team_1">Équipe 1</option>
+                  <option value="team_2">Équipe 2</option>
+                </select>
+              </div>
+              <div className="col-span-2">
+                <Label className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 block">
+                  Mot de passe {editingMember && "(laisser vide pour inchangé)"} *
+                </Label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder={editingMember ? "••••••••" : "Mot de passe d'accès"}
+                  className="h-8 text-xs bg-zinc-950 border-zinc-700"
+                  required={!editingMember}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button type="submit" disabled={isPending} size="sm" className="bg-amber-700 hover:bg-amber-600 text-white h-8 text-xs">
+                {isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
+                {editingMember ? "Mettre à jour" : "Créer le membre"}
+              </Button>
+              <Button type="button" onClick={resetForm} variant="ghost" size="sm" className="h-8 text-xs text-zinc-500">
+                Annuler
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Members List */}
+      <div className="space-y-2">
+        {members.length === 0 ? (
+          <div className="text-center py-8">
+            <Users className="h-8 w-8 text-zinc-700 mx-auto mb-2" />
+            <p className="text-xs text-zinc-500 font-medium">Aucun membre configuré pour cet entrepreneur.</p>
+            <p className="text-[10px] text-zinc-600 mt-1">Les membres utiliseront ces profils pour se connecter au portail.</p>
+          </div>
+        ) : (
+          members.map(m => (
+            <div
+              key={m.id}
+              className="flex items-center justify-between px-4 py-3 rounded-lg border border-zinc-800 bg-zinc-900/30 hover:bg-zinc-800/30 transition-colors group"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-zinc-100 truncate">{m.name}</p>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <Badge variant="outline" className={`text-[9px] px-1.5 py-0 border-zinc-700 ${
+                    m.role === 'owner' ? 'bg-purple-950/40 text-purple-400 border-purple-900/50' :
+                    m.role === 'team_leader' ? 'bg-amber-950/40 text-amber-400 border-amber-900/50' :
+                    'bg-zinc-800 text-zinc-400 border-zinc-700'
+                  }`}>
+                    {m.role === 'owner' ? 'Propriétaire' : m.role === 'team_leader' ? "Chef d'équipe" : 'Employé'}
+                  </Badge>
+                  {m.team && (
+                    <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-blue-950/40 text-blue-400 border-blue-900/50">
+                      {m.team === 'team_1' ? 'Équipe 1' : 'Équipe 2'}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                {confirmingDeleteId === m.id ? (
+                  <span className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleDelete(m.id)}
+                      disabled={isPending}
+                      className="text-xs text-red-400 hover:text-red-300 font-semibold px-2 py-1 rounded bg-red-950/30"
+                    >
+                      Supprimer
+                    </button>
+                    <button
+                      onClick={() => setConfirmingDeleteId(null)}
+                      className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1"
+                    >
+                      Annuler
+                    </button>
+                  </span>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => handleEdit(m)}
+                      className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-amber-400 p-1.5 rounded transition-all"
+                      title="Modifier"
+                    >
+                      <Plus className="h-3.5 w-3.5 rotate-45" />
+                    </button>
+                    <button
+                      onClick={() => setConfirmingDeleteId(m.id)}
+                      className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 p-1.5 rounded transition-all"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── PORTAL LINK ─────────────────────────────────────────────────────────────
 function PortalLinkPanel({ token, baseUrl }: { token: string | null; baseUrl: string }) {
   const url = token ? `${baseUrl}/maintenance/contractor/${token}` : null
@@ -457,10 +693,28 @@ export function ContractorHubPanel({
   baseUrl: string
   library: any[]   // global services not yet linked
 }) {
-  const [activeTab, setActiveTab] = useState<'services' | 'campaigns' | 'checklist'>('services')
+  const [activeTab, setActiveTab] = useState<'services' | 'campaigns' | 'checklist' | 'members'>('services')
   const [services, setServices] = useState<any[]>(initialServices)
   const [unlinkedLibrary, setUnlinkedLibrary] = useState<any[]>(library)
   const [serviceSearch, setServiceSearch] = useState('')
+  const [members, setMembers] = useState<any[]>([])
+  const [loadingMembers, setLoadingMembers] = useState(true)
+
+  const fetchMembers = () => {
+    getContractorMembersAction(contractorId)
+      .then(data => {
+        setMembers(data)
+        setLoadingMembers(false)
+      })
+      .catch(err => {
+        console.error(err)
+        setLoadingMembers(false)
+      })
+  }
+
+  useEffect(() => {
+    fetchMembers()
+  }, [contractorId])
 
   const onServiceCreated = (svc: any) => {
     setServices(prev => [...prev, svc])
@@ -489,6 +743,7 @@ export function ContractorHubPanel({
     { key: 'services', label: 'Services & Tarifs', icon: Wrench, count: services.length },
     { key: 'campaigns', label: 'Campagnes', icon: CalendarRange, count: campaigns.length },
     { key: 'checklist', label: 'Tâches', icon: ListChecks, count: checklist.filter(i => !i.done).length },
+    { key: 'members', label: 'Membres & Équipes', icon: Users, count: members.length },
   ]
 
   return (
@@ -584,6 +839,19 @@ export function ContractorHubPanel({
       {activeTab === 'checklist' && (
         <div className="flex-1">
           <ChecklistPanel contractorId={contractorId} initial={checklist} />
+        </div>
+      )}
+
+      {/* Tab: Members */}
+      {activeTab === 'members' && (
+        <div className="flex-1 overflow-y-auto">
+          {loadingMembers ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
+            </div>
+          ) : (
+            <MembersPanel contractorId={contractorId} members={members} onUpdate={fetchMembers} />
+          )}
         </div>
       )}
     </div>

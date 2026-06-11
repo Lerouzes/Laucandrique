@@ -32,7 +32,8 @@ import {
     Mail,
     Activity,
     MapPin,
-    Paperclip
+    Paperclip,
+    Loader2
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -960,84 +961,146 @@ export function ResidentInvitePortal({
                                             </div>
                                         )}
                                         
-                                        {/* Date Selector */}
-                                        <div className="space-y-2">
-                                            <Label className="text-sm text-zinc-400 font-semibold uppercase tracking-wider">{t.chooseDateLabel}</Label>
-                                            {dates.length === 0 ? (
-                                                <p className="text-sm italic text-zinc-500 py-2">
-                                                    {t.noDateAvail}
-                                                </p>
-                                            ) : (
-                                                <div className="flex flex-wrap gap-2">
-                                                    {dates.map(date => {
-                                                        const dateObj = new Date(date + 'T00:00:00')
-                                                        const formattedDate = dateObj.toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                                                        const isSelected = selectedDate === date
-                                                        return (
-                                                            <button
-                                                                key={date}
-                                                                type="button"
-                                                                disabled={isDeadlinePassed}
-                                                                onClick={() => {
-                                                                    setSelectedDate(date)
-                                                                    setSelectedSlot('')
-                                                                }}
-                                                                className={`py-2 px-3.5 rounded-xl border text-sm font-bold transition-all cursor-pointer ${
-                                                                    isSelected 
-                                                                        ? 'bg-purple-950/30 border-purple-500 text-white' 
-                                                                        : 'bg-[#121318]/50 border-zinc-850 hover:border-zinc-700 text-zinc-400'
-                                                                } ${isDeadlinePassed ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                            >
-                                                                {formattedDate}
-                                                            </button>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )}
-                                        </div>
+                                        {/* Calendly-like Side-by-Side Scheduler */}
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch border-t border-zinc-900 pt-4">
+                                            
+                                            {/* Left Column: Date Picker (md:col-span-5) */}
+                                            <div className="md:col-span-5 space-y-3">
+                                                <Label className="text-xs text-zinc-400 font-bold uppercase tracking-wider block">{t.chooseDateLabel}</Label>
+                                                {dates.length === 0 ? (
+                                                    <p className="text-xs italic text-zinc-500 py-2">
+                                                        {t.noDateAvail}
+                                                    </p>
+                                                ) : (
+                                                    <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-x-visible md:max-h-[350px] md:overflow-y-auto pr-1 pb-2 md:pb-0 scrollbar-thin scrollbar-thumb-zinc-800">
+                                                        {dates.map(date => {
+                                                            const dateObj = new Date(date + 'T00:00:00')
+                                                            const weekday = dateObj.toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-US', { weekday: 'short' })
+                                                            const dayNum = dateObj.toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-US', { day: 'numeric' })
+                                                            const month = dateObj.toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-US', { month: 'short' })
+                                                            const isSelected = selectedDate === date
 
-                                        {/* Slot Selector */}
-                                        {selectedDate && (
-                                            <div className="space-y-2 border-t border-zinc-900 pt-3 animate-fade-in">
-                                                <Label className="text-sm text-zinc-400 font-semibold uppercase tracking-wider">
+                                                            return (
+                                                                <button
+                                                                    key={date}
+                                                                    type="button"
+                                                                    disabled={isDeadlinePassed}
+                                                                    onClick={() => {
+                                                                        setSelectedDate(date)
+                                                                        setSelectedSlot('')
+                                                                    }}
+                                                                    className={`flex md:flex-row flex-col items-center gap-1 md:gap-3 py-2 px-3 md:py-3 md:px-4 rounded-xl border text-left transition-all cursor-pointer shrink-0 md:shrink ${
+                                                                        isSelected 
+                                                                            ? 'bg-purple-950/20 border-purple-500 text-white shadow-md' 
+                                                                            : 'bg-[#121318]/50 border-zinc-850 hover:border-zinc-700 text-zinc-400'
+                                                                    } ${isDeadlinePassed ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                                >
+                                                                    <div className="flex flex-col items-center justify-center shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-lg bg-zinc-905 bg-zinc-900 border border-zinc-800 text-center">
+                                                                        <span className="text-[9px] font-bold text-zinc-500 uppercase leading-none">{weekday}</span>
+                                                                        <span className="text-xs md:text-sm font-extrabold text-white leading-tight mt-0.5">{dayNum}</span>
+                                                                    </div>
+                                                                    <div className="md:block hidden">
+                                                                        <span className="text-xs font-bold text-zinc-300 capitalize">{month}</span>
+                                                                        <span className="text-[10px] text-zinc-500 block mt-0.5">
+                                                                            {(availableSlots[date] || []).length} {lang === 'fr' ? 'créneaux' : 'slots'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="md:hidden block text-[9px] font-bold text-zinc-500 mt-1 uppercase">
+                                                                        {month}
+                                                                    </div>
+                                                                </button>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Right Column: Time Slots Picker (md:col-span-7) */}
+                                            <div className="md:col-span-7 border-t md:border-t-0 md:border-l border-zinc-900 pt-4 md:pt-0 md:pl-6 space-y-3 flex flex-col justify-start">
+                                                <Label className="text-xs text-zinc-400 font-bold uppercase tracking-wider block">
                                                     {t.chooseSlotLabel.replace('{duration}', String(totalDuration))}
                                                 </Label>
-                                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                                                    {(availableSlots[selectedDate] || []).map(slot => {
-                                                        const isSelected = selectedSlot === slot
-                                                        return (
-                                                            <button
-                                                                key={slot}
-                                                                type="button"
-                                                                disabled={isDeadlinePassed}
-                                                                onClick={() => setSelectedSlot(slot)}
-                                                                className={`py-2 rounded-lg border text-sm font-mono font-bold transition-all cursor-pointer ${
-                                                                    isSelected 
-                                                                        ? 'bg-purple-600 border-purple-500 text-white shadow' 
-                                                                        : 'bg-[#121318] border-zinc-850 hover:border-zinc-800 text-zinc-350'
-                                                                } ${isDeadlinePassed ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                            >
-                                                                {slot}
-                                                            </button>
-                                                        )
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )}
 
-                                        {/* Reserve Action Button */}
-                                        {selectedDate && selectedSlot && (
-                                            <div className="flex justify-end border-t border-zinc-900 pt-3">
-                                                <Button
-                                                    onClick={handleBookAppointment}
-                                                    disabled={booking || isDeadlinePassed}
-                                                    className="bg-emerald-650 hover:bg-emerald-700 text-white font-bold h-10 px-6 rounded-xl shadow cursor-pointer flex items-center gap-1.5 transition-all hover:scale-[1.02] text-sm"
-                                                >
-                                                    {booking ? t.bookingProgress : <><Check className="h-4 w-4" /> {t.confirmApptBtn}</>}
-                                                </Button>
+                                                {!selectedDate ? (
+                                                    <div className="flex-grow flex flex-col items-center justify-center text-center p-6 bg-zinc-950/25 border border-dashed border-zinc-850 rounded-2xl min-h-[150px]">
+                                                        <Clock className="h-6 w-6 text-zinc-650 text-zinc-500 mb-2" />
+                                                        <p className="text-xs text-zinc-500 font-medium">
+                                                            {lang === 'fr' 
+                                                                ? "Veuillez sélectionner une date à gauche."
+                                                                : "Please select a date on the left."}
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex-grow space-y-2 max-h-[350px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-800">
+                                                        {(availableSlots[selectedDate] || []).length === 0 ? (
+                                                            <p className="text-xs italic text-zinc-500 py-4 text-center">
+                                                                {lang === 'fr' ? 'Aucun créneau disponible pour cette journée.' : 'No slots available for this day.'}
+                                                            </p>
+                                                        ) : (
+                                                            (availableSlots[selectedDate] || []).map(slot => {
+                                                                const isSelected = selectedSlot === slot
+                                                                return (
+                                                                    <div 
+                                                                        key={slot} 
+                                                                        className="flex gap-2 transition-all items-center"
+                                                                    >
+                                                                        <button
+                                                                            type="button"
+                                                                            disabled={isDeadlinePassed}
+                                                                            onClick={() => setSelectedSlot(slot)}
+                                                                            className={`flex-1 py-3 px-4 rounded-xl border text-center font-mono font-bold text-xs transition-all cursor-pointer ${
+                                                                                isSelected 
+                                                                                    ? 'bg-purple-950/20 border-purple-500 text-white shadow' 
+                                                                                    : 'bg-[#121318] border-zinc-850 hover:border-zinc-800 text-zinc-350'
+                                                                            } ${isDeadlinePassed ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                                        >
+                                                                            {slot}
+                                                                        </button>
+                                                                        
+                                                                        {/* Inline confirming sliding button like Calendly */}
+                                                                        {isSelected && (
+                                                                            <Button
+                                                                                onClick={handleBookAppointment}
+                                                                                disabled={booking || isDeadlinePassed}
+                                                                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 px-5 rounded-xl shadow cursor-pointer flex items-center justify-center gap-1.5 shrink-0 transition-all duration-300 animate-slide-in-right text-xs"
+                                                                            >
+                                                                                {booking ? (
+                                                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                                ) : (
+                                                                                    <>
+                                                                                        <Check className="h-3.5 w-3.5" />
+                                                                                        <span>{lang === 'fr' ? 'Confirmer' : 'Confirm'}</span>
+                                                                                    </>
+                                                                                )}
+                                                                            </Button>
+                                                                        )}
+                                                                    </div>
+                                                                )
+                                                            })
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
 
+                                        </div>
+
+                                        <style dangerouslySetInnerHTML={{
+                                            __html: `
+                                                @keyframes slideInRight {
+                                                    from {
+                                                        opacity: 0;
+                                                        transform: translateX(10px);
+                                                    }
+                                                    to {
+                                                        opacity: 1;
+                                                        transform: translateX(0);
+                                                    }
+                                                }
+                                                .animate-slide-in-right {
+                                                    animation: slideInRight 0.2s ease-out forwards;
+                                                }
+                                            `
+                                        }} />
                                     </div>
                                 )}
                                 

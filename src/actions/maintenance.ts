@@ -875,11 +875,125 @@ export async function getContractorDashboardAction(token: string) {
         progress = progData || []
     }
 
+    // Fetch contractor members (excluding passwords for security)
+    const { data: members } = await supabase
+        .from('maintenance_contractor_members')
+        .select('id, name, role, team')
+        .eq('contractor_id', tokenObj.contractor_id)
+        .order('created_at', { ascending: true })
+
     return {
         contractor: tokenObj.contractor,
         campaigns: campaigns || [],
         appointments: appointmentsDetails,
-        progress: progress
+        progress: progress,
+        members: members || []
+    }
+}
+
+export async function getContractorMembersAction(contractorId: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('maintenance_contractor_members')
+        .select('*')
+        .eq('contractor_id', contractorId)
+        .order('created_at', { ascending: true })
+    if (error) throw new Error(error.message)
+    return data || []
+}
+
+export async function saveContractorMemberAction(memberData: {
+    id?: string
+    contractor_id: string
+    name: string
+    role: 'owner' | 'team_leader' | 'employee'
+    password?: string
+    team?: 'team_1' | 'team_2' | null
+}) {
+    const supabase = await createClient()
+    const payload: any = {
+        contractor_id: memberData.contractor_id,
+        name: memberData.name,
+        role: memberData.role,
+        team: memberData.team || null,
+        updated_at: new Date().toISOString()
+    }
+    if (memberData.password) {
+        payload.password = memberData.password
+    }
+
+    if (memberData.id) {
+        const { data, error } = await supabase
+            .from('maintenance_contractor_members')
+            .update(payload)
+            .eq('id', memberData.id)
+            .select()
+            .single()
+        if (error) throw new Error(error.message)
+        return data
+    } else {
+        if (!memberData.password) {
+            throw new Error("Le mot de passe est obligatoire pour un nouveau membre.")
+        }
+        const { data, error } = await supabase
+            .from('maintenance_contractor_members')
+            .insert({ ...payload, password: memberData.password })
+            .select()
+            .single()
+        if (error) throw new Error(error.message)
+        return data
+    }
+}
+
+export async function deleteContractorMemberAction(memberId: string) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('maintenance_contractor_members')
+        .delete()
+        .eq('id', memberId)
+    if (error) throw new Error(error.message)
+    return { success: true }
+}
+
+export async function updateAppointmentTeamAction(appointmentId: string, team: 'team_1' | 'team_2' | null) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('maintenance_appointments')
+        .update({ team: team || null, updated_at: new Date().toISOString() })
+        .eq('id', appointmentId)
+    if (error) throw new Error(error.message)
+    return { success: true }
+}
+
+export async function verifyContractorPasswordAction(token: string, memberId: string, password: string) {
+    const supabase = await createClient()
+
+    // 1. Verify token
+    const { data: tokenObj, error: tokenErr } = await supabase
+        .from('maintenance_contractor_tokens')
+        .select('*')
+        .eq('token', token)
+        .single()
+    if (tokenErr) throw new Error("Jeton d'accès invalide.")
+
+    // 2. Fetch member and check password
+    const { data: member, error: memberErr } = await supabase
+        .from('maintenance_contractor_members')
+        .select('*')
+        .eq('id', memberId)
+        .eq('contractor_id', tokenObj.contractor_id)
+        .single()
+    if (memberErr) throw new Error("Membre introuvable.")
+
+    if (member.password !== password) {
+        throw new Error("Mot de passe incorrect.")
+    }
+
+    return {
+        id: member.id,
+        name: member.name,
+        role: member.role,
+        team: member.team
     }
 }
 
