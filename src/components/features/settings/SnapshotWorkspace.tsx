@@ -103,16 +103,23 @@ export function SnapshotWorkspace({
 
     // Target fields we map in Gustav SDC Snapshots
     const gustavFields = [
-        { key: 'ms_list_item_id', label: "ID d'élément MS List", required: false },
-        { key: 'id', label: "ID Client Gustav", required: false },
-        { key: 'syndicate_code', label: "Code de Syndicat (ex: SDC-001)", required: true },
-        { key: 'legal_name', label: "Nom Légal / Entreprise", required: true },
-        { key: 'full_name', label: "Nom d'Affichage / SDC", required: true },
-        { key: 'manager', label: "Nom du Gestionnaire", required: false },
-        { key: 'doors_count', label: "Nombre de Portes", required: false },
-        { key: 'package_name', label: "Nom du Forfait", required: false },
-        { key: 'monthly_fee', label: "Frais Mensuels ($)", required: false },
-        { key: 'financial_year', label: "Début du Contrat (Exercice)", required: false },
+        { key: 'syndicate_code', label: "Code de Syndicat", required: true },
+        { key: 'full_name', label: "Nom Complet", required: true },
+        { key: 'email', label: "Alias (Email du syndicat)", required: false },
+        { key: 'doors_count', label: "Nombre d'unités", required: false },
+        { key: 'financial_year', label: "Année financière (YYYY-MM-DD)", required: false },
+        { key: 'manager', label: "Gestionnaire (Name)", required: false },
+        { key: 'package_name', label: "Type de forfait", required: false },
+        { key: 'address', label: "Adresse", required: false },
+        { key: 'city', label: "Ville", required: false },
+        { key: 'postal_code', label: "Code postal", required: false },
+        { key: 'amount_of_meetings', label: "Amount of meetings", required: false },
+        { key: 'team', label: "Team", required: false },
+        { key: 'package_pricing', label: "Package Pricing", required: false },
+        // Fallbacks
+        { key: 'id', label: "ID Client Gustav (Optionnel)", required: false },
+        { key: 'ms_list_item_id', label: "ID d'élément MS List (Optionnel)", required: false },
+        { key: 'legal_name', label: "Nom Légal / Entreprise (Optionnel)", required: false },
         { key: 'status', label: "Statut (Actif/Inactif)", required: false },
         { key: 'departure_date', label: "Date de départ / Résiliation", required: false },
     ]
@@ -123,9 +130,51 @@ export function SnapshotWorkspace({
             const wb = XLSX.utils.book_new()
             
             const wsData = [
-                ["ID MS List", "ID Gustav", "Code de Syndicat", "Nom Légal", "Nom d'Affichage", "Gestionnaire", "Nombre de portes", "Forfait", "Frais mensuels", "Début de contrat", "Statut", "Date de départ"],
-                ["101", "", "SDC-001", "Syndicat Brossard", "Laucandrique Brossard", managers[0] ? `${managers[0].first_name} ${managers[0].last_name}` : "", "24", "Or", "350.00", "2026-01-01", "Actif", ""],
-                ["102", "", "SDC-002", "Syndicat Longueuil", "Laucandrique Longueuil", "", "12", "Argent", "220.00", "2025-10-15", "Inactif", "2026-05-30"]
+                [
+                    "Code de Syndicat", 
+                    "Nom Complet", 
+                    "Alias", 
+                    "Nombre d'unités", 
+                    "Année financière (YYYY-MM-DD)", 
+                    "Gestionnaire (Name)", 
+                    "Type de forfait", 
+                    "Adresse", 
+                    "Ville", 
+                    "Code postal", 
+                    "Amount of meetings", 
+                    "Team", 
+                    "Package Pricing"
+                ],
+                [
+                    "SDC-001", 
+                    "Laucandrique Brossard", 
+                    "brossard@laucandrique.com", 
+                    "24", 
+                    "2026-01-01", 
+                    managers[0] ? `${managers[0].first_name} ${managers[0].last_name}` : "Jean Valjean", 
+                    "Or", 
+                    "123 rue des Fleurs", 
+                    "Brossard", 
+                    "J4Z 2B9", 
+                    "4", 
+                    "Équipe A", 
+                    "350.00"
+                ],
+                [
+                    "SDC-002", 
+                    "Laucandrique Longueuil", 
+                    "longueuil@laucandrique.com", 
+                    "12", 
+                    "2025-10-15", 
+                    "", 
+                    "Argent", 
+                    "456 boul. Taschereau", 
+                    "Longueuil", 
+                    "J4K 1A2", 
+                    "2", 
+                    "Équipe B", 
+                    "220.00"
+                ]
             ]
             const ws = XLSX.utils.aoa_to_sheet(wsData)
             ws['!cols'] = wsData[0].map(h => ({ wch: h.length + 5 }))

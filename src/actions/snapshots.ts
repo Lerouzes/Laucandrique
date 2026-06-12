@@ -109,10 +109,21 @@ export async function uploadSnapshotAction(
             const manager = row[fieldMappings.manager]?.toString()?.trim() || null
             const doors_count = row[fieldMappings.doors_count] != null ? parseInt(row[fieldMappings.doors_count]) : null
             const package_name = row[fieldMappings.package_name]?.toString()?.trim() || null
-            const monthly_fee = row[fieldMappings.monthly_fee] != null ? parseFloat(row[fieldMappings.monthly_fee]) : null
+            const monthly_fee = row[fieldMappings.monthly_fee] != null 
+                ? parseFloat(row[fieldMappings.monthly_fee]) 
+                : (row[fieldMappings.package_pricing] != null ? parseFloat(row[fieldMappings.package_pricing]) : null)
             const financial_year = row[fieldMappings.financial_year] ? parseDateSafe(row[fieldMappings.financial_year]) : null
             const status = row[fieldMappings.status]?.toString()?.trim()?.toLowerCase() || 'active'
             const departure_date = row[fieldMappings.departure_date] ? parseDateSafe(row[fieldMappings.departure_date]) : null
+
+            // New fields:
+            const email = row[fieldMappings.email]?.toString()?.trim() || null
+            const address = row[fieldMappings.address]?.toString()?.trim() || null
+            const city = row[fieldMappings.city]?.toString()?.trim() || null
+            const postal_code = row[fieldMappings.postal_code]?.toString()?.trim() || null
+            const amount_of_meetings = row[fieldMappings.amount_of_meetings] != null ? parseInt(row[fieldMappings.amount_of_meetings]) : null
+            const team = row[fieldMappings.team]?.toString()?.trim() || null
+            const package_pricing = row[fieldMappings.package_pricing] != null ? parseFloat(row[fieldMappings.package_pricing]) : null
 
             // Determine if active
             const isActive = status === 'active' || status === 'actif' || status === '1' || status === 'true'
@@ -138,6 +149,15 @@ export async function uploadSnapshotAction(
                 if (matchedClient) {
                     matchConfidence = 'High'
                     matchReason = `ID Gustav correspond (${id})`
+                }
+            }
+
+            // Match by Alias / Email of the syndicate
+            if (!matchedClient && email) {
+                matchedClient = dbClientsList.find(c => c.email && c.email.toLowerCase() === email.toLowerCase())
+                if (matchedClient) {
+                    matchConfidence = 'High'
+                    matchReason = `Alias / Courriel de syndicat correspond (${email})`
                 }
             }
 
@@ -191,12 +211,12 @@ export async function uploadSnapshotAction(
                 matchConfidence = 'None'
             }
 
-            // Match Manager
+            // Match Manager (with null email protection)
             let matchedManagerId: string | null = null
             if (manager) {
                 const mgrLower = manager.toLowerCase()
                 const dbMgr = dbManagersList.find(m => 
-                    m.email.toLowerCase() === mgrLower ||
+                    (m.email && m.email.toLowerCase() === mgrLower) ||
                     `${m.first_name} ${m.last_name}`.toLowerCase() === mgrLower ||
                     m.last_name.toLowerCase() === mgrLower ||
                     m.id === manager
@@ -227,6 +247,34 @@ export async function uploadSnapshotAction(
                 }
                 if (syndicate_code && matchedClient.syndicate_code !== syndicate_code) {
                     diffs.syndicate_code = { db: matchedClient.syndicate_code || 'N/A', excel: syndicate_code }
+                    hasChanges = true
+                }
+                if (email && matchedClient.email !== email) {
+                    diffs.email = { db: matchedClient.email || 'N/A', excel: email }
+                    hasChanges = true
+                }
+                if (address && matchedClient.address !== address) {
+                    diffs.address = { db: matchedClient.address || 'N/A', excel: address }
+                    hasChanges = true
+                }
+                if (city && matchedClient.city !== city) {
+                    diffs.city = { db: matchedClient.city || 'N/A', excel: city }
+                    hasChanges = true
+                }
+                if (postal_code && matchedClient.postal_code !== postal_code) {
+                    diffs.postal_code = { db: matchedClient.postal_code || 'N/A', excel: postal_code }
+                    hasChanges = true
+                }
+                if (amount_of_meetings != null && matchedClient.amount_of_meetings !== amount_of_meetings) {
+                    diffs.amount_of_meetings = { db: matchedClient.amount_of_meetings || '0', excel: amount_of_meetings }
+                    hasChanges = true
+                }
+                if (team && matchedClient.team !== team) {
+                    diffs.team = { db: matchedClient.team || 'N/A', excel: team }
+                    hasChanges = true
+                }
+                if (package_pricing != null && Number(matchedClient.package_pricing || 0) !== package_pricing) {
+                    diffs.package_pricing = { db: Number(matchedClient.package_pricing || 0), excel: package_pricing }
                     hasChanges = true
                 }
                 if (matchedManagerId && matchedClient.manager_id !== matchedManagerId) {
@@ -294,6 +342,13 @@ export async function uploadSnapshotAction(
                 financial_year,
                 status: isInactive ? 'inactive' : 'active',
                 departure_date,
+                email,
+                address,
+                city,
+                postal_code,
+                amount_of_meetings,
+                team,
+                package_pricing,
                 matchedClientId: matchedClient?.id || null,
                 matchConfidence,
                 matchReason,
@@ -437,7 +492,14 @@ export async function applySnapshotAction(
                 ms_list_item_id: row.ms_list_item_id || null,
                 manager_id: row.manager_id || null,
                 status: row.status || 'active',
-                departure_date: row.departure_date || null
+                departure_date: row.departure_date || null,
+                email: row.email || null,
+                address: row.address || null,
+                city: row.city || null,
+                postal_code: row.postal_code || null,
+                amount_of_meetings: row.amount_of_meetings || null,
+                team: row.team || null,
+                package_pricing: row.package_pricing || null
             }
 
             let finalClientId = targetClientId
@@ -469,7 +531,7 @@ export async function applySnapshotAction(
                     const contractPayload = {
                         client_id: targetClientId,
                         package_name: row.package_name || 'Non spécifié',
-                        monthly_fee: row.monthly_fee || 0,
+                        monthly_fee: row.monthly_fee || row.package_pricing || 0,
                         start_date: row.financial_year || null,
                         active: row.status !== 'inactive'
                     }
@@ -516,10 +578,17 @@ export async function applySnapshotAction(
                     compareAndLog('legal_name', currentClient.legal_name || currentClient.company_name, row.legal_name)
                     compareAndLog('full_name', currentClient.full_name, row.full_name)
                     compareAndLog('syndicate_code', currentClient.syndicate_code, row.syndicate_code)
+                    compareAndLog('email', currentClient.email, row.email)
+                    compareAndLog('address', currentClient.address, row.address)
+                    compareAndLog('city', currentClient.city, row.city)
+                    compareAndLog('postal_code', currentClient.postal_code, row.postal_code)
+                    compareAndLog('amount_of_meetings', currentClient.amount_of_meetings, row.amount_of_meetings)
+                    compareAndLog('team', currentClient.team, row.team)
+                    compareAndLog('package_pricing', currentClient.package_pricing, row.package_pricing)
                     compareAndLog('manager_id', currentClient.manager_id, row.manager_id)
                     compareAndLog('doors_count', currentClient.doors ? currentClient.doors.length : 0, row.doors_count)
                     compareAndLog('package_name', contract?.package_name, row.package_name)
-                    compareAndLog('monthly_fee', contract?.monthly_fee, row.monthly_fee)
+                    compareAndLog('monthly_fee', contract?.monthly_fee, row.monthly_fee || row.package_pricing)
                     compareAndLog('status', currentClient.status || 'active', row.status)
                     compareAndLog('departure_date', currentClient.departure_date, row.departure_date)
 
@@ -548,7 +617,7 @@ export async function applySnapshotAction(
                 const contractPayload = {
                     client_id: finalClientId,
                     package_name: row.package_name || 'Non spécifié',
-                    monthly_fee: row.monthly_fee || 0,
+                    monthly_fee: row.monthly_fee || row.package_pricing || 0,
                     start_date: row.financial_year || null,
                     active: row.status !== 'inactive'
                 }

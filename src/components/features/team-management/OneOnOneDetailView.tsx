@@ -43,7 +43,8 @@ import {
     X,
     ArrowLeft,
     RefreshCw,
-    Clock
+    Clock,
+    FileText
 } from 'lucide-react'
 import { SearchableClientSelect } from './SearchableClientSelect'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -156,6 +157,7 @@ export function OneOnOneDetailView({
 
     // Form fields
     const [meetingDate, setMeetingDate] = useState(oneOnOne.meeting_date)
+    const [summary, setSummary] = useState(oneOnOne.summary || '')
     const [emailsOver48h, setEmailsOver48h] = useState(oneOnOne.emails_over_48h || 0)
     const [lateTasks, setLateTasks] = useState(oneOnOne.late_tasks || 0)
     const [callsTotal, setCallsTotal] = useState(oneOnOne.calls_total || 0)
@@ -912,7 +914,8 @@ export function OneOnOneDetailView({
                         reviewed: true
                     })),
                 taskEmailAudits,
-                operationalRisks
+                operationalRisks,
+                summary
             })
             setIsEditing(true)
             router.refresh()
@@ -1042,7 +1045,8 @@ export function OneOnOneDetailView({
                 reviewedAudits: finalReviewedAudits,
                 reviewedAssemblies: finalReviewedAssemblies,
                 taskEmailAudits,
-                operationalRisks
+                operationalRisks,
+                summary
             })
             
             if (status === 'completed') {
@@ -1165,6 +1169,29 @@ export function OneOnOneDetailView({
                     </Button>
                 </div>
             </div>
+
+            {/* Summary Section */}
+            {(isEditing || summary) && (
+                <div className="bg-[#16171e]/70 border border-zinc-800 rounded-2xl p-6 shadow-xl space-y-3">
+                    <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-purple-400" />
+                        Sommaire de la rencontre
+                    </h3>
+                    {isEditing ? (
+                        <textarea
+                            value={summary}
+                            onChange={(e) => setSummary(e.target.value)}
+                            placeholder="Saisissez un aperçu global ou le sommaire de la rencontre..."
+                            rows={3}
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder-zinc-600 transition-colors"
+                        />
+                    ) : (
+                        <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">
+                            {summary}
+                        </p>
+                    )}
+                </div>
+            )}
 
             {/* dynamic performance scorecard */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

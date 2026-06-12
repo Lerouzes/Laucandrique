@@ -125,6 +125,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
     const [loading, setLoading] = useState(false)
     const [managerId, setManagerId] = useState(managers[0]?.id || '')
     const [meetingDate, setMeetingDate] = useState(new Date().toISOString().substring(0, 10))
+    const [summary, setSummary] = useState('')
     
     // Collapsible coaching section
     const [coachingOpen, setCoachingOpen] = useState(false)
@@ -847,7 +848,8 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 reviewedAudits: finalReviewedAudits,
                 reviewedAssemblies: finalReviewedAssemblies,
                 taskEmailAudits,
-                operationalRisks
+                operationalRisks,
+                summary
             })
 
             router.push('/team-management/one-on-ones')
@@ -923,6 +925,27 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                     </Button>
                 </div>
             </div>
+
+            {/* Summary / Overview */}
+            <Card className="bg-[#16171e]/70 border-zinc-800 shadow-md">
+                <CardHeader className="py-3 border-b border-zinc-900 bg-zinc-950/10">
+                    <CardTitle className="text-xs font-bold text-white flex items-center gap-1.5 uppercase tracking-wider text-purple-400">
+                        <Sparkles className="h-4 w-4 text-purple-400" />
+                        Résumé & Aperçu de la Rencontre
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 text-xs">
+                    <div className="space-y-1">
+                        <Label className="text-zinc-500 font-bold text-[9px] uppercase">Notes de synthèse / Vue d'ensemble de la rencontre</Label>
+                        <Textarea 
+                            value={summary}
+                            onChange={(e) => setSummary(e.target.value)}
+                            placeholder="Saisissez les faits saillants, résumé des discussions ou notes de cadrage pour cette rencontre..."
+                            className="bg-[#121318] border-zinc-850 text-xs text-zinc-200 focus-visible:ring-purple-650 min-h-[70px] resize-y"
+                        />
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Core parameters & Score banner */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -1030,6 +1030,7 @@ export async function createOneOnOneAction(data: {
     support_needed?: string
     training_needed?: string
     meeting_score?: number
+    summary?: string
     commitments?: Array<{
         commitment_text: string
         owner?: string
@@ -1131,7 +1132,8 @@ export async function createOneOnOneAction(data: {
             organization_notes: data.organization_notes || null,
             support_needed: data.support_needed || null,
             training_needed: data.training_needed || null,
-            meeting_score: data.meeting_score || null
+            meeting_score: data.meeting_score || null,
+            summary: data.summary || null
         })
         .select()
         .single()
@@ -1311,6 +1313,7 @@ export async function updateOneOnOneAction(id: string, data: {
     support_needed?: string
     training_needed?: string
     meeting_score?: number
+    summary?: string
     commitments: Array<{
         id?: string
         commitment_text: string
@@ -1423,7 +1426,8 @@ export async function updateOneOnOneAction(id: string, data: {
             organization_notes: data.organization_notes || null,
             support_needed: data.support_needed || null,
             training_needed: data.training_needed || null,
-            meeting_score: data.meeting_score || null
+            meeting_score: data.meeting_score || null,
+            summary: data.summary || null
         })
         .eq('id', id)
 
@@ -1630,64 +1634,78 @@ export async function updateOneOnOneAction(id: string, data: {
 export async function createSyndicateAuditAction(data: {
     client_id: string
     notes?: string
+    current_year_active?: boolean
+    board_meetings_fiscal_year?: number | null
+    board_meetings_count?: number | null
     answers: Array<{ category: 'governance' | 'financial' | 'operations'; question_key: string; score: number; note?: string }>
 }) {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    const audited_by = user?.id || null
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        const audited_by = user?.id || null
 
-    const GRADED_KEYS = [
-        'contrats_condo_web',
-        'rapports_maintenance',
-        'proces_verbaux_ca',
-        'proces_verbaux_assemblees',
-        
-        'respect_franchise_assurance_last',
-        'fonds_prevoyance_last',
-        'qualite_budget_cree_last',
-        'respect_postes_budgetaires_score_last',
-        
-        'respect_franchise_assurance_curr',
-        'fonds_prevoyance_curr',
-        'qualite_budget_cree_curr',
-        'respect_postes_budgetaires_score_curr'
-    ]
+        const GRADED_KEYS = [
+            'contrats_condo_web',
+            'rapports_maintenance',
+            'proces_verbaux_ca',
+            'proces_verbaux_assemblees',
+            
+            'respect_franchise_assurance_last',
+            'fonds_prevoyance_last',
+            'qualite_budget_cree_last',
+            'respect_postes_budgetaires_score_last'
+        ]
 
-    // Calculate overall health score dynamically using only actual graded items that are not null/undefined
-    const gradedAnswers = data.answers.filter(a => GRADED_KEYS.includes(a.question_key) && a.score !== null && a.score !== undefined)
-    const sum = gradedAnswers.reduce((acc, a) => acc + a.score, 0)
-    const maxPoints = gradedAnswers.length > 0 ? gradedAnswers.length * 5 : 1
-    const health_score = Math.round((sum / maxPoints) * 100)
+        if (data.current_year_active !== false) {
+            GRADED_KEYS.push(
+                'respect_franchise_assurance_curr',
+                'fonds_prevoyance_curr',
+                'qualite_budget_cree_curr',
+                'respect_postes_budgetaires_score_curr'
+            )
+        }
 
-    const { data: audit, error: err } = await supabase
-        .from('syndicate_audits')
-        .insert({
-            client_id: data.client_id,
-            health_score,
-            notes: data.notes || null,
-            audited_by
-        })
-        .select()
-        .single()
+        // Calculate overall health score dynamically using only actual graded items that are not null/undefined
+        const gradedAnswers = data.answers.filter(a => GRADED_KEYS.includes(a.question_key) && a.score !== null && a.score !== undefined)
+        const sum = gradedAnswers.reduce((acc, a) => acc + a.score, 0)
+        const maxPoints = gradedAnswers.length > 0 ? gradedAnswers.length * 5 : 1
+        const health_score = Math.round((sum / maxPoints) * 100)
 
-    if (err) throw new Error(err.message)
+        const { data: audit, error: err } = await supabase
+            .from('syndicate_audits')
+            .insert({
+                client_id: data.client_id,
+                health_score,
+                notes: data.notes || null,
+                audited_by,
+                current_year_active: data.current_year_active !== false,
+                board_meetings_fiscal_year: data.board_meetings_fiscal_year || null,
+                board_meetings_count: data.board_meetings_count || null
+            })
+            .select()
+            .single()
 
-    // Insert answers
-    const answersToInsert = data.answers.map(a => ({
-        audit_id: audit.id,
-        category: a.category,
-        question_key: a.question_key,
-        score: a.score,
-        note: a.note || null
-    }))
+        if (err) return { success: false, error: err.message }
 
-    const { error: ansErr } = await supabase.from('syndicate_audit_answers').insert(answersToInsert)
-    if (ansErr) throw new Error(ansErr.message)
+        // Insert answers
+        const answersToInsert = data.answers.map(a => ({
+            audit_id: audit.id,
+            category: a.category,
+            question_key: a.question_key,
+            score: a.score,
+            note: a.note || null
+        }))
 
-    revalidatePath('/team-management/dashboard')
-    revalidatePath('/team-management/audits')
-    revalidatePath('/team-management/syndicates')
-    return audit
+        const { error: ansErr } = await supabase.from('syndicate_audit_answers').insert(answersToInsert)
+        if (ansErr) return { success: false, error: ansErr.message }
+
+        revalidatePath('/team-management/dashboard')
+        revalidatePath('/team-management/audits')
+        revalidatePath('/team-management/syndicates')
+        return { success: true, data: audit }
+    } catch (e: any) {
+        return { success: false, error: e.message || "Une erreur inconnue est survenue" }
+    }
 }
 
 // ==========================================
@@ -2798,70 +2816,85 @@ export async function getWorkloadHistoryAction(opts: {
 
 export async function updateSyndicateAuditAction(id: string, data: {
     notes?: string
+    current_year_active?: boolean
+    board_meetings_fiscal_year?: number | null
+    board_meetings_count?: number | null
     answers: Array<{ category: 'governance' | 'financial' | 'operations'; question_key: string; score: number; note?: string }>
 }) {
-    const supabase = await createClient()
+    try {
+        const supabase = await createClient()
 
-    // Enforce Master check
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error("Non authentifié")
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'Master') {
-        throw new Error("Sécurité : Seul le rôle Master peut modifier un audit.")
+        // Enforce Master check
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { success: false, error: "Non authentifié" }
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        if (profile?.role !== 'Master') {
+            return { success: false, error: "Sécurité : Seul le rôle Master peut modifier un audit." }
+        }
+
+        const GRADED_KEYS = [
+            'contrats_condo_web',
+            'rapports_maintenance',
+            'proces_verbaux_ca',
+            'proces_verbaux_assemblees',
+            
+            'respect_franchise_assurance_last',
+            'fonds_prevoyance_last',
+            'qualite_budget_cree_last',
+            'respect_postes_budgetaires_score_last'
+        ]
+
+        if (data.current_year_active !== false) {
+            GRADED_KEYS.push(
+                'respect_franchise_assurance_curr',
+                'fonds_prevoyance_curr',
+                'qualite_budget_cree_curr',
+                'respect_postes_budgetaires_score_curr'
+            )
+        }
+
+        // Calculate overall health score dynamically using only actual graded items that are not null/undefined
+        const gradedAnswers = data.answers.filter(a => GRADED_KEYS.includes(a.question_key) && a.score !== null && a.score !== undefined)
+        const sum = gradedAnswers.reduce((acc, a) => acc + a.score, 0)
+        const maxPoints = gradedAnswers.length > 0 ? gradedAnswers.length * 5 : 1
+        const health_score = Math.round((sum / maxPoints) * 100)
+
+        const { error: err } = await supabase
+            .from('syndicate_audits')
+            .update({
+                health_score,
+                notes: data.notes || null,
+                current_year_active: data.current_year_active !== false,
+                board_meetings_fiscal_year: data.board_meetings_fiscal_year || null,
+                board_meetings_count: data.board_meetings_count || null
+            })
+            .eq('id', id)
+
+        if (err) return { success: false, error: err.message }
+
+        // Delete existing answers and insert new ones
+        const { error: delErr } = await supabase.from('syndicate_audit_answers').delete().eq('audit_id', id)
+        if (delErr) return { success: false, error: delErr.message }
+
+        const answersToInsert = data.answers.map(a => ({
+            audit_id: id,
+            category: a.category,
+            question_key: a.question_key,
+            score: a.score,
+            note: a.note || null
+        }))
+
+        const { error: ansErr } = await supabase.from('syndicate_audit_answers').insert(answersToInsert)
+        if (ansErr) return { success: false, error: ansErr.message }
+
+        revalidatePath('/team-management/dashboard')
+        revalidatePath('/team-management/audits')
+        revalidatePath(`/team-management/audits/${id}`)
+        revalidatePath('/team-management/syndicates')
+        return { success: true }
+    } catch (e: any) {
+        return { success: false, error: e.message || "Une erreur inconnue est survenue" }
     }
-
-    const GRADED_KEYS = [
-        'contrats_condo_web',
-        'rapports_maintenance',
-        'proces_verbaux_ca',
-        'proces_verbaux_assemblees',
-        
-        'respect_franchise_assurance_last',
-        'fonds_prevoyance_last',
-        'qualite_budget_cree_last',
-        'respect_postes_budgetaires_score_last',
-        
-        'respect_franchise_assurance_curr',
-        'fonds_prevoyance_curr',
-        'qualite_budget_cree_curr',
-        'respect_postes_budgetaires_score_curr'
-    ]
-
-    // Calculate overall health score dynamically using only actual graded items that are not null/undefined
-    const gradedAnswers = data.answers.filter(a => GRADED_KEYS.includes(a.question_key) && a.score !== null && a.score !== undefined)
-    const sum = gradedAnswers.reduce((acc, a) => acc + a.score, 0)
-    const maxPoints = gradedAnswers.length > 0 ? gradedAnswers.length * 5 : 1
-    const health_score = Math.round((sum / maxPoints) * 100)
-
-    const { error: err } = await supabase
-        .from('syndicate_audits')
-        .update({
-            health_score,
-            notes: data.notes || null
-        })
-        .eq('id', id)
-
-    if (err) throw new Error(err.message)
-
-    // Delete existing answers and insert new ones
-    const { error: delErr } = await supabase.from('syndicate_audit_answers').delete().eq('audit_id', id)
-    if (delErr) throw new Error(delErr.message)
-
-    const answersToInsert = data.answers.map(a => ({
-        audit_id: id,
-        category: a.category,
-        question_key: a.question_key,
-        score: a.score,
-        note: a.note || null
-    }))
-
-    const { error: ansErr } = await supabase.from('syndicate_audit_answers').insert(answersToInsert)
-    if (ansErr) throw new Error(ansErr.message)
-
-    revalidatePath('/team-management/dashboard')
-    revalidatePath('/team-management/audits')
-    revalidatePath(`/team-management/audits/${id}`)
-    revalidatePath('/team-management/syndicates')
 }
 
 export async function deleteSyndicateAuditAction(id: string) {
@@ -2892,65 +2925,72 @@ export async function saveSyndicateWorkloadAction(data: {
     syndicate_comms_count?: number | null
     manager_comms_count?: number | null
     board_meetings_count?: number | null
+    tasks_completed_count?: number | null
 }) {
-    const supabase = await createClient()
+    try {
+        const supabase = await createClient()
 
-    const payload = {
-        client_id: data.client_id,
-        year: data.year,
-        month: data.month,
-        tasks_count: data.tasks_count,
-        comms_count: data.comms_count,
-        syndicate_comms_count: data.syndicate_comms_count || null,
-        manager_comms_count: data.manager_comms_count || null,
-        board_meetings_count: data.board_meetings_count || null,
-        updated_at: new Date().toISOString()
-    }
+        const payload = {
+            client_id: data.client_id,
+            year: data.year,
+            month: data.month,
+            tasks_count: data.tasks_count,
+            comms_count: data.comms_count,
+            syndicate_comms_count: data.syndicate_comms_count || null,
+            manager_comms_count: data.manager_comms_count || null,
+            board_meetings_count: data.board_meetings_count || null,
+            tasks_completed_count: data.tasks_completed_count || null,
+            updated_at: new Date().toISOString()
+        }
 
-    const { error } = await supabase
-        .from('syndicate_workload')
-        .upsert(payload, { onConflict: 'client_id, year, month' })
-
-    if (error) {
-        console.error("Upsert failed, trying manual fallback:", error.message)
-        let query = supabase
+        const { error } = await supabase
             .from('syndicate_workload')
-            .select('id')
-            .eq('client_id', data.client_id)
-            .eq('year', data.year)
+            .upsert(payload, { onConflict: 'client_id, year, month' })
 
-        if (data.month === null) {
-            query = query.is('month', null)
-        } else {
-            query = query.eq('month', data.month)
+        if (error) {
+            console.error("Upsert failed, trying manual fallback:", error.message)
+            let query = supabase
+                .from('syndicate_workload')
+                .select('id')
+                .eq('client_id', data.client_id)
+                .eq('year', data.year)
+
+            if (data.month === null) {
+                query = query.is('month', null)
+            } else {
+                query = query.eq('month', data.month)
+            }
+
+            const { data: existing } = await query.maybeSingle()
+
+            if (existing?.id) {
+                const { error: updErr } = await supabase
+                    .from('syndicate_workload')
+                    .update({
+                        tasks_count: data.tasks_count,
+                        comms_count: data.comms_count,
+                        syndicate_comms_count: data.syndicate_comms_count || null,
+                        manager_comms_count: data.manager_comms_count || null,
+                        board_meetings_count: data.board_meetings_count || null,
+                        tasks_completed_count: data.tasks_completed_count || null,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existing.id)
+                if (updErr) return { success: false, error: updErr.message }
+            } else {
+                const { error: insErr } = await supabase
+                    .from('syndicate_workload')
+                    .insert(payload)
+                if (insErr) return { success: false, error: insErr.message }
+            }
         }
 
-        const { data: existing } = await query.maybeSingle()
-
-        if (existing?.id) {
-            const { error: updErr } = await supabase
-                .from('syndicate_workload')
-                .update({
-                    tasks_count: data.tasks_count,
-                    comms_count: data.comms_count,
-                    syndicate_comms_count: data.syndicate_comms_count || null,
-                    manager_comms_count: data.manager_comms_count || null,
-                    board_meetings_count: data.board_meetings_count || null,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', existing.id)
-            if (updErr) throw new Error(updErr.message)
-        } else {
-            const { error: insErr } = await supabase
-                .from('syndicate_workload')
-                .insert(payload)
-            if (insErr) throw new Error(insErr.message)
-        }
+        revalidatePath('/clients')
+        revalidatePath(`/clients/${data.client_id}`)
+        return { success: true }
+    } catch (e: any) {
+        return { success: false, error: e.message || "Une erreur inconnue est survenue" }
     }
-
-    revalidatePath('/clients')
-    revalidatePath(`/clients/${data.client_id}`)
-    return { success: true }
 }
 
 export async function getSyndicateWorkloadAction(clientId: string) {

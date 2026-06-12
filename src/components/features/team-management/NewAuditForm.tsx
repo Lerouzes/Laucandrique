@@ -38,7 +38,8 @@ import {
     ChevronUp,
     Trash2,
     ArrowLeft,
-    Star
+    Star,
+    X
 } from 'lucide-react'
 import { SearchableClientSelect } from './SearchableClientSelect'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
@@ -110,6 +111,39 @@ const MONTHS = [
     { value: 12, label: 'Décembre' }
 ]
 
+function getFiscalDates(targetYear: number, contractStartDate?: string | null) {
+    if (!contractStartDate) {
+        return {
+            start: `${targetYear}-01-01`,
+            end: `${targetYear}-12-31`
+        }
+    }
+    const date = new Date(contractStartDate)
+    if (isNaN(date.getTime())) {
+        return {
+            start: `${targetYear}-01-01`,
+            end: `${targetYear}-12-31`
+        }
+    }
+    const month = date.getMonth();
+    const day = date.getDate();
+    
+    const start = new Date(targetYear, month, day)
+    const end = new Date(targetYear + 1, month, day - 1)
+    
+    const formatDate = (d: Date) => {
+        const y = d.getFullYear()
+        const m = String(d.getMonth() + 1).padStart(2, '0')
+        const dayStr = String(d.getDate()).padStart(2, '0')
+        return `${y}-${m}-${dayStr}`
+    }
+    
+    return {
+        start: formatDate(start),
+        end: formatDate(end)
+    }
+}
+
 export function NewAuditForm({ 
     clients,
     questionConfigs = [],
@@ -137,6 +171,9 @@ export function NewAuditForm({
     }))
 
     const activeClientObj = clients.find(c => c.id === clientId)
+    const contractDate = activeClientObj?.contracts && Array.isArray(activeClientObj.contracts) 
+        ? activeClientObj.contracts[0]?.start_date 
+        : activeClientObj?.contracts?.start_date
 
     // Map custom configs to a lookup record
     const descriptionsMap: Record<string, string> = {
@@ -198,7 +235,11 @@ export function NewAuditForm({
     // New workload fields
     const [syndicateCommsCount, setSyndicateCommsCount] = useState<string>('')
     const [managerCommsCount, setManagerCommsCount] = useState<string>('')
-    const [boardMeetingsCount, setBoardMeetingsCount] = useState<string>('')
+    const [boardMeetingsCount, setBoardMeetingsCount] = useState<string>(initialAudit?.board_meetings_count !== undefined && initialAudit?.board_meetings_count !== null ? initialAudit.board_meetings_count.toString() : '')
+    const [currentYearActive, setCurrentYearActive] = useState<boolean>(initialAudit ? (initialAudit.current_year_active !== false) : true)
+    const [boardMeetingsFiscalYear, setBoardMeetingsFiscalYear] = useState<number>(initialAudit?.board_meetings_fiscal_year || new Date().getFullYear() - 1)
+    const [tasksCompletedCount, setTasksCompletedCount] = useState<string>('')
+    const [editingWorkload, setEditingWorkload] = useState<any | null>(null)
 
     const [savingWorkload, setSavingWorkload] = useState(false)
     const [showWorkloadForm, setShowWorkloadForm] = useState(false)
@@ -254,25 +295,29 @@ export function NewAuditForm({
     }
 
     // Graded questions calculation
-    const GRADED_KEYS = [
-        'contrats_condo_web',
-        'rapports_maintenance',
-        'proces_verbaux_ca',
-        'proces_verbaux_assemblees',
-        
-        'respect_franchise_assurance_last',
-        'fonds_prevoyance_last',
-        'qualite_budget_cree_last',
-        'respect_postes_budgetaires_score_last',
-        
-        'respect_franchise_assurance_curr',
-        'fonds_prevoyance_curr',
-        'qualite_budget_cree_curr',
-        'respect_postes_budgetaires_score_curr'
-    ]
-
     const getHealthScore = () => {
-        const gradedKeysPresent = GRADED_KEYS.filter(k => scores[k] !== undefined && scores[k] !== null)
+        const keys = [
+            'contrats_condo_web',
+            'rapports_maintenance',
+            'proces_verbaux_ca',
+            'proces_verbaux_assemblees',
+            
+            'respect_franchise_assurance_last',
+            'fonds_prevoyance_last',
+            'qualite_budget_cree_last',
+            'respect_postes_budgetaires_score_last'
+        ]
+
+        if (currentYearActive) {
+            keys.push(
+                'respect_franchise_assurance_curr',
+                'fonds_prevoyance_curr',
+                'qualite_budget_cree_curr',
+                'respect_postes_budgetaires_score_curr'
+            )
+        }
+
+        const gradedKeysPresent = keys.filter(k => scores[k] !== undefined && scores[k] !== null)
         const sum = gradedKeysPresent.reduce((acc, k) => acc + (scores[k] || 0), 0)
         const maxPoints = gradedKeysPresent.length > 0 ? gradedKeysPresent.length * 5 : 1
         return Math.round((sum / maxPoints) * 100)
@@ -296,7 +341,7 @@ export function NewAuditForm({
         }
         setSavingWorkload(true)
         try {
-            await saveSyndicateWorkloadAction({
+            const res = await saveSyndicateWorkloadAction({
                 client_id: clientId,
                 year: Number(workloadYear),
                 month: workloadType === 'monthly' ? Number(workloadMonth) : null,
@@ -304,8 +349,16 @@ export function NewAuditForm({
                 comms_count: commsCount === '' ? null : Number(commsCount),
                 syndicate_comms_count: syndicateCommsCount === '' ? null : Number(syndicateCommsCount),
                 manager_comms_count: managerCommsCount === '' ? null : Number(managerCommsCount),
-                board_meetings_count: boardMeetingsCount === '' ? null : Number(boardMeetingsCount)
+                board_meetings_count: boardMeetingsCount === '' ? null : Number(boardMeetingsCount),
+                tasks_completed_count: tasksCompletedCount === '' ? null : Number(tasksCompletedCount)
             })
+
+            if (res && !res.success) {
+                toast.error('Erreur lors de l\'enregistrement du volume de travail : ' + res.error)
+                setSavingWorkload(false)
+                return
+            }
+
             // Refresh saved workloads list
             const workloads = await getSyndicateWorkloadAction(clientId)
             setSavedWorkloads(workloads || [])
@@ -314,6 +367,7 @@ export function NewAuditForm({
             setSyndicateCommsCount('')
             setManagerCommsCount('')
             setBoardMeetingsCount('')
+            setTasksCompletedCount('')
             toast.success('Volume de travail enregistré avec succès.')
         } catch (err) {
             toast.error('Erreur lors de l\'enregistrement du volume de travail : ' + (err as Error).message)
@@ -336,6 +390,44 @@ export function NewAuditForm({
         } finally {
             setSavingWorkload(false)
             setWorkloadToDelete(null)
+        }
+    }
+
+    const handleUpdateWorkload = async (updatedWl: any) => {
+        if (!clientId) return
+        setSavingWorkload(true)
+        try {
+            // If year or month changed, delete the old one first to avoid duplicate keys/errors
+            if (editingWorkload.year !== updatedWl.year || editingWorkload.month !== updatedWl.month) {
+                await deleteSyndicateWorkloadAction(editingWorkload.id)
+            }
+
+            const res = await saveSyndicateWorkloadAction({
+                client_id: clientId,
+                year: Number(updatedWl.year),
+                month: updatedWl.month === '' ? null : (updatedWl.month === null ? null : Number(updatedWl.month)),
+                tasks_count: updatedWl.tasks_count === '' ? null : (updatedWl.tasks_count === null ? null : Number(updatedWl.tasks_count)),
+                comms_count: updatedWl.comms_count === '' ? null : (updatedWl.comms_count === null ? null : Number(updatedWl.comms_count)),
+                syndicate_comms_count: updatedWl.syndicate_comms_count === '' ? null : (updatedWl.syndicate_comms_count === null ? null : Number(updatedWl.syndicate_comms_count)),
+                manager_comms_count: updatedWl.manager_comms_count === '' ? null : (updatedWl.manager_comms_count === null ? null : Number(updatedWl.manager_comms_count)),
+                board_meetings_count: updatedWl.board_meetings_count === '' ? null : (updatedWl.board_meetings_count === null ? null : Number(updatedWl.board_meetings_count)),
+                tasks_completed_count: updatedWl.tasks_completed_count === '' ? null : (updatedWl.tasks_completed_count === null ? null : Number(updatedWl.tasks_completed_count))
+            })
+
+            if (res && !res.success) {
+                toast.error("Erreur lors de la mise à jour : " + res.error)
+                setSavingWorkload(false)
+                return
+            }
+
+            const workloads = await getSyndicateWorkloadAction(clientId)
+            setSavedWorkloads(workloads || [])
+            setEditingWorkload(null)
+            toast.success("Volume de travail mis à jour.")
+        } catch (err: any) {
+            toast.error("Erreur : " + err.message)
+        } finally {
+            setSavingWorkload(false)
         }
     }
 
@@ -405,19 +497,36 @@ export function NewAuditForm({
                 }
             })
 
+            let result;
             if (isEditMode) {
-                await updateSyndicateAuditAction(initialAudit.id, {
+                result = await updateSyndicateAuditAction(initialAudit.id, {
                     notes,
+                    current_year_active: currentYearActive,
+                    board_meetings_fiscal_year: boardMeetingsFiscalYear,
+                    board_meetings_count: boardMeetingsCount === '' ? null : Number(boardMeetingsCount),
                     answers
                 })
+            } else {
+                result = await createSyndicateAuditAction({
+                    client_id: clientId,
+                    notes,
+                    current_year_active: currentYearActive,
+                    board_meetings_fiscal_year: boardMeetingsFiscalYear,
+                    board_meetings_count: boardMeetingsCount === '' ? null : Number(boardMeetingsCount),
+                    answers
+                })
+            }
+
+            if (result && !result.success) {
+                toast.error('Erreur lors de l\'enregistrement de l\'audit : ' + result.error)
+                setLoading(false)
+                return
+            }
+
+            if (isEditMode) {
                 toast.success('Audit mis à jour avec succès.')
                 router.push(`/team-management/audits/${initialAudit.id}`)
             } else {
-                await createSyndicateAuditAction({
-                    client_id: clientId,
-                    notes,
-                    answers
-                })
                 toast.success('Audit créé avec succès.')
                 router.push('/team-management/audits')
             }
@@ -571,6 +680,30 @@ export function NewAuditForm({
                                             className="bg-[#121318] border-zinc-850 text-xs text-zinc-200 focus-visible:ring-purple-650 resize-y min-h-[50px] py-1.5" 
                                         />
                                     </div>
+                                    {q.key === 'proces_verbaux_ca' && (
+                                        <div className="col-span-full md:col-start-5 md:col-span-8 p-3 bg-zinc-950/45 border border-zinc-850 rounded-lg grid grid-cols-2 gap-3 text-xxs mt-2 animate-in fade-in duration-200">
+                                            <div className="space-y-1">
+                                                <Label className="text-zinc-500 text-[9px] uppercase font-bold">Année financière CA</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={boardMeetingsFiscalYear}
+                                                    onChange={(e) => setBoardMeetingsFiscalYear(Number(e.target.value))}
+                                                    className="bg-[#121318] border-zinc-850 h-8 text-xxs text-zinc-150 font-semibold"
+                                                    placeholder="Ex: 2025"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-zinc-500 text-[9px] uppercase font-bold">Nombre de réunions de CA</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={boardMeetingsCount}
+                                                    onChange={(e) => setBoardMeetingsCount(e.target.value)}
+                                                    className="bg-[#121318] border-zinc-850 h-8 text-xxs text-zinc-150 font-semibold"
+                                                    placeholder="Ex: 4"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </CardContent>
@@ -588,9 +721,14 @@ export function NewAuditForm({
                             {/* LAST YEAR FINANCIAL ANALYSES */}
                             <div className="space-y-4 p-4 bg-zinc-900/35 border border-zinc-850/80 rounded-2xl">
                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-900 pb-3 gap-2">
-                                    <h4 className="text-xxs font-bold text-white uppercase tracking-wider text-purple-400">
-                                        Dernière Année Financière (Last Year)
-                                    </h4>
+                                    <div className="space-y-0.5">
+                                        <h4 className="text-xxs font-bold text-white uppercase tracking-wider text-purple-400">
+                                            Dernière Année Financière (Last Year)
+                                        </h4>
+                                        <p className="text-[10px] text-zinc-500 font-medium">
+                                            Dates fiscales : <span className="font-mono text-purple-400">{getFiscalDates(scores.financial_year_target_last || (new Date().getFullYear() - 1), contractDate).start}</span> au <span className="font-mono text-purple-400">{getFiscalDates(scores.financial_year_target_last || (new Date().getFullYear() - 1), contractDate).end}</span>
+                                        </p>
+                                    </div>
                                     <div className="flex items-center gap-2">
                                         <Label className="text-zinc-500 text-[9px] uppercase font-bold">Année</Label>
                                         <Input 
@@ -780,193 +918,221 @@ export function NewAuditForm({
                             {/* CURRENT YEAR FINANCIAL ANALYSES */}
                             <div className="space-y-4 p-4 bg-zinc-900/35 border border-zinc-850/80 rounded-2xl">
                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-900 pb-3 gap-2">
-                                    <h4 className="text-xxs font-bold text-white uppercase tracking-wider text-purple-400">
-                                        Année Financière Courante (Current Year)
-                                    </h4>
-                                    <div className="flex items-center gap-2">
-                                        <Label className="text-zinc-500 text-[9px] uppercase font-bold">Année</Label>
-                                        <Input 
-                                            type="number"
-                                            value={scores.financial_year_target_curr || new Date().getFullYear()}
-                                            onChange={(e) => handleScoreChange('financial_year_target_curr', Number(e.target.value))}
-                                            placeholder="2026"
-                                            className="bg-[#121318] border-zinc-850 h-7 text-xxs w-16"
-                                        />
-                                        <Label className="text-zinc-500 text-[9px] uppercase font-bold ml-1">Vérifié le</Label>
-                                        <Input 
-                                            type="date"
-                                            value={qNotes.financial_year_target_curr || ''}
-                                            onChange={(e) => handleNoteChange('financial_year_target_curr', e.target.value)}
-                                            className="bg-[#121318] border-zinc-850 h-7 text-xxs w-28"
-                                        />
+                                    <div className="space-y-0.5">
+                                        <h4 className="text-xxs font-bold text-white uppercase tracking-wider text-purple-400">
+                                            Année Financière Courante (Current Year)
+                                        </h4>
+                                        {currentYearActive && (
+                                            <p className="text-[10px] text-zinc-500 font-medium">
+                                                Dates fiscales : <span className="font-mono text-purple-400">{getFiscalDates(scores.financial_year_target_curr || new Date().getFullYear(), contractDate).start}</span> au <span className="font-mono text-purple-400">{getFiscalDates(scores.financial_year_target_curr || new Date().getFullYear(), contractDate).end}</span>
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <label className="flex items-center gap-2 cursor-pointer select-none text-[10px] text-zinc-300 font-bold uppercase">
+                                            <input
+                                                type="checkbox"
+                                                checked={currentYearActive}
+                                                onChange={(e) => setCurrentYearActive(e.target.checked)}
+                                                className="rounded border-zinc-800 bg-[#121318] text-purple-650 focus:ring-purple-650 h-3.5 w-3.5"
+                                            />
+                                            Activer l'analyse
+                                        </label>
+                                        {currentYearActive && (
+                                            <div className="flex items-center gap-2">
+                                                <Label className="text-zinc-500 text-[9px] uppercase font-bold">Année</Label>
+                                                <Input 
+                                                    type="number"
+                                                    value={scores.financial_year_target_curr || new Date().getFullYear()}
+                                                    onChange={(e) => handleScoreChange('financial_year_target_curr', Number(e.target.value))}
+                                                    placeholder="2026"
+                                                    className="bg-[#121318] border-zinc-850 h-7 text-xxs w-16"
+                                                />
+                                                <Label className="text-zinc-500 text-[9px] uppercase font-bold ml-1">Vérifié le</Label>
+                                                <Input 
+                                                    type="date"
+                                                    value={qNotes.financial_year_target_curr || ''}
+                                                    onChange={(e) => handleNoteChange('financial_year_target_curr', e.target.value)}
+                                                    className="bg-[#121318] border-zinc-850 h-7 text-xxs w-28"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
-                                {/* Budget count parameters */}
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-zinc-950/20 p-3 rounded-lg border border-zinc-900">
-                                    <div className="space-y-1">
-                                        <Label className="text-zinc-500 text-[9px]">Postes budgétaires totaux</Label>
-                                        <Input 
-                                            type="number"
-                                            min="0"
-                                            value={scores.total_budget_items_curr || 0}
-                                            onChange={(e) => handleScoreChange('total_budget_items_curr', Number(e.target.value))}
-                                            className="bg-[#121318] border-zinc-850 h-8 text-xs font-semibold text-white"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-zinc-500 text-[9px]">Postes dépassés (excès +5% à 10%)</Label>
-                                        <Input 
-                                            type="number"
-                                            min="0"
-                                            max={scores.total_budget_items_curr || 0}
-                                            value={scores.exceeded_budget_items_curr || 0}
-                                            onChange={(e) => handleScoreChange('exceeded_budget_items_curr', Number(e.target.value))}
-                                            className="bg-[#121318] border-zinc-850 h-8 text-xs font-semibold text-white"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-zinc-500 text-[9px]">Projets non réalisés</Label>
-                                        <Input 
-                                            type="number"
-                                            min="0"
-                                            max={scores.total_budget_items_curr || 0}
-                                            value={scores.unrealized_budget_items_curr || 0}
-                                            onChange={(e) => handleScoreChange('unrealized_budget_items_curr', Number(e.target.value))}
-                                            className="bg-[#121318] border-zinc-850 h-8 text-xs font-semibold text-white"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-zinc-500 text-[9px]">Postes non prévus</Label>
-                                        <Input 
-                                            type="number"
-                                            min="0"
-                                            value={scores.unplanned_budget_items_curr || 0}
-                                            onChange={(e) => handleScoreChange('unplanned_budget_items_curr', Number(e.target.value))}
-                                            className="bg-[#121318] border-zinc-850 h-8 text-xs font-semibold text-white"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Live stats */}
-                                {(() => {
-                                    const T = scores.total_budget_items_curr || 0
-                                    const E = scores.exceeded_budget_items_curr || 0
-                                    const U = scores.unrealized_budget_items_curr || 0
-                                    const compliance = T > 0 ? Math.max(0, Math.round(((T - E - U) / T) * 100)) : 100
-                                    
-                                    let autoRating = 3
-                                    if (T > 0) {
-                                        if (compliance === 100) autoRating = 5
-                                        else if (compliance >= 90) autoRating = 4
-                                        else if (compliance >= 80) autoRating = 3
-                                        else if (compliance >= 70) autoRating = 2
-                                        else if (compliance >= 50) autoRating = 1
-                                        else autoRating = 0
-                                    }
-
-                                    if (scores.respect_postes_budgetaires_score_curr !== autoRating) {
-                                        setTimeout(() => handleScoreChange('respect_postes_budgetaires_score_curr', autoRating), 0)
-                                    }
-
-                                    return (
-                                        <div className="flex justify-between items-center bg-zinc-950/40 p-2.5 rounded-lg border border-zinc-900 text-xxs">
-                                            <div className="flex items-center gap-4">
-                                                <div>
-                                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Taux de respect du budget</span>
-                                                    <strong className="text-sm font-extrabold text-purple-400 mt-0.5 block">{compliance}%</strong>
-                                                </div>
-                                                <div>
-                                                    <span className="text-zinc-500 block uppercase font-bold text-[8px]">Cote automatique</span>
-                                                    <strong className="text-sm font-extrabold text-zinc-200 mt-0.5 block">{autoRating}/5</strong>
-                                                </div>
+                                {currentYearActive ? (
+                                    <>
+                                        {/* Budget count parameters */}
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-zinc-950/20 p-3 rounded-lg border border-zinc-900">
+                                            <div className="space-y-1">
+                                                <Label className="text-zinc-500 text-[9px]">Postes budgétaires totaux</Label>
+                                                <Input 
+                                                    type="number"
+                                                    min="0"
+                                                    value={scores.total_budget_items_curr || 0}
+                                                    onChange={(e) => handleScoreChange('total_budget_items_curr', Number(e.target.value))}
+                                                    className="bg-[#121318] border-zinc-850 h-8 text-xs font-semibold text-white"
+                                                />
                                             </div>
-                                            <div className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">
-                                                Respect des postes budgétaires (+5% à 10% acceptable)
+                                            <div className="space-y-1">
+                                                <Label className="text-zinc-500 text-[9px]">Postes dépassés (excès +5% à 10%)</Label>
+                                                <Input 
+                                                    type="number"
+                                                    min="0"
+                                                    max={scores.total_budget_items_curr || 0}
+                                                    value={scores.exceeded_budget_items_curr || 0}
+                                                    onChange={(e) => handleScoreChange('exceeded_budget_items_curr', Number(e.target.value))}
+                                                    className="bg-[#121318] border-zinc-850 h-8 text-xs font-semibold text-white"
+                                                />
                                             </div>
-                                        </div>
-                                    )
-                                })()}
-
-                                {/* Comments for current year metrics */}
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                                    <div className="space-y-1">
-                                        <Label className="text-zinc-500 text-[9px]">Notes - Respect postes budgétaires</Label>
-                                        <Textarea 
-                                            value={qNotes.exceeded_budget_items_curr || ''}
-                                            onChange={(e) => handleNoteChange('exceeded_budget_items_curr', e.target.value)}
-                                            placeholder="Commentaires sur les dépassements..."
-                                            rows={2}
-                                            className="bg-[#121318] border-zinc-850 text-xxs text-zinc-200 resize-none font-normal"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-zinc-500 text-[9px]">Notes - Réalisation projets</Label>
-                                        <Textarea 
-                                            value={qNotes.unrealized_budget_items_curr || ''}
-                                            onChange={(e) => handleNoteChange('unrealized_budget_items_curr', e.target.value)}
-                                            placeholder="Notes sur les projets budgétés non réalisés..."
-                                            rows={2}
-                                            className="bg-[#121318] border-zinc-850 text-xxs text-zinc-200 resize-none font-normal"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-zinc-500 text-[9px]">Notes - Postes imprévus</Label>
-                                        <Textarea 
-                                            value={qNotes.unplanned_budget_items_curr || ''}
-                                            onChange={(e) => handleNoteChange('unplanned_budget_items_curr', e.target.value)}
-                                            placeholder="Notes sur les postes imprévus..."
-                                            rows={2}
-                                            className="bg-[#121318] border-zinc-850 text-xxs text-zinc-200 resize-none font-normal"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Rest of standard graded questions */}
-                                <div className="space-y-4 pt-3 border-t border-zinc-900">
-                                    {[
-                                        { key: 'respect_franchise_assurance_curr', text: 'Respect de la franchise d\'assurance basée sur le budget' },
-                                        { key: 'fonds_prevoyance_curr', text: 'Fonds de prévoyance (étude + cotisations) conforme' },
-                                        { key: 'qualite_budget_cree_curr', text: 'Qualité du budget créé' }
-                                    ].map(q => (
-                                        <div key={q.key} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border-b border-zinc-900 pb-3 last:border-b-0 last:pb-0">
-                                            <div className="md:col-span-4 text-xxs font-semibold text-zinc-200 pt-2 flex items-center gap-1.5">
-                                                <span>{q.text}</span>
-                                                {descriptionsMap[q.key] && (
-                                                    <div className="relative group cursor-pointer inline-flex items-center">
-                                                        <HelpCircle className="h-3.5 w-3.5 text-zinc-500 hover:text-purple-400 transition-colors shrink-0" />
-                                                        <div className="absolute left-0 bottom-6 hidden group-hover:block z-50 w-64 p-2.5 bg-[#121318] border border-zinc-800 rounded-lg text-[10px] text-zinc-400 shadow-2xl pointer-events-none font-normal leading-relaxed">
-                                                            {descriptionsMap[q.key]}
-                                                        </div>
-                                                    </div>
-                                                )}
+                                            <div className="space-y-1">
+                                                <Label className="text-zinc-500 text-[9px]">Projets non réalisés</Label>
+                                                <Input 
+                                                    type="number"
+                                                    min="0"
+                                                    max={scores.total_budget_items_curr || 0}
+                                                    value={scores.unrealized_budget_items_curr || 0}
+                                                    onChange={(e) => handleScoreChange('unrealized_budget_items_curr', Number(e.target.value))}
+                                                    className="bg-[#121318] border-zinc-850 h-8 text-xs font-semibold text-white"
+                                                />
                                             </div>
-                                            <div className="md:col-span-3">
-                                                <select 
-                                                    value={scores[q.key] !== undefined ? scores[q.key] : 3}
-                                                    onChange={(e) => handleScoreChange(q.key, Number(e.target.value))}
-                                                    className="w-full bg-[#121318] border border-zinc-850 rounded-lg py-1.5 px-2.5 text-zinc-100 outline-none focus:border-purple-600 h-9 text-xs font-semibold"
-                                                >
-                                                    <option value="5">5/5 - Parfait / Conforme</option>
-                                                    <option value="4">4/5 - Bon / Dérives mineures</option>
-                                                    <option value="3">3/5 - Moyen / Suivi régulier requis</option>
-                                                    <option value="2">2/5 - Insuffisant / Dérives notables</option>
-                                                    <option value="1">1/5 - Urgent / Déficiences majeures</option>
-                                                    <option value="0">0/5 - Critique / Absence totale</option>
-                                                </select>
-                                            </div>
-                                            <div className="md:col-span-5">
-                                                <Textarea 
-                                                    value={qNotes[q.key] || ''}
-                                                    onChange={(e) => handleNoteChange(q.key, e.target.value)}
-                                                    placeholder="Remarque spécifique..." 
-                                                    rows={2}
-                                                    className="bg-[#121318] border-zinc-850 text-xs text-zinc-200 focus-visible:ring-purple-650 min-h-[45px] py-1.5 font-normal" 
+                                            <div className="space-y-1">
+                                                <Label className="text-zinc-500 text-[9px]">Postes non prévus</Label>
+                                                <Input 
+                                                    type="number"
+                                                    min="0"
+                                                    value={scores.unplanned_budget_items_curr || 0}
+                                                    onChange={(e) => handleScoreChange('unplanned_budget_items_curr', Number(e.target.value))}
+                                                    className="bg-[#121318] border-zinc-850 h-8 text-xs font-semibold text-white"
                                                 />
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
+
+                                        {/* Live stats */}
+                                        {(() => {
+                                            const T = scores.total_budget_items_curr || 0
+                                            const E = scores.exceeded_budget_items_curr || 0
+                                            const U = scores.unrealized_budget_items_curr || 0
+                                            const compliance = T > 0 ? Math.max(0, Math.round(((T - E - U) / T) * 100)) : 100
+                                            
+                                            let autoRating = 3
+                                            if (T > 0) {
+                                                if (compliance === 100) autoRating = 5
+                                                else if (compliance >= 90) autoRating = 4
+                                                else if (compliance >= 80) autoRating = 3
+                                                else if (compliance >= 70) autoRating = 2
+                                                else if (compliance >= 50) autoRating = 1
+                                                else autoRating = 0
+                                            }
+
+                                            if (scores.respect_postes_budgetaires_score_curr !== autoRating) {
+                                                setTimeout(() => handleScoreChange('respect_postes_budgetaires_score_curr', autoRating), 0)
+                                            }
+
+                                            return (
+                                                <div className="flex justify-between items-center bg-zinc-950/40 p-2.5 rounded-lg border border-zinc-900 text-xxs">
+                                                    <div className="flex items-center gap-4">
+                                                        <div>
+                                                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Taux de respect du budget</span>
+                                                            <strong className="text-sm font-extrabold text-purple-400 mt-0.5 block">{compliance}%</strong>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Cote automatique</span>
+                                                            <strong className="text-sm font-extrabold text-zinc-200 mt-0.5 block">{autoRating}/5</strong>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">
+                                                        Respect des postes budgétaires (+5% à 10% acceptable)
+                                                    </div>
+                                                </div>
+                                            )
+                                        })()}
+
+                                        {/* Comments for current year metrics */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                                            <div className="space-y-1">
+                                                <Label className="text-zinc-500 text-[9px]">Notes - Respect postes budgétaires</Label>
+                                                <Textarea 
+                                                    value={qNotes.exceeded_budget_items_curr || ''}
+                                                    onChange={(e) => handleNoteChange('exceeded_budget_items_curr', e.target.value)}
+                                                    placeholder="Commentaires sur les dépassements..."
+                                                    rows={2}
+                                                    className="bg-[#121318] border-zinc-850 text-xxs text-zinc-200 resize-none font-normal"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-zinc-500 text-[9px]">Notes - Réalisation projets</Label>
+                                                <Textarea 
+                                                    value={qNotes.unrealized_budget_items_curr || ''}
+                                                    onChange={(e) => handleNoteChange('unrealized_budget_items_curr', e.target.value)}
+                                                    placeholder="Notes sur les projets budgétés non réalisés..."
+                                                    rows={2}
+                                                    className="bg-[#121318] border-zinc-850 text-xxs text-zinc-200 resize-none font-normal"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-zinc-500 text-[9px]">Notes - Postes imprévus</Label>
+                                                <Textarea 
+                                                    value={qNotes.unplanned_budget_items_curr || ''}
+                                                    onChange={(e) => handleNoteChange('unplanned_budget_items_curr', e.target.value)}
+                                                    placeholder="Notes sur les postes imprévus..."
+                                                    rows={2}
+                                                    className="bg-[#121318] border-zinc-850 text-xxs text-zinc-200 resize-none font-normal"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Rest of standard graded questions */}
+                                        <div className="space-y-4 pt-3 border-t border-zinc-900">
+                                            {[
+                                                { key: 'respect_franchise_assurance_curr', text: 'Respect de la franchise d\'assurance basée sur le budget' },
+                                                { key: 'fonds_prevoyance_curr', text: 'Fonds de prévoyance (étude + cotisations) conforme' },
+                                                { key: 'qualite_budget_cree_curr', text: 'Qualité du budget créé' }
+                                            ].map(q => (
+                                                <div key={q.key} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border-b border-zinc-900 pb-3 last:border-b-0 last:pb-0">
+                                                    <div className="md:col-span-4 text-xxs font-semibold text-zinc-200 pt-2 flex items-center gap-1.5">
+                                                        <span>{q.text}</span>
+                                                        {descriptionsMap[q.key] && (
+                                                            <div className="relative group cursor-pointer inline-flex items-center">
+                                                                <HelpCircle className="h-3.5 w-3.5 text-zinc-500 hover:text-purple-400 transition-colors shrink-0" />
+                                                                <div className="absolute left-0 bottom-6 hidden group-hover:block z-50 w-64 p-2.5 bg-[#121318] border border-zinc-800 rounded-lg text-[10px] text-zinc-400 shadow-2xl pointer-events-none font-normal leading-relaxed">
+                                                                    {descriptionsMap[q.key]}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="md:col-span-3">
+                                                        <select 
+                                                            value={scores[q.key] !== undefined ? scores[q.key] : 3}
+                                                            onChange={(e) => handleScoreChange(q.key, Number(e.target.value))}
+                                                            className="w-full bg-[#121318] border border-zinc-850 rounded-lg py-1.5 px-2.5 text-zinc-100 outline-none focus:border-purple-600 h-9 text-xs font-semibold"
+                                                        >
+                                                            <option value="5">5/5 - Parfait / Conforme</option>
+                                                            <option value="4">4/5 - Bon / Dérives mineures</option>
+                                                            <option value="3">3/5 - Moyen / Suivi régulier requis</option>
+                                                            <option value="2">2/5 - Insuffisant / Dérives notables</option>
+                                                            <option value="1">1/5 - Urgent / Déficiences majeures</option>
+                                                            <option value="0">0/5 - Critique / Absence totale</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="md:col-span-5">
+                                                        <Textarea 
+                                                            value={qNotes[q.key] || ''}
+                                                            onChange={(e) => handleNoteChange(q.key, e.target.value)}
+                                                            placeholder="Remarque spécifique..." 
+                                                            rows={2}
+                                                            className="bg-[#121318] border-zinc-850 text-xs text-zinc-200 focus-visible:ring-purple-650 min-h-[45px] py-1.5 font-normal" 
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="p-6 bg-zinc-950/20 border border-dashed border-zinc-850 rounded-xl text-center text-zinc-500 text-xxs font-medium italic">
+                                        L'analyse de l'année financière courante est désactivée. Les questions correspondantes sont exclues du score de santé global.
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -1276,6 +1442,25 @@ export function NewAuditForm({
                                         </div>
                                     </div>
 
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <Label className="text-zinc-500">Tâches terminées à ce jour</Label>
+                                            <Input 
+                                                type="number" 
+                                                placeholder="ex: 120"
+                                                value={tasksCompletedCount}
+                                                onChange={(e) => setTasksCompletedCount(e.target.value)}
+                                                className="bg-[#121318] border-zinc-850 h-8 text-xxs text-zinc-100"
+                                            />
+                                        </div>
+                                        <div className="space-y-1 flex flex-col justify-end">
+                                            <div className="p-1.5 bg-zinc-950/45 border border-zinc-900 rounded-lg text-[9px] text-zinc-400 font-medium">
+                                                Début: <span className="font-mono text-purple-400">{getFiscalDates(workloadYear, contractDate).start}</span><br />
+                                                Fin: <span className="font-mono text-purple-400">{getFiscalDates(workloadYear, contractDate).end}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <Button 
                                         type="button" 
                                         onClick={handleSaveWorkload} 
@@ -1292,7 +1477,11 @@ export function NewAuditForm({
                                         <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-wider block">Saisies existantes</span>
                                         <div className="space-y-1.5 text-[10px]">
                                             {savedWorkloads.map((wl) => (
-                                                <div key={wl.id} className="flex justify-between items-center bg-zinc-950/40 p-2 border border-zinc-900 rounded-lg group/item">
+                                                <div 
+                                                    key={wl.id} 
+                                                    onClick={() => setEditingWorkload(wl)}
+                                                    className="flex justify-between items-center bg-zinc-950/40 p-2 border border-zinc-900 rounded-lg group/item cursor-pointer hover:bg-zinc-900/50 hover:border-zinc-800 transition-colors animate-in fade-in duration-200"
+                                                >
                                                     <div className="flex-1">
                                                         <div className="flex items-center gap-1">
                                                             <strong className="text-zinc-300">{wl.year}</strong>
@@ -1302,16 +1491,20 @@ export function NewAuditForm({
                                                         </div>
                                                         <div className="text-[9px] text-zinc-400 flex flex-wrap gap-x-2.5 gap-y-0.5 mt-0.5 font-mono">
                                                             <span>Tâches: <strong className="text-purple-400 font-bold">{wl.tasks_count ?? '-'}</strong></span>
-                                                            <span>CA / an: <strong className="text-amber-400 font-bold">{wl.board_meetings_count ?? '-'}</strong></span>
-                                                            <span>Comms Syndicat: <strong className="text-cyan-400 font-bold">{wl.syndicate_comms_count ?? '-'}</strong></span>
-                                                            <span>Comms Gest.: <strong className="text-blue-400 font-bold">{wl.manager_comms_count ?? '-'}</strong></span>
+                                                            <span>Tâches term.: <strong className="text-emerald-400 font-bold">{wl.tasks_completed_count ?? '-'}</strong></span>
+                                                            <span>CA/an: <strong className="text-amber-400 font-bold">{wl.board_meetings_count ?? '-'}</strong></span>
+                                                            <span>Comms Syn: <strong className="text-cyan-400 font-bold">{wl.syndicate_comms_count ?? '-'}</strong></span>
+                                                            <span>Comms Gest: <strong className="text-blue-400 font-bold">{wl.manager_comms_count ?? '-'}</strong></span>
                                                         </div>
                                                     </div>
                                                     <Button
                                                         type="button"
                                                         variant="ghost"
                                                         size="icon"
-                                                        onClick={() => setWorkloadToDelete(wl.id)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            setWorkloadToDelete(wl.id)
+                                                        }}
                                                         className="h-6 w-6 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0 cursor-pointer"
                                                     >
                                                         <Trash2 className="h-3.5 w-3.5" />
@@ -1466,6 +1659,152 @@ export function NewAuditForm({
                         <div className="mt-6 flex justify-end">
                             <Button type="button" onClick={() => setActiveComplaint(null)} className="bg-purple-600 hover:bg-purple-700 text-white text-xxs h-8 px-4 font-bold rounded-lg shadow-lg cursor-pointer">
                                 Fermer
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal for editing workload */}
+            {editingWorkload && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#16171e] border border-zinc-800 rounded-xl max-w-md w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-zinc-900 bg-zinc-950/20 flex justify-between items-center">
+                            <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                                <Activity className="h-4 w-4 text-purple-400" />
+                                Modifier le Volume de Travail
+                            </h3>
+                            <button 
+                                type="button" 
+                                onClick={() => setEditingWorkload(null)}
+                                className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                        <div className="p-4 space-y-4 text-xxs">
+                            <div className="p-2 bg-zinc-950/45 border border-zinc-900 rounded-lg text-xxs text-zinc-400 font-medium">
+                                <div className="text-[9px] uppercase font-bold text-zinc-500 mb-1">Dates fiscales pour cette période</div>
+                                Début : <span className="font-mono text-purple-400">{getFiscalDates(editingWorkload.year, contractDate).start}</span><br />
+                                Fin : <span className="font-mono text-purple-400">{getFiscalDates(editingWorkload.year, contractDate).end}</span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Année</Label>
+                                    <select 
+                                        value={editingWorkload.year} 
+                                        onChange={(e) => setEditingWorkload({ ...editingWorkload, year: Number(e.target.value) })}
+                                        className="w-full bg-[#121318] border border-zinc-850 rounded p-1.5 text-white outline-none h-8 cursor-pointer text-xxs"
+                                    >
+                                        <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
+                                        <option value={new Date().getFullYear() - 1}>{new Date().getFullYear() - 1}</option>
+                                        <option value={new Date().getFullYear() - 2}>{new Date().getFullYear() - 2}</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Fréquence</Label>
+                                    <select 
+                                        value={editingWorkload.month !== null && editingWorkload.month !== undefined ? "monthly" : "annual"} 
+                                        onChange={(e) => {
+                                            const isMonthly = e.target.value === 'monthly'
+                                            setEditingWorkload({ 
+                                                ...editingWorkload, 
+                                                month: isMonthly ? (editingWorkload.month || new Date().getMonth() + 1) : null 
+                                            })
+                                        }}
+                                        className="w-full bg-[#121318] border border-zinc-850 rounded p-1.5 text-white outline-none h-8 cursor-pointer text-xxs"
+                                    >
+                                        <option value="annual">Annuelle (Total global)</option>
+                                        <option value="monthly">Mensuelle</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {editingWorkload.month !== null && editingWorkload.month !== undefined && (
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Mois</Label>
+                                    <select 
+                                        value={editingWorkload.month} 
+                                        onChange={(e) => setEditingWorkload({ ...editingWorkload, month: Number(e.target.value) })}
+                                        className="w-full bg-[#121318] border border-zinc-850 rounded p-1.5 text-white outline-none h-8 cursor-pointer text-xxs"
+                                    >
+                                        {MONTHS.map(m => (
+                                            <option key={m.value} value={m.value}>{m.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Volume de Tâches</Label>
+                                    <Input 
+                                        type="number" 
+                                        value={editingWorkload.tasks_count !== null && editingWorkload.tasks_count !== undefined ? editingWorkload.tasks_count : ''}
+                                        onChange={(e) => setEditingWorkload({ ...editingWorkload, tasks_count: e.target.value === '' ? null : Number(e.target.value) })}
+                                        className="bg-[#121318] border-zinc-850 h-8 text-xxs text-zinc-150 font-semibold"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Tâches terminées à ce jour</Label>
+                                    <Input 
+                                        type="number" 
+                                        value={editingWorkload.tasks_completed_count !== null && editingWorkload.tasks_completed_count !== undefined ? editingWorkload.tasks_completed_count : ''}
+                                        onChange={(e) => setEditingWorkload({ ...editingWorkload, tasks_completed_count: e.target.value === '' ? null : Number(e.target.value) })}
+                                        className="bg-[#121318] border-zinc-850 h-8 text-xxs text-zinc-150 font-semibold"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Comms Totales Syndicat</Label>
+                                    <Input 
+                                        type="number" 
+                                        value={editingWorkload.syndicate_comms_count !== null && editingWorkload.syndicate_comms_count !== undefined ? editingWorkload.syndicate_comms_count : ''}
+                                        onChange={(e) => setEditingWorkload({ ...editingWorkload, syndicate_comms_count: e.target.value === '' ? null : Number(e.target.value) })}
+                                        className="bg-[#121318] border-zinc-850 h-8 text-xxs text-zinc-150 font-semibold"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Comms Assignées Gest.</Label>
+                                    <Input 
+                                        type="number" 
+                                        value={editingWorkload.manager_comms_count !== null && editingWorkload.manager_comms_count !== undefined ? editingWorkload.manager_comms_count : ''}
+                                        onChange={(e) => setEditingWorkload({ ...editingWorkload, manager_comms_count: e.target.value === '' ? null : Number(e.target.value) })}
+                                        className="bg-[#121318] border-zinc-850 h-8 text-xxs text-zinc-150 font-semibold"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <Label className="text-zinc-500">Réunions de CA / an</Label>
+                                <Input 
+                                    type="number" 
+                                    value={editingWorkload.board_meetings_count !== null && editingWorkload.board_meetings_count !== undefined ? editingWorkload.board_meetings_count : ''}
+                                    onChange={(e) => setEditingWorkload({ ...editingWorkload, board_meetings_count: e.target.value === '' ? null : Number(e.target.value) })}
+                                    className="bg-[#121318] border-zinc-850 h-8 text-xxs text-zinc-150 font-semibold"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="p-4 border-t border-zinc-900 bg-zinc-950/20 flex gap-3 justify-end">
+                            <Button 
+                                type="button" 
+                                variant="ghost" 
+                                onClick={() => setEditingWorkload(null)}
+                                className="text-xxs h-8 border-zinc-850 text-zinc-400 hover:text-zinc-200"
+                            >
+                                Annuler
+                            </Button>
+                            <Button 
+                                type="button" 
+                                onClick={() => handleUpdateWorkload(editingWorkload)}
+                                disabled={savingWorkload}
+                                className="bg-purple-650 hover:bg-purple-700 text-white text-xxs h-8 px-4 font-semibold rounded-lg shadow cursor-pointer"
+                            >
+                                {savingWorkload ? 'Enregistrement...' : 'Sauvegarder'}
                             </Button>
                         </div>
                     </div>

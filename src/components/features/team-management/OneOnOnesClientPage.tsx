@@ -148,6 +148,7 @@ export function OneOnOnesClientPage({ oneOnOnes = [], managers = [] }: OneOnOnes
                                     <th className="p-3 text-center">Tâches en retard</th>
                                     <th className="p-3 text-center">Appels (Taux)</th>
                                     <th className="p-3 text-center">Courriels +48h</th>
+                                    <th className="p-3 text-center">Score</th>
                                     <th className="p-3 text-center">Statut</th>
                                     <th className="p-3 text-right">Détails</th>
                                 </tr>
@@ -155,7 +156,7 @@ export function OneOnOnesClientPage({ oneOnOnes = [], managers = [] }: OneOnOnes
                             <tbody className="divide-y divide-zinc-850">
                                 {(!oneOnOnes || oneOnOnes.length === 0) ? (
                                     <tr>
-                                        <td colSpan={7} className="p-4 text-center italic text-zinc-500">
+                                        <td colSpan={8} className="p-4 text-center italic text-zinc-500">
                                             Aucune rencontre d'alignement enregistrée.
                                         </td>
                                     </tr>
@@ -166,7 +167,7 @@ export function OneOnOnesClientPage({ oneOnOnes = [], managers = [] }: OneOnOnes
                                         return (
                                             <>
                                                 <tr key={monthKey} className="bg-zinc-950/40 border-y border-zinc-800">
-                                                    <td colSpan={7} className="p-2.5 font-bold text-purple-400 text-xxs uppercase tracking-wider">
+                                                    <td colSpan={8} className="p-2.5 font-bold text-purple-400 text-xxs uppercase tracking-wider">
                                                         {monthLabel} ({monthMeetings.length} séance{monthMeetings.length > 1 ? 's' : ''})
                                                     </td>
                                                 </tr>
@@ -180,6 +181,22 @@ export function OneOnOnesClientPage({ oneOnOnes = [], managers = [] }: OneOnOnes
                                                         o.status === 'completed' 
                                                             ? 'bg-emerald-500/20 text-emerald-400 border-emerald-800/40' 
                                                             : 'bg-amber-500/20 text-amber-400 border-amber-800/40'
+
+                                                    // Performance-based color code mapping:
+                                                    // >= 90: emerald
+                                                    // >= 80: teal
+                                                    // >= 70: purple
+                                                    // >= 60: amber
+                                                    // < 60: rose
+                                                    let scoreColor = 'bg-zinc-500/20 text-zinc-400 border-zinc-850'
+                                                    if (o.meeting_score !== null && o.meeting_score !== undefined) {
+                                                        const s = o.meeting_score
+                                                        if (s >= 90) scoreColor = 'bg-emerald-500/20 text-emerald-400 border-emerald-800/40'
+                                                        else if (s >= 80) scoreColor = 'bg-teal-500/20 text-teal-400 border-teal-850'
+                                                        else if (s >= 70) scoreColor = 'bg-purple-500/20 text-purple-400 border-purple-800/40'
+                                                        else if (s >= 60) scoreColor = 'bg-amber-500/20 text-amber-400 border-amber-800/40'
+                                                        else scoreColor = 'bg-rose-500/20 text-rose-405 border-rose-800/40'
+                                                    }
 
                                                     return (
                                                         <tr key={o.id} className="hover:bg-zinc-900/30 transition-colors cursor-pointer text-xxs border-b border-zinc-850/50">
@@ -218,6 +235,13 @@ export function OneOnOnesClientPage({ oneOnOnes = [], managers = [] }: OneOnOnes
                                                             <td className="p-0 text-center text-zinc-300">
                                                                 <Link href={`/team-management/one-on-ones/${o.id}`} className="p-3 hover:text-purple-400 transition-colors block w-full h-full">
                                                                     {o.emails_over_48h}
+                                                                </Link>
+                                                            </td>
+                                                            <td className="p-0 text-center">
+                                                                <Link href={`/team-management/one-on-ones/${o.id}`} className="p-3 hover:text-purple-400 transition-colors block w-full h-full">
+                                                                    <Badge variant="outline" className={`text-xs font-black px-2 py-0.5 font-mono ${scoreColor}`}>
+                                                                        {o.meeting_score !== null ? `${o.meeting_score}%` : 'N/A'}
+                                                                    </Badge>
                                                                 </Link>
                                                             </td>
                                                             <td className="p-0 text-center">
