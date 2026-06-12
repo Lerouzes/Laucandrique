@@ -660,6 +660,27 @@ export async function applySnapshotAction(
                 }
                 appliedInactiveCount++
             }
+
+            // 7. Verify / Create Operational Risk Ticket for Date of Leaving
+            if (row.departure_date) {
+                // Check if an active risk already exists for this client
+                const { data: existingRisk } = await supabase
+                    .from('manager_operational_risks')
+                    .select('id')
+                    .eq('client_id', finalClientId)
+                    .eq('status', 'active')
+                    .maybeSingle()
+
+                if (!existingRisk && row.manager_id) {
+                    await supabase.from('manager_operational_risks').insert({
+                        manager_id: row.manager_id,
+                        client_id: finalClientId,
+                        description: `Non-renouvellement de contrat / départ planifié le ${row.departure_date}. À analyser lors du 1v1.`,
+                        severity: 'critical',
+                        status: 'active'
+                    })
+                }
+            }
         }
 
         // Update snapshot status

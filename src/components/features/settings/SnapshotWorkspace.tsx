@@ -116,12 +116,12 @@ export function SnapshotWorkspace({
         { key: 'amount_of_meetings', label: "Amount of meetings", required: false },
         { key: 'team', label: "Team", required: false },
         { key: 'package_pricing', label: "Package Pricing", required: false },
+        { key: 'departure_date', label: "Date de départ / Résiliation (Date of leaving)", required: false },
         // Fallbacks
         { key: 'id', label: "ID Client Gustav (Optionnel)", required: false },
         { key: 'ms_list_item_id', label: "ID d'élément MS List (Optionnel)", required: false },
         { key: 'legal_name', label: "Nom Légal / Entreprise (Optionnel)", required: false },
         { key: 'status', label: "Statut (Actif/Inactif)", required: false },
-        { key: 'departure_date', label: "Date de départ / Résiliation", required: false },
     ]
 
     // 1. Excel Template Download
@@ -143,7 +143,8 @@ export function SnapshotWorkspace({
                     "Code postal", 
                     "Amount of meetings", 
                     "Team", 
-                    "Package Pricing"
+                    "Package Pricing",
+                    "Date de départ / Résiliation (Date of leaving)"
                 ],
                 [
                     "SDC-001", 
@@ -158,7 +159,8 @@ export function SnapshotWorkspace({
                     "J4Z 2B9", 
                     "4", 
                     "Équipe A", 
-                    "350.00"
+                    "350.00",
+                    ""
                 ],
                 [
                     "SDC-002", 
@@ -173,7 +175,8 @@ export function SnapshotWorkspace({
                     "J4K 1A2", 
                     "2", 
                     "Équipe B", 
-                    "220.00"
+                    "220.00",
+                    "2026-05-30"
                 ]
             ]
             const ws = XLSX.utils.aoa_to_sheet(wsData)
