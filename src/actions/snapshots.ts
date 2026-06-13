@@ -39,29 +39,60 @@ export async function getSnapshotsAction() {
 
 // Helper: safe date parsing
 function parseDateSafe(val: any): string | null {
-    if (!val) return null
+    if (val === undefined || val === null) return null
     const str = String(val).trim()
     if (str === '') return null
-    // Accept YYYY-MM-DD
+
+    // 1. Check if it's a raw number (Excel serial date or year)
+    if (/^\d+(\.\d+)?$/.test(str)) {
+        const num = Number(str)
+        if (num >= 1900 && num <= 2100) {
+            // It's a year (like 2026)
+            return `${Math.floor(num)}-01-01`
+        }
+        if (num >= 1 && num <= 100000) {
+            // It's an Excel serial number
+            const date = new Date(Date.UTC(1899, 11, 30) + Math.floor(num) * 24 * 60 * 60 * 1000)
+            if (!isNaN(date.getTime())) {
+                const y = date.getUTCFullYear()
+                const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+                const d = String(date.getUTCDate()).padStart(2, '0')
+                if (y >= 1900 && y <= 2100) {
+                    return `${y}-${m}-${d}`
+                }
+            }
+        }
+    }
+
+    // 2. Accept YYYY-MM-DD
     const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/)
-    if (isoMatch) return isoMatch[0]
-    // Accept DD/MM/YYYY
+    if (isoMatch) {
+        const y = parseInt(isoMatch[1], 10)
+        if (y >= 1900 && y <= 2100) {
+            return isoMatch[0]
+        }
+    }
+
+    // 3. Accept DD/MM/YYYY or D/M/YYYY
     const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
     if (slashMatch) {
         const d = slashMatch[1].padStart(2, '0')
         const m = slashMatch[2].padStart(2, '0')
-        const y = slashMatch[3]
-        return `${y}-${m}-${d}`
+        const y = parseInt(slashMatch[3], 10)
+        if (y >= 1900 && y <= 2100) {
+            return `${y}-${m}-${d}`
+        }
     }
-    // Accept year only
-    const yearMatch = str.match(/^(\d{4})$/)
-    if (yearMatch) return `${yearMatch[1]}-01-01`
 
-    // Try standard JS Date
+    // 4. Try standard JS Date but validate the year is reasonable
     const dObj = new Date(str)
     if (!isNaN(dObj.getTime())) {
-        return dObj.toISOString().split('T')[0]
+        const y = dObj.getFullYear()
+        if (y >= 1900 && y <= 2100) {
+            return dObj.toISOString().split('T')[0]
+        }
     }
+
     return null
 }
 

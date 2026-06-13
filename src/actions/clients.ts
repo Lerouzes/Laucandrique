@@ -296,34 +296,60 @@ export async function updateClientAction(clientIdOrPrev: any, formData: FormData
 }
 
 function parseDateSafe(val: any): string {
-    if (!val) return '2000-01-01'
+    if (val === undefined || val === null) return '2000-01-01'
     const str = String(val).trim()
-    // Accept YYYY-MM-DD format
-    const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-    if (isoMatch) {
-        const y = parseInt(isoMatch[1], 10)
-        const m = parseInt(isoMatch[2], 10) - 1
-        const d = parseInt(isoMatch[3], 10)
-        const date = new Date(Date.UTC(y, m, d))
-        if (!isNaN(date.getTime())) return str
-    }
-    // Accept DD/MM/YYYY or MM/DD/YYYY
-    const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-    if (slashMatch) {
-        const a = parseInt(slashMatch[1], 10)
-        const b = parseInt(slashMatch[2], 10)
-        const y = parseInt(slashMatch[3], 10)
-        // Assume DD/MM/YYYY (French convention)
-        const date = new Date(Date.UTC(y, b - 1, a))
-        if (!isNaN(date.getTime())) {
-            return `${y}-${String(b).padStart(2, '0')}-${String(a).padStart(2, '0')}`
+    if (str === '') return '2000-01-01'
+
+    // 1. Check if it's a raw number (Excel serial date or year)
+    if (/^\d+(\.\d+)?$/.test(str)) {
+        const num = Number(str)
+        if (num >= 1900 && num <= 2100) {
+            // It's a year (like 2026)
+            return `${Math.floor(num)}-01-01`
+        }
+        if (num >= 1 && num <= 100000) {
+            // It's an Excel serial number
+            const date = new Date(Date.UTC(1899, 11, 30) + Math.floor(num) * 24 * 60 * 60 * 1000)
+            if (!isNaN(date.getTime())) {
+                const y = date.getUTCFullYear()
+                const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+                const d = String(date.getUTCDate()).padStart(2, '0')
+                if (y >= 1900 && y <= 2100) {
+                    return `${y}-${m}-${d}`
+                }
+            }
         }
     }
-    // Accept year only
-    const yearMatch = str.match(/^(\d{4})$/)
-    if (yearMatch) {
-        return `${yearMatch[1]}-01-01`
+
+    // 2. Accept YYYY-MM-DD
+    const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (isoMatch) {
+        const y = parseInt(isoMatch[1], 10)
+        if (y >= 1900 && y <= 2100) {
+            return isoMatch[0]
+        }
     }
+
+    // 3. Accept DD/MM/YYYY or D/M/YYYY
+    const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+    if (slashMatch) {
+        const d = slashMatch[1].padStart(2, '0')
+        const m = slashMatch[2].padStart(2, '0')
+        const y = parseInt(slashMatch[3], 10)
+        if (y >= 1900 && y <= 2100) {
+            return `${y}-${m}-${d}`
+        }
+    }
+
+    // 4. Try standard JS Date but validate the year is reasonable
+    const dObj = new Date(str)
+    if (!isNaN(dObj.getTime())) {
+        const y = dObj.getFullYear()
+        if (y >= 1900 && y <= 2100) {
+            return dObj.toISOString().split('T')[0]
+        }
+    }
+
     return '2000-01-01'
 }
 
