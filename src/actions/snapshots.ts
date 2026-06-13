@@ -569,10 +569,11 @@ export async function applySnapshotAction(
             // Prepare client payloads
             let resolvedMgrId = row.manager_id
             if (!resolvedMgrId && row.manager_name) {
-                if (manualManagerMatches && manualManagerMatches[row.manager_name]) {
-                    resolvedMgrId = manualManagerMatches[row.manager_name]
+                const manualMatch = manualManagerMatches && (manualManagerMatches[row.manager_name] || manualManagerMatches[tempId])
+                if (manualMatch) {
+                    resolvedMgrId = manualMatch
                 } else {
-                    const mgrLower = row.manager_name.toLowerCase()
+                    const mgrLower = row.manager_name.trim().toLowerCase()
                     const { data: dbMgrs } = await supabase.from('managers').select('id, first_name, last_name')
                     const match = dbMgrs?.find(m => 
                         `${m.first_name} ${m.last_name}`.toLowerCase() === mgrLower ||
@@ -581,10 +582,19 @@ export async function applySnapshotAction(
                     if (match) {
                         resolvedMgrId = match.id
                     } else {
-                        // Automatically create manager from import
-                        const createRes = await addManagerFromImportAction(row.manager_name, true)
-                        if (createRes.success && createRes.managerId) {
-                            resolvedMgrId = createRes.managerId
+                        // Automatically create manager from import unless it's a known placeholder / department name
+                        const placeholderBlacklist = [
+                            'operation', 'operations', 'operations12', 'operation12', 
+                            'aucun', 'none', 'n/a', 'na', 'sans', 'non spécifié', 'unknown', 'inconnu',
+                            'opérations', 'opérations12'
+                        ]
+                        const isPlaceholder = placeholderBlacklist.includes(mgrLower) || !row.manager_name.includes(' ')
+                        
+                        if (!isPlaceholder) {
+                            const createRes = await addManagerFromImportAction(row.manager_name, true)
+                            if (createRes.success && createRes.managerId) {
+                                resolvedMgrId = createRes.managerId
+                            }
                         }
                     }
                 }
@@ -644,13 +654,16 @@ export async function applySnapshotAction(
                         package_name: row.package_name || 'Non spécifié',
                         monthly_fee: row.monthly_fee || row.package_pricing || 0,
                         start_date: row.financial_year || null,
-                        renewal_date: row.renewal_date || null,
                         active: row.status !== 'inactive'
                     }
 
-                    await supabase
+                    const { error: contractErr } = await supabase
                         .from('contracts')
                         .upsert(contractPayload, { onConflict: 'client_id' })
+                    
+                    if (contractErr) {
+                        console.error(`Error upserting contract for client ${targetClientId}:`, contractErr.message)
+                    }
 
                     // 4. Update doors count
                     if (row.doors_count != null) {
@@ -696,7 +709,6 @@ export async function applySnapshotAction(
                     compareAndLog('city', currentClient.city, row.city)
                     compareAndLog('postal_code', currentClient.postal_code, row.postal_code)
                     compareAndLog('renewal_date', currentClient.renewal_date, row.renewal_date)
-                    compareAndLog('contract_renewal_date', contract?.renewal_date, row.renewal_date)
                     compareAndLog('amount_of_meetings', currentClient.amount_of_meetings, row.amount_of_meetings)
                     compareAndLog('team', currentClient.team, row.team)
                     compareAndLog('package_pricing', currentClient.package_pricing, row.package_pricing)
@@ -735,11 +747,13 @@ export async function applySnapshotAction(
                     package_name: row.package_name || 'Non spécifié',
                     monthly_fee: row.monthly_fee || row.package_pricing || 0,
                     start_date: row.financial_year || null,
-                    renewal_date: row.renewal_date || null,
                     active: row.status !== 'inactive'
                 }
 
-                await supabase.from('contracts').insert(contractPayload)
+                const { error: contractErr } = await supabase.from('contracts').insert(contractPayload)
+                if (contractErr) {
+                    console.error(`Error inserting contract for client ${finalClientId}:`, contractErr.message)
+                }
 
                 // Create doors
                 if (row.doors_count && row.doors_count > 0) {

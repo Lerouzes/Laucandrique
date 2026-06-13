@@ -426,9 +426,19 @@ export async function confirmBulkImportAction(rows: {
                 if (match) {
                     resolvedMgrId = match.id
                 } else {
-                    const createRes = await addManagerFromImportAction(row.manager_name_ref.trim(), true)
-                    if (createRes.success && createRes.managerId) {
-                        resolvedMgrId = createRes.managerId
+                    // Automatically create manager from import unless it's a known placeholder / department name
+                    const placeholderBlacklist = [
+                        'operation', 'operations', 'operations12', 'operation12', 
+                        'aucun', 'none', 'n/a', 'na', 'sans', 'non spécifié', 'unknown', 'inconnu',
+                        'opérations', 'opérations12'
+                    ]
+                    const isPlaceholder = placeholderBlacklist.includes(mgrLower) || !row.manager_name_ref.includes(' ')
+                    
+                    if (!isPlaceholder) {
+                        const createRes = await addManagerFromImportAction(row.manager_name_ref.trim(), true)
+                        if (createRes.success && createRes.managerId) {
+                            resolvedMgrId = createRes.managerId
+                        }
                     }
                 }
             }
