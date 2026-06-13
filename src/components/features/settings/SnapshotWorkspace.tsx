@@ -139,7 +139,7 @@ export function SnapshotWorkspace({
         { key: 'doors_count', label: "Nombre d'unités", required: false },
         { key: 'financial_year', label: "Année financière (YYYY-MM-DD)", required: false },
         { key: 'manager', label: "Gestionnaire (Name)", required: false },
-        { key: 'operations_lead', label: "Chargé d’opération", required: false },
+        { key: 'operations_lead', label: "Chargé d'opération", required: false },
         { key: 'package_name', label: "Type de forfait", required: false },
         { key: 'address', label: "Adresse", required: false },
         { key: 'city', label: "Ville", required: false },
@@ -153,8 +153,6 @@ export function SnapshotWorkspace({
         // Fallbacks
         { key: 'id', label: "ID Client Gustav (Optionnel)", required: false },
         { key: 'ms_list_item_id', label: "ID d'élément MS List (Optionnel)", required: false },
-        { key: 'legal_name', label: "Nom Légal / Entreprise (Optionnel)", required: false },
-        { key: 'status', label: "Statut (Actif/Inactif)", required: false },
     ]
 
     // 1. Excel Template Download
