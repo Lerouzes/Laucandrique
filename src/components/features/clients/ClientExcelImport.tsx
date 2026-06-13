@@ -201,11 +201,19 @@ export function ClientExcelImport({
 
                 // Format & Map data to rows
                 const parsed: ImportRow[] = rawData.map((row: any, index) => {
-                    const sdcNum = String(row['SDC #'] || row['sdc_#'] || row['manager'] || '').trim()
-                    const sdcName = String(row['SDC Name'] || row['sdc_name'] || row['Nom complet'] || row['Nom Complet'] || row['full_name'] || row['company_name'] || '').trim()
+                    const getFuzzyVal = (keywords: string[], fallback = '') => {
+                        const matchedKey = Object.keys(row).find(k => {
+                            const kl = k.toLowerCase().trim()
+                            return keywords.some(kw => kl.includes(kw.toLowerCase()))
+                        })
+                        return matchedKey ? String(row[matchedKey] || '').trim() : fallback
+                    }
+
+                    const sdcNum = getFuzzyVal(['sdc #', 'sdc_#', 'sdc', 'reference', 'référence', 'code'], '').trim()
+                    const sdcName = getFuzzyVal(['sdc name', 'sdc_name', 'nom complet', 'full_name', 'company_name', 'nom complet du syndicat', 'nom_complet', 'nom'], '').trim()
                     
                     // Match Manager fuzzy/exact by name
-                    const managerNameRef = String(row['Manager'] || row['manager_name'] || row['Gestionnaire'] || '').trim()
+                    const managerNameRef = getFuzzyVal(['manager', 'gestionnaire', 'manager_name'], '').trim()
                     let matchedManagerId: string | null = null
                     if (managerNameRef) {
                         const match = safeManagers.find(
@@ -222,46 +230,41 @@ export function ClientExcelImport({
                           )
                         : null
 
-                    const rawDoors = row['Nombre de portes'] || row['doors_count'] || row['Portes'] || row['Amount of doors']
+                    const rawDoors = getFuzzyVal(['porte', 'portes', 'doors', 'unités', 'unites', 'doors_count'])
                     let doorsCount: number | null = null
-                    if (rawDoors !== undefined && rawDoors !== null) {
-                        const parsedDoors = parseInt(String(rawDoors).replace(/\D/g, ''), 10)
+                    if (rawDoors) {
+                        const parsedDoors = parseInt(rawDoors.replace(/\D/g, ''), 10)
                         doorsCount = isNaN(parsedDoors) ? null : parsedDoors
                     }
 
-                    let rawPackage = String(row['Forfait'] || row['forfait'] || row['package'] || '').trim()
+                    let rawPackage = getFuzzyVal(['forfait', 'package', 'type de forfait']).trim()
                     if (rawPackage.toLowerCase().includes('platine')) {
                         rawPackage = 'Platinum'
-                    } else if (rawPackage.toLowerCase() === 'argent +') {
+                    } else if (rawPackage.toLowerCase() === 'argent +' || rawPackage.toLowerCase() === 'argent+') {
                         rawPackage = 'Argent+'
                     }
                     const validPackages = ['Bronze', 'Argent', 'Argent+', 'Or', 'Platinum']
                     const packageName = validPackages.find(p => p.toLowerCase() === rawPackage.toLowerCase()) || null
 
-                    const rawFee = row['Frais mensuels'] || row['monthly_fee'] || row['Pricing'] || row['monthly pricing']
-                    const monthlyFee = rawFee !== undefined && rawFee !== null ? parseAmount(rawFee) : null
+                    const rawFee = getFuzzyVal(['frais mensuels', 'monthly_fee', 'pricing', 'monthly pricing', 'package pricing', 'package_pricing', 'honoraires'])
+                    const monthlyFee = rawFee ? parseAmount(rawFee) : null
 
-                    const rawYear = row['Exercice financier'] || row['financial_year'] || row['Financial year'] || row['Date exercice']
+                    const rawYear = getFuzzyVal(['exercice', 'financial_year', 'financial year', 'année financière', 'annee financiere'])
                     const financialYear = rawYear ? parseExcelDate(rawYear) : null
 
-                    const rawStatusStr = String(row['Statut'] || row['status'] || row['status_contract'] || '').trim().toLowerCase()
+                    const rawStatusStr = getFuzzyVal(['statut', 'status', 'status_contract', 'statut de projet', 'statut de contrat']).trim().toLowerCase()
                     let status: 'active' | 'inactive' = 'active'
-                    if (rawStatusStr.includes('inactiv') || rawStatusStr === 'inactive' || rawStatusStr === 'inactif') {
+                    if (rawStatusStr.includes('inactiv') || rawStatusStr === 'inactive' || rawStatusStr === 'inactif' || rawStatusStr.includes('quitt')) {
                         status = 'inactive'
                     } else if (rawStatusStr.includes('activ') || rawStatusStr === 'active' || rawStatusStr === 'actif') {
                         status = 'active'
                     }
 
-                    const operationsLeadRaw = String(
-                        row['Chargé d’opération'] || 
-                        row['Chargé d\'opération'] || 
-                        row['operations_lead'] || 
-                        row['Chargé d’opérations'] || 
-                        row['Chargé d'opération'] || 
-                        row['operations lead'] || 
-                        row['Chargé d’op.'] ||
-                        ''
-                    ).trim()
+                    const operationsLeadRaw = getFuzzyVal([
+                        'chargé d’opération', 'chargé d\'opération', 'charge d\'operation',
+                        'chargé d’opérations', 'chargé d\'opérations', 'charge d\'operations', 
+                        'charge d’operation', 'operations_lead', 'operations lead', 'chargé d’op', 'chargé d\'op'
+                    ]).trim()
 
                     return {
                         temp_id: `row-${index}-${Date.now()}`,
@@ -269,12 +272,12 @@ export function ClientExcelImport({
                         manager: sdcNum,
                         full_name: sdcNum,
                         company_name: sdcName,
-                        address: String(row['Address'] || row['Adresse'] || row['address'] || '').trim(),
-                        email: String(row['Email'] || row['Courriel'] || row['email'] || '').trim(),
-                        phone: String(row['Phone'] || row['Téléphone'] || row['phone'] || '').trim(),
-                        city: String(row['City'] || row['Ville'] || row['city'] || '').trim(),
-                        province: String(row['Province'] || row['province'] || '').trim(),
-                        postal_code: String(row['Postal Code'] || row['Code Postal'] || row['postal_code'] || '').trim(),
+                        address: getFuzzyVal(['adresse', 'address']),
+                        email: getFuzzyVal(['email', 'courriel', 'alias']),
+                        phone: getFuzzyVal(['phone', 'téléphone', 'telephone']),
+                        city: getFuzzyVal(['city', 'ville']),
+                        province: getFuzzyVal(['province']),
+                        postal_code: getFuzzyVal(['postal code', 'code postal', 'postal_code', 'zip']),
                         manager_name_ref: managerNameRef,
                         manager_id: matchedManagerId,
                         import_action: duplicateMatch ? 'update' : 'create',
