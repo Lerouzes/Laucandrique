@@ -67,6 +67,7 @@ interface ImportRow {
     monthly_fee: number | null
     financial_year: string | null
     status: 'active' | 'inactive'
+    operations_lead: string | null
 }
 
 export function ClientExcelImport({ 
@@ -251,6 +252,17 @@ export function ClientExcelImport({
                         status = 'active'
                     }
 
+                    const operationsLeadRaw = String(
+                        row['Chargé d’opération'] || 
+                        row['Chargé d\'opération'] || 
+                        row['operations_lead'] || 
+                        row['Chargé d’opérations'] || 
+                        row['Chargé d'opération'] || 
+                        row['operations lead'] || 
+                        row['Chargé d’op.'] ||
+                        ''
+                    ).trim()
+
                     return {
                         temp_id: `row-${index}-${Date.now()}`,
                         id: duplicateMatch?.id,
@@ -271,7 +283,8 @@ export function ClientExcelImport({
                         package_name: packageName,
                         monthly_fee: monthlyFee,
                         financial_year: financialYear,
-                        status: status
+                        status: status,
+                        operations_lead: operationsLeadRaw || null
                     }
                 })
 

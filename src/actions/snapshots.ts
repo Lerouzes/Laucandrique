@@ -3,6 +3,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { addManagerFromImportAction } from '@/actions/managers'
 
 // Enforce Master/Direction profiles for snapshots
 async function authorizeUser() {
@@ -218,7 +219,10 @@ export async function uploadSnapshotAction(
                     }
                 }
                 if (!matchedClient && full_name) {
-                    matchedClient = dbClientsList.find(c => c.full_name && c.full_name.toLowerCase() === full_name.toLowerCase())
+                    matchedClient = dbClientsList.find(c => c.company_name && c.company_name.toLowerCase() === full_name.toLowerCase())
+                    if (!matchedClient) {
+                        matchedClient = dbClientsList.find(c => c.full_name && c.full_name.toLowerCase() === full_name.toLowerCase())
+                    }
                     if (matchedClient) {
                         matchConfidence = 'Medium'
                         matchReason = `Nom d'affichage correspond (${full_name})`
@@ -545,14 +549,23 @@ export async function applySnapshotAction(
                     )
                     if (match) {
                         resolvedMgrId = match.id
+                    } else {
+                        // Automatically create manager from import
+                        const createRes = await addManagerFromImportAction(row.manager_name, true)
+                        if (createRes.success && createRes.managerId) {
+                            resolvedMgrId = createRes.managerId
+                        }
                     }
                 }
             }
 
             const clientPayload: Record<string, any> = {
-                full_name: row.full_name || 'Syndicate Importé',
-                legal_name: row.legal_name || null,
-                company_name: row.legal_name || null,
+                // SDC # is stored in database full_name column
+                full_name: row.syndicate_code || row.full_name || 'SDC-Importé',
+                // Syndicate display name is stored in company_name
+                company_name: row.full_name || null,
+                legal_name: row.legal_name || row.full_name || null,
+                display_name: row.full_name || null,
                 syndicate_code: row.syndicate_code || null,
                 ms_list_item_id: row.ms_list_item_id || null,
                 manager_id: resolvedMgrId || null,
@@ -566,7 +579,7 @@ export async function applySnapshotAction(
                 renewal_date: row.renewal_date || null,
                 amount_of_meetings: row.amount_of_meetings || null,
                 team: row.team || null,
-                package_pricing: row.package_pricing || null
+                package_pricing: row.package_pricing || row.monthly_fee || null
             }
 
             let finalClientId = targetClientId
@@ -643,8 +656,9 @@ export async function applySnapshotAction(
                         }
                     }
 
-                    compareAndLog('legal_name', currentClient.legal_name || currentClient.company_name, row.legal_name)
-                    compareAndLog('full_name', currentClient.full_name, row.full_name)
+                    compareAndLog('legal_name', currentClient.legal_name, row.legal_name || row.full_name)
+                    compareAndLog('full_name', currentClient.full_name, row.syndicate_code || row.full_name)
+                    compareAndLog('company_name', currentClient.company_name, row.full_name)
                     compareAndLog('syndicate_code', currentClient.syndicate_code, row.syndicate_code)
                     compareAndLog('email', currentClient.email, row.email)
                     compareAndLog('address', currentClient.address, row.address)

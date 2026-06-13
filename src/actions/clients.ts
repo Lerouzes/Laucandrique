@@ -3,6 +3,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { addManagerFromImportAction } from '@/actions/managers'
 import fs from 'fs'
 import path from 'path'
 
@@ -345,6 +346,8 @@ export async function confirmBulkImportAction(rows: {
     monthly_fee?: number | null
     financial_year?: string | null
     status?: 'active' | 'inactive' | null
+    manager_name_ref?: string | null
+    operations_lead?: string | null
 }[]) {
     // Top-level try/catch ensures this server action NEVER crashes the app
     try {
@@ -385,6 +388,25 @@ export async function confirmBulkImportAction(rows: {
                 continue
             }
 
+            // Resolve manager_id if missing but manager_name_ref is present
+            let resolvedMgrId = row.manager_id || null
+            if (!resolvedMgrId && row.manager_name_ref && row.manager_name_ref.trim() !== '') {
+                const mgrLower = row.manager_name_ref.trim().toLowerCase()
+                const { data: dbMgrs } = await supabase.from('managers').select('id, first_name, last_name')
+                const match = dbMgrs?.find(m => 
+                    `${m.first_name} ${m.last_name}`.toLowerCase() === mgrLower ||
+                    m.last_name.toLowerCase() === mgrLower
+                )
+                if (match) {
+                    resolvedMgrId = match.id
+                } else {
+                    const createRes = await addManagerFromImportAction(row.manager_name_ref.trim(), true)
+                    if (createRes.success && createRes.managerId) {
+                        resolvedMgrId = createRes.managerId
+                    }
+                }
+            }
+
             // Full payload (with all new columns)
             const fullPayload: Record<string, any> = {
                 full_name: row.full_name.trim(),
@@ -396,9 +418,10 @@ export async function confirmBulkImportAction(rows: {
                 province: row.province?.trim() || null,
                 postal_code: row.postal_code?.trim() || null,
                 manager: row.manager || row.full_name.trim(),
-                manager_id: row.manager_id || null,
+                manager_id: resolvedMgrId,
                 status: row.status || 'active',
                 package_pricing: row.monthly_fee || null,
+                operations_lead: row.operations_lead || null,
             }
 
             // Core payload — falls back to this if DB hasn't been migrated with new columns

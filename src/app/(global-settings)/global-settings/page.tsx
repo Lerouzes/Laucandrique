@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Search, RefreshCw, List, FileSpreadsheet } from 'lucide-react'
+import { Search, RefreshCw, List, FileSpreadsheet, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -14,6 +14,7 @@ import { ClientsTable } from '@/components/features/clients/ClientsTable'
 import { ClientFormDialog } from '@/components/features/clients/ClientFormDialog'
 import { getSnapshotsAction } from '@/actions/snapshots'
 import { SnapshotWorkspace } from '@/components/features/settings/SnapshotWorkspace'
+import { AccountsManager } from '@/components/features/settings/AccountsManager'
 import { getManagers } from '@/actions/managers'
 
 // Tabs component
@@ -30,11 +31,13 @@ export default function GlobalSettingsPage() {
     const [managers, setManagers] = useState<any[]>([])
     const [searchVal, setSearchVal] = useState('')
     const [userRole, setUserRole] = useState<string>('Agent')
+    const [currentUserId, setCurrentUserId] = useState<string>('')
 
     // Fetch user role
     useEffect(() => {
         supabase.auth.getUser().then(({ data: { user } }) => {
             if (user) {
+                setCurrentUserId(user.id)
                 supabase.from('profiles').select('role').eq('id', user.id).single().then(({ data }) => {
                     if (data?.role) setUserRole(data.role)
                 })
@@ -87,6 +90,12 @@ export default function GlobalSettingsPage() {
                         <FileSpreadsheet className="h-4 w-4" />
                         Snapshots & Synchro
                     </TabsTrigger>
+                    {userRole === 'Master' && (
+                        <TabsTrigger value="accounts" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
+                            <Users className="h-4 w-4" />
+                            Gestion des Comptes
+                        </TabsTrigger>
+                    )}
                 </TabsList>
 
                 {/* TAB 1: CLIENT MASTER LIST */}
@@ -132,6 +141,16 @@ export default function GlobalSettingsPage() {
                         currentUserRole={userRole}
                     />
                 </TabsContent>
+
+                {/* TAB 3: ACCOUNTS MANAGEMENT */}
+                {userRole === 'Master' && (
+                    <TabsContent value="accounts" className="outline-none">
+                        <AccountsManager 
+                            userRole={userRole}
+                            currentUserId={currentUserId}
+                        />
+                    </TabsContent>
+                )}
             </Tabs>
         </div>
     )
