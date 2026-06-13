@@ -210,7 +210,7 @@ export default async function AuditDetailPage({
     // Syndicate statistics
     const doorsCount = client?.doors?.length || 0
     const activeContract = client?.contracts?.[0]
-    const mrr = activeContract ? Number(activeContract.monthly_fee || 0) : 0
+    const mrr = activeContract ? Number(activeContract.monthly_fee || 0) : Number(client?.package_pricing || 0)
 
     return (
         <div className="space-y-6 pb-12 max-w-7xl mx-auto px-4">

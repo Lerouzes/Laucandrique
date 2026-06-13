@@ -108,6 +108,10 @@ export default async function TeamsListPage() {
         
         const teamReportQuoteApprovalRate = teamReportQuotesSent > 0 ? Math.round((teamReportQuotesAccepted / teamReportQuotesSent) * 100) : 0
         const teamAdditionalQuoteApprovalRate = teamAdditionalQuotesSent > 0 ? Math.round((teamAdditionalQuotesAccepted / teamAdditionalQuotesSent) * 100) : 0
+        
+        const teamTotalSalary = teamManagers.reduce((sum, m) => sum + Number(m.salary || 0), 0)
+        const monthlyTeamCost = teamTotalSalary / 12
+        const teamCostToMrrRatio = totalMrr > 0 ? (monthlyTeamCost / totalMrr) * 100 : 0
 
         teamStatsList.push({
             team,
@@ -131,7 +135,9 @@ export default async function TeamsListPage() {
             teamAdditionalQuotesRejected,
             teamAdditionalQuoteApprovalRate,
             teamAdditionalQuotesAcceptedValue,
-            teamAdditionalQuotesGeneratedValue
+            teamAdditionalQuotesGeneratedValue,
+            monthlyTeamCost,
+            teamCostToMrrRatio
         })
     }
 
@@ -147,10 +153,10 @@ export default async function TeamsListPage() {
 
             {/* Teams Grid */}
             <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-                {teamStatsList.map(({ team, managersCount, totalSyndicates, totalDoors, totalMrr, avgWorkload, avgPerformance, riskCount, teamManagersList, quoteApprovalRate, totalApprovedQuotes, totalPresentedQuotes, teamReportQuotesSent, teamReportQuotesAccepted, teamReportQuoteApprovalRate, teamAdditionalQuotesSent, teamAdditionalQuotesAccepted, teamAdditionalQuoteApprovalRate, teamAdditionalQuotesAcceptedValue, teamAdditionalQuotesGeneratedValue }) => {
+                {teamStatsList.map(({ team, managersCount, totalSyndicates, totalDoors, totalMrr, avgWorkload, avgPerformance, riskCount, teamManagersList, quoteApprovalRate, totalApprovedQuotes, totalPresentedQuotes, teamReportQuotesSent, teamReportQuotesAccepted, teamReportQuoteApprovalRate, teamAdditionalQuotesSent, teamAdditionalQuotesAccepted, teamAdditionalQuoteApprovalRate, teamAdditionalQuotesAcceptedValue, teamAdditionalQuotesGeneratedValue, monthlyTeamCost, teamCostToMrrRatio }) => {
                     const workloadColor = 
-                        avgWorkload > 120 ? 'text-rose-400' :
-                        avgWorkload > 80 ? 'text-amber-400' : 'text-emerald-400'
+                        avgWorkload > 120 ? 'text-rose-450 text-rose-500' :
+                        avgWorkload > 80 ? 'text-amber-400' : 'text-emerald-450 text-emerald-400'
 
                     return (
                         <Card key={team.id} className="bg-[#16171e]/70 border-zinc-800/80 shadow-md flex flex-col justify-between">
@@ -207,10 +213,26 @@ export default async function TeamsListPage() {
                                             {teamReportQuoteApprovalRate}% <span className="text-[10px] font-normal text-zinc-500 ml-1">({teamReportQuotesAccepted}/{teamReportQuotesSent})</span>
                                         </span>
                                     </div>
-                                    <div className="p-2.5 bg-zinc-900/40 border border-zinc-850 rounded-xl border-emerald-900/20">
+                                                                   <div className="p-2.5 bg-zinc-900/40 border border-zinc-850 rounded-xl border-emerald-900/20">
                                         <span className="text-emerald-400 block uppercase tracking-wider font-bold text-emerald-400">Demandes additionnelles</span>
                                         <span className="text-xs font-bold text-zinc-200 mt-1 block">
                                             ${teamAdditionalQuotesAcceptedValue.toLocaleString('fr-CA')} <span className="text-[10px] font-normal text-zinc-500 ml-1">({teamAdditionalQuoteApprovalRate}%)</span>
+                                        </span>
+                                    </div>
+                                    <div className="p-2.5 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                                        <span className="text-zinc-500 block uppercase tracking-wider font-bold">Coût Salaires (Mensuel)</span>
+                                        <span className="text-xs font-bold text-zinc-200 mt-1 block">
+                                            ${monthlyTeamCost.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                    <div className="p-2.5 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                                        <span className="text-zinc-500 block uppercase tracking-wider font-bold">Ratio Coût / MRR</span>
+                                        <span className={cn(
+                                            "text-xs font-bold mt-1 block",
+                                            teamCostToMrrRatio > 80 ? "text-rose-500" :
+                                            teamCostToMrrRatio > 50 ? "text-amber-400" : "text-emerald-400"
+                                        )}>
+                                            {teamCostToMrrRatio.toFixed(1)}%
                                         </span>
                                     </div>
                                 </div>

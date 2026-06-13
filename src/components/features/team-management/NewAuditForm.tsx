@@ -1310,7 +1310,9 @@ export function NewAuditForm({
                                         <strong className="text-sm font-extrabold text-emerald-450 text-emerald-400 block mt-0.5">
                                             {activeClientObj.contracts && activeClientObj.contracts[0] 
                                                 ? `$${Number(activeClientObj.contracts[0].monthly_fee || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}` 
-                                                : 'Aucun contrat'}
+                                                : (activeClientObj.package_pricing
+                                                    ? `$${Number(activeClientObj.package_pricing).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}`
+                                                    : 'Aucun contrat')}
                                         </strong>
                                     </div>
                                 </div>

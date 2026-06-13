@@ -79,7 +79,7 @@ export async function getManagerStats(managerId: string) {
     // 3. Monthly Recurring Revenue (MRR)
     const mrr = activeSyndicates.reduce((acc, c) => {
         const contract = Array.isArray(c.contracts) ? c.contracts[0] : c.contracts
-        const fee = Number(contract?.monthly_fee || 0)
+        const fee = Number(contract?.monthly_fee || c.package_pricing || 0)
         return acc + fee
     }, 0)
 
@@ -411,9 +411,14 @@ export async function getGlobalTeamStats(opts?: {
     // Monthly recurring revenue
     const mrr = activeClients.reduce((acc, c) => {
         const contract = Array.isArray(c.contracts) ? c.contracts[0] : c.contracts
-        const fee = Number(contract?.monthly_fee || 0)
+        const fee = Number(contract?.monthly_fee || c.package_pricing || 0)
         return acc + fee
     }, 0)
+
+    // Team salaries (using managers list in current team context)
+    const teamTotalSalary = teamManagers.reduce((sum, m) => sum + Number(m.salary || 0), 0)
+    const monthlySalaryCost = teamTotalSalary / 12
+    const costToMrrRatio = mrr > 0 ? (monthlySalaryCost / mrr) * 100 : 0
 
     // Contract counts by package
     const packageCounts = {
@@ -620,6 +625,8 @@ export async function getGlobalTeamStats(opts?: {
         totalSyndicates: activeClients.length,
         totalDoors,
         mrr,
+        monthlySalaryCost,
+        costToMrrRatio,
         packageCounts,
         meetingsCount: meetingsCount || 0,
         atRiskCount,

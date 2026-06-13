@@ -98,6 +98,10 @@ export default async function TeamDetailPage({
     const teamReportQuoteApprovalRate = teamReportQuotesSent > 0 ? Math.round((teamReportQuotesAccepted / teamReportQuotesSent) * 100) : 0
     const teamAdditionalQuoteApprovalRate = teamAdditionalQuotesSent > 0 ? Math.round((teamAdditionalQuotesAccepted / teamAdditionalQuotesSent) * 100) : 0
 
+    const teamTotalSalary = (managers || []).reduce((sum, m) => sum + Number(m.salary || 0), 0)
+    const monthlyTeamCost = teamTotalSalary / 12
+    const teamCostToMrrRatio = totalMrr > 0 ? (monthlyTeamCost / totalMrr) * 100 : 0
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -115,7 +119,7 @@ export default async function TeamDetailPage({
             </div>
 
             {/* Metrics cards */}
-            <div className="grid gap-4 grid-cols-2 lg:grid-cols-6">
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-7">
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardHeader className="pb-2">
                         <CardDescription className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Syndicats Actifs</CardDescription>
@@ -179,6 +183,27 @@ export default async function TeamDetailPage({
                             <span className="text-[9px] text-zinc-500 font-normal block">Généré: ${teamAdditionalQuotesGeneratedValue.toLocaleString('fr-CA')}</span>
                             <span className="text-[9px] text-zinc-450 font-normal text-zinc-400">({teamAdditionalQuotesAccepted}/{teamAdditionalQuotesSent} acc. · {teamAdditionalQuoteApprovalRate}%)</span>
                         </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                    <CardHeader className="pb-2">
+                        <CardDescription className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Ratio Coût / MRR</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex items-baseline justify-between">
+                        <div>
+                            <div className={cn(
+                                "text-xl font-extrabold",
+                                teamCostToMrrRatio > 80 ? "text-rose-500" :
+                                teamCostToMrrRatio > 50 ? "text-amber-400" : "text-emerald-400"
+                            )}>
+                                {teamCostToMrrRatio.toFixed(1)}%
+                            </div>
+                            <span className="text-[9px] text-zinc-500 font-normal block mt-1">
+                                Mensuel: ${monthlyTeamCost.toLocaleString('fr-CA', { maximumFractionDigits: 0 })}
+                            </span>
+                        </div>
+                        <DollarSign className="h-4 w-4 text-purple-400" />
                     </CardContent>
                 </Card>
             </div>

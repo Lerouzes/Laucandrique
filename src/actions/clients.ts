@@ -176,6 +176,15 @@ export async function updateClientAction(clientIdOrPrev: any, formData: FormData
         console.error('Debug log insertion failed:', dbgEx)
     }
 
+    // Contract details
+    const package_name_raw = (formData.get('package_name') as string || '').trim()
+    const package_name = package_name_raw !== '' ? package_name_raw : null
+    const monthly_fee_raw = formData.get('monthly_fee')
+    const financial_year_raw = formData.get('financial_year')
+
+    const monthly_fee = monthly_fee_raw != null && monthly_fee_raw !== '' ? Number(monthly_fee_raw) : 0
+    const start_date = financial_year_raw && financial_year_raw !== '' ? parseDateSafe(financial_year_raw) : null
+
     const payload = {
         full_name: String(formData.get('full_name') || '').trim(),
         company_name: String(formData.get('company_name') || '') || null,
@@ -190,6 +199,7 @@ export async function updateClientAction(clientIdOrPrev: any, formData: FormData
         operations_lead: String(formData.get('operations_lead') || '').trim() || null,
         notes: String(formData.get('notes') || '') || null,
         status: String(formData.get('status') || 'active') as 'active' | 'inactive',
+        package_pricing: isNaN(monthly_fee) ? 0 : monthly_fee,
         aga_planned_date: formData.get('aga_planned_date') ? String(formData.get('aga_planned_date')) : null,
         aga_completed_date: formData.get('aga_completed_date') ? String(formData.get('aga_completed_date')) : null,
         aga_status: formData.get('aga_status') ? String(formData.get('aga_status')) : 'pending',
@@ -205,14 +215,6 @@ export async function updateClientAction(clientIdOrPrev: any, formData: FormData
         { onConflict: 'name' }
     )
 
-    // Contract details
-    const package_name_raw = (formData.get('package_name') as string || '').trim()
-    const package_name = package_name_raw !== '' ? package_name_raw : null
-    const monthly_fee_raw = formData.get('monthly_fee')
-    const financial_year_raw = formData.get('financial_year')
-
-    const monthly_fee = monthly_fee_raw != null && monthly_fee_raw !== '' ? Number(monthly_fee_raw) : 0
-    const start_date = financial_year_raw && financial_year_raw !== '' ? parseDateSafe(financial_year_raw) : null
     const active = payload.status !== 'inactive'
 
     const { error: contractErr } = await supabase
@@ -396,6 +398,7 @@ export async function confirmBulkImportAction(rows: {
                 manager: row.manager || row.full_name.trim(),
                 manager_id: row.manager_id || null,
                 status: row.status || 'active',
+                package_pricing: row.monthly_fee || null,
             }
 
             // Core payload — falls back to this if DB hasn't been migrated with new columns
