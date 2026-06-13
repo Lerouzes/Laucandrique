@@ -113,9 +113,11 @@ export function SnapshotWorkspace({
         { key: 'address', label: "Adresse", required: false },
         { key: 'city', label: "Ville", required: false },
         { key: 'postal_code', label: "Code postal", required: false },
+        { key: 'renewal_date', label: "Renewal date of the contract (Date de renouvellement)", required: false },
         { key: 'amount_of_meetings', label: "Amount of meetings", required: false },
-        { key: 'team', label: "Team", required: false },
         { key: 'package_pricing', label: "Package Pricing", required: false },
+        { key: 'team', label: "Team (Code d'équipe)", required: false },
+        { key: 'project_status', label: "Statut du projet (Projet actif/Projet quitté)", required: false },
         { key: 'departure_date', label: "Date de départ / Résiliation (Date of leaving)", required: false },
         // Fallbacks
         { key: 'id', label: "ID Client Gustav (Optionnel)", required: false },
@@ -141,9 +143,11 @@ export function SnapshotWorkspace({
                     "Adresse", 
                     "Ville", 
                     "Code postal", 
+                    "Renewal date of the contract (Date de renouvellement)",
                     "Amount of meetings", 
-                    "Team", 
                     "Package Pricing",
+                    "Team",
+                    "Statut de projet (Projet actif/Projet quitté)",
                     "Date de départ / Résiliation (Date of leaving)"
                 ],
                 [
@@ -157,9 +161,11 @@ export function SnapshotWorkspace({
                     "123 rue des Fleurs", 
                     "Brossard", 
                     "J4Z 2B9", 
+                    "2027-01-01",
                     "4", 
-                    "Équipe A", 
                     "350.00",
+                    "G001: Classique",
+                    "Projet actif",
                     ""
                 ],
                 [
@@ -173,9 +179,11 @@ export function SnapshotWorkspace({
                     "456 boul. Taschereau", 
                     "Longueuil", 
                     "J4K 1A2", 
+                    "2026-10-15",
                     "2", 
-                    "Équipe B", 
                     "220.00",
+                    "G002: Essentiel",
+                    "Projet quitté",
                     "2026-05-30"
                 ]
             ]

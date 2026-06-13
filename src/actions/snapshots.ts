@@ -121,13 +121,36 @@ export async function uploadSnapshotAction(
             const address = row[fieldMappings.address]?.toString()?.trim() || null
             const city = row[fieldMappings.city]?.toString()?.trim() || null
             const postal_code = row[fieldMappings.postal_code]?.toString()?.trim() || null
+            const renewal_date = row[fieldMappings.renewal_date] ? parseDateSafe(row[fieldMappings.renewal_date]) : null
             const amount_of_meetings = row[fieldMappings.amount_of_meetings] != null ? parseInt(row[fieldMappings.amount_of_meetings]) : null
-            const team = row[fieldMappings.team]?.toString()?.trim() || null
             const package_pricing = row[fieldMappings.package_pricing] != null ? parseFloat(row[fieldMappings.package_pricing]) : null
+            const project_status = row[fieldMappings.project_status]?.toString()?.trim() || null
 
-            // Determine if active
-            const isActive = status === 'active' || status === 'actif' || status === '1' || status === 'true'
-            const isInactive = !isActive || departure_date != null
+            // Map Team using master list naming system (G001: Classique, G002: Essentiel, G003: Tremblant)
+            let team = row[fieldMappings.team]?.toString()?.trim() || null
+            if (team) {
+                const teamLower = team.toLowerCase()
+                if (teamLower.includes('g001') || teamLower.includes('classique')) {
+                    team = 'Classique'
+                } else if (teamLower.includes('g002') || teamLower.includes('essentiel')) {
+                    team = 'Essentiel'
+                } else if (teamLower.includes('g003') || teamLower.includes('tremblant')) {
+                    team = 'Tremblant'
+                }
+            }
+
+            // Determine if active (Projet actif vs Projet quitté)
+            let isInactive = false
+            if (project_status) {
+                const psLower = project_status.toLowerCase()
+                if (psLower.includes('quitté') || psLower.includes('quitte') || psLower.includes('inactive')) {
+                    isInactive = true
+                }
+            } else {
+                // Fallback to original status or departure_date
+                const isActiveVal = status === 'active' || status === 'actif' || status === '1' || status === 'true'
+                isInactive = !isActiveVal || departure_date != null
+            }
 
             // Find match
             let matchedClient: any = null
@@ -269,6 +292,10 @@ export async function uploadSnapshotAction(
                     diffs.amount_of_meetings = { db: matchedClient.amount_of_meetings || '0', excel: amount_of_meetings }
                     hasChanges = true
                 }
+                if (renewal_date && matchedClient.renewal_date !== renewal_date) {
+                    diffs.renewal_date = { db: matchedClient.renewal_date || 'N/A', excel: renewal_date }
+                    hasChanges = true
+                }
                 if (team && matchedClient.team !== team) {
                     diffs.team = { db: matchedClient.team || 'N/A', excel: team }
                     hasChanges = true
@@ -346,9 +373,11 @@ export async function uploadSnapshotAction(
                 address,
                 city,
                 postal_code,
+                renewal_date,
                 amount_of_meetings,
                 team,
                 package_pricing,
+                project_status,
                 matchedClientId: matchedClient?.id || null,
                 matchConfidence,
                 matchReason,
@@ -497,6 +526,7 @@ export async function applySnapshotAction(
                 address: row.address || null,
                 city: row.city || null,
                 postal_code: row.postal_code || null,
+                renewal_date: row.renewal_date || null,
                 amount_of_meetings: row.amount_of_meetings || null,
                 team: row.team || null,
                 package_pricing: row.package_pricing || null
@@ -533,6 +563,7 @@ export async function applySnapshotAction(
                         package_name: row.package_name || 'Non spécifié',
                         monthly_fee: row.monthly_fee || row.package_pricing || 0,
                         start_date: row.financial_year || null,
+                        renewal_date: row.renewal_date || null,
                         active: row.status !== 'inactive'
                     }
 
@@ -582,6 +613,8 @@ export async function applySnapshotAction(
                     compareAndLog('address', currentClient.address, row.address)
                     compareAndLog('city', currentClient.city, row.city)
                     compareAndLog('postal_code', currentClient.postal_code, row.postal_code)
+                    compareAndLog('renewal_date', currentClient.renewal_date, row.renewal_date)
+                    compareAndLog('contract_renewal_date', contract?.renewal_date, row.renewal_date)
                     compareAndLog('amount_of_meetings', currentClient.amount_of_meetings, row.amount_of_meetings)
                     compareAndLog('team', currentClient.team, row.team)
                     compareAndLog('package_pricing', currentClient.package_pricing, row.package_pricing)
@@ -619,6 +652,7 @@ export async function applySnapshotAction(
                     package_name: row.package_name || 'Non spécifié',
                     monthly_fee: row.monthly_fee || row.package_pricing || 0,
                     start_date: row.financial_year || null,
+                    renewal_date: row.renewal_date || null,
                     active: row.status !== 'inactive'
                 }
 
