@@ -51,8 +51,8 @@ interface Snapshot {
     change_summary: any
     field_mappings: any
     processed_rows: any[]
-    uploaded_by_profile?: { first_name: string, last_name: string }
-    applied_by_profile?: { first_name: string, last_name: string }
+    uploaded_by_profile?: { full_name: string }
+    applied_by_profile?: { full_name: string }
 }
 
 interface Manager {
@@ -578,7 +578,7 @@ export function SnapshotWorkspace({
                                             </Badge>
                                         </div>
                                         <p className="text-[10px] text-zinc-500">
-                                            Importé le {new Date(snap.uploaded_at).toLocaleString('fr-CA')} par {snap.uploaded_by_profile ? `${snap.uploaded_by_profile.first_name} ${snap.uploaded_by_profile.last_name}` : 'Système'}
+                                            Importé le {new Date(snap.uploaded_at).toLocaleString('fr-CA')} par {snap.uploaded_by_profile ? snap.uploaded_by_profile.full_name : 'Système'}
                                         </p>
                                         <div className="flex gap-4 text-[10px] text-zinc-400 pt-1">
                                             <span>Nouveaux: {snap.new_count}</span>
@@ -713,7 +713,7 @@ export function SnapshotWorkspace({
                                     </Badge>
                                 </div>
                                 <p className="text-xs text-zinc-500 mt-1">
-                                    Fichier : {selectedSnapshot.file_name} | Importé par : {selectedSnapshot.uploaded_by_profile ? `${selectedSnapshot.uploaded_by_profile.first_name} ${selectedSnapshot.uploaded_by_profile.last_name}` : 'N/A'}
+                                    Fichier : {selectedSnapshot.file_name} | Importé par : {selectedSnapshot.uploaded_by_profile ? selectedSnapshot.uploaded_by_profile.full_name : 'N/A'}
                                 </p>
                             </div>
 

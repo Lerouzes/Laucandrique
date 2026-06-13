@@ -22,7 +22,7 @@ export async function getSnapshotsAction() {
         const supabase = await createClient()
         const { data, error } = await supabase
             .from('client_snapshots')
-            .select('*, uploaded_by_profile:profiles!client_snapshots_uploaded_by_fkey(first_name, last_name), applied_by_profile:profiles!client_snapshots_applied_by_fkey(first_name, last_name)')
+            .select('*, uploaded_by_profile:profiles!client_snapshots_uploaded_by_fkey(full_name), applied_by_profile:profiles!client_snapshots_applied_by_fkey(full_name)')
             .order('uploaded_at', { ascending: false })
 
         if (error) {
