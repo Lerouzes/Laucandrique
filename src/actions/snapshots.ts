@@ -125,7 +125,8 @@ export async function uploadSnapshotAction(
             const amount_of_meetings = row[fieldMappings.amount_of_meetings] != null ? parseInt(row[fieldMappings.amount_of_meetings]) : null
             const package_pricing = row[fieldMappings.package_pricing] != null ? parseFloat(row[fieldMappings.package_pricing]) : null
             const project_status = row[fieldMappings.project_status]?.toString()?.trim() || null
-            const operations_lead = row[fieldMappings.operations_lead]?.toString()?.trim() || null
+            const operations_lead_raw = row[fieldMappings.operations_lead]?.toString()?.trim() || null
+            const operations_lead = (operations_lead_raw && operations_lead_raw.toLowerCase() !== 'aucun') ? operations_lead_raw : null
 
             // Map Team using master list naming system (G001: Classique, G002: Essentiel, G003: Tremblant)
             let team = row[fieldMappings.team]?.toString()?.trim() || null
