@@ -425,7 +425,7 @@ export function SnapshotWorkspace({
             try {
                 const res = await rejectSnapshotAction(selectedSnapshot.id)
                 if (res.success) {
-                    toast.success("Snapshot rejeté.")
+                    toast.success("Snapshot rejeté et supprimé.")
                     const { getSnapshotsAction } = await import('@/actions/snapshots')
                     const updated = await getSnapshotsAction()
                     setSnapshots(updated)

@@ -781,23 +781,19 @@ export async function applySnapshotAction(
     }
 }
 
-// 4. Reject a snapshot
+// 4. Reject and delete a snapshot
 export async function rejectSnapshotAction(snapshotId: string) {
     try {
-        const { user } = await authorizeUser()
+        await authorizeUser()
         const supabase = await createClient()
 
         const { error } = await supabase
             .from('client_snapshots')
-            .update({
-                status: 'Rejected',
-                rejected_at: new Date().toISOString(),
-                rejected_by: user.id
-            })
+            .delete()
             .eq('id', snapshotId)
 
         if (error) {
-            console.error("Error rejecting snapshot:", error)
+            console.error("Error deleting rejected snapshot:", error)
             return { success: false, error: error.message }
         }
 
