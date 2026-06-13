@@ -26,7 +26,7 @@ export async function getProjects(query?: string) {
 
     const { data, error } = await supabase
         .from('projects')
-        .select('*, clients(full_name, address), contractors(full_name, color), quotes(quote_number, total, contractor_id, approved_at, contractors(full_name, color))')
+        .select('*, clients(id, full_name, address, status, departure_date, contracts(active)), contractors(full_name, color), quotes(quote_number, total, contractor_id, manager_id, approved_at, contractors(full_name, color), managers(first_name, last_name, team_id))')
         .order('created_at', { ascending: false })
 
     if (error) {
@@ -34,11 +34,25 @@ export async function getProjects(query?: string) {
         return []
     }
 
-    if (!query) return data
-    const normalized = query.trim().toLowerCase()
-    if (!normalized) return data
+    // Fetch all manager teams to manually map them
+    const { data: teams } = await supabase
+        .from('manager_teams')
+        .select('id, name')
 
-    return (data || []).filter((project: any) => {
+    const teamById = new Map((teams || []).map((t: any) => [t.id, t]))
+    const mappedData = (data || []).map((project: any) => {
+        if (project.quotes && project.quotes.managers) {
+            const teamId = project.quotes.managers.team_id
+            project.quotes.managers.manager_teams = teamId ? teamById.get(teamId) || null : null
+        }
+        return project
+    })
+
+    if (!query) return mappedData
+    const normalized = query.trim().toLowerCase()
+    if (!normalized) return mappedData
+
+    return mappedData.filter((project: any) => {
         const clientName = String(project.clients?.full_name || '').toLowerCase()
         const address = String(project.clients?.address || '').toLowerCase()
         const quoteNumber = String(project.quotes?.quote_number || '')

@@ -390,7 +390,12 @@ export async function getGlobalTeamStats(opts?: {
     let activeClients = (clients || []).filter(c => {
         const isActiveStatus = c.status === 'active' || !c.status
         const notDepartedYet = !c.departure_date || new Date(c.departure_date) > now
-        return isActiveStatus && notDepartedYet
+        
+        // Find if contract is active:
+        const contract = Array.isArray(c.contracts) ? c.contracts[0] : c.contracts
+        const isContractActive = contract ? contract.active === true : false
+        
+        return isActiveStatus && notDepartedYet && isContractActive
     })
 
     if (targetTeamId) {
@@ -458,8 +463,11 @@ export async function getGlobalTeamStats(opts?: {
         .gte('audit_date', startDate)
         .lte('audit_date', endDate)
 
-    if (targetTeamId) {
+    // Always restrict to active clients to avoid counting audits of inactive syndicates/contracts
+    if (activeClientIds.length > 0) {
         auditsQuery = auditsQuery.in('client_id', activeClientIds)
+    } else {
+        auditsQuery = auditsQuery.in('client_id', ['00000000-0000-0000-0000-000000000000'])
     }
     const { data: audits } = await auditsQuery
 

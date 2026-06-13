@@ -67,8 +67,27 @@ export default async function DashboardPage({
         getSettings()
     ])
 
+    // Helper to check if a client has an active status and active contract
+    const isClientActiveAndContractActive = (client: any): boolean => {
+        if (!client) return false
+        const now = new Date()
+        const isActiveStatus = client.status === 'active' || !client.status
+        const notDepartedYet = !client.departure_date || new Date(client.departure_date) > now
+        
+        // Find active contract
+        const contracts = client.contracts
+        const contract = Array.isArray(contracts) ? contracts[0] : contracts
+        const isContractActive = contract ? contract.active === true : false
+        
+        return isActiveStatus && notDepartedYet && isContractActive
+    }
+
+    // Filter to only quotes and projects that belong to active clients with active contracts
+    const activeQuotesOnly = quotes.filter((q: any) => isClientActiveAndContractActive(q.clients))
+    const activeProjectsOnly = projects.filter((p: any) => isClientActiveAndContractActive(p.clients))
+
     // Filter logic
-    const filteredQuotes = quotes.filter((q: any) => {
+    const filteredQuotes = activeQuotesOnly.filter((q: any) => {
         const managerId = q.manager_id || 'none'
         const teamName = q.managers?.manager_teams?.name || ''
         const managerMatch = selectedManagers.length === 0 || selectedManagers.includes(managerId)
@@ -95,7 +114,7 @@ export default async function DashboardPage({
     const totalSentValue = rangeSentQuotes.reduce((acc: number, q: any) => acc + (q.total || 0), 0)
     const totalPipelineValue = totalApprovedValue + totalSentValue
  
-    const activeProjects = projects.filter((p: any) => {
+    const activeProjects = activeProjectsOnly.filter((p: any) => {
         if (!(p.status === 'in_progress' || p.status === 'planned')) return false
         const managerId = p.quotes?.manager_id || 'none'
         const teamName = p.quotes?.managers?.manager_teams?.name || ''
@@ -110,7 +129,7 @@ export default async function DashboardPage({
     })
  
     // Unplanned projects (approved quotes with no calendar date yet)
-    const unplannedProjects = projects.filter((p: any) => {
+    const unplannedProjects = activeProjectsOnly.filter((p: any) => {
         if (p.status !== 'unplanned') return false
         const managerId = p.quotes?.manager_id || 'none'
         const teamName = p.quotes?.managers?.manager_teams?.name || ''
@@ -157,8 +176,8 @@ export default async function DashboardPage({
             }
         })
 
-    const availableManagers = Array.from(new Set(quotes.map((q: any) => q.manager_id).filter(Boolean)))
-    const availableTeams = Array.from(new Set(quotes.map((q: any) => q.managers?.manager_teams?.name).filter(Boolean)))
+    const availableManagers = Array.from(new Set(activeQuotesOnly.map((q: any) => q.manager_id).filter(Boolean)))
+    const availableTeams = Array.from(new Set(activeQuotesOnly.map((q: any) => q.managers?.manager_teams?.name).filter(Boolean)))
 
     // Calculate win rate using date range
     const rangeDeniedQuotes = filteredQuotes
@@ -260,7 +279,7 @@ export default async function DashboardPage({
             {showFilters && (
                 <DashboardFilters 
                     availableManagers={availableManagers.map(id => {
-                        const q = quotes.find((x: any) => x.manager_id === id)
+                        const q = activeQuotesOnly.find((x: any) => x.manager_id === id)
                         const name = q?.managers ? `${q.managers.first_name} ${q.managers.last_name}` : id
                         return { id, name }
                     })}
