@@ -125,6 +125,7 @@ export async function uploadSnapshotAction(
             const amount_of_meetings = row[fieldMappings.amount_of_meetings] != null ? parseInt(row[fieldMappings.amount_of_meetings]) : null
             const package_pricing = row[fieldMappings.package_pricing] != null ? parseFloat(row[fieldMappings.package_pricing]) : null
             const project_status = row[fieldMappings.project_status]?.toString()?.trim() || null
+            const operations_lead = row[fieldMappings.operations_lead]?.toString()?.trim() || null
 
             // Map Team using master list naming system (G001: Classique, G002: Essentiel, G003: Tremblant)
             let team = row[fieldMappings.team]?.toString()?.trim() || null
@@ -300,6 +301,10 @@ export async function uploadSnapshotAction(
                     diffs.team = { db: matchedClient.team || 'N/A', excel: team }
                     hasChanges = true
                 }
+                if (operations_lead && matchedClient.operations_lead !== operations_lead) {
+                    diffs.operations_lead = { db: matchedClient.operations_lead || 'Aucun', excel: operations_lead }
+                    hasChanges = true
+                }
                 if (package_pricing != null && Number(matchedClient.package_pricing || 0) !== package_pricing) {
                     diffs.package_pricing = { db: Number(matchedClient.package_pricing || 0), excel: package_pricing }
                     hasChanges = true
@@ -378,6 +383,7 @@ export async function uploadSnapshotAction(
                 team,
                 package_pricing,
                 project_status,
+                operations_lead,
                 matchedClientId: matchedClient?.id || null,
                 matchConfidence,
                 matchReason,
@@ -513,13 +519,27 @@ export async function applySnapshotAction(
             }
 
             // Prepare client payloads
+            let resolvedMgrId = row.manager_id
+            if (!resolvedMgrId && row.manager_name) {
+                const mgrLower = row.manager_name.toLowerCase()
+                const { data: dbMgrs } = await supabase.from('managers').select('id, first_name, last_name')
+                const match = dbMgrs?.find(m => 
+                    `${m.first_name} ${m.last_name}`.toLowerCase() === mgrLower ||
+                    m.last_name.toLowerCase() === mgrLower
+                )
+                if (match) {
+                    resolvedMgrId = match.id
+                }
+            }
+
             const clientPayload: Record<string, any> = {
                 full_name: row.full_name || 'Syndicate Importé',
                 legal_name: row.legal_name || null,
                 company_name: row.legal_name || null,
                 syndicate_code: row.syndicate_code || null,
                 ms_list_item_id: row.ms_list_item_id || null,
-                manager_id: row.manager_id || null,
+                manager_id: resolvedMgrId || null,
+                operations_lead: row.operations_lead || null,
                 status: row.status || 'active',
                 departure_date: row.departure_date || null,
                 email: row.email || null,
@@ -624,6 +644,7 @@ export async function applySnapshotAction(
                     compareAndLog('monthly_fee', contract?.monthly_fee, row.monthly_fee || row.package_pricing)
                     compareAndLog('status', currentClient.status || 'active', row.status)
                     compareAndLog('departure_date', currentClient.departure_date, row.departure_date)
+                    compareAndLog('operations_lead', currentClient.operations_lead, row.operations_lead)
 
                     if (historyRecords.length > 0) {
                         await supabase.from('client_field_history').insert(historyRecords)

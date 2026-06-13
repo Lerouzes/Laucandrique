@@ -11,7 +11,6 @@ type Profile = Database['public']['Tables']['profiles']['Row']
 
 const navItems = [
     { name: 'Tableau de bord', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Clients', href: '/clients', icon: Users },
     { name: 'Soumissions', href: '/quotes', icon: FileText },
     { name: 'Planification', href: '/planification', icon: CalendarDays },
     { name: 'Contracteurs', href: '/contractors', icon: HardHat },

@@ -114,7 +114,7 @@ export function ClientsTable({ data }: { data: Client[] }) {
                             <TableRow 
                                 key={client.id} 
                                 className="border-b border-zinc-800 hover:bg-zinc-800/50 cursor-pointer"
-                                onClick={() => router.push(`/clients/${client.id}`)}
+                                onClick={() => router.push(`/global-settings/clients/${client.id}`)}
                             >
                                 <TableCell className="font-medium text-cyan-400 hover:text-cyan-300 hover:underline transition-colors">{client.full_name}</TableCell>
                                 <TableCell className="text-zinc-300">

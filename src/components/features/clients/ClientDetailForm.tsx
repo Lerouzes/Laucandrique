@@ -150,6 +150,11 @@ export function ClientDetailForm({
               ))}
             </select>
           </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="operations_lead" className="text-xs text-zinc-400 font-semibold">Chargé d'opération</Label>
+            <Input id="operations_lead" name="operations_lead" defaultValue={client.operations_lead || ''} placeholder="Nom du chargé d'opération" className="bg-zinc-950 border-zinc-850 h-9 text-xs focus-visible:ring-zinc-800" />
+          </div>
         </div>
 
         {/* Address Card */}

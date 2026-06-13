@@ -854,6 +854,7 @@ export type Database = {
           phone: string | null
           salary: number
           team_id: string | null
+          active: boolean
         }
         Insert: {
           created_at?: string | null
@@ -865,6 +866,7 @@ export type Database = {
           phone?: string | null
           salary?: number
           team_id?: string | null
+          active?: boolean
         }
         Update: {
           created_at?: string | null
@@ -876,6 +878,7 @@ export type Database = {
           phone?: string | null
           salary?: number
           team_id?: string | null
+          active?: boolean
         }
         Relationships: [
           {

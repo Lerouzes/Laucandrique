@@ -71,6 +71,7 @@ export async function createClientAction(formData: FormData) {
         postal_code: formData.get('postal_code') as string || null,
         manager: (formData.get('manager') as string) || (formData.get('full_name') as string) || null,
         manager_id: formData.get('manager_id') as string || null,
+        operations_lead: formData.get('operations_lead') as string || null,
         notes: formData.get('notes') as string || null,
     }
 
@@ -186,6 +187,7 @@ export async function updateClientAction(clientIdOrPrev: any, formData: FormData
         postal_code: String(formData.get('postal_code') || '') || null,
         manager: String(formData.get('full_name') || '').trim() || null,
         manager_id: String(formData.get('manager_id') || '') || null,
+        operations_lead: String(formData.get('operations_lead') || '').trim() || null,
         notes: String(formData.get('notes') || '') || null,
         status: String(formData.get('status') || 'active') as 'active' | 'inactive',
         aga_planned_date: formData.get('aga_planned_date') ? String(formData.get('aga_planned_date')) : null,

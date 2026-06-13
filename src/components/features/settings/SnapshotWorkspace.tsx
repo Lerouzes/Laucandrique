@@ -34,6 +34,7 @@ import {
     rejectSnapshotAction, 
     replaceSnapshotAction 
 } from '@/actions/snapshots'
+import { addManagerFromImportAction } from '@/actions/managers'
 
 interface Snapshot {
     id: string
@@ -101,6 +102,35 @@ export function SnapshotWorkspace({
     const [ignoredRows, setIgnoredRows] = useState<Record<string, boolean>>({})
     const [manualMatches, setManualMatches] = useState<Record<string, string>>({}) // tempId -> client ID
 
+    const handleCreateManagerFromImport = async (name: string, active: boolean, tempId: string) => {
+        try {
+            const res = await addManagerFromImportAction(name, active)
+            if (res.success) {
+                toast.success(`Gestionnaire "${name}" créé avec succès!`)
+                if (selectedSnapshot) {
+                    const updatedRows = selectedSnapshot.processed_rows.map((r: any) => {
+                        if (r.tempId === tempId) {
+                            return {
+                                ...r,
+                                manager_id: res.managerId,
+                                needsManualReview: false
+                            }
+                        }
+                        return r
+                    })
+                    setSelectedSnapshot({
+                        ...selectedSnapshot,
+                        processed_rows: updatedRows
+                    })
+                }
+            } else {
+                toast.error("Erreur", { description: res.error })
+            }
+        } catch (err: any) {
+            toast.error("Erreur", { description: err.message })
+        }
+    }
+
     // Target fields we map in Gustav SDC Snapshots
     const gustavFields = [
         { key: 'syndicate_code', label: "Code de Syndicat", required: true },
@@ -109,6 +139,7 @@ export function SnapshotWorkspace({
         { key: 'doors_count', label: "Nombre d'unités", required: false },
         { key: 'financial_year', label: "Année financière (YYYY-MM-DD)", required: false },
         { key: 'manager', label: "Gestionnaire (Name)", required: false },
+        { key: 'operations_lead', label: "Chargé d’opération", required: false },
         { key: 'package_name', label: "Type de forfait", required: false },
         { key: 'address', label: "Adresse", required: false },
         { key: 'city', label: "Ville", required: false },
@@ -139,6 +170,7 @@ export function SnapshotWorkspace({
                     "Nombre d'unités", 
                     "Année financière (YYYY-MM-DD)", 
                     "Gestionnaire (Name)", 
+                    "Chargé d’opération",
                     "Type de forfait", 
                     "Adresse", 
                     "Ville", 
@@ -157,6 +189,7 @@ export function SnapshotWorkspace({
                     "24", 
                     "2026-01-01", 
                     managers[0] ? `${managers[0].first_name} ${managers[0].last_name}` : "Jean Valjean", 
+                    "Pierre Durand",
                     "Or", 
                     "123 rue des Fleurs", 
                     "Brossard", 
@@ -164,7 +197,7 @@ export function SnapshotWorkspace({
                     "2027-01-01",
                     "4", 
                     "350.00",
-                    "G001: Classique",
+                    "G001",
                     "Projet actif",
                     ""
                 ],
@@ -175,6 +208,7 @@ export function SnapshotWorkspace({
                     "12", 
                     "2025-10-15", 
                     "", 
+                    "",
                     "Argent", 
                     "456 boul. Taschereau", 
                     "Longueuil", 
@@ -182,7 +216,7 @@ export function SnapshotWorkspace({
                     "2026-10-15",
                     "2", 
                     "220.00",
-                    "G002: Essentiel",
+                    "G002",
                     "Projet quitté",
                     "2026-05-30"
                 ]
@@ -895,18 +929,49 @@ export function SnapshotWorkspace({
                                                                     {row.matchReason || 'Non identifié.'}
                                                                 </p>
                                                                 {(selectedSnapshot.status === 'Draft' || selectedSnapshot.status === 'Pending Review') && (
-                                                                    <select
-                                                                        value={manualMatches[row.tempId] || ''}
-                                                                        onChange={e => setManualMatches(prev => ({ ...prev, [row.tempId]: e.target.value }))}
-                                                                        className="h-8 w-full rounded border border-zinc-800 bg-zinc-950 px-2 text-[10px] text-zinc-200"
-                                                                    >
-                                                                        <option value="">-- Créer un nouveau Client --</option>
-                                                                        {existingClients.map(c => (
-                                                                            <option key={c.id} value={c.id}>
-                                                                                [{c.syndicate_code || 'N/A'}] {c.company_name || c.full_name}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
+                                                                    <>
+                                                                        <select
+                                                                            value={manualMatches[row.tempId] || ''}
+                                                                            onChange={e => setManualMatches(prev => ({ ...prev, [row.tempId]: e.target.value }))}
+                                                                            className="h-8 w-full rounded border border-zinc-800 bg-zinc-950 px-2 text-[10px] text-zinc-200"
+                                                                        >
+                                                                            <option value="">-- Créer un nouveau Client --</option>
+                                                                            {existingClients.map(c => (
+                                                                                <option key={c.id} value={c.id}>
+                                                                                    [{c.syndicate_code || 'N/A'}] {c.company_name || c.full_name}
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+
+                                                                        {row.manager_name && !row.manager_id && (
+                                                                            <div className="mt-2 p-2 rounded-lg border border-purple-900/60 bg-purple-950/20 space-y-1.5">
+                                                                                <p className="text-[10px] text-purple-300 font-medium">
+                                                                                    Gestionnaire non trouvé : <span className="font-bold">"{row.manager_name}"</span>
+                                                                                </p>
+                                                                                <div className="flex items-center justify-between gap-2">
+                                                                                    <label className="flex items-center gap-1 cursor-pointer select-none">
+                                                                                        <input 
+                                                                                            type="checkbox" 
+                                                                                            id={`mgr-active-${row.tempId}`} 
+                                                                                            defaultChecked 
+                                                                                            className="rounded border-zinc-800 bg-zinc-950 text-purple-600 h-3 w-3" 
+                                                                                        />
+                                                                                        <span className="text-[9px] text-zinc-400">Toujours actif ?</span>
+                                                                                    </label>
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            const checkbox = document.getElementById(`mgr-active-${row.tempId}`) as HTMLInputElement;
+                                                                                            const isActive = checkbox ? checkbox.checked : true;
+                                                                                            handleCreateManagerFromImport(row.manager_name, isActive, row.tempId);
+                                                                                        }}
+                                                                                        className="text-[9px] px-2 py-0.5 rounded bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-all"
+                                                                                    >
+                                                                                        Ajouter
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                    </>
                                                                 )}
                                                             </div>
                                                         </td>

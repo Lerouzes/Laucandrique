@@ -42,7 +42,7 @@ export function DeleteClientButton({
                 if (res.success) {
                     toast.success('Client supprimé avec succès.')
                     setIsOpen(false)
-                    router.push('/clients')
+                    router.push('/global-settings?tab=clients')
                     router.refresh()
                 } else {
                     toast.error('Erreur', { description: res.error })

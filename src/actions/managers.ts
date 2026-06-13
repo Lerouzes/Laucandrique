@@ -185,3 +185,43 @@ export async function deleteManagerAction(id: string) {
   revalidatePath('/clients')
   return { success: true }
 }
+
+export async function addManagerFromImportAction(fullName: string, active: boolean) {
+  const supabase = await createClient()
+  const parts = fullName.trim().split(/\s+/)
+  const first_name = parts[0] || 'Gestionnaire'
+  const last_name = parts.slice(1).join(' ') || 'Importé'
+  const email = null
+
+  // Check if a manager with this exact name already exists
+  const { data: existing } = await supabase
+    .from('managers')
+    .select('id')
+    .ilike('first_name', first_name)
+    .ilike('last_name', last_name)
+    .limit(1)
+
+  if (existing && existing.length > 0) {
+    return { success: true, managerId: existing[0].id }
+  }
+
+  const { data, error } = await supabase
+    .from('managers')
+    .insert({
+      first_name,
+      last_name,
+      email,
+      active
+    })
+    .select('id')
+    .single()
+
+  if (error || !data) {
+    return { success: false, error: error?.message || 'Failed to create manager' }
+  }
+
+  revalidatePath('/settings')
+  revalidatePath('/clients')
+  return { success: true, managerId: data.id }
+}
+
