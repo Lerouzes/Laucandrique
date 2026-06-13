@@ -481,6 +481,7 @@ export async function applySnapshotAction(
         // 1. Fetch snapshot details
         const { data: snapshot, error: snapErr } = await supabase
             .from('client_snapshots')
+            .select('*')
             .eq('id', snapshotId)
             .single()
 
