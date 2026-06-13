@@ -101,34 +101,78 @@ export function SnapshotWorkspace({
     const [approvedRows, setApprovedRows] = useState<Record<string, boolean>>({})
     const [ignoredRows, setIgnoredRows] = useState<Record<string, boolean>>({})
     const [manualMatches, setManualMatches] = useState<Record<string, string>>({}) // tempId -> client ID
+    const [manualManagerMatches, setManualManagerMatches] = useState<Record<string, string>>({}) // tempId -> manager ID
 
     const handleCreateManagerFromImport = async (name: string, active: boolean, tempId: string) => {
         try {
             const res = await addManagerFromImportAction(name, active)
-            if (res.success) {
+            if (res.success && res.managerId) {
                 toast.success(`Gestionnaire "${name}" créé avec succès!`)
                 if (selectedSnapshot) {
+                    const managerId = res.managerId
+                    const targetNameLower = name.toLowerCase()
+
+                    const newMatches: Record<string, string> = {}
+                    const newApproved: Record<string, boolean> = {}
+
                     const updatedRows = selectedSnapshot.processed_rows.map((r: any) => {
-                        if (r.tempId === tempId) {
+                        if (r.manager_name && r.manager_name.toLowerCase() === targetNameLower) {
+                            newMatches[r.tempId] = managerId
+                            newApproved[r.tempId] = true
                             return {
                                 ...r,
-                                manager_id: res.managerId,
+                                manager_id: managerId,
                                 needsManualReview: false
                             }
                         }
                         return r
                     })
+
+                    setManualManagerMatches(prev => ({ ...prev, ...newMatches }))
+                    setApprovedRows(prev => ({ ...prev, ...newApproved }))
+
                     setSelectedSnapshot({
                         ...selectedSnapshot,
                         processed_rows: updatedRows
                     })
                 }
             } else {
-                toast.error("Erreur", { description: res.error })
+                toast.error("Erreur", { description: res.error || "Une erreur est survenue lors de la création du gestionnaire." })
             }
         } catch (err: any) {
             toast.error("Erreur", { description: err.message })
         }
+    }
+
+    const handleLinkToExistingManager = (excelManagerName: string, existingManagerId: string) => {
+        if (!selectedSnapshot) return
+
+        const targetNameLower = excelManagerName.toLowerCase()
+        const newMatches: Record<string, string> = {}
+        const newApproved: Record<string, boolean> = {}
+
+        const updatedRows = selectedSnapshot.processed_rows.map((r: any) => {
+            if (r.manager_name && r.manager_name.toLowerCase() === targetNameLower) {
+                newMatches[r.tempId] = existingManagerId
+                newApproved[r.tempId] = true
+                return {
+                    ...r,
+                    manager_id: existingManagerId,
+                    needsManualReview: false
+                }
+            }
+            return r
+        })
+
+        setManualManagerMatches(prev => ({ ...prev, ...newMatches }))
+        setApprovedRows(prev => ({ ...prev, ...newApproved }))
+
+        setSelectedSnapshot({
+            ...selectedSnapshot,
+            processed_rows: updatedRows
+        })
+
+        toast.success(`Les lignes avec le gestionnaire "${excelManagerName}" ont été associées.`)
     }
 
     // Target fields we map in Gustav SDC Snapshots
@@ -365,6 +409,7 @@ export function SnapshotWorkspace({
         setApprovedRows(approved)
         setIgnoredRows(ignored)
         setManualMatches(matches)
+        setManualManagerMatches({})
     }
 
     const handleSelectSnapshot = (snap: Snapshot) => {
@@ -395,7 +440,8 @@ export function SnapshotWorkspace({
                     selectedSnapshot.id,
                     approvedIds,
                     ignoredIds,
-                    manualMatches
+                    manualMatches,
+                    manualManagerMatches
                 )
 
                 if (res.success) {
@@ -946,7 +992,28 @@ export function SnapshotWorkspace({
                                                                                 <p className="text-[10px] text-purple-300 font-medium">
                                                                                     Gestionnaire non trouvé : <span className="font-bold">"{row.manager_name}"</span>
                                                                                 </p>
-                                                                                <div className="flex items-center justify-between gap-2">
+                                                                                
+                                                                                <div className="space-y-1">
+                                                                                    <p className="text-[9px] text-zinc-400">Associer à un gestionnaire existant :</p>
+                                                                                    <select
+                                                                                        onChange={e => {
+                                                                                            if (e.target.value) {
+                                                                                                handleLinkToExistingManager(row.manager_name, e.target.value);
+                                                                                            }
+                                                                                        }}
+                                                                                        className="h-7 w-full rounded border border-zinc-800 bg-zinc-950 px-2 text-[9px] text-zinc-200"
+                                                                                        defaultValue=""
+                                                                                    >
+                                                                                        <option value="" disabled>-- Sélectionner --</option>
+                                                                                        {managers.map(m => (
+                                                                                            <option key={m.id} value={m.id}>
+                                                                                                {m.first_name} {m.last_name}
+                                                                                            </option>
+                                                                                        ))}
+                                                                                    </select>
+                                                                                </div>
+
+                                                                                <div className="flex items-center justify-between gap-2 pt-1 border-t border-purple-900/30">
                                                                                     <label className="flex items-center gap-1 cursor-pointer select-none">
                                                                                         <input 
                                                                                             type="checkbox" 
@@ -964,7 +1031,7 @@ export function SnapshotWorkspace({
                                                                                         }}
                                                                                         className="text-[9px] px-2 py-0.5 rounded bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-all"
                                                                                     >
-                                                                                        Ajouter
+                                                                                        Créer
                                                                                     </button>
                                                                                 </div>
                                                                             </div>

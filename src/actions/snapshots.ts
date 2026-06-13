@@ -471,7 +471,8 @@ export async function applySnapshotAction(
     snapshotId: string,
     approvedRowTempIds: string[],
     ignoredRowTempIds: string[],
-    manualMatches: Record<string, string> // maps row tempId -> client ID from DB
+    manualMatches: Record<string, string>, // maps row tempId -> client ID from DB
+    manualManagerMatches: Record<string, string> = {} // maps manager_name -> manager_id
 ) {
     try {
         const { user } = await authorizeUser()
@@ -532,14 +533,18 @@ export async function applySnapshotAction(
             // Prepare client payloads
             let resolvedMgrId = row.manager_id
             if (!resolvedMgrId && row.manager_name) {
-                const mgrLower = row.manager_name.toLowerCase()
-                const { data: dbMgrs } = await supabase.from('managers').select('id, first_name, last_name')
-                const match = dbMgrs?.find(m => 
-                    `${m.first_name} ${m.last_name}`.toLowerCase() === mgrLower ||
-                    m.last_name.toLowerCase() === mgrLower
-                )
-                if (match) {
-                    resolvedMgrId = match.id
+                if (manualManagerMatches && manualManagerMatches[row.manager_name]) {
+                    resolvedMgrId = manualManagerMatches[row.manager_name]
+                } else {
+                    const mgrLower = row.manager_name.toLowerCase()
+                    const { data: dbMgrs } = await supabase.from('managers').select('id, first_name, last_name')
+                    const match = dbMgrs?.find(m => 
+                        `${m.first_name} ${m.last_name}`.toLowerCase() === mgrLower ||
+                        m.last_name.toLowerCase() === mgrLower
+                    )
+                    if (match) {
+                        resolvedMgrId = match.id
+                    }
                 }
             }
 
