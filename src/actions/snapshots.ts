@@ -108,7 +108,17 @@ export async function uploadSnapshotAction(
             const full_name = row[fieldMappings.full_name]?.toString()?.trim() || null
             const manager = row[fieldMappings.manager]?.toString()?.trim() || null
             const doors_count = row[fieldMappings.doors_count] != null ? parseInt(row[fieldMappings.doors_count]) : null
-            const package_name = row[fieldMappings.package_name]?.toString()?.trim() || null
+            const package_name_raw = row[fieldMappings.package_name]?.toString()?.trim() || null
+            const package_name = (() => {
+                if (!package_name_raw) return null
+                const lower = package_name_raw.toLowerCase()
+                if (lower.includes('platine') || lower === 'platinum') return 'Platinum'
+                if (lower === 'argent +' || lower === 'argent+') return 'Argent+'
+                if (lower === 'or' || lower === 'gold') return 'Or'
+                if (lower === 'argent' || lower === 'silver') return 'Argent'
+                if (lower === 'bronze') return 'Bronze'
+                return package_name_raw // keep as-is if unrecognized
+            })()
             const monthly_fee = row[fieldMappings.monthly_fee] != null 
                 ? parseFloat(row[fieldMappings.monthly_fee]) 
                 : (row[fieldMappings.package_pricing] != null ? parseFloat(row[fieldMappings.package_pricing]) : null)
