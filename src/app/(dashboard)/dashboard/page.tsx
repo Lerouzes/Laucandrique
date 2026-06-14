@@ -76,8 +76,8 @@ export default async function DashboardPage({
         
         // Find active contract
         const contracts = client.contracts
-        const contract = Array.isArray(contracts) ? contracts[0] : contracts
-        const isContractActive = contract ? contract.active === true : false
+        const contractArr = Array.isArray(contracts) ? contracts : contracts ? [contracts] : []
+        const isContractActive = contractArr.some((con: any) => con.active === true)
         
         return isActiveStatus && notDepartedYet && isContractActive
     }

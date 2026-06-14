@@ -406,10 +406,10 @@ export async function getGlobalTeamStats(opts?: {
         const notDepartedYet = !c.departure_date || new Date(c.departure_date) > now
         
         // Find if contract is active:
-        const contract = Array.isArray(c.contracts) ? c.contracts[0] : c.contracts
-        const isContractActive = contract ? contract.active === true : false
+        const contractArr = Array.isArray(c.contracts) ? c.contracts : c.contracts ? [c.contracts] : []
+        const hasActiveContract = contractArr.some((con: any) => con.active === true)
         
-        return isActiveStatus && notDepartedYet && isContractActive
+        return isActiveStatus && notDepartedYet && hasActiveContract
     })
 
     if (targetTeamId && targetTeamName) {
@@ -432,8 +432,9 @@ export async function getGlobalTeamStats(opts?: {
 
     // Monthly recurring revenue
     const mrr = activeClients.reduce((acc, c) => {
-        const contract = Array.isArray(c.contracts) ? c.contracts[0] : c.contracts
-        const fee = Number(contract?.monthly_fee || c.package_pricing || 0)
+        const contractArr = Array.isArray(c.contracts) ? c.contracts : c.contracts ? [c.contracts] : []
+        const activeContract = contractArr.find((con: any) => con.active === true) || contractArr[0]
+        const fee = Number(activeContract?.monthly_fee || c.package_pricing || 0)
         return acc + fee
     }, 0)
 
@@ -452,8 +453,9 @@ export async function getGlobalTeamStats(opts?: {
     }
 
     activeClients.forEach(c => {
-        const contract = Array.isArray(c.contracts) ? c.contracts[0] : c.contracts
-        const pkgName = contract?.package_name as keyof typeof packageCounts
+        const contractArr = Array.isArray(c.contracts) ? c.contracts : c.contracts ? [c.contracts] : []
+        const activeContract = contractArr.find((con: any) => con.active === true) || contractArr[0]
+        const pkgName = activeContract?.package_name as keyof typeof packageCounts
         if (pkgName && pkgName in packageCounts) {
             packageCounts[pkgName]++
         }

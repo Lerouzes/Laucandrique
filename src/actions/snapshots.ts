@@ -494,6 +494,7 @@ export async function uploadSnapshotAction(
         }
 
         revalidatePath('/settings')
+        revalidatePath('/global-settings')
         return { success: true, snapshotId: snapshot.id }
     } catch (err: any) {
         console.error("Exception in uploadSnapshotAction:", err)
@@ -831,6 +832,7 @@ export async function applySnapshotAction(
             .eq('id', snapshotId)
 
         revalidatePath('/settings')
+        revalidatePath('/global-settings')
         revalidatePath('/team-management/dashboard')
         return { 
             success: true, 
@@ -863,6 +865,7 @@ export async function rejectSnapshotAction(snapshotId: string) {
         }
 
         revalidatePath('/settings')
+        revalidatePath('/global-settings')
         return { success: true }
     } catch (err: any) {
         console.error("Exception in rejectSnapshotAction:", err)
@@ -916,6 +919,7 @@ export async function replaceSnapshotAction(
             .eq('id', snapshotId)
 
         revalidatePath('/settings')
+        revalidatePath('/global-settings')
         return { success: true, newSnapshotId }
     } catch (err: any) {
         console.error("Exception in replaceSnapshotAction:", err)

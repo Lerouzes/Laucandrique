@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 
-import { useState, useTransition, useMemo, useRef } from 'react'
+import { useState, useEffect, useTransition, useMemo, useRef } from 'react'
 import { 
     Upload, 
     Download, 
@@ -18,7 +18,8 @@ import {
     Calendar,
     ChevronDown,
     Building2,
-    Lock
+    Lock,
+    Trash2
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
@@ -84,6 +85,11 @@ export function SnapshotWorkspace({
     const isAuthorized = currentUserRole === 'Master' || currentUserRole === 'Direction'
 
     const [snapshots, setSnapshots] = useState<Snapshot[]>(initialSnapshots)
+
+    useEffect(() => {
+        setSnapshots(initialSnapshots)
+    }, [initialSnapshots])
+
     const [selectedSnapshot, setSelectedSnapshot] = useState<Snapshot | null>(null)
     const [isPending, startTransition] = useTransition()
     
@@ -485,6 +491,30 @@ export function SnapshotWorkspace({
         })
     }
 
+    // 5.5. Delete Snapshot
+    const handleDeleteSnapshot = (snapshotId: string) => {
+        if (!window.confirm("Voulez-vous vraiment supprimer définitivement ce snapshot ? Cette action est irréversible et supprimera uniquement l'historique du snapshot.")) return
+
+        startTransition(async () => {
+            try {
+                const res = await rejectSnapshotAction(snapshotId)
+                if (res.success) {
+                    toast.success("Snapshot supprimé avec succès.")
+                    const { getSnapshotsAction } = await import('@/actions/snapshots')
+                    const updated = await getSnapshotsAction()
+                    setSnapshots(updated)
+                    if (selectedSnapshot?.id === snapshotId) {
+                        setSelectedSnapshot(null)
+                    }
+                } else {
+                    toast.error("Erreur lors de la suppression", { description: res.error })
+                }
+            } catch (e: any) {
+                toast.error("Exception", { description: e.message })
+            }
+        })
+    }
+
     // 6. Replace Snapshot
     const handleReplaceSnapshot = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!selectedSnapshot) return
@@ -597,47 +627,63 @@ export function SnapshotWorkspace({
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="relative pl-6 border-l-2 border-zinc-800 space-y-6">
-                            {snapshots.slice(0, 3).map((snap, idx) => (
-                                <div key={snap.id} className="relative">
-                                    {/* Timeline dot */}
-                                    <div className={cn(
-                                        "absolute -left-[31px] top-1 h-4 w-4 rounded-full border-4 border-zinc-900",
-                                        snap.status === 'Applied' && "bg-emerald-500",
-                                        snap.status === 'Draft' && "bg-purple-500",
-                                        snap.status === 'Rejected' && "bg-rose-500",
-                                        snap.status === 'Replaced' && "bg-zinc-650 bg-zinc-500"
-                                    )} />
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold text-zinc-300 hover:text-purple-400 cursor-pointer" onClick={() => handleSelectSnapshot(snap)}>
-                                                {snap.name}
-                                            </span>
-                                            <Badge className={cn(
-                                                "text-[9px] py-0 px-1.5",
-                                                snap.status === 'Applied' && "bg-emerald-950/40 text-emerald-400 border border-emerald-800",
-                                                snap.status === 'Draft' && "bg-purple-950/40 text-purple-400 border border-purple-800",
-                                                snap.status === 'Rejected' && "bg-rose-950/40 text-rose-400 border border-rose-800",
-                                                snap.status === 'Replaced' && "bg-zinc-950 text-zinc-400 border border-zinc-850"
-                                            )}>
-                                                {snap.status}
-                                            </Badge>
-                                        </div>
-                                        <p className="text-[10px] text-zinc-500">
-                                            Importé le {new Date(snap.uploaded_at).toLocaleString('fr-CA')} par {snap.uploaded_by_profile ? snap.uploaded_by_profile.full_name : 'Système'}
-                                        </p>
-                                        <div className="flex gap-4 text-[10px] text-zinc-400 pt-1">
-                                            <span>Nouveaux: {snap.new_count}</span>
-                                            <span>Modifiés: {snap.modified_count}</span>
-                                            <span>Inactifs: {snap.inactive_count}</span>
-                                            <span>Ignorés/Total: {snap.detected_count}</span>
+                        <div className="max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
+                            <div className="relative pl-6 border-l-2 border-zinc-800 space-y-6 mr-1">
+                                {snapshots.map((snap, idx) => (
+                                    <div key={snap.id} className="relative">
+                                        {/* Timeline dot */}
+                                        <div className={cn(
+                                            "absolute -left-[31px] top-1 h-4 w-4 rounded-full border-4 border-zinc-900",
+                                            snap.status === 'Applied' && "bg-emerald-500",
+                                            snap.status === 'Draft' && "bg-purple-500",
+                                            snap.status === 'Rejected' && "bg-rose-500",
+                                            snap.status === 'Replaced' && "bg-zinc-650 bg-zinc-500"
+                                        )} />
+                                        <div className="space-y-1">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-semibold text-zinc-300 hover:text-purple-400 cursor-pointer" onClick={() => handleSelectSnapshot(snap)}>
+                                                        {snap.name}
+                                                    </span>
+                                                    <Badge className={cn(
+                                                        "text-[9px] py-0 px-1.5",
+                                                        snap.status === 'Applied' && "bg-emerald-950/40 text-emerald-400 border border-emerald-800",
+                                                        snap.status === 'Draft' && "bg-purple-950/40 text-purple-400 border border-purple-800",
+                                                        snap.status === 'Rejected' && "bg-rose-950/40 text-rose-400 border border-rose-800",
+                                                        snap.status === 'Replaced' && "bg-zinc-950 text-zinc-400 border border-zinc-850"
+                                                    )}>
+                                                        {snap.status}
+                                                    </Badge>
+                                                </div>
+                                                {isAuthorized && (
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteSnapshot(snap.id);
+                                                        }}
+                                                        className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-rose-400 transition-colors"
+                                                        title="Supprimer ce snapshot"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <p className="text-[10px] text-zinc-500">
+                                                Importé le {new Date(snap.uploaded_at).toLocaleString('fr-CA')} par {snap.uploaded_by_profile ? snap.uploaded_by_profile.full_name : 'Système'}
+                                            </p>
+                                            <div className="flex gap-4 text-[10px] text-zinc-400 pt-1">
+                                                <span>Nouveaux: {snap.new_count}</span>
+                                                <span>Modifiés: {snap.modified_count}</span>
+                                                <span>Inactifs: {snap.inactive_count}</span>
+                                                <span>Ignorés/Total: {snap.detected_count}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
-                            {snapshots.length === 0 && (
-                                <p className="text-xs text-zinc-500 italic">Aucun snapshot dans l'historique.</p>
-                            )}
+                                ))}
+                                {snapshots.length === 0 && (
+                                    <p className="text-xs text-zinc-500 italic">Aucun snapshot dans l'historique.</p>
+                                )}
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -782,6 +828,21 @@ export function SnapshotWorkspace({
                                     >
                                         <Check className="h-4 w-4 mr-1.5" />
                                         Appliquer les changements
+                                    </Button>
+                                </div>
+                            )}
+
+                            {/* Deletion control for already applied, replaced or rejected snapshots */}
+                            {isAuthorized && (selectedSnapshot.status === 'Applied' || selectedSnapshot.status === 'Replaced' || selectedSnapshot.status === 'Rejected') && (
+                                <div className="flex items-center gap-2">
+                                    <Button 
+                                        onClick={() => handleDeleteSnapshot(selectedSnapshot.id)} 
+                                        disabled={isPending}
+                                        variant="outline" 
+                                        className="text-xs text-rose-400 hover:bg-rose-950/20 hover:text-rose-350 border-zinc-800"
+                                    >
+                                        <Trash2 className="h-4 w-4 mr-1.5 text-rose-455 text-rose-400" />
+                                        Supprimer le snapshot
                                     </Button>
                                 </div>
                             )}

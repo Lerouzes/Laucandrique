@@ -310,12 +310,14 @@ export function MrrSyndicatesClient({
                         Gestionnaire
                     </label>
                     <SearchableManagerSelect
-                        managers={managers.map(m => ({
-                            id: m.id,
-                            first_name: m.name.split(' ')[0],
-                            last_name: m.name.split(' ').slice(1).join(' '),
-                            team_name: m.team_name || undefined,
-                        }))}
+                        managers={managers
+                            .filter(m => teamId === 'all' || m.team_id === teamId)
+                            .map(m => ({
+                                id: m.id,
+                                first_name: m.name.split(' ')[0],
+                                last_name: m.name.split(' ').slice(1).join(' '),
+                                team_name: m.team_name || undefined,
+                            }))}
                         name="managerId"
                         placeholder="Rechercher un gestionnaire…"
                         defaultValue={managerId !== 'all' ? managerId : ''}

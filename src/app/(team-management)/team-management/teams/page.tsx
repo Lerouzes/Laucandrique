@@ -19,7 +19,20 @@ export default async function TeamsListPage() {
         .from('managers')
         .select('*')
 
-    // 3. Compute stats for all managers in parallel
+    // 3. Get all active clients with their contracts and doors
+    const { data: clients } = await supabase
+        .from('clients')
+        .select('*, contracts(*), doors(id)')
+
+    const now = new Date()
+    const activeClients = (clients || []).filter(c => {
+        const isActiveStatus = c.status === 'active' || !c.status
+        const notDepartedYet = !c.departure_date || new Date(c.departure_date) > now
+        const contractArr = Array.isArray(c.contracts) ? c.contracts : c.contracts ? [c.contracts] : []
+        return isActiveStatus && notDepartedYet && contractArr.some((con: any) => con.active === true)
+    })
+
+    // 4. Compute stats for all managers in parallel
     const managerStatsMap: Record<string, any> = {}
     if (managers && managers.length > 0) {
         const statsList = await Promise.all(
@@ -40,15 +53,22 @@ export default async function TeamsListPage() {
         })
     }
 
-    // 4. Compute stats for each team by aggregating stats of their managers
+    // 5. Compute stats for each team
     const teamStatsList = []
 
     for (const team of teams || []) {
         const teamManagers = (managers || []).filter(m => m.team_id === team.id)
+        const teamClients = activeClients.filter(c => c.team === team.name)
         
-        let totalSyndicates = 0
-        let totalDoors = 0
-        let totalMrr = 0
+        const totalSyndicates = teamClients.length
+        const totalDoors = teamClients.reduce((sum, c) => sum + ((c.doors as any[])?.length || 0), 0)
+        const totalMrr = teamClients.reduce((sum, c) => {
+            const contractArr = Array.isArray(c.contracts) ? c.contracts : c.contracts ? [c.contracts] : []
+            const activeContract = contractArr.find((con: any) => con.active === true) || contractArr[0]
+            const fee = Number(activeContract?.monthly_fee || c.package_pricing || 0)
+            return sum + fee
+        }, 0)
+
         let sumWorkloadIndex = 0
         let sumPerformanceScore = 0
         let riskCount = 0
@@ -70,9 +90,6 @@ export default async function TeamsListPage() {
         for (const m of teamManagers) {
             const stats = managerStatsMap[m.id]
             if (stats) {
-                totalSyndicates += stats.syndicatesCount
-                totalDoors += stats.doorsCount
-                totalMrr += stats.mrr
                 sumWorkloadIndex += stats.workloadIndex
                 sumPerformanceScore += stats.performanceScore
                 totalApprovedQuotes += stats.approvedQuotesCount || 0
@@ -229,8 +246,7 @@ export default async function TeamsListPage() {
                                         <span className="text-zinc-500 block uppercase tracking-wider font-bold">Ratio Coût / MRR</span>
                                         <span className={cn(
                                             "text-xs font-bold mt-1 block",
-                                            teamCostToMrrRatio > 80 ? "text-rose-500" :
-                                            teamCostToMrrRatio > 50 ? "text-amber-400" : "text-emerald-400"
+                                            teamCostToMrrRatio <= 25 ? "text-emerald-400" : "text-amber-400"
                                         )}>
                                             {teamCostToMrrRatio.toFixed(1)}%
                                         </span>

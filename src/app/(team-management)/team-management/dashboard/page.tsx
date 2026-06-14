@@ -165,10 +165,10 @@ export default async function TeamManagementDashboard(props: {
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                         <CardTitle className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Coût de l'équipe</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-purple-450 text-purple-400" />
+                        <TrendingUp className={`h-4 w-4 ${stats.costToMrrRatio <= 25 ? 'text-emerald-400' : 'text-amber-400'}`} />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-xl font-extrabold text-white">
+                        <div className={`text-xl font-extrabold ${stats.costToMrrRatio <= 25 ? 'text-emerald-400' : 'text-amber-450 text-amber-400'}`}>
                             {stats.costToMrrRatio.toFixed(1)}%
                         </div>
                         <p className="text-[10px] text-zinc-500 mt-1">
