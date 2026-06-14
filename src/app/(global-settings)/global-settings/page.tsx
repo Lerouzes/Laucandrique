@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState, useTransition, Suspense } from 'react'
+import { useEffect, useState, useTransition, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Search, RefreshCw, List, FileSpreadsheet, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { createClient } from '@/utils/supabase/client'
+import { Checkbox } from '@/components/ui/checkbox'
 
 // Clients & Snapshots Imports
 import { getClients } from '@/actions/clients'
@@ -32,6 +33,7 @@ export default function GlobalSettingsPage() {
     const [searchVal, setSearchVal] = useState('')
     const [userRole, setUserRole] = useState<string>('Agent')
     const [currentUserId, setCurrentUserId] = useState<string>('')
+    const [showOnlyActive, setShowOnlyActive] = useState(true)
 
     // Fetch user role
     useEffect(() => {
@@ -71,6 +73,11 @@ export default function GlobalSettingsPage() {
         }
     }
 
+    const filteredClients = useMemo(() => {
+        if (!showOnlyActive) return clients
+        return clients.filter(c => c.status !== 'inactive')
+    }, [clients, showOnlyActive])
+
     return (
         <div className="space-y-6">
             <div>
@@ -101,15 +108,30 @@ export default function GlobalSettingsPage() {
                 {/* TAB 1: CLIENT MASTER LIST */}
                 <TabsContent value="clients" className="space-y-4 outline-none">
                     <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
-                        <div className="relative w-full max-w-sm">
-                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-550 text-zinc-500" />
-                            <Input
-                                type="search"
-                                placeholder="Rechercher un client..."
-                                className="w-full bg-zinc-950 border-zinc-850 text-zinc-150 pl-9 placeholder:text-zinc-500 focus-visible:ring-zinc-700 focus-visible:border-transparent text-xs"
-                                value={searchVal}
-                                onChange={(e) => setSearchVal(e.target.value)}
-                            />
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 flex-1">
+                            <div className="relative w-full max-w-sm">
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-550 text-zinc-500" />
+                                <Input
+                                    type="search"
+                                    placeholder="Rechercher un client..."
+                                    className="w-full bg-zinc-950 border-zinc-850 text-zinc-150 pl-9 placeholder:text-zinc-500 focus-visible:ring-zinc-700 focus-visible:border-transparent text-xs"
+                                    value={searchVal}
+                                    onChange={(e) => setSearchVal(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex items-center gap-2 select-none">
+                                <Checkbox
+                                    id="show-only-active"
+                                    checked={showOnlyActive}
+                                    onCheckedChange={(checked) => setShowOnlyActive(!!checked)}
+                                />
+                                <label
+                                    htmlFor="show-only-active"
+                                    className="text-xs text-zinc-400 hover:text-zinc-300 cursor-pointer font-medium"
+                                >
+                                    Afficher uniquement les syndicats actifs
+                                </label>
+                            </div>
                         </div>
                         <div className="flex gap-2 shrink-0">
                             <Button 
@@ -127,7 +149,7 @@ export default function GlobalSettingsPage() {
 
                     <Card className="bg-zinc-900 border-zinc-800">
                         <CardContent className="p-0">
-                            <ClientsTable data={clients} />
+                            <ClientsTable data={filteredClients} />
                         </CardContent>
                     </Card>
                 </TabsContent>
