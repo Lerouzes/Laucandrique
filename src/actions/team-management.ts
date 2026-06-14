@@ -326,7 +326,18 @@ export async function getGlobalTeamStats(opts?: {
         targetTeamId = opts.teamId === 'all' ? null : opts.teamId
     }
 
-    // Get managers in current team context
+    // Resolve team name for client-based filtering (clients.team is the source of truth)
+    let targetTeamName: string | null = null
+    if (targetTeamId) {
+        const { data: teamRow } = await supabase
+            .from('manager_teams')
+            .select('name')
+            .eq('id', targetTeamId)
+            .single()
+        targetTeamName = teamRow?.name || null
+    }
+
+    // Get managers in current team context (for salary & activity stats)
     let query = supabase.from('managers').select('*')
     if (targetTeamId) {
         query = query.eq('team_id', targetTeamId)
@@ -398,8 +409,11 @@ export async function getGlobalTeamStats(opts?: {
         return isActiveStatus && notDepartedYet && isContractActive
     })
 
-    if (targetTeamId) {
-        activeClients = activeClients.filter(c => c.manager_id && managerIds.includes(c.manager_id))
+    if (targetTeamId && targetTeamName) {
+        // Filter by the client's own team column — this is the source of truth.
+        // A client's team is set directly on their record and may not match their
+        // manager's team assignment (e.g., during reassignments or imports).
+        activeClients = activeClients.filter(c => c.team === targetTeamName)
     }
 
     // Doors sum (optimized single query)
