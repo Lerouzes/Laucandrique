@@ -711,10 +711,10 @@ export async function getMrrSyndicates(opts?: {
     const { data: allTeams } = await supabase.from('manager_teams').select('id, name')
     const teamNameById = new Map((allTeams || []).map((t: any) => [t.id, t.name]))
 
-    // Fetch all managers for lookup
+    // Fetch all managers for lookup (include salary for cost % calculation)
     const { data: allManagers } = await supabase
         .from('managers')
-        .select('id, first_name, last_name, team_id')
+        .select('id, first_name, last_name, team_id, salary')
     const managerMap = new Map((allManagers || []).map((m: any) => [m.id, m]))
 
     // Fetch active clients with contracts
@@ -776,12 +776,21 @@ export async function getMrrSyndicates(opts?: {
         mrrByTeam[t].mrr += s.monthly_fee
     })
 
-    const mrrByManager: Record<string, { count: number; mrr: number; name: string }> = {}
+    const mrrByManager: Record<string, { count: number; mrr: number; name: string; monthly_cost: number; cost_pct: number }> = {}
     syndicates.forEach((s: any) => {
         const key = s.manager_id || 'none'
-        if (!mrrByManager[key]) mrrByManager[key] = { count: 0, mrr: 0, name: s.manager_name || 'Non assigné' }
+        if (!mrrByManager[key]) {
+            const mgr = s.manager_id ? managerMap.get(s.manager_id) : null
+            const annualSalary = Number(mgr?.salary || 0)
+            const monthly_cost = annualSalary / 12
+            mrrByManager[key] = { count: 0, mrr: 0, name: s.manager_name || 'Non assigné', monthly_cost, cost_pct: 0 }
+        }
         mrrByManager[key].count++
         mrrByManager[key].mrr += s.monthly_fee
+    })
+    // Compute cost_pct after all MRR is summed
+    Object.values(mrrByManager).forEach((m: any) => {
+        m.cost_pct = m.mrr > 0 ? (m.monthly_cost / m.mrr) * 100 : 0
     })
 
     const mrrByPackage: Record<string, { count: number; mrr: number }> = {}
@@ -798,6 +807,7 @@ export async function getMrrSyndicates(opts?: {
             name: `${m.first_name} ${m.last_name}`,
             team_id: m.team_id,
             team_name: m.team_id ? (teamNameById.get(m.team_id) || null) : null,
+            monthly_cost: Number(m.salary || 0) / 12,
         }))
         .sort((a: any, b: any) => a.name.localeCompare(b.name))
 
