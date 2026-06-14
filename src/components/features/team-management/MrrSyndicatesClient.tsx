@@ -21,6 +21,7 @@ import {
     AlertTriangle,
     CheckCircle,
 } from 'lucide-react'
+import { SearchableManagerSelect } from '@/components/features/team-management/SearchableManagerSelect'
 
 type Syndicate = {
     id: string
@@ -72,16 +73,11 @@ function fmtPct(n: number) {
 
 function CostPctBadge({ pct }: { pct: number }) {
     if (pct <= 0) return <span className="text-zinc-600 text-[10px]">—</span>
-    const color =
-        pct > 80 ? 'text-rose-400' :
-        pct > 50 ? 'text-amber-400' :
-        pct > 30 ? 'text-yellow-300' :
-        'text-emerald-400'
-    const icon = pct > 80
-        ? <AlertTriangle className="h-3 w-3" />
-        : pct < 35
+    const isGood = pct <= 25
+    const color = isGood ? 'text-emerald-400' : 'text-amber-400'
+    const icon = isGood
         ? <CheckCircle className="h-3 w-3" />
-        : null
+        : <AlertTriangle className="h-3 w-3" />
     return (
         <span className={`flex items-center gap-1 font-bold text-[11px] tabular-nums ${color}`}>
             {icon}
@@ -313,17 +309,31 @@ export function MrrSyndicatesClient({
                         <Filter className="h-3.5 w-3.5 text-purple-400" />
                         Gestionnaire
                     </label>
-                    <select
-                        value={managerId}
-                        onChange={e => { setManagerId(e.target.value); handleFilter(teamId, e.target.value) }}
-                        disabled={isPending}
-                        className="w-full bg-[#121318] border border-zinc-800 rounded-lg px-2.5 py-1.5 text-zinc-300 text-xs font-semibold outline-none focus:border-purple-600/50 h-9 cursor-pointer"
-                    >
-                        <option value="all">Tous les gestionnaires</option>
-                        {managers.map(m => (
-                            <option key={m.id} value={m.id}>{m.name}{m.team_name ? ` · ${m.team_name}` : ''}</option>
-                        ))}
-                    </select>
+                    <SearchableManagerSelect
+                        managers={managers.map(m => ({
+                            id: m.id,
+                            first_name: m.name.split(' ')[0],
+                            last_name: m.name.split(' ').slice(1).join(' '),
+                            team_name: m.team_name || undefined,
+                        }))}
+                        name="managerId"
+                        placeholder="Rechercher un gestionnaire…"
+                        defaultValue={managerId !== 'all' ? managerId : ''}
+                        onChange={(id) => {
+                            const newId = id || 'all'
+                            setManagerId(newId)
+                            handleFilter(teamId, newId)
+                        }}
+                        className="w-full"
+                    />
+                    {managerId !== 'all' && (
+                        <button
+                            onClick={() => { setManagerId('all'); handleFilter(teamId, 'all') }}
+                            className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1"
+                        >
+                            <X className="h-3 w-3" /> Effacer le filtre
+                        </button>
+                    )}
                 </div>
 
                 {isPending && (

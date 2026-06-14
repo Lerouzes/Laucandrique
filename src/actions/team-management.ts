@@ -59,7 +59,9 @@ export async function getManagerStats(managerId: string) {
     const activeSyndicates = (syndicates || []).filter(c => {
         const isActiveStatus = c.status === 'active' || !c.status
         const notDepartedYet = !c.departure_date || new Date(c.departure_date) > now
-        return isActiveStatus && notDepartedYet
+        const contractArr = Array.isArray(c.contracts) ? c.contracts : c.contracts ? [c.contracts] : []
+        const hasActiveContract = contractArr.some((con: any) => con.active === true)
+        return isActiveStatus && notDepartedYet && hasActiveContract
     })
 
     const syndicatesCount = activeSyndicates.length
@@ -76,10 +78,11 @@ export async function getManagerStats(managerId: string) {
     }
 
 
-    // 3. Monthly Recurring Revenue (MRR)
+    // 3. Monthly Recurring Revenue (MRR) — use only the active contract
     const mrr = activeSyndicates.reduce((acc, c) => {
-        const contract = Array.isArray(c.contracts) ? c.contracts[0] : c.contracts
-        const fee = Number(contract?.monthly_fee || c.package_pricing || 0)
+        const contractArr = Array.isArray(c.contracts) ? c.contracts : c.contracts ? [c.contracts] : []
+        const activeContract = contractArr.find((con: any) => con.active === true) || contractArr[0]
+        const fee = Number(activeContract?.monthly_fee || c.package_pricing || 0)
         return acc + fee
     }, 0)
 
