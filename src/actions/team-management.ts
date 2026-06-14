@@ -679,6 +679,145 @@ export async function getGlobalTeamStats(opts?: {
 }
 
 // ==========================================
+// MRR SYNDICATES LIST
+// ==========================================
+
+export async function getMrrSyndicates(opts?: {
+    teamId?: string | null
+    managerId?: string | null
+}) {
+    const supabase = await createClient()
+    const { getActiveTeamContext } = await import('@/utils/team-context')
+    const context = await getActiveTeamContext()
+
+    // Resolve target team ID
+    let targetTeamId = context.teamId
+    if (!context.isRestricted && opts && opts.teamId !== undefined) {
+        targetTeamId = opts.teamId === 'all' ? null : opts.teamId
+    }
+
+    // Resolve team name for client-based filtering
+    let targetTeamName: string | null = null
+    if (targetTeamId) {
+        const { data: teamRow } = await supabase
+            .from('manager_teams')
+            .select('name')
+            .eq('id', targetTeamId)
+            .single()
+        targetTeamName = teamRow?.name || null
+    }
+
+    // Fetch all manager teams for lookup
+    const { data: allTeams } = await supabase.from('manager_teams').select('id, name')
+    const teamNameById = new Map((allTeams || []).map((t: any) => [t.id, t.name]))
+
+    // Fetch all managers for lookup
+    const { data: allManagers } = await supabase
+        .from('managers')
+        .select('id, first_name, last_name, team_id')
+    const managerMap = new Map((allManagers || []).map((m: any) => [m.id, m]))
+
+    // Fetch active clients with contracts
+    const { data: clients } = await supabase
+        .from('clients')
+        .select('id, full_name, team, status, departure_date, manager_id, package_pricing, contracts(*)')
+        .order('full_name')
+
+    const now = new Date()
+    let syndicates = (clients || [])
+        .filter((c: any) => {
+            const isActiveStatus = c.status === 'active' || !c.status
+            const notDepartedYet = !c.departure_date || new Date(c.departure_date) > now
+            const contractArr = Array.isArray(c.contracts) ? c.contracts : c.contracts ? [c.contracts] : []
+            const hasActiveContract = contractArr.some((con: any) => con.active === true)
+            return isActiveStatus && notDepartedYet && hasActiveContract
+        })
+        .map((c: any) => {
+            const contractArr = Array.isArray(c.contracts) ? c.contracts : c.contracts ? [c.contracts] : []
+            const activeContract = contractArr.find((con: any) => con.active === true) || contractArr[0]
+            const manager = c.manager_id ? managerMap.get(c.manager_id) : null
+            const managerTeamId = manager?.team_id
+            const managerTeamName = managerTeamId ? (teamNameById.get(managerTeamId) || null) : null
+
+            return {
+                id: c.id,
+                full_name: c.full_name,
+                team: c.team || null,
+                manager_id: c.manager_id || null,
+                manager_name: manager ? `${manager.first_name} ${manager.last_name}` : null,
+                manager_team_name: managerTeamName,
+                package_name: activeContract?.package_name || null,
+                monthly_fee: Number(activeContract?.monthly_fee || c.package_pricing || 0),
+                contract_start: activeContract?.start_date || null,
+                contract_end: activeContract?.end_date || null,
+            }
+        })
+
+    // Apply team filter (by client's team column — source of truth)
+    if (targetTeamId && targetTeamName) {
+        syndicates = syndicates.filter((s: any) => s.team === targetTeamName)
+    }
+
+    // Apply manager filter
+    if (opts?.managerId && opts.managerId !== 'all') {
+        syndicates = syndicates.filter((s: any) => s.manager_id === opts.managerId)
+    }
+
+    // Build aggregate stats
+    const totalMrr = syndicates.reduce((sum: number, s: any) => sum + s.monthly_fee, 0)
+    const totalSyndicates = syndicates.length
+    const avgMrr = totalSyndicates > 0 ? totalMrr / totalSyndicates : 0
+
+    const mrrByTeam: Record<string, { count: number; mrr: number }> = {}
+    syndicates.forEach((s: any) => {
+        const t = s.team || 'Non assigné'
+        if (!mrrByTeam[t]) mrrByTeam[t] = { count: 0, mrr: 0 }
+        mrrByTeam[t].count++
+        mrrByTeam[t].mrr += s.monthly_fee
+    })
+
+    const mrrByManager: Record<string, { count: number; mrr: number; name: string }> = {}
+    syndicates.forEach((s: any) => {
+        const key = s.manager_id || 'none'
+        if (!mrrByManager[key]) mrrByManager[key] = { count: 0, mrr: 0, name: s.manager_name || 'Non assigné' }
+        mrrByManager[key].count++
+        mrrByManager[key].mrr += s.monthly_fee
+    })
+
+    const mrrByPackage: Record<string, { count: number; mrr: number }> = {}
+    syndicates.forEach((s: any) => {
+        const pkg = s.package_name || 'Non assigné'
+        if (!mrrByPackage[pkg]) mrrByPackage[pkg] = { count: 0, mrr: 0 }
+        mrrByPackage[pkg].count++
+        mrrByPackage[pkg].mrr += s.monthly_fee
+    })
+
+    const allManagersList = (allManagers || [])
+        .map((m: any) => ({
+            id: m.id,
+            name: `${m.first_name} ${m.last_name}`,
+            team_id: m.team_id,
+            team_name: m.team_id ? (teamNameById.get(m.team_id) || null) : null,
+        }))
+        .sort((a: any, b: any) => a.name.localeCompare(b.name))
+
+    return {
+        syndicates,
+        stats: {
+            totalMrr,
+            totalSyndicates,
+            avgMrr,
+            mrrByTeam,
+            mrrByManager,
+            mrrByPackage,
+        },
+        managers: allManagersList,
+        teams: (allTeams || []).sort((a: any, b: any) => a.name.localeCompare(b.name)),
+        isRestricted: context.isRestricted,
+    }
+}
+
+// ==========================================
 // 2. MANUAL STATS / KPI INSERTS
 // ==========================================
 

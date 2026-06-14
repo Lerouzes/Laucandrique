@@ -2,6 +2,7 @@ import { getGlobalTeamStats, getComplaintCategoriesAction } from '@/actions/team
 import { getManagers, getManagerTeams } from '@/actions/managers'
 import { getClients } from '@/actions/clients'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import Link from 'next/link'
 import { CallsStatsPanel } from '@/components/features/team-management/CallsStatsPanel'
 import { DashboardFilterBar } from '@/components/features/team-management/DashboardFilterBar'
 import { ManualStatsEntryCards } from '@/components/features/team-management/ManualStatsEntryCards'
@@ -143,17 +144,22 @@ export default async function TeamManagementDashboard(props: {
                     </CardContent>
                 </Card>
 
-                {/* 5. Recurring Revenue */}
-                <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Revenu Récurrent (MRR)</CardTitle>
-                        <DollarSign className="h-4 w-4 text-emerald-400" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-xl font-extrabold text-emerald-400">${stats.mrr.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</div>
-                        <p className="text-[10px] text-zinc-500 mt-1">Honoraires de gestion récurrents</p>
-                    </CardContent>
-                </Card>
+                {/* 5. Recurring Revenue — clickable link to MRR detail page */}
+                <Link
+                    href={`/team-management/mrr${teamId ? `?teamId=${teamId}` : ''}`}
+                    className="group block"
+                >
+                    <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md group-hover:border-emerald-700/50 group-hover:bg-emerald-950/10 transition-all duration-200 cursor-pointer">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                            <CardTitle className="text-xxs font-bold text-zinc-400 uppercase tracking-wider">Revenu Récurrent (MRR)</CardTitle>
+                            <DollarSign className="h-4 w-4 text-emerald-400 group-hover:scale-110 transition-transform duration-200" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-xl font-extrabold text-emerald-400">${stats.mrr.toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</div>
+                            <p className="text-[10px] text-zinc-500 mt-1 group-hover:text-emerald-600 transition-colors">Cliquer pour voir le détail →</p>
+                        </CardContent>
+                    </Card>
+                </Link>
 
                 {/* 6. Team Cost vs MRR */}
                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">

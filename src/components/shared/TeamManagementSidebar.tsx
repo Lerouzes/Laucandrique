@@ -18,7 +18,8 @@ import {
     Layers,
     UserCheck,
     Settings,
-    Wrench
+    Wrench,
+    DollarSign
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -32,6 +33,7 @@ const navItems = [
     { name: 'Gestionnaires', href: '/team-management/managers', icon: UserCheck },
     { name: '1-à-1 Rencontres', href: '/team-management/one-on-ones', icon: CalendarDays },
     { name: 'Syndicats', href: '/team-management/syndicates', icon: Building2 },
+    { name: 'Revenus MRR', href: '/team-management/mrr', icon: DollarSign },
     { name: 'Audits de Santé', href: '/team-management/audits', icon: ClipboardCheck },
     { name: 'Assemblées', href: '/team-management/assemblies', icon: UsersRound },
     { name: 'Projets', href: '/team-management/projects', icon: FolderGit },
