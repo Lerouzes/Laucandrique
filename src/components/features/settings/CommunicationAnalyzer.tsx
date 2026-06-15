@@ -63,7 +63,7 @@ interface ParsedRow {
 }
 
 // 7 Departments + Council (as in the HTML code)
-const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Technique", "Sinistres", "Assurance", "Direction", "Conseil d'Administration"]
+const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Technique", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration"]
 
 const DEPT_COLORS: Record<string, string> = {
     "Gestion": "border-l-sky-500 bg-sky-950/10",
@@ -73,6 +73,8 @@ const DEPT_COLORS: Record<string, string> = {
     "Sinistres": "border-l-rose-500 bg-rose-950/10",
     "Assurance": "border-l-pink-500 bg-pink-950/10",
     "Direction": "border-l-zinc-500 bg-zinc-900/40",
+    "Chargé d’opération": "border-l-indigo-500 bg-indigo-950/10",
+    "Chargé d'opération": "border-l-indigo-500 bg-indigo-950/10",
     "Conseil d'Administration": "border-l-amber-500 bg-amber-950/10"
 }
 
@@ -84,20 +86,86 @@ const DEPT_BADGE_CSS: Record<string, string> = {
     "Sinistres": "bg-rose-500/10 text-rose-450 text-rose-400 border border-rose-550/20",
     "Assurance": "bg-pink-500/10 text-pink-400 border border-pink-550/20",
     "Direction": "bg-zinc-800 text-zinc-400 border border-zinc-700/60",
+    "Chargé d’opération": "bg-indigo-500/10 text-indigo-400 border border-indigo-550/20",
+    "Chargé d'opération": "bg-indigo-500/10 text-indigo-400 border border-indigo-550/20",
     "Conseil d'Administration": "bg-amber-500/10 text-amber-400 border border-amber-550/20"
 }
 
 // Initial Employee Department Map matching the HTML tool precisely
 const INITIAL_DEPT_MAP: Record<string, string> = {
-    "Helene Pucacco": "Administration", "Mylène Choinière": "Administration", "Linda Bouchard": "Administration",
-    "Administration Laucandrique": "Administration", "Maggy Carocha": "Administration", "Suzie Dextraze": "Administration",
-    "Catherine Ducharme": "Administration", "Anne-Marie Sauvageau": "Administration", "Jillian Wise": "Administration",
-    "Benoit Morin": "Comptabilité", "Marie-Pierre Martel": "Comptabilité", "Helene Satou Ndour": "Comptabilité",
-    "Nouredine Achouri": "Comptabilité", "Line Garand": "Comptabilité", "Danielle Guidi": "Comptabilité",
-    "Victor Dubremetz": "Technique", "Angélique Hesbois": "Technique",
-    "Ekampreet Sudhar Singh": "Sinistres", "Halle T. Bellange": "Sinistres", "Nour Hejazin": "Sinistres", "Département Sinistres": "Sinistres",
+    // Accounting / Comptabilité
+    "Paul Gauthier": "Comptabilité",
+    "Violeta Bente": "Comptabilité",
+    "Compte Payable Laucandrique": "Comptabilité",
+    "Comptabilité": "Comptabilité",
+    "Comptabilite": "Comptabilité",
+    "Madeleine Cormier": "Comptabilité",
+    "Benoit Morin": "Comptabilité",
+    "Marie-Pierre Martel": "Comptabilité",
+    "Helene Satou Ndour": "Comptabilité",
+    "Nouredine Achouri": "Comptabilité",
+    "Line Garand": "Comptabilité",
+    "Danielle Guidi": "Comptabilité",
+
+    // Administration
+    "Reception Laucandrique": "Administration",
+    "Réception Laucandrique": "Administration",
+    "Tania Senécal": "Administration",
+    "Tania Senecal": "Administration",
+    "Réception - Suzanne Sylvestre": "Administration",
+    "Reception - Suzanne Sylvestre": "Administration",
+    "Hélène Pucacco": "Administration",
+    "Helene Pucacco": "Administration",
+    "Carine Leroux": "Administration",
+    "L'équipe Laucandrique Tremblant": "Administration",
+    "L'equipe Laucandrique Tremblant": "Administration",
+    "Mylene Choiniere": "Administration",
+    "Mylène Choinière": "Administration",
+    "Linda Bouchard": "Administration",
+    "Administration Laucandrique": "Administration",
+    "Maggy Carocha": "Administration",
+    "Suzie Dextraze": "Administration",
+    "Catherine Ducharme": "Administration",
+    "Anne-Marie Sauvageau": "Administration",
+    "Jillian Wise": "Administration",
+
+    // Sinistres
+    "Département Sinistres": "Sinistres",
+    "Departement Sinistres": "Sinistres",
+    "Sinistre Laucandrique": "Sinistres",
+    "Victoria Ponomarenko": "Sinistres",
+    "Alaa-Eddine Lemrabete": "Sinistres",
+    "Ekampreet Sudhar Singh": "Sinistres",
+    "Halle T. Bellange": "Sinistres",
+    "Nour Hejazin": "Sinistres",
+
+    // Chargé d’opération
+    "Stéphane Genest": "Chargé d’opération",
+    "Stephane Genest": "Chargé d’opération",
+    "Carlos Villegas": "Chargé d’opération",
+    "Kelly Frost": "Chargé d’opération",
+    "operations": "Chargé d’opération",
+    "operations12": "Chargé d’opération",
+    "opérations": "Chargé d’opération",
+    "Genest Stéphane": "Chargé d’opération",
+    "Genest Stephane": "Chargé d’opération",
+
+    // Technique
+    "Angelique Hesbois": "Technique",
+    "Angélique Hesbois": "Technique",
+    "Victor Dubremetz": "Technique",
+
+    // Assurance
     "Marie-Camille Benhamou": "Assurance",
-    "Hélène Vallerand": "Direction", "Jean-Philippe Morin": "Direction", "Francesca Chabot": "Direction",
+
+    // Direction
+    "Nicole Rousseau": "Direction",
+    "Marc Boyer": "Direction",
+    "Hélène Vallerand": "Direction",
+    "Jean-Philippe Morin": "Direction",
+    "Francesca Chabot": "Direction",
+
+    // Gestion
     "Édouard Le Rouzes": "Gestion"
 }
 
@@ -493,6 +561,7 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                     deptCounts: pipelineData.deptCounts,
                     yearlyHistoricAggregates: pipelineData.yearlyHistoricAggregates,
                     timelineList: pipelineData.timelineList,
+                    monthlyDeptHistory: pipelineData.monthlyDeptHistory,
                     dynamicDeptMap: deptMap,
                     discoveredUsers,
                     analysis_date: new Date().toISOString()

@@ -605,7 +605,7 @@ export function HRManagement({ initialDepartments, initialEmployees, managers }:
                                                             <div className="space-y-1">
                                                                 <Label className="text-zinc-500 text-[10px]">Chef d'équipe (Leader)</Label>
                                                                 <SearchSelect
-                                                                    options={employees.filter(emp => emp.department_id === d.id || !emp.department_id).map(emp => ({ id: emp.id, label: `${emp.first_name} ${emp.last_name}` }))}
+                                                                    options={employees.filter(emp => emp.is_active).map(emp => ({ id: emp.id, label: `${emp.first_name} ${emp.last_name}` }))}
                                                                     value={editDeptLeaderId}
                                                                     onChange={setEditDeptLeaderId}
                                                                     placeholder="-- Aucun leader --"

@@ -17,7 +17,7 @@ import { getSnapshotsAction } from '@/actions/snapshots'
 import { SnapshotWorkspace } from '@/components/features/settings/SnapshotWorkspace'
 import { AccountsManager } from '@/components/features/settings/AccountsManager'
 import { CommunicationAnalyzer } from '@/components/features/settings/CommunicationAnalyzer'
-import { getManagers } from '@/actions/managers'
+import { getManagers, getManagerTeams } from '@/actions/managers'
 
 // Tabs component
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -35,6 +35,8 @@ export default function GlobalSettingsPage() {
     const [userRole, setUserRole] = useState<string>('Agent')
     const [currentUserId, setCurrentUserId] = useState<string>('')
     const [showOnlyActive, setShowOnlyActive] = useState(true)
+    const [teams, setTeams] = useState<any[]>([])
+    const [selectedTeamId, setSelectedTeamId] = useState<string>('all')
 
     // Fetch user role
     useEffect(() => {
@@ -51,6 +53,7 @@ export default function GlobalSettingsPage() {
     // Load managers on mount
     useEffect(() => {
         getManagers(true).then(setManagers)
+        getManagerTeams().then(setTeams)
     }, [])
 
     // Fetch clients / snapshots on activeTab or searchVal updates
@@ -75,9 +78,17 @@ export default function GlobalSettingsPage() {
     }
 
     const filteredClients = useMemo(() => {
-        if (!showOnlyActive) return clients
-        return clients.filter(c => c.status !== 'inactive')
-    }, [clients, showOnlyActive])
+        let list = clients
+        if (showOnlyActive) {
+            list = list.filter(c => c.status !== 'inactive')
+        }
+        if (selectedTeamId === 'none') {
+            list = list.filter(c => !c.managers || !c.managers.manager_teams)
+        } else if (selectedTeamId !== 'all') {
+            list = list.filter(c => c.managers?.manager_teams?.id === selectedTeamId)
+        }
+        return list
+    }, [clients, showOnlyActive, selectedTeamId])
 
     return (
         <div className="space-y-6">
@@ -89,7 +100,7 @@ export default function GlobalSettingsPage() {
             </div>
 
             <Tabs defaultValue="clients" value={activeTab} onValueChange={handleTabChange} className="w-full space-y-6">
-                <TabsList className="bg-zinc-950 border border-zinc-850 p-1 flex justify-start gap-1 w-fit rounded-xl">
+                <TabsList className="bg-zinc-950 border border-zinc-850 p-1 flex justify-start gap-1 w-fit rounded-xl max-w-full overflow-x-auto scrollbar-none">
                     <TabsTrigger value="clients" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
                         <List className="h-4 w-4" />
                         Liste Maîtresse SDC
@@ -124,6 +135,21 @@ export default function GlobalSettingsPage() {
                                     onChange={(e) => setSearchVal(e.target.value)}
                                 />
                             </div>
+
+                            {/* Team Filter Dropdown */}
+                            <select
+                                value={selectedTeamId}
+                                onChange={(e) => setSelectedTeamId(e.target.value)}
+                                className="bg-zinc-950 border border-zinc-850 rounded-xl px-3 py-2 text-xs text-zinc-300 font-semibold outline-none focus:border-indigo-650 focus:ring-1 focus:ring-indigo-650/30 cursor-pointer h-9 shrink-0"
+                            >
+                                <option value="all">Toutes les équipes</option>
+                                <option value="none">Sans équipe</option>
+                                {teams.map((t) => (
+                                    <option key={t.id} value={t.id}>
+                                        {t.name}
+                                    </option>
+                                ))}
+                            </select>
                             <div className="flex items-center gap-2 select-none">
                                 <Checkbox
                                     id="show-only-active"

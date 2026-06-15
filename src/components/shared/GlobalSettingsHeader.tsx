@@ -2,12 +2,14 @@
 'use client'
 
 import { User } from '@supabase/supabase-js'
-import { LogOut } from 'lucide-react'
+import { LogOut, Menu } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Database } from '@/types/supabase'
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import { GlobalSettingsSidebar } from '@/components/shared/GlobalSettingsSidebar'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
 
@@ -37,6 +39,21 @@ export function GlobalSettingsHeader({
 
     return (
         <header className="flex h-16 items-center justify-between border-b border-zinc-850 bg-[#0b0c10]/80 backdrop-blur-md px-6 z-40">
+            {/* Mobile Sheet Trigger */}
+            <div className="flex items-center gap-4 md:hidden">
+                <Sheet>
+                    <SheetTrigger render={<Button variant="ghost" size="icon" className="text-zinc-400 hover:text-white hover:bg-zinc-900" />}>
+                        <Menu className="h-6 w-6" />
+                        <span className="sr-only">Ouvrir le menu</span>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="w-64 p-0 bg-[#0b0c10] border-r border-zinc-800 text-zinc-300">
+                        <div className="h-full flex flex-col">
+                            <GlobalSettingsSidebar profile={profile} />
+                        </div>
+                    </SheetContent>
+                </Sheet>
+            </div>
+
             {/* Title / Context details */}
             <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Source de Vérité Gustav</span>

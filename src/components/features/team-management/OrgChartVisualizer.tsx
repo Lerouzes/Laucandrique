@@ -76,18 +76,51 @@ export function OrgChartVisualizer({ departments, employees, mode }: OrgChartVis
             nodesMap[emp.id] = { node: emp, children: [] }
         })
 
+        // Map department id to department node for fast lookup
+        const deptMap = new Map(departments.map(d => [d.id, d]))
+
+        // Helper to find parent department leader
+        const getParentDeptLeader = (deptId: string | null): string | null => {
+            if (!deptId) return null
+            let curr = deptMap.get(deptId)
+            while (curr && curr.parent_department_id) {
+                const parent = deptMap.get(curr.parent_department_id)
+                if (parent && parent.team_leader_id) {
+                    return parent.team_leader_id
+                }
+                curr = parent
+            }
+            return null
+        }
+
         const roots: any[] = []
         activeEmployees.forEach(emp => {
             const current = nodesMap[emp.id]
-            if (emp.supervisor_id && nodesMap[emp.supervisor_id]) {
-                nodesMap[emp.supervisor_id].children.push(current)
+            let resolvedSupervisorId = emp.supervisor_id
+
+            if (!resolvedSupervisorId && emp.department_id) {
+                const dept = deptMap.get(emp.department_id)
+                if (dept) {
+                    if (dept.team_leader_id && dept.team_leader_id !== emp.id) {
+                        resolvedSupervisorId = dept.team_leader_id
+                    } else if (dept.team_leader_id === emp.id) {
+                        // This employee is the team leader of this department.
+                        // They report to the parent department's team leader.
+                        resolvedSupervisorId = getParentDeptLeader(dept.parent_department_id)
+                    }
+                }
+            }
+
+            // Verify the supervisor exists and is active, and is not a self-reference
+            if (resolvedSupervisorId && resolvedSupervisorId !== emp.id && nodesMap[resolvedSupervisorId]) {
+                nodesMap[resolvedSupervisorId].children.push(current)
             } else {
                 roots.push(current)
             }
         })
 
         return roots
-    }, [employees, mode])
+    }, [employees, departments, mode])
 
     // Recursively render Department Node
     const renderDeptNode = (treeNode: { node: DepartmentNode; children: any[] }) => {

@@ -123,7 +123,18 @@ export function ClientsTable({ data }: { data: Client[] }) {
                                 <TableCell className="text-zinc-400">{client.email || '-'}</TableCell>
                                 <TableCell className="text-zinc-400">{client.phone || '-'}</TableCell>
                                 <TableCell className="text-zinc-400">{client.city || '-'}</TableCell>
-                                <TableCell className="text-zinc-400">{(client as any).managers ? `${(client as any).managers.first_name} ${(client as any).managers.last_name}` : '-'}</TableCell>
+                                <TableCell className="text-zinc-450">
+                                    {(client as any).managers ? (
+                                        <div>
+                                            <div className="font-semibold text-zinc-300">{`${(client as any).managers.first_name} ${(client as any).managers.last_name}`}</div>
+                                            {(client as any).managers.manager_teams?.name && (
+                                                <span className="text-[10px] text-indigo-400 font-bold bg-indigo-950/30 border border-indigo-900/30 px-1.5 py-0.2 mt-0.5 rounded inline-block">
+                                                    {(client as any).managers.manager_teams.name}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ) : '-'}
+                                </TableCell>
                                 <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                     <DeleteClientButton clientId={client.id} clientName={client.full_name} compact />
                                 </TableCell>

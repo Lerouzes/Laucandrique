@@ -23,7 +23,7 @@ export async function getClients(query?: string) {
 
         let request = supabase
             .from('clients')
-            .select('*, managers(first_name,last_name,email)')
+            .select('*, managers(first_name,last_name,email,manager_teams(id,name))')
             .order('created_at', { ascending: false })
 
         if (query) {
