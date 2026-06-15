@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -70,6 +70,99 @@ interface HRManagementProps {
     initialDepartments: Department[]
     initialEmployees: Employee[]
     managers: Manager[]
+}
+
+interface SearchSelectOption {
+    id: string
+    label: string
+}
+
+interface SearchSelectProps {
+    options: SearchSelectOption[]
+    value: string
+    onChange: (val: string) => void
+    placeholder?: string
+    className?: string
+}
+
+function SearchSelect({ options, value, onChange, placeholder = "-- Choisir --", className = "" }: SearchSelectProps) {
+    const [search, setSearch] = useState('')
+    const [isOpen, setIsOpen] = useState(false)
+
+    const selectedOption = options.find(opt => opt.id === value)
+
+    useEffect(() => {
+        if (selectedOption) {
+            setSearch(selectedOption.label)
+        } else {
+            setSearch('')
+        }
+    }, [selectedOption])
+
+    const filteredOptions = useMemo(() => {
+        if (!search || (selectedOption && search === selectedOption.label)) {
+            return options
+        }
+        const query = search.toLowerCase()
+        return options.filter(opt => opt.label.toLowerCase().includes(query))
+    }, [options, search, selectedOption])
+
+    return (
+        <div className="relative w-full">
+            <div className="relative">
+                <input
+                    type="text"
+                    placeholder={placeholder}
+                    value={search}
+                    onChange={(e) => {
+                        setSearch(e.target.value)
+                        setIsOpen(true)
+                        if (!e.target.value) {
+                            onChange('')
+                        }
+                    }}
+                    onFocus={() => setIsOpen(true)}
+                    onBlur={() => setTimeout(() => setIsOpen(false), 200)}
+                    className={`w-full bg-[#121318] border border-zinc-800 rounded-lg px-3 text-zinc-150 text-xs placeholder:text-zinc-500 focus:ring-1 focus:ring-purple-500 outline-none ${className}`}
+                />
+                {value && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            onChange('')
+                            setSearch('')
+                        }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                    >
+                        <X className="h-3 w-3" />
+                    </button>
+                )}
+            </div>
+            {isOpen && (
+                <div className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-[#16171e] border border-zinc-800 rounded-lg shadow-xl scrollbar-thin">
+                    {filteredOptions.length > 0 ? (
+                        filteredOptions.map((opt) => (
+                            <div
+                                key={opt.id}
+                                onClick={() => {
+                                    onChange(opt.id)
+                                    setSearch(opt.label)
+                                    setIsOpen(false)
+                                }}
+                                className={`px-3 py-1.5 text-xs cursor-pointer hover:bg-purple-600 hover:text-white transition-colors ${
+                                    value === opt.id ? 'bg-purple-950/60 text-purple-300 font-bold' : 'text-zinc-300'
+                                }`}
+                            >
+                                {opt.label}
+                            </div>
+                        ))
+                    ) : (
+                        <div className="px-3 py-1.5 text-xs text-zinc-500 italic">Aucun résultat trouvé</div>
+                    )}
+                </div>
+            )}
+        </div>
+    )
 }
 
 export function HRManagement({ initialDepartments, initialEmployees, managers }: HRManagementProps) {
@@ -428,30 +521,24 @@ export function HRManagement({ initialDepartments, initialEmployees, managers }:
 
                                     <div className="space-y-1">
                                         <Label className="text-zinc-500">Service Parent (Rattachement)</Label>
-                                        <select
+                                        <SearchSelect
+                                            options={departments.map(d => ({ id: d.id, label: d.name }))}
                                             value={newDeptParentId}
-                                            onChange={(e) => setNewDeptParentId(e.target.value)}
-                                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg h-9 px-3 text-zinc-150 text-[16px] md:text-xs"
-                                        >
-                                            <option value="">-- Aucun (Service Principal) --</option>
-                                            {departments.map((d) => (
-                                                <option key={d.id} value={d.id}>{d.name}</option>
-                                            ))}
-                                        </select>
+                                            onChange={setNewDeptParentId}
+                                            placeholder="-- Aucun (Service Principal) --"
+                                            className="h-9"
+                                        />
                                     </div>
 
                                     <div className="space-y-1">
                                         <Label className="text-zinc-500">Gestionnaire responsable</Label>
-                                        <select
+                                        <SearchSelect
+                                            options={managers.map(m => ({ id: m.id, label: `${m.first_name} ${m.last_name}` }))}
                                             value={newDeptManagerId}
-                                            onChange={(e) => setNewDeptManagerId(e.target.value)}
-                                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg h-9 px-3 text-zinc-150 text-[16px] md:text-xs"
-                                        >
-                                            <option value="">-- Aucun gestionnaire --</option>
-                                            {managers.map((m) => (
-                                                <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
-                                            ))}
-                                        </select>
+                                            onChange={setNewDeptManagerId}
+                                            placeholder="-- Aucun gestionnaire --"
+                                            className="h-9"
+                                        />
                                     </div>
 
                                     <Button 
@@ -507,42 +594,33 @@ export function HRManagement({ initialDepartments, initialEmployees, managers }:
                                                             </div>
                                                             <div className="space-y-1">
                                                                 <Label className="text-zinc-500 text-[10px]">Rattaché à (Parent)</Label>
-                                                                <select
+                                                                <SearchSelect
+                                                                    options={departments.filter(p => p.id !== d.id).map(p => ({ id: p.id, label: p.name }))}
                                                                     value={editDeptParentId}
-                                                                    onChange={(e) => setEditDeptParentId(e.target.value)}
-                                                                    className="w-full bg-[#121318] border border-zinc-700 rounded-lg h-8 px-2 text-zinc-150 text-[16px] md:text-xs"
-                                                                >
-                                                                    <option value="">-- Aucun (Racine) --</option>
-                                                                    {departments.filter(p => p.id !== d.id).map((p) => (
-                                                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                                                    ))}
-                                                                </select>
+                                                                    onChange={setEditDeptParentId}
+                                                                    placeholder="-- Aucun (Racine) --"
+                                                                    className="h-8"
+                                                                />
                                                             </div>
                                                             <div className="space-y-1">
                                                                 <Label className="text-zinc-500 text-[10px]">Chef d'équipe (Leader)</Label>
-                                                                <select
+                                                                <SearchSelect
+                                                                    options={employees.filter(emp => emp.department_id === d.id || !emp.department_id).map(emp => ({ id: emp.id, label: `${emp.first_name} ${emp.last_name}` }))}
                                                                     value={editDeptLeaderId}
-                                                                    onChange={(e) => setEditDeptLeaderId(e.target.value)}
-                                                                    className="w-full bg-[#121318] border border-zinc-700 rounded-lg h-8 px-2 text-zinc-150 text-[16px] md:text-xs"
-                                                                >
-                                                                    <option value="">-- Aucun leader --</option>
-                                                                    {employees.filter(emp => emp.department_id === d.id || !emp.department_id).map((emp) => (
-                                                                        <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</option>
-                                                                    ))}
-                                                                </select>
+                                                                    onChange={setEditDeptLeaderId}
+                                                                    placeholder="-- Aucun leader --"
+                                                                    className="h-8"
+                                                                />
                                                             </div>
                                                             <div className="space-y-1">
                                                                 <Label className="text-zinc-500 text-[10px]">Directeur de Service (Manager)</Label>
-                                                                <select
+                                                                <SearchSelect
+                                                                    options={managers.map(mgr => ({ id: mgr.id, label: `${mgr.first_name} ${mgr.last_name}` }))}
                                                                     value={editDeptManagerId}
-                                                                    onChange={(e) => setEditDeptManagerId(e.target.value)}
-                                                                    className="w-full bg-[#121318] border border-zinc-700 rounded-lg h-8 px-2 text-zinc-150 text-[16px] md:text-xs"
-                                                                >
-                                                                    <option value="">-- Aucun --</option>
-                                                                    {managers.map((mgr) => (
-                                                                        <option key={mgr.id} value={mgr.id}>{mgr.first_name} {mgr.last_name}</option>
-                                                                    ))}
-                                                                </select>
+                                                                    onChange={setEditDeptManagerId}
+                                                                    placeholder="-- Aucun --"
+                                                                    className="h-8"
+                                                                />
                                                             </div>
                                                         </div>
 
@@ -690,30 +768,24 @@ export function HRManagement({ initialDepartments, initialEmployees, managers }:
 
                                     <div className="space-y-1">
                                         <Label className="text-zinc-500">Département d'Affectation</Label>
-                                        <select
+                                        <SearchSelect
+                                            options={departments.map(d => ({ id: d.id, label: d.name }))}
                                             value={newEmpDeptId}
-                                            onChange={(e) => setNewEmpDeptId(e.target.value)}
-                                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg h-9 px-3 text-zinc-150 text-[16px] md:text-xs"
-                                        >
-                                            <option value="">-- Aucun --</option>
-                                            {departments.map((d) => (
-                                                <option key={d.id} value={d.id}>{d.name}</option>
-                                            ))}
-                                        </select>
+                                            onChange={setNewEmpDeptId}
+                                            placeholder="-- Aucun --"
+                                            className="h-9"
+                                        />
                                     </div>
 
                                     <div className="space-y-1">
                                         <Label className="text-zinc-500">Supérieur direct</Label>
-                                        <select
+                                        <SearchSelect
+                                            options={employees.filter(emp => emp.is_active).map(emp => ({ id: emp.id, label: `${emp.first_name} ${emp.last_name}` }))}
                                             value={newEmpSupervisorId}
-                                            onChange={(e) => setNewEmpSupervisorId(e.target.value)}
-                                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg h-9 px-3 text-zinc-150 text-[16px] md:text-xs"
-                                        >
-                                            <option value="">-- Aucun --</option>
-                                            {employees.filter(emp => emp.is_active).map((emp) => (
-                                                <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</option>
-                                            ))}
-                                        </select>
+                                            onChange={setNewEmpSupervisorId}
+                                            placeholder="-- Aucun --"
+                                            className="h-9"
+                                        />
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-3">
@@ -836,29 +908,23 @@ export function HRManagement({ initialDepartments, initialEmployees, managers }:
                                                             </div>
                                                             <div className="space-y-1">
                                                                 <Label className="text-zinc-500 text-[10px]">Département</Label>
-                                                                <select
+                                                                <SearchSelect
+                                                                    options={departments.map(dep => ({ id: dep.id, label: dep.name }))}
                                                                     value={editEmpDeptId}
-                                                                    onChange={(e) => setEditEmpDeptId(e.target.value)}
-                                                                    className="w-full bg-[#121318] border border-zinc-700 rounded-lg h-8 px-2 text-zinc-150 text-[16px] md:text-xs"
-                                                                >
-                                                                    <option value="">-- Aucun --</option>
-                                                                    {departments.map((dep) => (
-                                                                        <option key={dep.id} value={dep.id}>{dep.name}</option>
-                                                                    ))}
-                                                                </select>
+                                                                    onChange={setEditEmpDeptId}
+                                                                    placeholder="-- Aucun --"
+                                                                    className="h-8"
+                                                                />
                                                             </div>
                                                             <div className="space-y-1">
                                                                 <Label className="text-zinc-500 text-[10px]">Supérieur direct</Label>
-                                                                <select
+                                                                <SearchSelect
+                                                                    options={employees.filter(el => el.id !== emp.id && el.is_active).map(el => ({ id: el.id, label: `${el.first_name} ${el.last_name}` }))}
                                                                     value={editEmpSupervisorId}
-                                                                    onChange={(e) => setEditEmpSupervisorId(e.target.value)}
-                                                                    className="w-full bg-[#121318] border border-zinc-700 rounded-lg h-8 px-2 text-zinc-150 text-[16px] md:text-xs"
-                                                                >
-                                                                    <option value="">-- Aucun --</option>
-                                                                    {employees.filter(el => el.id !== emp.id && el.is_active).map((el) => (
-                                                                        <option key={el.id} value={el.id}>{el.first_name} {el.last_name}</option>
-                                                                    ))}
-                                                                </select>
+                                                                    onChange={setEditEmpSupervisorId}
+                                                                    placeholder="-- Aucun --"
+                                                                    className="h-8"
+                                                                />
                                                             </div>
                                                             <div className="space-y-1">
                                                                 <Label className="text-zinc-500 text-[10px]">Date d'embauche</Label>

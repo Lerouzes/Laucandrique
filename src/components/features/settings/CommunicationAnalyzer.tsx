@@ -103,6 +103,32 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
 
 export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
     const [selectedClientId, setSelectedClientId] = useState<string>('')
+    const [sdcSearch, setSdcSearch] = useState('')
+    const [isSdcDropdownOpen, setIsSdcDropdownOpen] = useState(false)
+
+    const selectedClient = useMemo(() => {
+        return clients.find(c => c.id === selectedClientId) || null
+    }, [clients, selectedClientId])
+
+    useEffect(() => {
+        if (selectedClient) {
+            setSdcSearch(selectedClient.company_name || selectedClient.full_name)
+        } else {
+            setSdcSearch('')
+        }
+    }, [selectedClient])
+
+    const filteredSdcClients = useMemo(() => {
+        if (!sdcSearch || (selectedClient && sdcSearch === (selectedClient.company_name || selectedClient.full_name))) {
+            return clients
+        }
+        const query = sdcSearch.toLowerCase()
+        return clients.filter(c => 
+            (c.company_name || '').toLowerCase().includes(query) ||
+            (c.full_name || '').toLowerCase().includes(query)
+        )
+    }, [clients, sdcSearch, selectedClient])
+
     const [unitCount, setUnitCount] = useState<number>(90)
     
     // CSV uploader states
@@ -542,21 +568,61 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
         <div className="space-y-6">
             {/* SDC selection banner & Config controls */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-zinc-950 border border-zinc-850 p-4 rounded-xl">
-                <div className="space-y-1 md:col-span-2">
-                    <Label htmlFor="client-select" className="text-[10px] text-zinc-550 uppercase tracking-wider font-bold">Syndicat (SDC) Cible</Label>
-                    <select
-                        id="client-select"
-                        value={selectedClientId}
-                        onChange={(e) => setSelectedClientId(e.target.value)}
-                        className="w-full bg-[#121318] border border-zinc-800 rounded-lg h-9 px-3 text-zinc-150 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
-                    >
-                        <option value="">-- Choisir un syndicat dans la liste maîtresse --</option>
-                        {clients.map((c) => (
-                            <option key={c.id} value={c.id}>
-                                {c.company_name || 'Syndicat sans nom'} ({c.full_name})
-                            </option>
-                        ))}
-                    </select>
+                <div className="space-y-1 md:col-span-2 relative">
+                    <Label className="text-[10px] text-zinc-550 uppercase tracking-wider font-bold">Syndicat (SDC) Cible</Label>
+                    <div className="relative">
+                        <Input
+                            type="text"
+                            placeholder="Rechercher et choisir un syndicat..."
+                            value={sdcSearch}
+                            onChange={(e) => {
+                                setSdcSearch(e.target.value)
+                                setIsSdcDropdownOpen(true)
+                                if (!e.target.value) {
+                                    setSelectedClientId('')
+                                }
+                            }}
+                            onFocus={() => setIsSdcDropdownOpen(true)}
+                            onBlur={() => setTimeout(() => setIsSdcDropdownOpen(false), 200)}
+                            className="w-full bg-[#121318] border-zinc-800 h-9 pr-8 text-zinc-150 text-xs placeholder:text-zinc-500"
+                        />
+                        {selectedClientId && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSelectedClientId('')
+                                    setSdcSearch('')
+                                }}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        )}
+                    </div>
+                    {isSdcDropdownOpen && (
+                        <div className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-[#16171e] border border-zinc-800 rounded-lg shadow-xl scrollbar-thin">
+                            {filteredSdcClients.length > 0 ? (
+                                filteredSdcClients.map((c) => (
+                                    <div
+                                        key={c.id}
+                                        onClick={() => {
+                                            setSelectedClientId(c.id)
+                                            setSdcSearch(c.company_name || c.full_name)
+                                            setIsSdcDropdownOpen(false)
+                                        }}
+                                        className={`px-3 py-2 text-xs cursor-pointer hover:bg-indigo-650 hover:text-white transition-colors ${
+                                            selectedClientId === c.id ? 'bg-indigo-950/60 text-indigo-300 font-bold' : 'text-zinc-300'
+                                        }`}
+                                    >
+                                        <span className="font-semibold">{c.company_name || 'Syndicat sans nom'}</span>{' '}
+                                        <span className="text-[10px] opacity-75 font-mono">({c.full_name})</span>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="px-3 py-2 text-xs text-zinc-550 italic">Aucun résultat trouvé</div>
+                            )}
+                        </div>
+                    )}
                 </div>
                 
                 <div className="space-y-1">
