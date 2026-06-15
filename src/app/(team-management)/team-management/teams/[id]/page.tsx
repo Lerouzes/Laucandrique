@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Network, Users, Building2, DoorOpen, DollarSign, Calendar, BarChart3, AlertTriangle, ArrowRight } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export default async function TeamDetailPage({
     params
@@ -35,7 +36,7 @@ export default async function TeamDetailPage({
         .select('*, contracts(*), doors(id)')
 
     const now = new Date()
-    const activeClients = (clients || []).filter(c => {
+    const activeClients = (clients as any[] || []).filter(c => {
         const isActiveStatus = c.status === 'active' || !c.status
         const notDepartedYet = !c.departure_date || new Date(c.departure_date) > now
         const contractArr = Array.isArray(c.contracts) ? c.contracts : c.contracts ? [c.contracts] : []

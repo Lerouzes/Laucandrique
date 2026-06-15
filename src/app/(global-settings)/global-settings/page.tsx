@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Search, RefreshCw, List, FileSpreadsheet, Users } from 'lucide-react'
+import { Search, RefreshCw, List, FileSpreadsheet, Users, MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,6 +16,7 @@ import { ClientFormDialog } from '@/components/features/clients/ClientFormDialog
 import { getSnapshotsAction } from '@/actions/snapshots'
 import { SnapshotWorkspace } from '@/components/features/settings/SnapshotWorkspace'
 import { AccountsManager } from '@/components/features/settings/AccountsManager'
+import { CommunicationAnalyzer } from '@/components/features/settings/CommunicationAnalyzer'
 import { getManagers } from '@/actions/managers'
 
 // Tabs component
@@ -54,7 +55,7 @@ export default function GlobalSettingsPage() {
 
     // Fetch clients / snapshots on activeTab or searchVal updates
     useEffect(() => {
-        if (activeTab === 'clients') {
+        if (activeTab === 'clients' || activeTab === 'communications') {
             getClients(searchVal).then(setClients)
         } else if (activeTab === 'snapshots') {
             getSnapshotsAction().then(setSnapshots)
@@ -66,7 +67,7 @@ export default function GlobalSettingsPage() {
     }
 
     const refreshData = () => {
-        if (activeTab === 'clients') {
+        if (activeTab === 'clients' || activeTab === 'communications') {
             getClients(searchVal).then(setClients)
         } else if (activeTab === 'snapshots') {
             getSnapshotsAction().then(setSnapshots)
@@ -96,6 +97,10 @@ export default function GlobalSettingsPage() {
                     <TabsTrigger value="snapshots" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
                         <FileSpreadsheet className="h-4 w-4" />
                         Snapshots & Synchro
+                    </TabsTrigger>
+                    <TabsTrigger value="communications" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
+                        <MessageSquare className="h-4 w-4" />
+                        Analyse Communications
                     </TabsTrigger>
                     {userRole === 'Master' && (
                         <TabsTrigger value="accounts" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
@@ -162,6 +167,11 @@ export default function GlobalSettingsPage() {
                         existingClients={clients}
                         currentUserRole={userRole}
                     />
+                </TabsContent>
+
+                {/* TAB 3: COMMUNICATIONS ANALYZER */}
+                <TabsContent value="communications" className="outline-none">
+                    <CommunicationAnalyzer clients={filteredClients} />
                 </TabsContent>
 
                 {/* TAB 3: ACCOUNTS MANAGEMENT */}

@@ -8,18 +8,20 @@ import { getClientById, updateClientAction, getContractForClient } from '@/actio
 import { getManagers } from '@/actions/managers'
 import { getQuotes } from '@/actions/quotes'
 import { getSyndicateWorkloadAction } from '@/actions/team-management'
+import { getCommunicationStatsByClient } from '@/actions/communication-stats'
 import { Badge } from '@/components/ui/badge'
 import { ClientDetailForm } from '@/components/features/clients/ClientDetailForm'
 import { ClientTabsContainer } from '@/components/features/clients/ClientTabsContainer'
 import { CoOwnersManager } from '@/components/features/clients/CoOwnersManager'
+import { ClientCommunicationTrends } from '@/components/features/clients/ClientCommunicationTrends'
 import { ArrowLeft } from 'lucide-react'
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
 
-  // Fetch client + contract + co-owners separately
-  const [client, managers, quotes, contractDirect, workload, coOwnersRes] = await Promise.all([
+  // Fetch client + contract + co-owners + comm stats separately
+  const [client, managers, quotes, contractDirect, workload, coOwnersRes, commStats] = await Promise.all([
     getClientById(id),
     getManagers(true),
     getQuotes(),
@@ -29,7 +31,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       .from('doors')
       .select('*, resident:maintenance_residents(*)')
       .eq('client_id', id)
-      .order('door_number', { ascending: true })
+      .order('door_number', { ascending: true }),
+    getCommunicationStatsByClient(id)
   ])
 
   if (!client) notFound()
@@ -78,6 +81,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           <CoOwnersManager
             clientId={id}
             initialCoOwners={coOwnersRes.data || []}
+          />
+        }
+        communicationsTab={
+          <ClientCommunicationTrends
+            stats={commStats}
+            clientId={id}
           />
         }
       />

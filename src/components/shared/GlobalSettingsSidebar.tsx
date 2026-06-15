@@ -11,7 +11,8 @@ import {
     Layers,
     Wrench,
     Settings,
-    ShieldCheck
+    ShieldCheck,
+    MessageSquare
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -99,7 +100,8 @@ export function GlobalSettingsSidebar({ profile }: { profile: Profile | null }) 
             <nav className="flex-1 space-y-1.5 px-3 py-4 overflow-y-auto">
                 {[
                     { name: 'Liste Maîtresse SDC', href: '/global-settings?tab=clients', key: 'clients', icon: Users },
-                    { name: 'Snapshots & Synchro', href: '/global-settings?tab=snapshots', key: 'snapshots', icon: FileSpreadsheet }
+                    { name: 'Snapshots & Synchro', href: '/global-settings?tab=snapshots', key: 'snapshots', icon: FileSpreadsheet },
+                    { name: 'Analyse Communications', href: '/global-settings?tab=communications', key: 'communications', icon: MessageSquare }
                 ].map((item) => {
                     const isActive = activeTab === item.key
                     return (

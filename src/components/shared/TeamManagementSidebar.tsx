@@ -19,7 +19,8 @@ import {
     UserCheck,
     Settings,
     Wrench,
-    DollarSign
+    DollarSign,
+    UserCog
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -29,6 +30,7 @@ type Profile = Database['public']['Tables']['profiles']['Row']
 
 const navItems = [
     { name: 'Tableau de bord', href: '/team-management/dashboard', icon: LayoutDashboard },
+    { name: 'Ressources Humaines', href: '/team-management/hr', icon: UserCog },
     { name: 'Équipes', href: '/team-management/teams', icon: Network },
     { name: 'Gestionnaires', href: '/team-management/managers', icon: UserCheck },
     { name: '1-à-1 Rencontres', href: '/team-management/one-on-ones', icon: CalendarDays },

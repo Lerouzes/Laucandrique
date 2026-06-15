@@ -25,7 +25,7 @@ export default async function TeamsListPage() {
         .select('*, contracts(*), doors(id)')
 
     const now = new Date()
-    const activeClients = (clients || []).filter(c => {
+    const activeClients = (clients as any[] || []).filter(c => {
         const isActiveStatus = c.status === 'active' || !c.status
         const notDepartedYet = !c.departure_date || new Date(c.departure_date) > now
         const contractArr = Array.isArray(c.contracts) ? c.contracts : c.contracts ? [c.contracts] : []
