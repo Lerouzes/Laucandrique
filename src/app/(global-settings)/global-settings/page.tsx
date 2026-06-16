@@ -18,6 +18,9 @@ import { SnapshotWorkspace } from '@/components/features/settings/SnapshotWorksp
 import { AccountsManager } from '@/components/features/settings/AccountsManager'
 import { CommunicationAnalyzer } from '@/components/features/settings/CommunicationAnalyzer'
 import { getManagers, getManagerTeams } from '@/actions/managers'
+import { getAllCommunicationStats } from '@/actions/communication-stats'
+import { getSettings } from '@/actions/settings'
+import { GlobalCommunicationAnalytics } from '@/components/features/settings/GlobalCommunicationAnalytics'
 
 // Tabs component
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -31,6 +34,8 @@ export default function GlobalSettingsPage() {
     const [clients, setClients] = useState<any[]>([])
     const [snapshots, setSnapshots] = useState<any[]>([])
     const [managers, setManagers] = useState<any[]>([])
+    const [allCommsStats, setAllCommsStats] = useState<any[]>([])
+    const [targetIndex, setTargetIndex] = useState<number>(2.50)
     const [searchVal, setSearchVal] = useState('')
     const [userRole, setUserRole] = useState<string>('Agent')
     const [currentUserId, setCurrentUserId] = useState<string>('')
@@ -65,6 +70,17 @@ export default function GlobalSettingsPage() {
         }
     }, [activeTab, searchVal])
 
+    useEffect(() => {
+        if (activeTab === 'comms-analytics') {
+            getAllCommunicationStats().then(setAllCommsStats)
+            getSettings().then(data => {
+                if (data?.communication_target_index) {
+                    setTargetIndex(Number(data.communication_target_index))
+                }
+            })
+        }
+    }, [activeTab])
+
     const handleTabChange = (tab: string) => {
         router.push(`/global-settings?tab=${tab}`, { scroll: false })
     }
@@ -74,6 +90,8 @@ export default function GlobalSettingsPage() {
             getClients(searchVal).then(setClients)
         } else if (activeTab === 'snapshots') {
             getSnapshotsAction().then(setSnapshots)
+        } else if (activeTab === 'comms-analytics') {
+            getAllCommunicationStats().then(setAllCommsStats)
         }
     }
 
@@ -112,6 +130,10 @@ export default function GlobalSettingsPage() {
                     <TabsTrigger value="communications" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
                         <MessageSquare className="h-4 w-4" />
                         Analyse Communications
+                    </TabsTrigger>
+                    <TabsTrigger value="comms-analytics" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
+                        <MessageSquare className="h-4 w-4 text-indigo-400" />
+                        Analytics Communications
                     </TabsTrigger>
                     {userRole === 'Master' && (
                         <TabsTrigger value="accounts" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
@@ -198,6 +220,15 @@ export default function GlobalSettingsPage() {
                 {/* TAB 3: COMMUNICATIONS ANALYZER */}
                 <TabsContent value="communications" className="outline-none">
                     <CommunicationAnalyzer clients={filteredClients} />
+                </TabsContent>
+
+                {/* TAB 4: GLOBAL COMMUNICATIONS ANALYTICS */}
+                <TabsContent value="comms-analytics" className="outline-none">
+                    <GlobalCommunicationAnalytics 
+                        stats={allCommsStats} 
+                        teams={teams}
+                        targetIndex={targetIndex}
+                    />
                 </TabsContent>
 
                 {/* TAB 3: ACCOUNTS MANAGEMENT */}

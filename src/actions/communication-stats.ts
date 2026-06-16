@@ -164,3 +164,36 @@ export async function deleteCommunicationStatsAction(id: string, clientId?: stri
     revalidatePath('/global-settings')
     return { success: true }
 }
+
+export async function getAllCommunicationStats(): Promise<any[]> {
+    const supabase = await createClient()
+
+    const { data, error } = await (supabase
+        .from('client_communication_stats' as any)
+        .select(`
+            *,
+            clients(
+                id,
+                company_name,
+                full_name,
+                manager_id,
+                status,
+                managers(
+                    id,
+                    first_name,
+                    last_name,
+                    team_id,
+                    manager_teams(id, name)
+                ),
+                doors(id)
+            )
+        `)
+        .order('analysis_date', { ascending: false }) as any)
+
+    if (error) {
+        console.error('Error fetching all communication stats:', error)
+        return []
+    }
+
+    return (data || []) as any[]
+}
