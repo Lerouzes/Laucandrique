@@ -233,6 +233,50 @@ export function ClientCommunicationTrends({
         return counts
     }, [selectedRun, runSummary, filteredTimelineList])
 
+    // Unit Breakdown counts aggregated over filtered timeline
+    const filteredUnitCounts = useMemo(() => {
+        if (!selectedRun) return []
+
+        const monthlyUnitHistory = runSummary.monthlyUnitHistory
+        const periods = filteredTimelineList.map((t: any) => t.period)
+        const totalComms = filteredStats?.totalComms || 1
+
+        if (monthlyUnitHistory) {
+            // Compute dynamic unit counts based on active periods
+            const counts: Record<string, number> = {}
+            Object.entries(monthlyUnitHistory).forEach(([unit, history]: [string, any]) => {
+                let sum = 0
+                periods.forEach(p => {
+                    sum += Number(history[p] || 0)
+                })
+                if (sum > 0) {
+                    counts[unit] = sum
+                }
+            })
+
+            return Object.entries(counts)
+                .map(([unit, count]) => {
+                    const percentage = totalComms > 0 ? Math.round((count / totalComms) * 100) : 0
+                    const avgPerMonth = Number((count / (filteredTimelineList.length || 1)).toFixed(2))
+                    return { unit, count, percentage, avgPerMonth }
+                })
+                .sort((a, b) => b.count - a.count)
+        } else {
+            // Fallback for older saved runs
+            const sortedUnits = runSummary.sortedUnits || []
+            const runTotal = Number(selectedRun.total_communications || 1)
+            return sortedUnits.map((u: any) => {
+                const percentage = runTotal > 0 ? Math.round((u.count / runTotal) * 100) : 0
+                return {
+                    unit: u.unit,
+                    count: u.count,
+                    percentage,
+                    avgPerMonth: null
+                }
+            })
+        }
+    }, [selectedRun, runSummary, filteredTimelineList, filteredStats])
+
     // Chronological timeline data formatted for Chart
     const runChartData = useMemo(() => {
         return filteredTimelineList.map((t: any) => {
@@ -666,6 +710,66 @@ export function ClientCommunicationTrends({
                             })}
                         </div>
                     </div>
+
+                    {/* Unit Breakdown Card */}
+                    <Card className="bg-[#121318]/90 border border-zinc-850 shadow-lg">
+                        <CardHeader className="pb-3 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                            <div>
+                                <CardTitle className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Volume de communication par Unité (Porte)</CardTitle>
+                                <CardDescription className="text-xxs text-zinc-500">
+                                    Répartition du volume total de communications par unité/porte sur la période sélectionnée ({filteredStats?.periodText}).
+                                </CardDescription>
+                            </div>
+                            <Badge className="bg-[#1e1a3a] text-indigo-300 border border-indigo-900/60 px-2 py-0.5 rounded-full text-[9px] font-bold">
+                                {filteredUnitCounts.length} Unités actives
+                            </Badge>
+                        </CardHeader>
+                        <CardContent>
+                            {filteredUnitCounts.length === 0 ? (
+                                <div className="text-center py-8 text-zinc-555 italic text-xxs">
+                                    Aucune donnée par unité pour cette période.
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 max-h-[320px] overflow-y-auto pr-1 scrollbar-thin">
+                                    {filteredUnitCounts.map((u, idx) => (
+                                        <div 
+                                            key={u.unit} 
+                                            className="p-3 bg-zinc-950/45 border border-zinc-850 rounded-xl hover:border-zinc-800 transition-all flex flex-col justify-between space-y-2 group"
+                                        >
+                                            <div className="flex justify-between items-start">
+                                                <span className="text-[10px] font-bold text-zinc-400">
+                                                    Unité <strong className="text-zinc-200">{u.unit}</strong>
+                                                </span>
+                                                <span className="text-[9px] text-zinc-500 font-mono font-bold">
+                                                    #{idx + 1}
+                                                </span>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between items-baseline">
+                                                    <span className="text-base font-black text-indigo-400 font-mono">
+                                                        {u.count}
+                                                    </span>
+                                                    <span className="text-[9px] text-zinc-550 font-mono">
+                                                        comms
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-[9px]">
+                                                    <span className="text-zinc-500 font-mono">Part:</span>
+                                                    <span className="text-zinc-350 font-bold font-mono">{u.percentage}%</span>
+                                                </div>
+                                                {u.avgPerMonth !== null && (
+                                                    <div className="flex justify-between items-center text-[9px] border-t border-zinc-900/60 pt-1 mt-1">
+                                                        <span className="text-zinc-500 font-mono">Moyenne:</span>
+                                                        <span className="text-emerald-400 font-mono font-bold">{u.avgPerMonth}/m</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
 
                     {/* 3. Team Comparison Chart */}
                     {teamComparisonStats.length > 1 && (

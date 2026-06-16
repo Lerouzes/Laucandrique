@@ -491,6 +491,7 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
         const employeeCounts: Record<string, number> = {}
         const unitCounts: Record<string, number> = {}
         const monthlyDeptHistory: Record<string, Record<string, number>> = {}
+        const monthlyUnitHistory: Record<string, Record<string, number>> = {}
         const localYearlyAgg: Record<string, Record<string, number>> = {}
         
         DEPT_LIST.forEach(d => { monthlyDeptHistory[d] = {}; })
@@ -525,6 +526,15 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                 }
                 if (localYearlyAgg[row.year][resolvedDept] !== undefined) {
                     localYearlyAgg[row.year][resolvedDept]++
+                }
+            }
+
+            if (row.unite && row.unite !== "" && row.unite !== "-") {
+                if (timelineKey !== "Unknown") {
+                    if (!monthlyUnitHistory[row.unite]) {
+                        monthlyUnitHistory[row.unite] = {}
+                    }
+                    monthlyUnitHistory[row.unite][timelineKey] = (monthlyUnitHistory[row.unite][timelineKey] || 0) + 1
                 }
             }
 
@@ -591,6 +601,7 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
             sortedEmployees,
             filteredList,
             monthlyDeptHistory,
+            monthlyUnitHistory,
             yearlyHistoricAggregates: localYearlyAgg
         }
     }, [rawRows, deptMap, selectedYear, selectedMonth, selectedUserFilter, unitCount])
@@ -635,6 +646,8 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                     yearlyHistoricAggregates: pipelineData.yearlyHistoricAggregates,
                     timelineList: pipelineData.timelineList,
                     monthlyDeptHistory: pipelineData.monthlyDeptHistory,
+                    monthlyUnitHistory: pipelineData.monthlyUnitHistory,
+                    sortedUnits: pipelineData.sortedUnits,
                     dynamicDeptMap: deptMap,
                     discoveredUsers,
                     analysis_date: period_end || new Date().toISOString()
