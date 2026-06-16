@@ -295,11 +295,43 @@ export function ClientCommunicationTrends({
         let totalComms = 0
         let inclusionsVolume = 0
         let exclusionsVolume = 0
+        
+        let outboundEmails = 0
+        let inboundEmails = 0
+        let chats = 0
+        let phoneCalls = 0
+        let others = 0
+        let hasGranularTypes = false
 
         filteredTimelineList.forEach((t: any) => {
             inclusionsVolume += Number(t.contractVolume || 0)
             exclusionsVolume += Number(t.outOfContractVolume || 0)
+
+            if (t.outboundEmails !== undefined || t.inboundEmails !== undefined || t.chats !== undefined || t.phoneCalls !== undefined) {
+                outboundEmails += Number(t.outboundEmails || 0)
+                inboundEmails += Number(t.inboundEmails || 0)
+                chats += Number(t.chats || 0)
+                phoneCalls += Number(t.phoneCalls || 0)
+                others += Number(t.others || 0)
+                hasGranularTypes = true
+            }
         })
+
+        // Fallback for older runs
+        if (!hasGranularTypes) {
+            const recap = runSummary?.typeRecap
+            if (recap) {
+                outboundEmails = Number(recap.outboundEmails || 0)
+                inboundEmails = Number(recap.inboundEmails || 0)
+                chats = Number(recap.chats || 0)
+                phoneCalls = Number(recap.phoneCalls || 0)
+                others = Number(recap.others || 0)
+                hasGranularTypes = true
+            } else {
+                outboundEmails = Number(selectedRun.total_emails || 0)
+                phoneCalls = Number(selectedRun.total_phone_calls || 0)
+            }
+        }
 
         totalComms = inclusionsVolume + exclusionsVolume
         const monthsCount = filteredTimelineList.length
@@ -316,15 +348,19 @@ export function ClientCommunicationTrends({
 
         return {
             totalComms,
-            emails: null,
-            calls: null,
             inclusionsVolume,
             exclusionsVolume,
             ratio,
             periodText,
-            monthsCount
+            monthsCount,
+            outboundEmails,
+            inboundEmails,
+            chats,
+            phoneCalls,
+            others,
+            hasGranularTypes
         }
-    }, [selectedRun, filteredTimelineList, totalUnits])
+    }, [selectedRun, filteredTimelineList, totalUnits, runSummary])
 
     // Department Breakdown counts aggregated over filtered timeline
     const filteredDeptCounts = useMemo(() => {
@@ -692,25 +728,61 @@ export function ClientCommunicationTrends({
 
                             {/* Card 2: Communication Volume & Channel Split */}
                             <Card className="bg-[#121318] border border-zinc-850 shadow-md relative overflow-hidden group hover:border-zinc-800 transition-all">
-                                <CardContent className="p-6">
-                                    <span className="text-[10px] text-zinc-400 uppercase tracking-wider font-extrabold block">Volume de Communications</span>
+                                <CardContent className="p-5 flex flex-col justify-between h-full">
+                                    <div>
+                                        <span className="text-[10px] text-zinc-400 uppercase tracking-wider font-extrabold block">Volume de Communications</span>
 
-                                    <div className="flex items-baseline gap-2 mt-2">
-                                        <span className="text-5xl font-black text-zinc-150 tracking-tight font-mono">
-                                            {filteredStats.totalComms}
-                                        </span>
-                                        <span className="text-xs text-zinc-500 font-medium">communications</span>
+                                        <div className="flex items-baseline gap-2 mt-1.5">
+                                            <span className="text-4xl font-black text-zinc-150 tracking-tight font-mono">
+                                                {filteredStats.totalComms}
+                                            </span>
+                                            <span className="text-[10px] text-zinc-550 font-semibold uppercase font-bold">comms</span>
+                                        </div>
+
+                                        <div className="mt-3 flex items-center gap-4 text-[9px] font-semibold">
+                                            <span className="flex items-center gap-1 text-zinc-400">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
+                                                {filteredStats.inclusionsVolume} forfait
+                                            </span>
+                                            <span className="flex items-center gap-1 text-zinc-400">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-orange-500"></span>
+                                                {filteredStats.exclusionsVolume} hors-forfait
+                                            </span>
+                                        </div>
                                     </div>
 
-                                    <div className="mt-4 pt-1 flex items-center gap-4 text-[10px]">
-                                        <span className="flex items-center gap-1 font-semibold text-zinc-400">
-                                            <span className="h-2 w-2 rounded-full bg-indigo-500"></span>
-                                            {filteredStats.inclusionsVolume} forfaitaires
-                                        </span>
-                                        <span className="flex items-center gap-1 font-semibold text-zinc-400">
-                                            <span className="h-2 w-2 rounded-full bg-orange-500"></span>
-                                            {filteredStats.exclusionsVolume} hors-forfait
-                                        </span>
+                                    <div className="mt-3 pt-2.5 border-t border-zinc-900/60 grid grid-cols-2 gap-x-3 gap-y-1 text-[9px] text-zinc-450 font-semibold">
+                                        {filteredStats.hasGranularTypes ? (
+                                            <>
+                                                <div className="flex items-center justify-between">
+                                                    <span>Expédiés (M) :</span>
+                                                    <span className="font-mono text-zinc-300">{filteredStats.outboundEmails}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span>Reçus (M) :</span>
+                                                    <span className="font-mono text-zinc-300">{filteredStats.inboundEmails}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span>Clavardage :</span>
+                                                    <span className="font-mono text-zinc-300">{filteredStats.chats}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span>Appels :</span>
+                                                    <span className="font-mono text-zinc-300">{filteredStats.phoneCalls}</span>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="flex items-center justify-between col-span-2">
+                                                    <span>Courriels :</span>
+                                                    <span className="font-mono text-zinc-300">{filteredStats.outboundEmails}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between col-span-2">
+                                                    <span>Appels :</span>
+                                                    <span className="font-mono text-zinc-300">{filteredStats.phoneCalls}</span>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </CardContent>
                             </Card>

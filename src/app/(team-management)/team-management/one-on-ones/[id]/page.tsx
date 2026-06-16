@@ -137,6 +137,48 @@ export default async function OneOnOneDetailPage({
         .select('*')
         .eq('manager_id', oneOnOne.manager_id)
 
+    // 10. Fetch manager's active clients and their latest communication stats
+    const { data: managerClients } = await supabase
+        .from('clients')
+        .select(`
+            id,
+            company_name,
+            full_name,
+            doors(id)
+        `)
+        .eq('manager_id', oneOnOne.manager_id)
+        .eq('status', 'active')
+
+    const clientIds = (managerClients || []).map(c => c.id)
+
+    let communicationStats: any[] = []
+    if (clientIds.length > 0) {
+        const { data: statsData } = await (supabase
+            .from('client_communication_stats' as any)
+            .select('*')
+            .in('client_id', clientIds)
+            .order('analysis_date', { ascending: false }) as any)
+
+        const statsList = (statsData || []) as any[]
+
+        // Deduplicate: only keep the latest analysis per client
+        const latestStatsMap = new Map()
+        for (const stat of statsList) {
+            if (!latestStatsMap.has(stat.client_id)) {
+                latestStatsMap.set(stat.client_id, stat)
+            }
+        }
+        communicationStats = Array.from(latestStatsMap.values()).map(stat => {
+            const client = managerClients?.find(c => c.id === stat.client_id)
+            return {
+                ...stat,
+                client_company_name: client?.company_name || client?.full_name || 'Syndicat sans nom',
+                client_full_name: client?.full_name || '',
+                doors_count: client?.doors?.length || stat.analysis_summary?.total_units || 90
+            }
+        })
+    }
+
     return (
         <div className="space-y-6 pb-12">
             <div>
@@ -156,6 +198,7 @@ export default async function OneOnOneDetailPage({
                 reviewedAssemblies={reviewedAssemblies || []}
                 taskEmailAudits={taskEmailAudits || []}
                 operationalRisks={operationalRisks || []}
+                communicationStats={communicationStats}
             />
         </div>
     )

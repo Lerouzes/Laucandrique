@@ -18,9 +18,10 @@ import {
     Calendar,
     ArrowRight,
     Download,
-    Loader2
+    Loader2,
+    ChevronDown
 } from 'lucide-react'
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, Fragment } from 'react'
 import {
     AreaChart,
     Area,
@@ -40,6 +41,22 @@ import {
 } from 'recharts'
 import Link from 'next/link'
 
+const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Technique", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
+
+const DEPT_BADGE_CSS: Record<string, string> = {
+    "Gestion": "bg-sky-500/10 text-sky-400 border border-sky-550/20",
+    "Administration": "bg-teal-500/10 text-teal-400 border border-teal-550/20",
+    "Comptabilité": "bg-purple-500/10 text-purple-400 border border-purple-550/20",
+    "Technique": "bg-orange-500/10 text-orange-400 border border-orange-550/20",
+    "Sinistres": "bg-rose-500/10 text-rose-450 text-rose-400 border border-rose-550/20",
+    "Assurance": "bg-pink-500/10 text-pink-400 border border-pink-550/20",
+    "Direction": "bg-zinc-800 text-zinc-400 border border-zinc-700/60",
+    "Chargé d’opération": "bg-indigo-500/10 text-indigo-400 border border-indigo-550/20",
+    "Chargé d'opération": "bg-indigo-500/10 text-indigo-400 border border-indigo-550/20",
+    "Conseil d'Administration": "bg-amber-500/10 text-amber-400 border border-amber-550/20",
+    "Marketing": "bg-pink-500/10 text-pink-400 border border-pink-550/20"
+}
+
 interface GlobalCommunicationAnalyticsProps {
     stats: any[]
     teams: any[]
@@ -56,6 +73,7 @@ export function GlobalCommunicationAnalytics({
     const [endPeriod, setEndPeriod] = useState<string>('')
     const [searchQuery, setSearchQuery] = useState<string>('')
     const [isExporting, setIsExporting] = useState(false)
+    const [expandedClientId, setExpandedClientId] = useState<string | null>(null)
 
     const handleExportPDF = async () => {
         setIsExporting(true)
@@ -174,10 +192,67 @@ export function GlobalCommunicationAnalytics({
 
             let inclusions = 0
             let exclusions = 0
+            
+            let outboundEmails = 0
+            let inboundEmails = 0
+            let chats = 0
+            let phoneCalls = 0
+            let others = 0
+            let hasGranularTypes = false
+
             activeTimeline.forEach((t: any) => {
                 inclusions += Number(t.contractVolume || 0)
                 exclusions += Number(t.outOfContractVolume || 0)
+                
+                if (t.outboundEmails !== undefined || t.inboundEmails !== undefined || t.chats !== undefined || t.phoneCalls !== undefined) {
+                    outboundEmails += Number(t.outboundEmails || 0)
+                    inboundEmails += Number(t.inboundEmails || 0)
+                    chats += Number(t.chats || 0)
+                    phoneCalls += Number(t.phoneCalls || 0)
+                    others += Number(t.others || 0)
+                    hasGranularTypes = true
+                }
             })
+
+            // Fallback for older runs
+            if (!hasGranularTypes) {
+                const recap = run.analysis_summary?.typeRecap
+                if (recap) {
+                    outboundEmails = Number(recap.outboundEmails || 0)
+                    inboundEmails = Number(recap.inboundEmails || 0)
+                    chats = Number(recap.chats || 0)
+                    phoneCalls = Number(recap.phoneCalls || 0)
+                    others = Number(recap.others || 0)
+                    hasGranularTypes = true
+                } else {
+                    outboundEmails = Number(run.total_emails || 0)
+                    phoneCalls = Number(run.total_phone_calls || 0)
+                }
+            }
+
+            // Calculate department counts dynamically within active timeline
+            const deptCounts: Record<string, number> = {}
+            DEPT_LIST.forEach(d => {
+                deptCounts[d] = 0
+            })
+            const monthlyDeptHistory = run.analysis_summary?.monthlyDeptHistory || {}
+            let hasDeptHistory = false
+            
+            DEPT_LIST.forEach(d => {
+                const history = monthlyDeptHistory[d] || monthlyDeptHistory[d.replace('’', "'")] || {}
+                activeTimeline.forEach((t: any) => {
+                    const val = history[t.period] || 0
+                    deptCounts[d] += val
+                    if (val > 0) hasDeptHistory = true
+                })
+            })
+
+            // Fallback for SDC audit without monthly dept history
+            if (!hasDeptHistory && run.analysis_summary?.deptCounts) {
+                DEPT_LIST.forEach(d => {
+                    deptCounts[d] = run.analysis_summary.deptCounts[d] || run.analysis_summary.deptCounts[d.replace('’', "'")] || 0
+                })
+            }
 
             const totalComms = inclusions + exclusions
             const monthsCount = activeTimeline.length
@@ -199,7 +274,14 @@ export function GlobalCommunicationAnalytics({
                 ratio,
                 monthsCount,
                 activePeriods: activeTimeline.map((t: any) => t.period),
-                runDate: run.analysis_date
+                runDate: run.analysis_date,
+                outboundEmails,
+                inboundEmails,
+                chats,
+                phoneCalls,
+                others,
+                hasGranularTypes,
+                deptCounts
             }
         }).filter(Boolean) as any[]
     }, [latestClientRuns, filterTeamId, startPeriod, endPeriod])
@@ -223,7 +305,13 @@ export function GlobalCommunicationAnalytics({
                 avgRatio: 0,
                 totalComms: 0,
                 surchargePct: 0,
-                topOutlier: null
+                topOutlier: null,
+                outboundEmails: 0,
+                inboundEmails: 0,
+                chats: 0,
+                phoneCalls: 0,
+                others: 0,
+                hasGranularTypes: false
             }
         }
 
@@ -238,11 +326,45 @@ export function GlobalCommunicationAnalytics({
         const sortedByRatio = [...processedClients].sort((a, b) => b.ratio - a.ratio)
         const topOutlier = sortedByRatio[0] || null
 
+        let outboundEmails = 0
+        let inboundEmails = 0
+        let chats = 0
+        let phoneCalls = 0
+        let others = 0
+        let hasGranularTypes = false
+
+        processedClients.forEach(c => {
+            outboundEmails += c.outboundEmails || 0
+            inboundEmails += c.inboundEmails || 0
+            chats += c.chats || 0
+            phoneCalls += c.phoneCalls || 0
+            others += c.others || 0
+            if (c.hasGranularTypes) hasGranularTypes = true
+        })
+
+        if (!hasGranularTypes) {
+            // fallback: total emails and total calls
+            let totalEmails = 0
+            let totalCallsOld = 0
+            processedClients.forEach(c => {
+                totalEmails += c.outboundEmails || 0
+                totalCallsOld += c.phoneCalls || 0
+            })
+            outboundEmails = totalEmails
+            phoneCalls = totalCallsOld
+        }
+
         return {
             avgRatio,
             totalComms,
             surchargePct,
-            topOutlier
+            topOutlier,
+            outboundEmails,
+            inboundEmails,
+            chats,
+            phoneCalls,
+            others,
+            hasGranularTypes
         }
     }, [processedClients, targetIndex])
 
@@ -476,16 +598,48 @@ export function GlobalCommunicationAnalytics({
 
                         {/* KPI 2: Total Volume */}
                         <Card className="bg-[#121318] border border-zinc-850 shadow-md relative overflow-hidden group hover:border-zinc-800 transition-all">
-                            <CardContent className="p-6">
-                                <span className="text-[10px] text-zinc-400 uppercase tracking-wider font-extrabold block">Volume global analysé</span>
-                                <div className="flex items-baseline gap-2 mt-2">
-                                    <span className="text-4xl font-black text-zinc-150 tracking-tight font-mono">
-                                        {kpis.totalComms}
-                                    </span>
-                                    <span className="text-xs text-zinc-500 font-medium">communications</span>
+                            <CardContent className="p-5 flex flex-col justify-between h-full">
+                                <div>
+                                    <span className="text-[10px] text-zinc-400 uppercase tracking-wider font-extrabold block">Volume global analysé</span>
+                                    <div className="flex items-baseline gap-2 mt-1.5">
+                                        <span className="text-4xl font-black text-zinc-150 tracking-tight font-mono">
+                                            {kpis.totalComms}
+                                        </span>
+                                        <span className="text-[10px] text-zinc-550 font-semibold uppercase font-bold">comms</span>
+                                    </div>
                                 </div>
-                                <div className="mt-3.5 text-[10px] text-zinc-500 font-medium font-mono">
-                                    Couvrant {processedClients.length} syndicat{processedClients.length > 1 ? 's' : ''} actif{processedClients.length > 1 ? 's' : ''}
+                                <div className="mt-3.5 pt-2.5 border-t border-zinc-900/60 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[9px] text-zinc-400 font-medium">
+                                    {kpis.hasGranularTypes ? (
+                                        <>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-zinc-550 font-bold">Expédiés (M) :</span>
+                                                <span className="font-mono text-zinc-350 font-bold">{kpis.outboundEmails}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-zinc-550 font-bold">Reçus (M) :</span>
+                                                <span className="font-mono text-zinc-350 font-bold">{kpis.inboundEmails}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-zinc-550 font-bold">Clavardage :</span>
+                                                <span className="font-mono text-zinc-350 font-bold">{kpis.chats}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-zinc-550 font-bold">Appels :</span>
+                                                <span className="font-mono text-zinc-350 font-bold">{kpis.phoneCalls}</span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center justify-between col-span-2">
+                                                <span className="text-zinc-550 font-bold">Courriels :</span>
+                                                <span className="font-mono text-zinc-350 font-bold">{kpis.outboundEmails}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between col-span-2">
+                                                <span className="text-zinc-550 font-bold">Appels :</span>
+                                                <span className="font-mono text-zinc-350 font-bold">{kpis.phoneCalls}</span>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
@@ -745,36 +899,88 @@ export function GlobalCommunicationAnalytics({
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-zinc-850">
-                                        {searchedClients.map((c) => {
-                                            const loadStyle = getLoadStyle(c.ratio)
-                                            return (
-                                                <tr key={c.id} className="hover:bg-zinc-900/10 text-zinc-300">
-                                                    <td className="p-3 font-bold text-zinc-200">
-                                                        {c.name} <span className="text-[10px] text-zinc-550 font-mono font-normal">({c.code})</span>
-                                                    </td>
-                                                    <td className="p-3 text-zinc-400">{c.managerName}</td>
-                                                    <td className="p-3 text-zinc-400">{c.teamName}</td>
-                                                    <td className="p-3 font-mono text-zinc-400">{c.doors} SDC</td>
-                                                    <td className="p-3 font-mono text-zinc-400">
-                                                        {c.totalComms} ({c.monthsCount} mois)
-                                                    </td>
-                                                    <td className="p-3 font-mono font-bold text-indigo-400">{c.ratio.toFixed(2)}</td>
-                                                    <td className="p-3">
-                                                        <Badge className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${loadStyle.bg}`}>
-                                                            {loadStyle.label}
-                                                        </Badge>
-                                                    </td>
-                                                    <td className="p-3 text-right">
-                                                        <Link 
-                                                            href={`/global-settings/clients/${c.id}?tab=communications`}
-                                                            className="text-indigo-400 hover:text-indigo-300 font-bold hover:underline inline-flex items-center gap-0.5"
-                                                        >
-                                                            Inspecter <ArrowRight className="h-3 w-3" />
-                                                        </Link>
-                                                    </td>
-                                                </tr>
-                                            )
-                                        })}
+                                         {searchedClients.map((c) => {
+                                             const loadStyle = getLoadStyle(c.ratio)
+                                             const isExpanded = expandedClientId === c.id
+                                             return (
+                                                 <Fragment key={c.id}>
+                                                     <tr 
+                                                         className="hover:bg-zinc-900/15 text-zinc-300 cursor-pointer transition-colors"
+                                                         onClick={() => setExpandedClientId(isExpanded ? null : c.id)}
+                                                     >
+                                                         <td className="p-3 font-bold text-zinc-200">
+                                                             <span className="flex items-center gap-1.5 select-none">
+                                                                 <ChevronDown className={`h-3.5 w-3.5 text-zinc-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                                                                 {c.name}
+                                                             </span>
+                                                             <span className="text-[10px] text-zinc-550 font-mono font-normal block pl-5 mt-0.5">({c.code})</span>
+                                                         </td>
+                                                         <td className="p-3 text-zinc-455 font-medium">{c.managerName}</td>
+                                                         <td className="p-3 text-zinc-455 font-medium">{c.teamName}</td>
+                                                         <td className="p-3 font-mono text-zinc-455">{c.doors} SDC</td>
+                                                         <td className="p-3 font-mono text-zinc-455">
+                                                             {c.totalComms} ({c.monthsCount} m)
+                                                         </td>
+                                                         <td className="p-3 font-mono font-bold text-indigo-400">{c.ratio.toFixed(2)}</td>
+                                                         <td className="p-3">
+                                                             <Badge className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${loadStyle.bg}`}>
+                                                                 {loadStyle.label}
+                                                             </Badge>
+                                                         </td>
+                                                         <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
+                                                             <Link 
+                                                                 href={`/global-settings/clients/${c.id}?tab=communications`}
+                                                                 className="text-indigo-400 hover:text-indigo-300 font-bold hover:underline inline-flex items-center gap-0.5"
+                                                             >
+                                                                 Inspecter <ArrowRight className="h-3.5 w-3.5" />
+                                                             </Link>
+                                                         </td>
+                                                     </tr>
+                                                     {isExpanded && (
+                                                         <tr className="bg-zinc-950/60 border-y border-zinc-900">
+                                                             <td colSpan={8} className="p-4">
+                                                                 <div className="space-y-3">
+                                                                     <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-extrabold flex items-center gap-1">
+                                                                         <span>Charge de communications par service :</span>
+                                                                     </div>
+                                                                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                                                                         {DEPT_LIST.map(dept => {
+                                                                             const count = c.deptCounts?.[dept] || 0
+                                                                             const load = c.doors > 0 ? (count / Math.max(1, c.doors * c.monthsCount)).toFixed(2) : '0.00'
+                                                                             return (
+                                                                                 <div key={dept} className="p-2.5 rounded-xl border border-zinc-900 bg-[#121318]/40 flex flex-col justify-between gap-1 shadow-sm">
+                                                                                     <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-bold block truncate" title={dept}>
+                                                                                         {dept}
+                                                                                     </span>
+                                                                                     <div className="flex items-baseline justify-between mt-1">
+                                                                                         <span className="font-mono text-xs font-bold text-zinc-200">
+                                                                                             {count}
+                                                                                         </span>
+                                                                                         <span className="text-[9px] text-zinc-555 font-mono font-medium">
+                                                                                             {load}/p/m
+                                                                                         </span>
+                                                                                     </div>
+                                                                                 </div>
+                                                                             )
+                                                                         })}
+                                                                     </div>
+                                                                     {c.hasGranularTypes && (
+                                                                         <div className="mt-2.5 pt-2.5 border-t border-zinc-900/60 flex flex-wrap gap-4 text-[10px] font-medium text-zinc-400">
+                                                                             <span className="text-zinc-550 font-bold uppercase tracking-wider">Canaux :</span>
+                                                                             <span>Courriels Expédiés : <strong className="text-zinc-200 font-mono">{c.outboundEmails}</strong></span>
+                                                                             <span>Courriels Reçus : <strong className="text-zinc-200 font-mono">{c.inboundEmails}</strong></span>
+                                                                             <span>Clavardages : <strong className="text-zinc-200 font-mono">{c.chats}</strong></span>
+                                                                             <span>Appels : <strong className="text-zinc-200 font-mono">{c.phoneCalls}</strong></span>
+                                                                             {c.others > 0 && <span>Autres : <strong className="text-zinc-200 font-mono">{c.others}</strong></span>}
+                                                                         </div>
+                                                                     )}
+                                                                 </div>
+                                                             </td>
+                                                         </tr>
+                                                     )}
+                                                 </Fragment>
+                                             )
+                                         })}
                                     </tbody>
                                 </table>
                             </div>

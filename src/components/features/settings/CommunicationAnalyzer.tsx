@@ -182,6 +182,15 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Édouard Le Rouzes": "Gestion"
 }
 
+const classifyCommType = (typeStr: string): 'outboundEmail' | 'inboundEmail' | 'chat' | 'phoneCall' | 'other' => {
+    const t = (typeStr || "").toLowerCase()
+    if (t.includes("expédié") || t.includes("expedie") || t.includes("sent")) return 'outboundEmail'
+    if (t.includes("reçu") || t.includes("recu") || t.includes("received")) return 'inboundEmail'
+    if (t.includes("clavardage") || t.includes("chat")) return 'chat'
+    if (t.includes("téléphone") || t.includes("phone") || t.includes("appel") || t.includes("call")) return 'phoneCall'
+    return 'other'
+}
+
 export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
     const [selectedClientId, setSelectedClientId] = useState<string>('')
     const [sdcSearch, setSdcSearch] = useState('')
@@ -504,7 +513,15 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
         DEPT_LIST.forEach(d => { deptCounts[d] = 0; })
         deptCounts["Chargé d'opération"] = 0
         
-        const timelineChronologyMap: Record<string, { contractVolume: number; outOfContractVolume: number }> = {}
+        const timelineChronologyMap: Record<string, { 
+            contractVolume: number; 
+            outOfContractVolume: number;
+            outboundEmails: number;
+            inboundEmails: number;
+            chats: number;
+            phoneCalls: number;
+            others: number;
+        }> = {}
         const employeeCounts: Record<string, number> = {}
         const unitCounts: Record<string, number> = {}
         const monthlyDeptHistory: Record<string, Record<string, number>> = {}
@@ -528,13 +545,28 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
 
                 // Chronology timeline map
                 if (!timelineChronologyMap[timelineKey]) {
-                    timelineChronologyMap[timelineKey] = { contractVolume: 0, outOfContractVolume: 0 }
+                    timelineChronologyMap[timelineKey] = { 
+                        contractVolume: 0, 
+                        outOfContractVolume: 0,
+                        outboundEmails: 0,
+                        inboundEmails: 0,
+                        chats: 0,
+                        phoneCalls: 0,
+                        others: 0
+                    }
                 }
                 if (resolvedDept !== "Sinistres" && resolvedDept !== "Technique") {
                     timelineChronologyMap[timelineKey].contractVolume++
                 } else {
                     timelineChronologyMap[timelineKey].outOfContractVolume++
                 }
+
+                const cls = classifyCommType(row.type)
+                if (cls === 'outboundEmail') timelineChronologyMap[timelineKey].outboundEmails++
+                else if (cls === 'inboundEmail') timelineChronologyMap[timelineKey].inboundEmails++
+                else if (cls === 'chat') timelineChronologyMap[timelineKey].chats++
+                else if (cls === 'phoneCall') timelineChronologyMap[timelineKey].phoneCalls++
+                else timelineChronologyMap[timelineKey].others++
             }
 
             if (row.year && row.year !== "Unknown") {
@@ -596,7 +628,12 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                     period,
                     contractVolume: data.contractVolume,
                     outOfContractVolume: data.outOfContractVolume,
-                    ratio: Number(ratio)
+                    ratio: Number(ratio),
+                    outboundEmails: data.outboundEmails,
+                    inboundEmails: data.inboundEmails,
+                    chats: data.chats,
+                    phoneCalls: data.phoneCalls,
+                    others: data.others
                 }
             })
             .sort((a, b) => a.period.localeCompare(b.period))
@@ -644,13 +681,32 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
             const period_start = activePeriodDates.length > 0 ? activePeriodDates[0].toISOString().substring(0, 10) : null
             const period_end = activePeriodDates.length > 0 ? activePeriodDates[activePeriodDates.length - 1].toISOString().substring(0, 10) : null
 
-            // Determine total emails vs total calls
+            // Determine total emails vs total calls and granular type recaps
             let total_emails = 0
             let total_phone_calls = 0
+
+            let outboundEmailsCount = 0
+            let inboundEmailsCount = 0
+            let chatsCount = 0
+            let phoneCallsCount = 0
+            let othersCount = 0
+
             rawRows.forEach(r => {
-                const t = (r.type || "").toLowerCase()
-                if (t.includes("courriel") || t.includes("email") || t.includes("mail")) total_emails++
-                else if (t.includes("téléphone") || t.includes("phone") || t.includes("appel") || t.includes("call")) total_phone_calls++
+                const cls = classifyCommType(r.type)
+                if (cls === 'outboundEmail') {
+                    outboundEmailsCount++
+                    total_emails++
+                } else if (cls === 'inboundEmail') {
+                    inboundEmailsCount++
+                    total_emails++
+                } else if (cls === 'chat') {
+                    chatsCount++
+                } else if (cls === 'phoneCall') {
+                    phoneCallsCount++
+                    total_phone_calls++
+                } else {
+                    othersCount++
+                }
             })
 
             const summaryPayload = {
@@ -670,7 +726,14 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                     sortedUnits: pipelineData.sortedUnits,
                     dynamicDeptMap: deptMap,
                     discoveredUsers,
-                    analysis_date: period_end || new Date().toISOString()
+                    analysis_date: period_end || new Date().toISOString(),
+                    typeRecap: {
+                        outboundEmails: outboundEmailsCount,
+                        inboundEmails: inboundEmailsCount,
+                        chats: chatsCount,
+                        phoneCalls: phoneCallsCount,
+                        others: othersCount
+                    }
                 }
             }
 

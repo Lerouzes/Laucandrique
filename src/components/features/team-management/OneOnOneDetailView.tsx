@@ -44,7 +44,8 @@ import {
     ArrowLeft,
     RefreshCw,
     Clock,
-    FileText
+    FileText,
+    Network
 } from 'lucide-react'
 import { SearchableClientSelect } from './SearchableClientSelect'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -126,7 +127,7 @@ const ASSEMBLY_LABELS: Record<string, string> = {
     followup_tasks_created: "Tâches de suivi créées"
 }
 
-export function OneOnOneDetailView({ 
+export function OneOnOneDetailView({
     oneOnOne, 
     commitments,
     manager,
@@ -135,7 +136,8 @@ export function OneOnOneDetailView({
     reviewedAudits = [],
     reviewedAssemblies = [],
     taskEmailAudits: initialTaskEmailAudits = [],
-    operationalRisks: initialOperationalRisks = []
+    operationalRisks: initialOperationalRisks = [],
+    communicationStats = []
 }: { 
     oneOnOne: any
     commitments: any[]
@@ -146,6 +148,7 @@ export function OneOnOneDetailView({
     reviewedAssemblies?: any[]
     taskEmailAudits?: any[]
     operationalRisks?: any[]
+    communicationStats?: any[]
 }) {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
@@ -1561,6 +1564,177 @@ export function OneOnOneDetailView({
                     </div>
                 </CardContent>
             </Card>
+
+            {/* NEW SECTION: Revue de la charge de communications (Clientèle) */}
+            {communicationStats && communicationStats.length > 0 && (
+                <Card className="bg-[#16171e]/70 border-zinc-800 shadow-md">
+                    <CardHeader>
+                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                            <Network className="h-4.5 w-4.5 text-purple-400" />
+                            Revue de la Charge de Communications (Portefeuille Client)
+                        </CardTitle>
+                        <CardDescription className="text-xxs text-zinc-500">
+                            Volume de communications et indice de surcharge calculés pour chaque syndicat sous la gestion de {manager.first_name} {manager.last_name}.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        {/* Summary metrics grid */}
+                        {(() => {
+                            const targetIndex = 2.50
+                            const totalComms = communicationStats.reduce((acc, curr) => acc + (curr.total_communications || 0), 0)
+                            const totalDoors = communicationStats.reduce((acc, curr) => acc + (curr.doors_count || 0), 0)
+                            
+                            // Find average load score
+                            let sumRatios = 0
+                            let countRatios = 0
+                            let surchargeCount = 0
+
+                            communicationStats.forEach(stat => {
+                                const timeline = stat.analysis_summary?.timelineList || []
+                                if (timeline.length > 0) {
+                                    // Calculate dynamic ratio from inclusions within timeline
+                                    let inclusions = 0
+                                    timeline.forEach((t: any) => {
+                                        inclusions += Number(t.contractVolume || 0)
+                                    })
+                                    const clientDoors = stat.doors_count || 90
+                                    const monthsCount = timeline.length
+                                    const clientRatio = Number((inclusions / Math.max(1, clientDoors * monthsCount)).toFixed(2))
+                                    
+                                    sumRatios += clientRatio
+                                    countRatios++
+                                    if (clientRatio > targetIndex) {
+                                        surchargeCount++
+                                    }
+                                } else {
+                                    // Fallback to overall ratio
+                                    const clientRatio = Number(((stat.total_communications - (stat.analysis_summary?.deptCounts?.Sinistres || 0) - (stat.analysis_summary?.deptCounts?.Technique || 0)) / Math.max(1, stat.doors_count || 90)).toFixed(2))
+                                    sumRatios += clientRatio
+                                    countRatios++
+                                    if (clientRatio > targetIndex) {
+                                        surchargeCount++
+                                    }
+                                }
+                            })
+
+                            const avgRatio = countRatios > 0 ? Number((sumRatios / countRatios).toFixed(2)) : 0
+                            const surchargePct = countRatios > 0 ? Math.round((surchargeCount / countRatios) * 100) : 0
+
+                            // Surcharge status styling
+                            let badgeStyle = "bg-emerald-950/45 text-emerald-400 border border-emerald-900/40"
+                            let badgeText = "Gestion Stable"
+                            if (avgRatio > targetIndex * 1.8) {
+                                badgeStyle = "bg-rose-955 bg-rose-600/10 text-rose-455 border border-rose-500/20 animate-pulse"
+                                badgeText = "Surcharge Critique"
+                            } else if (avgRatio > targetIndex * 1.2) {
+                                badgeStyle = "bg-amber-955 bg-amber-600/10 text-amber-450 border border-amber-500/20"
+                                badgeText = "Surcharge Modérée"
+                            }
+
+                            return (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-zinc-900/20 p-4 border border-zinc-850 rounded-xl text-xxs text-zinc-350">
+                                    <div className="space-y-1">
+                                        <span className="text-zinc-500 block uppercase tracking-wider font-bold">Indice Moyen du Portefeuille</span>
+                                        <div className="flex items-baseline gap-2 mt-1">
+                                            <span className="text-2xl font-black text-indigo-400 font-mono">{avgRatio.toFixed(2)}</span>
+                                            <Badge className={`px-2 py-0.5 rounded-full text-[8px] font-bold ${badgeStyle}`}>
+                                                {badgeText}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="text-zinc-500 block uppercase tracking-wider font-bold">Taux de Surcharge Clientèle</span>
+                                        <div className="flex items-baseline gap-2 mt-1">
+                                            <span className={`text-2xl font-black font-mono ${surchargePct > 30 ? 'text-rose-455 text-rose-400 font-extrabold' : 'text-emerald-400'}`}>{surchargePct}%</span>
+                                            <span className="text-zinc-550 text-zinc-500 font-semibold font-mono">({surchargeCount} / {communicationStats.length} SDCs surchargés)</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="text-zinc-550 text-zinc-500 block uppercase tracking-wider font-bold">Volume Global Portefeuille</span>
+                                        <div className="flex items-baseline gap-2 mt-1">
+                                            <span className="text-2xl font-black text-white font-mono">{totalComms}</span>
+                                            <span className="text-zinc-500 font-semibold font-mono">{totalDoors} portes</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })()}
+
+                        {/* List of SDCs table */}
+                        <div className="border border-zinc-850 rounded-xl overflow-hidden text-xxs bg-[#121318]/20">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="bg-[#0c0d12] text-zinc-500 border-b border-zinc-850 font-bold uppercase tracking-wider">
+                                    <tr>
+                                        <th className="p-3 font-semibold text-zinc-400">Nom du Syndicat (SDC)</th>
+                                        <th className="p-3 font-semibold text-zinc-400">Portes</th>
+                                        <th className="p-3 font-semibold text-zinc-400">Volume Comms</th>
+                                        <th className="p-3 font-semibold text-zinc-400">Indice Forfaitaire</th>
+                                        <th className="p-3 font-semibold text-center text-zinc-400">Canaux Principaux</th>
+                                        <th className="p-3 font-semibold text-right text-zinc-400">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-850 text-zinc-300">
+                                    {(() => {
+                                        const targetIndex = 2.50
+                                        return communicationStats.map(stat => {
+                                            const timeline = stat.analysis_summary?.timelineList || []
+                                            let inclusions = 0
+                                            timeline.forEach((t: any) => {
+                                                inclusions += Number(t.contractVolume || 0)
+                                            })
+                                            const monthsCount = timeline.length || 1
+                                            const doors = stat.doors_count || 90
+                                            const ratio = timeline.length > 0
+                                                ? Number((inclusions / (doors * monthsCount)).toFixed(2))
+                                                : Number(((stat.total_communications - (stat.analysis_summary?.deptCounts?.Sinistres || 0) - (stat.analysis_summary?.deptCounts?.Technique || 0)) / doors).toFixed(2))
+
+                                            // Surcharge badge for this client
+                                            let sbadge = null
+                                            if (ratio > targetIndex * 1.8) {
+                                                sbadge = <Badge className="bg-rose-955 bg-rose-600/10 text-rose-400 border border-rose-500/20 text-[8px] font-bold px-1.5 py-0.5 rounded-full select-none ml-2">Critique</Badge>
+                                            } else if (ratio > targetIndex * 1.2) {
+                                                sbadge = <Badge className="bg-amber-955 bg-amber-600/10 text-amber-450 border border-amber-500/20 text-[8px] font-bold px-1.5 py-0.5 rounded-full select-none ml-2">Modéré</Badge>
+                                            }
+
+                                            // Channels recap
+                                            const recap = stat.analysis_summary?.typeRecap
+                                            let channelsText = `${stat.total_emails} M / ${stat.total_phone_calls} A`
+                                            if (recap) {
+                                                channelsText = `${recap.outboundEmails} E-Exp / ${recap.inboundEmails} E-Reç / ${recap.chats} C / ${recap.phoneCalls} T`
+                                            }
+
+                                            return (
+                                                <tr key={stat.id} className="hover:bg-zinc-900/15">
+                                                    <td className="p-3 font-bold text-zinc-200">
+                                                        <span className="flex items-center">
+                                                            {stat.client_company_name}
+                                                            {sbadge}
+                                                        </span>
+                                                        <span className="text-[10px] text-zinc-550 font-mono font-normal block mt-0.5">({stat.client_full_name})</span>
+                                                    </td>
+                                                    <td className="p-3 text-zinc-400">{doors} portes</td>
+                                                    <td className="p-3 text-zinc-400 font-mono">{stat.total_communications} comms ({monthsCount}m)</td>
+                                                    <td className="p-3 font-bold text-indigo-400 font-mono">{ratio.toFixed(2)}</td>
+                                                    <td className="p-3 text-zinc-500 text-center font-mono text-[9px]">{channelsText}</td>
+                                                    <td className="p-3 text-right">
+                                                        <Link
+                                                            href={`/global-settings/clients/${stat.client_id}?tab=communications`}
+                                                            target="_blank"
+                                                            className="text-indigo-400 hover:text-indigo-300 font-bold hover:underline inline-flex items-center gap-0.5"
+                                                        >
+                                                            Consulter <ArrowUpRight className="h-3 w-3" />
+                                                        </Link>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })
+                                    })()}
+                                </tbody>
+                            </table>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* SECTION 2: Previous Meeting Follow-Up */}
             <Card className="bg-[#16171e]/70 border-zinc-800 shadow-md">
