@@ -4,9 +4,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Info, Mail, Phone, Calendar, TrendingUp, TrendingDown, ArrowRight, Trash2, Network, Users, ShieldAlert } from 'lucide-react'
+import { Info, Mail, Phone, Calendar, TrendingUp, TrendingDown, ArrowRight, Trash2, Network, Users, ShieldAlert, Search } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 import { deleteCommunicationStatsAction } from '@/actions/communication-stats'
+import { toggleDoorBoardMemberAction } from '@/actions/clients'
 import { toast } from 'sonner'
 import {
     AreaChart,
@@ -41,6 +42,7 @@ interface ClientCommunicationTrendsProps {
     clientId: string
     teamComparison?: any[]
     targetIndex?: number
+    initialDoors?: any[]
 }
 
 const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Technique", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration"]
@@ -62,11 +64,20 @@ export function ClientCommunicationTrends({
     stats: initialStats, 
     clientId, 
     teamComparison = [], 
-    targetIndex = 2.50 
+    targetIndex = 2.50,
+    initialDoors = []
 }: ClientCommunicationTrendsProps) {
     const [stats, setStats] = useState<CommStatRecord[]>(initialStats)
     const [deletingId, setDeletingId] = useState<string | null>(null)
     const [selectedRunId, setSelectedRunId] = useState<string>('')
+    const [doors, setDoors] = useState<any[]>(initialDoors)
+    const [unitSearch, setUnitSearch] = useState('')
+
+    useEffect(() => {
+        if (initialDoors) {
+            setDoors(initialDoors)
+        }
+    }, [initialDoors])
     
     // Date filter states
     const [filterMode, setFilterMode] = useState<'all' | 'year' | 'custom'>('all')
@@ -114,6 +125,45 @@ export function ClientCommunicationTrends({
             }
         } catch (err: any) {
             toast.error("Erreur lors de la suppression.")
+        }
+    }
+
+    const handleToggleBoardMember = async (door: any) => {
+        if (!door) return
+
+        const newStatus = !door.is_board_member
+        
+        // Optimistic UI update
+        setDoors(prev => prev.map(d => {
+            if (d.id === door.id) {
+                return { ...d, is_board_member: newStatus }
+            }
+            return d
+        }))
+
+        try {
+            const res = await toggleDoorBoardMemberAction(door.id, newStatus, clientId)
+            if (res.success) {
+                toast.success(newStatus ? `Unité ${door.door_number} marquée comme membre du CA.` : `Unité ${door.door_number} retirée du CA.`)
+            } else {
+                // Rollback if error
+                setDoors(prev => prev.map(d => {
+                    if (d.id === door.id) {
+                        return { ...d, is_board_member: !newStatus }
+                    }
+                    return d
+                }))
+                toast.error("Erreur lors de la mise à jour.")
+            }
+        } catch (err: any) {
+            // Rollback if exception
+            setDoors(prev => prev.map(d => {
+                if (d.id === door.id) {
+                    return { ...d, is_board_member: !newStatus }
+                }
+                return d
+            }))
+            toast.error("Erreur lors de la mise à jour.")
         }
     }
 
@@ -276,6 +326,34 @@ export function ClientCommunicationTrends({
             })
         }
     }, [selectedRun, runSummary, filteredTimelineList, filteredStats])
+
+    const normalizeDoorNum = (numStr: string) => {
+        if (!numStr) return ''
+        return numStr
+            .toLowerCase()
+            .replace(/porte/g, '')
+            .replace(/unit[eé]?/g, '')
+            .replace(/#/g, '')
+            .replace(/\s+/g, '')
+            .replace(/^0+/, '')
+            .trim()
+    }
+
+    const searchedUnitCounts = useMemo(() => {
+        const mapped = filteredUnitCounts.map(u => {
+            const matchedDoor = doors.find(d => normalizeDoorNum(d.door_number) === normalizeDoorNum(u.unit))
+            return {
+                ...u,
+                door: matchedDoor || null
+            }
+        })
+
+        if (!unitSearch) return mapped
+        const query = unitSearch.toLowerCase().trim()
+        return mapped.filter(u => 
+            u.unit.toLowerCase().includes(query)
+        )
+    }, [filteredUnitCounts, doors, unitSearch])
 
     // Chronological timeline data formatted for Chart
     const runChartData = useMemo(() => {
@@ -713,59 +791,95 @@ export function ClientCommunicationTrends({
 
                     {/* Unit Breakdown Card */}
                     <Card className="bg-[#121318]/90 border border-zinc-850 shadow-lg">
-                        <CardHeader className="pb-3 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                        <CardHeader className="pb-3 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                             <div>
                                 <CardTitle className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Volume de communication par Unité (Porte)</CardTitle>
                                 <CardDescription className="text-xxs text-zinc-500">
                                     Répartition du volume total de communications par unité/porte sur la période sélectionnée ({filteredStats?.periodText}).
                                 </CardDescription>
                             </div>
-                            <Badge className="bg-[#1e1a3a] text-indigo-300 border border-indigo-900/60 px-2 py-0.5 rounded-full text-[9px] font-bold">
-                                {filteredUnitCounts.length} Unités actives
-                            </Badge>
+                            
+                            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                                <div className="relative">
+                                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-500" />
+                                    <input
+                                        type="text"
+                                        placeholder="Rechercher unité..."
+                                        value={unitSearch}
+                                        onChange={(e) => setUnitSearch(e.target.value)}
+                                        className="bg-zinc-950 border border-zinc-800 rounded-xl pl-8 pr-2.5 py-1.5 text-xxs text-zinc-300 placeholder:text-zinc-550 outline-none focus:border-indigo-650 focus:ring-1 focus:ring-indigo-650/30 w-36"
+                                    />
+                                </div>
+                                <Badge className="bg-[#1e1a3a] text-indigo-300 border border-indigo-900/60 px-2 py-1 rounded-full text-[9px] font-bold">
+                                    {filteredUnitCounts.length} Unités actives
+                                </Badge>
+                            </div>
                         </CardHeader>
                         <CardContent>
-                            {filteredUnitCounts.length === 0 ? (
+                            {searchedUnitCounts.length === 0 ? (
                                 <div className="text-center py-8 text-zinc-555 italic text-xxs">
-                                    Aucune donnée par unité pour cette période.
+                                    {unitSearch ? "Aucun résultat pour cette recherche." : "Aucune donnée par unité pour cette période."}
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 max-h-[320px] overflow-y-auto pr-1 scrollbar-thin">
-                                    {filteredUnitCounts.map((u, idx) => (
-                                        <div 
-                                            key={u.unit} 
-                                            className="p-3 bg-zinc-950/45 border border-zinc-850 rounded-xl hover:border-zinc-800 transition-all flex flex-col justify-between space-y-2 group"
-                                        >
-                                            <div className="flex justify-between items-start">
-                                                <span className="text-[10px] font-bold text-zinc-400">
-                                                    Unité <strong className="text-zinc-200">{u.unit}</strong>
-                                                </span>
-                                                <span className="text-[9px] text-zinc-500 font-mono font-bold">
-                                                    #{idx + 1}
-                                                </span>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <div className="flex justify-between items-baseline">
-                                                    <span className="text-base font-black text-indigo-400 font-mono">
-                                                        {u.count}
+                                    {searchedUnitCounts.map((u, idx) => {
+                                        const matchedDoor = u.door
+                                        const isBoard = matchedDoor?.is_board_member || false
+                                        return (
+                                            <div 
+                                                key={u.unit} 
+                                                className={`p-3 border rounded-xl hover:border-zinc-850 transition-all flex flex-col justify-between space-y-2 group ${
+                                                    isBoard 
+                                                        ? 'bg-amber-950/15 border-amber-900/40 hover:border-amber-700/60'
+                                                        : 'bg-zinc-950/45 border-zinc-850 hover:border-zinc-800'
+                                                }`}
+                                            >
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[10px] font-bold text-zinc-400">
+                                                        Unité <strong className="text-zinc-200">{u.unit}</strong>
                                                     </span>
-                                                    <span className="text-[9px] text-zinc-550 font-mono">
-                                                        comms
-                                                    </span>
+                                                    
+                                                    {matchedDoor ? (
+                                                        <button
+                                                            onClick={() => handleToggleBoardMember(matchedDoor)}
+                                                            className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase transition-all cursor-pointer ${
+                                                                isBoard
+                                                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
+                                                                    : 'bg-zinc-900/50 text-zinc-550 border border-zinc-800 hover:text-zinc-350 hover:border-zinc-700'
+                                                            }`}
+                                                            title={isBoard ? "Retirer du CA" : "Marquer comme membre du CA"}
+                                                        >
+                                                            CA
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-[9px] text-zinc-500 font-mono font-bold">
+                                                            #{idx + 1}
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <div className="flex justify-between items-center text-[9px]">
-                                                    <span className="text-zinc-500 font-mono">Part:</span>
-                                                    <span className="text-zinc-350 font-bold font-mono">{u.percentage}%</span>
-                                                </div>
-                                                {u.avgPerMonth !== null && (
-                                                    <div className="flex justify-between items-center text-[9px] border-t border-zinc-900/60 pt-1 mt-1">
-                                                        <span className="text-zinc-500 font-mono">Moyenne:</span>
-                                                        <span className="text-emerald-400 font-mono font-bold">{u.avgPerMonth}/m</span>
+                                                <div className="space-y-1">
+                                                    <div className="flex justify-between items-baseline">
+                                                        <span className="text-base font-black text-indigo-400 font-mono">
+                                                            {u.count}
+                                                        </span>
+                                                        <span className="text-[9px] text-zinc-555 font-mono">
+                                                            comms
+                                                        </span>
                                                     </div>
-                                                )}
+                                                    <div className="flex justify-between items-center text-[9px]">
+                                                        <span className="text-zinc-500 font-mono">Part:</span>
+                                                        <span className="text-zinc-350 font-bold font-mono">{u.percentage}%</span>
+                                                    </div>
+                                                    {u.avgPerMonth !== null && (
+                                                        <div className="flex justify-between items-center text-[9px] border-t border-zinc-900/60 pt-1 mt-1">
+                                                            <span className="text-zinc-500 font-mono">Moyenne:</span>
+                                                            <span className="text-emerald-400 font-mono font-bold">{u.avgPerMonth}/m</span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
                             )}
                         </CardContent>

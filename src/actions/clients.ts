@@ -731,3 +731,24 @@ export async function updateClientAgaAction(
     revalidatePath('/clients')
     return { success: true }
 }
+
+export async function toggleDoorBoardMemberAction(doorId: string, isBoardMember: boolean, clientId: string) {
+    try {
+        const supabase = await createClient()
+        const { error } = await supabase
+            .from('doors')
+            .update({ is_board_member: isBoardMember })
+            .eq('id', doorId)
+
+        if (error) {
+            console.error('Error toggling board member status:', error)
+            return { success: false, error: error.message }
+        }
+
+        revalidatePath(`/global-settings/clients/${clientId}`)
+        return { success: true }
+    } catch (err: any) {
+        console.error('toggleDoorBoardMemberAction exception:', err)
+        return { success: false, error: err.message }
+    }
+}

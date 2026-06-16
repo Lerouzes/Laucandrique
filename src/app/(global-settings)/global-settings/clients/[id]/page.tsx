@@ -92,6 +92,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             clientId={id}
             teamComparison={teamComparison}
             targetIndex={Number((settings as any)?.communication_target_index || 2.50)}
+            initialDoors={coOwnersRes.data || []}
           />
         }
       />
