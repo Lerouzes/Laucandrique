@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Info, Mail, Phone, Calendar, TrendingUp, TrendingDown, ArrowRight, Trash2, Network, Users, ShieldAlert, Search } from 'lucide-react'
+import { Info, Mail, Phone, Calendar, TrendingUp, TrendingDown, ArrowRight, Trash2, Network, Users, ShieldAlert, Search, Download, Loader2 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 import { deleteCommunicationStatsAction } from '@/actions/communication-stats'
 import { toggleDoorBoardMemberAction } from '@/actions/clients'
@@ -45,6 +45,7 @@ interface ClientCommunicationTrendsProps {
     teamComparison?: any[]
     targetIndex?: number
     initialDoors?: any[]
+    clientName?: string
 }
 
 const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Technique", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
@@ -68,7 +69,8 @@ export function ClientCommunicationTrends({
     clientId, 
     teamComparison = [], 
     targetIndex = 2.50,
-    initialDoors = []
+    initialDoors = [],
+    clientName = 'Syndicat'
 }: ClientCommunicationTrendsProps) {
     const [stats, setStats] = useState<CommStatRecord[]>(initialStats)
     const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -94,6 +96,55 @@ export function ClientCommunicationTrends({
     const [selectedYear, setSelectedYear] = useState<string>('')
     const [customStartMonth, setCustomStartMonth] = useState<string>('')
     const [customEndMonth, setCustomEndMonth] = useState<string>('')
+    const [isExporting, setIsExporting] = useState(false)
+
+    const handleExportPDF = async () => {
+        setIsExporting(true)
+        try {
+            const html2canvas = (await import('html2canvas')).default
+            const { jsPDF } = await import('jspdf')
+
+            const element = document.getElementById('client-trends-content')
+            if (!element) {
+                alert('Contenu à exporter introuvable')
+                return
+            }
+
+            const canvas = await html2canvas(element, {
+                scale: 1.5,
+                useCORS: true,
+                backgroundColor: '#0c0d12',
+                windowWidth: 1400
+            })
+
+            const imgData = canvas.toDataURL('image/png')
+            const imgWidth = 210
+            const pageHeight = 297
+            const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+            const pdf = new jsPDF('p', 'mm', 'a4')
+            let heightLeft = imgHeight
+            let position = 0
+
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+            heightLeft -= pageHeight
+
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight
+                pdf.addPage()
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+                heightLeft -= pageHeight
+            }
+
+            const dateStr = new Date().toLocaleDateString('fr-CA')
+            const cleanName = clientName.replace(/[^a-zA-Z0-9]/g, '_')
+            pdf.save(`analyse_communications_${cleanName}_${dateStr}.pdf`)
+        } catch (error) {
+            console.error('PDF export failed:', error)
+        } finally {
+            setIsExporting(false)
+        }
+    }
 
     const formatLocalDate = (dateStr: string | null | undefined): string => {
         if (!dateStr) return '?'
@@ -592,7 +643,26 @@ export function ClientCommunicationTrends({
                                 </>
                             )}
                         </div>
+                        <Button
+                            onClick={handleExportPDF}
+                            disabled={isExporting}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9 px-3 text-xs flex items-center gap-1.5 rounded-lg shrink-0 transition-all cursor-pointer shadow-lg shadow-indigo-600/10"
+                        >
+                            {isExporting ? (
+                                <>
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    <span>Export...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Download className="h-3.5 w-3.5" />
+                                    <span>Exporter PDF</span>
+                                </>
+                            )}
+                        </Button>
                     </div>
+
+                    <div id="client-trends-content" className="space-y-8 bg-[#0c0d12] p-2 rounded-xl">
 
                     {/* KPI Summary Row */}
                     {filteredStats && (
@@ -1103,7 +1173,8 @@ export function ClientCommunicationTrends({
                             </div>
                         </CardContent>
                     </Card>
-                </>
+                </div>
+            </>
             )}
         </div>
     )

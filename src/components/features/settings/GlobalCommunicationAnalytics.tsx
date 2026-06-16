@@ -16,7 +16,9 @@ import {
     AlertTriangle,
     ShieldAlert,
     Calendar,
-    ArrowRight
+    ArrowRight,
+    Download,
+    Loader2
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 import {
@@ -53,6 +55,53 @@ export function GlobalCommunicationAnalytics({
     const [startPeriod, setStartPeriod] = useState<string>('')
     const [endPeriod, setEndPeriod] = useState<string>('')
     const [searchQuery, setSearchQuery] = useState<string>('')
+    const [isExporting, setIsExporting] = useState(false)
+
+    const handleExportPDF = async () => {
+        setIsExporting(true)
+        try {
+            const html2canvas = (await import('html2canvas')).default
+            const { jsPDF } = await import('jspdf')
+            
+            const element = document.getElementById('global-analytics-content')
+            if (!element) {
+                alert('Contenu à exporter introuvable')
+                return
+            }
+
+            const canvas = await html2canvas(element, {
+                scale: 1.5,
+                useCORS: true,
+                backgroundColor: '#0c0d12',
+                windowWidth: 1400
+            })
+
+            const imgData = canvas.toDataURL('image/png')
+            const imgWidth = 210
+            const pageHeight = 297
+            const imgHeight = (canvas.height * imgWidth) / canvas.width
+            
+            const pdf = new jsPDF('p', 'mm', 'a4')
+            let heightLeft = imgHeight
+            let position = 0
+            
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+            heightLeft -= pageHeight
+            
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight
+                pdf.addPage()
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+                heightLeft -= pageHeight
+            }
+            
+            pdf.save(`analyse_globale_communications_${startPeriod}_to_${endPeriod}.pdf`)
+        } catch (error) {
+            console.error('PDF export failed:', error)
+        } finally {
+            setIsExporting(false)
+        }
+    }
 
     // 1. Filter stats to only keep the latest run per client_id
     const latestClientRuns = useMemo(() => {
@@ -363,16 +412,35 @@ export function GlobalCommunicationAnalytics({
                     )}
                 </div>
 
-                {/* SDC Search */}
-                <div className="relative w-full xl:max-w-xs">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-500" />
-                    <Input
-                        type="search"
-                        placeholder="Rechercher syndicat ou manager..."
-                        className="w-full bg-zinc-950 border-zinc-800 text-zinc-150 pl-9 placeholder:text-zinc-550 focus-visible:ring-indigo-650/30 text-xs"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
+                {/* SDC Search & PDF Export */}
+                <div className="flex items-center gap-2 w-full xl:max-w-md">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-500" />
+                        <Input
+                            type="search"
+                            placeholder="Rechercher syndicat ou manager..."
+                            className="w-full bg-zinc-950 border-zinc-800 text-zinc-150 pl-9 placeholder:text-zinc-550 focus-visible:ring-indigo-650/30 text-xs"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+                    <Button 
+                        onClick={handleExportPDF} 
+                        disabled={isExporting}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9 px-3 text-xs flex items-center gap-1.5 rounded-lg shrink-0 transition-all cursor-pointer shadow-lg shadow-indigo-600/10 animate-fade-in"
+                    >
+                        {isExporting ? (
+                            <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <span>Export...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Download className="h-3.5 w-3.5" />
+                                <span>Exporter PDF</span>
+                            </>
+                        )}
+                    </Button>
                 </div>
             </div>
 
@@ -385,7 +453,7 @@ export function GlobalCommunicationAnalytics({
                     </p>
                 </Card>
             ) : (
-                <>
+                <div id="global-analytics-content" className="space-y-6 bg-[#0c0d12] p-2 rounded-xl">
                     {/* KPI Cards Row */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         {/* KPI 1: Average Workload Ratio */}
@@ -712,7 +780,7 @@ export function GlobalCommunicationAnalytics({
                             </div>
                         </CardContent>
                     </Card>
-                </>
+                </div>
             )}
         </div>
     )
