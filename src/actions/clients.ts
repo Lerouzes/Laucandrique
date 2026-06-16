@@ -23,7 +23,7 @@ export async function getClients(query?: string) {
 
         let request = supabase
             .from('clients')
-            .select('*, managers(first_name,last_name,email,manager_teams(id,name))')
+            .select('*, managers(first_name,last_name,email,manager_teams(id,name)), doors(id)')
             .order('created_at', { ascending: false })
 
         if (query) {
@@ -37,7 +37,7 @@ export async function getClients(query?: string) {
             // Fall back to simple select without managers join
             const fallback = supabase
                 .from('clients')
-                .select('*')
+                .select('*, doors(id)')
                 .order('created_at', { ascending: false })
             if (query) fallback.or(`full_name.ilike.%${query}%,company_name.ilike.%${query}%`)
             const { data: fallbackData, error: fallbackError } = await fallback

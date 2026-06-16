@@ -44,6 +44,7 @@ interface Client {
     id: string
     company_name: string | null
     full_name: string
+    doors?: { id: string }[]
 }
 
 interface CommunicationAnalyzerProps {
@@ -181,6 +182,9 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
     useEffect(() => {
         if (selectedClient) {
             setSdcSearch(selectedClient.company_name || selectedClient.full_name)
+            if (selectedClient.doors && selectedClient.doors.length > 0) {
+                setUnitCount(selectedClient.doors.length)
+            }
         } else {
             setSdcSearch('')
         }
