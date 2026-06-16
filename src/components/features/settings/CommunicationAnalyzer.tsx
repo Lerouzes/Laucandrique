@@ -64,7 +64,7 @@ interface ParsedRow {
 }
 
 // 7 Departments + Council (as in the HTML code)
-const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Technique", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration"]
+const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Technique", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
 
 const DEPT_COLORS: Record<string, string> = {
     "Gestion": "border-l-sky-500 bg-sky-950/10",
@@ -76,7 +76,8 @@ const DEPT_COLORS: Record<string, string> = {
     "Direction": "border-l-zinc-500 bg-zinc-900/40",
     "Chargé d’opération": "border-l-indigo-500 bg-indigo-950/10",
     "Chargé d'opération": "border-l-indigo-500 bg-indigo-950/10",
-    "Conseil d'Administration": "border-l-amber-500 bg-amber-950/10"
+    "Conseil d'Administration": "border-l-amber-500 bg-amber-950/10",
+    "Marketing": "border-l-pink-600 bg-pink-950/10"
 }
 
 const DEPT_BADGE_CSS: Record<string, string> = {
@@ -89,7 +90,8 @@ const DEPT_BADGE_CSS: Record<string, string> = {
     "Direction": "bg-zinc-800 text-zinc-400 border border-zinc-700/60",
     "Chargé d’opération": "bg-indigo-500/10 text-indigo-400 border border-indigo-550/20",
     "Chargé d'opération": "bg-indigo-500/10 text-indigo-400 border border-indigo-550/20",
-    "Conseil d'Administration": "bg-amber-500/10 text-amber-400 border border-amber-550/20"
+    "Conseil d'Administration": "bg-amber-500/10 text-amber-400 border border-amber-550/20",
+    "Marketing": "bg-pink-500/10 text-pink-400 border border-pink-550/20"
 }
 
 // Initial Employee Department Map matching the HTML tool precisely
@@ -107,6 +109,7 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Nouredine Achouri": "Comptabilité",
     "Line Garand": "Comptabilité",
     "Danielle Guidi": "Comptabilité",
+    "Ian Coulombe": "Comptabilité",
 
     // Administration
     "Reception Laucandrique": "Administration",
@@ -129,6 +132,7 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Catherine Ducharme": "Administration",
     "Anne-Marie Sauvageau": "Administration",
     "Jillian Wise": "Administration",
+    "Janie Beauchemin": "Administration",
 
     // Sinistres
     "Département Sinistres": "Sinistres",
@@ -139,6 +143,9 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Ekampreet Sudhar Singh": "Sinistres",
     "Halle T. Bellange": "Sinistres",
     "Nour Hejazin": "Sinistres",
+    "Patrice Anfosso": "Sinistres",
+    "Jean-Philippe Lemieux": "Sinistres",
+    "Caroline Lamothe": "Sinistres",
 
     // Chargé d’opération
     "Stéphane Genest": "Chargé d’opération",
@@ -150,6 +157,8 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "opérations": "Chargé d’opération",
     "Genest Stéphane": "Chargé d’opération",
     "Genest Stephane": "Chargé d’opération",
+    "Gabriel Gauvin": "Chargé d’opération",
+    "Patrice Marcil": "Chargé d’opération",
 
     // Technique
     "Angelique Hesbois": "Technique",
@@ -158,6 +167,9 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
 
     // Assurance
     "Marie-Camille Benhamou": "Assurance",
+
+    // Marketing
+    "Nada Talbi": "Marketing",
 
     // Direction
     "Nicole Rousseau": "Direction",
@@ -487,9 +499,9 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
         let inbound = 0
         let contractInclusionsVolume = 0
         
-        const deptCounts: Record<string, number> = { 
-            "Gestion": 0, "Administration": 0, "Comptabilité": 0, "Technique": 0, "Sinistres": 0, "Assurance": 0, "Direction": 0, "Conseil d'Administration": 0 
-        }
+        const deptCounts: Record<string, number> = {}
+        DEPT_LIST.forEach(d => { deptCounts[d] = 0; })
+        deptCounts["Chargé d'opération"] = 0
         
         const timelineChronologyMap: Record<string, { contractVolume: number; outOfContractVolume: number }> = {}
         const employeeCounts: Record<string, number> = {}
@@ -499,6 +511,7 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
         const localYearlyAgg: Record<string, Record<string, number>> = {}
         
         DEPT_LIST.forEach(d => { monthlyDeptHistory[d] = {}; })
+        monthlyDeptHistory["Chargé d'opération"] = {}
 
         const filteredList: ParsedRow[] = []
 
@@ -508,7 +521,9 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
 
             if (timelineKey !== "Unknown") {
                 // Monthly history for cards expanded drawer
-                monthlyDeptHistory[resolvedDept][timelineKey] = (monthlyDeptHistory[resolvedDept][timelineKey] || 0) + 1
+                if (monthlyDeptHistory[resolvedDept]) {
+                    monthlyDeptHistory[resolvedDept][timelineKey] = (monthlyDeptHistory[resolvedDept][timelineKey] || 0) + 1
+                }
 
                 // Chronology timeline map
                 if (!timelineChronologyMap[timelineKey]) {
@@ -522,14 +537,14 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
             }
 
             if (row.year && row.year !== "Unknown") {
-                if (!localYearlyAgg[row.year]) {
-                    localYearlyAgg[row.year] = { 
-                        "Gestion": 0, "Administration": 0, "Comptabilité": 0, "Technique": 0, 
-                        "Sinistres": 0, "Assurance": 0, "Direction": 0, "Conseil d'Administration": 0 
-                    }
+                const yearVal = row.year;
+                if (!localYearlyAgg[yearVal]) {
+                    localYearlyAgg[yearVal] = {}
+                    DEPT_LIST.forEach(d => { localYearlyAgg[yearVal][d] = 0; })
+                    localYearlyAgg[yearVal]["Chargé d'opération"] = 0
                 }
-                if (localYearlyAgg[row.year][resolvedDept] !== undefined) {
-                    localYearlyAgg[row.year][resolvedDept]++
+                if (localYearlyAgg[yearVal][resolvedDept] !== undefined) {
+                    localYearlyAgg[yearVal][resolvedDept]++
                 }
             }
 

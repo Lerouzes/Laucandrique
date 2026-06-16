@@ -47,7 +47,7 @@ interface ClientCommunicationTrendsProps {
     initialDoors?: any[]
 }
 
-const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Technique", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration"]
+const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Technique", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
 
 const DEPT_COLORS: Record<string, string> = {
     "Gestion": "#3b82f6", // Blue
@@ -59,7 +59,8 @@ const DEPT_COLORS: Record<string, string> = {
     "Direction": "#64748b", // Slate
     "Chargé d’opération": "#6366f1", // Indigo
     "Chargé d'opération": "#6366f1",
-    "Conseil d'Administration": "#f59e0b" // Amber
+    "Conseil d'Administration": "#f59e0b", // Amber
+    "Marketing": "#d946ef" // Fuchsia
 }
 
 export function ClientCommunicationTrends({ 
