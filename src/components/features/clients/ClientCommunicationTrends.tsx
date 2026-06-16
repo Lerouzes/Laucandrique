@@ -57,6 +57,16 @@ const DEPT_COLORS: Record<string, string> = {
 }
 
 export function ClientCommunicationTrends({ stats: initialStats, clientId, teamComparison = [] }: ClientCommunicationTrendsProps) {
+    const formatLocalDate = (dateStr: string | null | undefined): string => {
+        if (!dateStr) return '?'
+        const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr.split(' ')[0]
+        const parts = cleanStr.split('-')
+        if (parts.length === 3) {
+            return `${parts[0]}-${parts[1]}-${parts[2]}`
+        }
+        return dateStr
+    }
+
     const [stats, setStats] = useState<CommStatRecord[]>(initialStats)
     const [deletingId, setDeletingId] = useState<string | null>(null)
     const [selectedRunId, setSelectedRunId] = useState<string>('')
@@ -134,7 +144,7 @@ export function ClientCommunicationTrends({ stats: initialStats, clientId, teamC
                 inclusionsVolume,
                 exclusionsVolume: selectedRun.total_communications - inclusionsVolume,
                 ratio: Number((inclusionsVolume / totalUnits).toFixed(2)),
-                periodText: `${selectedRun.period_start ? new Date(selectedRun.period_start).toLocaleDateString('fr-CA') : '?'} au ${selectedRun.period_end ? new Date(selectedRun.period_end).toLocaleDateString('fr-CA') : '?'}`
+                periodText: `${selectedRun.period_start ? formatLocalDate(selectedRun.period_start) : '?'} au ${selectedRun.period_end ? formatLocalDate(selectedRun.period_end) : '?'}`
             }
         } else {
             const entry = timelineList.find((t: any) => t.period === selectedMonthFilter)
@@ -309,7 +319,7 @@ export function ClientCommunicationTrends({ stats: initialStats, clientId, teamC
                                 >
                                     {stats.map((s, idx) => (
                                         <option key={s.id} value={s.id}>
-                                            Analyse du {new Date(s.analysis_date).toLocaleDateString('fr-CA')} ({s.total_communications} comms)
+                                            Analyse du {formatLocalDate(s.analysis_date)} ({s.total_communications} comms)
                                         </option>
                                     ))}
                                 </select>
@@ -613,11 +623,11 @@ export function ClientCommunicationTrends({ stats: initialStats, clientId, teamC
                                                             onClick={() => setSelectedRunId(row.id)}
                                                             className="text-left hover:underline text-indigo-400 font-bold"
                                                         >
-                                                            {new Date(row.analysis_date).toLocaleDateString('fr-CA')}
+                                                            {formatLocalDate(row.analysis_date)}
                                                         </button>
                                                     </td>
                                                     <td className="p-3 text-zinc-400">
-                                                        {row.period_start ? new Date(row.period_start).toLocaleDateString('fr-CA') : '?'} au {row.period_end ? new Date(row.period_end).toLocaleDateString('fr-CA') : '?'}
+                                                        {row.period_start ? formatLocalDate(row.period_start) : '?'} au {row.period_end ? formatLocalDate(row.period_end) : '?'}
                                                     </td>
                                                     <td className="p-3 font-mono font-medium">{runUnits} SDC</td>
                                                     <td className="p-3 font-mono font-bold text-emerald-400">{inclusionsLoadRate}</td>

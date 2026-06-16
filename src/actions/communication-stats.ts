@@ -113,6 +113,7 @@ export async function saveCommunicationStatsAction(
         total_emails: number
         total_phone_calls: number
         total_communications: number
+        analysis_date?: string | null
         analysis_summary: any
     }
 ): Promise<any> {
@@ -120,17 +121,23 @@ export async function saveCommunicationStatsAction(
 
     if (!clientId) throw new Error("ID du client requis")
 
+    const insertPayload: any = {
+        client_id: clientId,
+        period_start: stats.period_start,
+        period_end: stats.period_end,
+        total_emails: stats.total_emails,
+        total_phone_calls: stats.total_phone_calls,
+        total_communications: stats.total_communications,
+        analysis_summary: stats.analysis_summary
+    }
+
+    if (stats.analysis_date) {
+        insertPayload.analysis_date = stats.analysis_date
+    }
+
     const { data, error } = await (supabase
         .from('client_communication_stats' as any)
-        .insert({
-            client_id: clientId,
-            period_start: stats.period_start,
-            period_end: stats.period_end,
-            total_emails: stats.total_emails,
-            total_phone_calls: stats.total_phone_calls,
-            total_communications: stats.total_communications,
-            analysis_summary: stats.analysis_summary
-        })
+        .insert(insertPayload)
         .select('*')
         .single() as any)
 

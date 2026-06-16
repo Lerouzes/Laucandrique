@@ -249,17 +249,89 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
         return clean
     }
 
+    const parseDateString = (dateStr: string): Date | null => {
+        if (!dateStr) return null
+        const cleanStr = dateStr.trim().replace(/^"|"$/g, '')
+        
+        // Try direct Date parsing first
+        let d = new Date(cleanStr)
+        if (!isNaN(d.getTime())) return d
+        
+        // Handle formats like DD/MM/YYYY HH:MM:SS or DD/MM/YYYY
+        if (cleanStr.includes('/')) {
+            const parts = cleanStr.split(' ')
+            const dateParts = parts[0].split('/')
+            if (dateParts.length === 3) {
+                let day = 1, month = 0, year = 2000
+                if (dateParts[0].length === 4) {
+                    // YYYY/MM/DD
+                    year = parseInt(dateParts[0], 10)
+                    month = parseInt(dateParts[1], 10) - 1
+                    day = parseInt(dateParts[2], 10)
+                } else {
+                    // DD/MM/YYYY
+                    day = parseInt(dateParts[0], 10)
+                    month = parseInt(dateParts[1], 10) - 1
+                    year = parseInt(dateParts[2], 10)
+                    if (year < 100) year += 2000
+                }
+                
+                let hour = 0, min = 0, sec = 0
+                if (parts[1]) {
+                    const timeParts = parts[1].split(':')
+                    hour = parseInt(timeParts[0], 10) || 0
+                    min = parseInt(timeParts[1], 10) || 0
+                    sec = parseInt(timeParts[2], 10) || 0
+                }
+                d = new Date(year, month, day, hour, min, sec)
+                if (!isNaN(d.getTime())) return d
+            }
+        }
+        
+        // Handle formats like DD-MM-YYYY HH:MM:SS or DD-MM-YYYY
+        if (cleanStr.includes('-')) {
+            const parts = cleanStr.split(' ')
+            const dateParts = parts[0].split('-')
+            if (dateParts.length === 3) {
+                let day = 1, month = 0, year = 2000
+                if (dateParts[0].length === 4) {
+                    // YYYY-MM-DD
+                    year = parseInt(dateParts[0], 10)
+                    month = parseInt(dateParts[1], 10) - 1
+                    day = parseInt(dateParts[2], 10)
+                } else {
+                    // DD-MM-YYYY
+                    day = parseInt(dateParts[0], 10)
+                    month = parseInt(dateParts[1], 10) - 1
+                    year = parseInt(dateParts[2], 10)
+                    if (year < 100) year += 2000
+                }
+                
+                let hour = 0, min = 0, sec = 0
+                if (parts[1]) {
+                    const timeParts = parts[1].split(':')
+                    hour = parseInt(timeParts[0], 10) || 0
+                    min = parseInt(timeParts[1], 10) || 0
+                    sec = parseInt(timeParts[2], 10) || 0
+                }
+                d = new Date(year, month, day, hour, min, sec)
+                if (!isNaN(d.getTime())) return d
+            }
+        }
+        
+        return null
+    }
+
     const extractDateMeta = (dateString: string) => {
         let year = "Unknown"
         let month = "Unknown"
         if(!dateString) return { year, month }
-        const cleanStr = dateString.trim().replace(/^"|"$/g, '')
-        if (cleanStr.includes('-')) {
-            const parts = cleanStr.split('-')
-            if(parts[0] && parts[0].length === 4) { year = parts[0]; month = parts[1] || "Unknown"; }
-        } else if (cleanStr.includes('/')) {
-            const parts = cleanStr.split('/')
-            if(parts[2] && parts[2].substring(0,4).length === 4) { year = parts[2].substring(0,4); month = parts[1] || "Unknown"; }
+        
+        const parsed = parseDateString(dateString)
+        if (parsed) {
+            year = parsed.getFullYear().toString()
+            const m = parsed.getMonth() + 1 // 1-indexed
+            month = m < 10 ? "0" + m : m.toString()
         }
         return { year, month }
     }
@@ -534,8 +606,8 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
         try {
             // Find start and end period from raw rows
             const activePeriodDates = rawRows
-                .map(r => new Date(r.date))
-                .filter(d => !isNaN(d.getTime()))
+                .map(r => parseDateString(r.date))
+                .filter((d): d is Date => d !== null)
                 .sort((a, b) => a.getTime() - b.getTime())
             
             const period_start = activePeriodDates.length > 0 ? activePeriodDates[0].toISOString().substring(0, 10) : null
@@ -556,6 +628,7 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                 total_emails,
                 total_phone_calls,
                 total_communications: rawRows.length,
+                analysis_date: period_end,
                 analysis_summary: {
                     total_units: unitCount,
                     deptCounts: pipelineData.deptCounts,
@@ -564,7 +637,7 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                     monthlyDeptHistory: pipelineData.monthlyDeptHistory,
                     dynamicDeptMap: deptMap,
                     discoveredUsers,
-                    analysis_date: new Date().toISOString()
+                    analysis_date: period_end || new Date().toISOString()
                 }
             }
 
