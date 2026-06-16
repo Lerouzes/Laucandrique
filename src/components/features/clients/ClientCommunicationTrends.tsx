@@ -604,8 +604,6 @@ export function ClientCommunicationTrends({
                                 const percentage = Math.round((count / totalComms) * 100)
                                 const color = DEPT_COLORS[dept] || '#818cf8'
 
-                                if (count === 0) return null
-
                                 return (
                                     <Card 
                                         key={dept} 
