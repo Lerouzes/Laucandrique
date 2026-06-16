@@ -991,17 +991,29 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                                         let trendNoticeClass = "bg-zinc-800 text-zinc-450 border-zinc-750"
                                         let trendNoticeText = "Volume cumulé"
 
-                                        if (selectedYear !== "all" && pipelineData.yearlyHistoricAggregates) {
+                                        if (selectedYear !== "all" && pipelineData.monthlyDeptHistory) {
+                                            // Get the calendar months present in the selected year
+                                            const monthsInSelectedYear = pipelineData.timelineList
+                                                .map((t: any) => t.period)
+                                                .filter((p: string) => p.startsWith(selectedYear))
+                                                .map((p: string) => p.split('-')[1]) // e.g. "01", "02", ...
+
                                             let totalOtherYearsVolume = 0
                                             let otherYearsCount = 0
-                                            
-                                            Object.entries(pipelineData.yearlyHistoricAggregates).forEach(([y, depts]: [string, any]) => {
-                                                if (y !== selectedYear) {
-                                                    totalOtherYearsVolume += (depts[d] || 0)
-                                                    otherYearsCount++
-                                                }
+
+                                            // Find other years detected in the data
+                                            const otherYears = detectedYears.filter(y => y !== selectedYear)
+
+                                            otherYears.forEach(y => {
+                                                let otherYearEquivalentVolume = 0
+                                                monthsInSelectedYear.forEach((m: string) => {
+                                                    const periodKey = `${y}-${m}`
+                                                    otherYearEquivalentVolume += (pipelineData.monthlyDeptHistory[d]?.[periodKey] || 0)
+                                                })
+                                                totalOtherYearsVolume += otherYearEquivalentVolume
+                                                otherYearsCount++
                                             })
-                                            
+
                                             const baselineAverage = otherYearsCount > 0 ? (totalOtherYearsVolume / otherYearsCount) : 0
                                             
                                             if (baselineAverage === 0) {
@@ -1010,10 +1022,10 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                                             } else {
                                                 const pctDelta = (((count - baselineAverage) / baselineAverage) * 100).toFixed(1)
                                                 if (count >= baselineAverage) {
-                                                    trendNoticeClass = "bg-rose-500/15 text-rose-450 text-rose-450/80 border border-rose-950/40"
+                                                    trendNoticeClass = "bg-rose-500/15 text-rose-450 border border-rose-950/40"
                                                     trendNoticeText = `+${pctDelta}% vs historique`
                                                 } else {
-                                                    trendNoticeClass = "bg-emerald-500/15 text-emerald-450 text-emerald-450/80 border border-emerald-950/40"
+                                                    trendNoticeClass = "bg-emerald-500/15 text-emerald-450 border border-emerald-950/40"
                                                     trendNoticeText = `${pctDelta}% vs historique`
                                                 }
                                             }
