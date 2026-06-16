@@ -21,7 +21,9 @@ import {
     BarChart,
     Bar,
     Cell,
-    ReferenceLine
+    ReferenceLine,
+    ComposedChart,
+    Line
 } from 'recharts'
 
 interface CommStatRecord {
@@ -365,16 +367,30 @@ export function ClientCommunicationTrends({
                 label = date.toLocaleDateString('fr-CA', { month: 'short', year: '2-digit' })
             } catch (_) {}
 
+            // Find matched team ratios for this period
+            let sumTeamRatio = 0
+            let teamCount = 0
+            teamComparison.forEach((tc: any) => {
+                const tcTimeline = tc.analysis_summary?.timelineList || []
+                const tcMatch = tcTimeline.find((item: any) => item.period === t.period)
+                if (tcMatch && typeof tcMatch.ratio === 'number') {
+                    sumTeamRatio += tcMatch.ratio
+                    teamCount++
+                }
+            })
+            const teamAverage = teamCount > 0 ? Number((sumTeamRatio / teamCount).toFixed(2)) : 0
+
             return {
                 name: label,
                 period: t.period,
                 'Forfait (Inclus)': t.contractVolume,
                 'Exclus (Sinistre/Tech)': t.outOfContractVolume,
                 'Total': t.contractVolume + t.outOfContractVolume,
-                'Indice': t.ratio
+                'Indice': t.ratio,
+                'Moyenne Équipe': teamAverage
             }
         }).sort((a: any, b: any) => a.period.localeCompare(b.period))
-    }, [filteredTimelineList])
+    }, [filteredTimelineList, teamComparison])
 
     // Normalize team comparison statistics
     const teamComparisonStats = useMemo(() => {
@@ -656,7 +672,7 @@ export function ClientCommunicationTrends({
                             <CardContent className="h-72 pt-2">
                                 {runChartData.length > 0 ? (
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={runChartData}>
+                                        <ComposedChart data={runChartData}>
                                             <defs>
                                                 <linearGradient id="colorForfait" x1="0" y1="0" x2="0" y2="1">
                                                     <stop offset="5%" stopColor="#818cf8" stopOpacity={0.15}/>
@@ -669,12 +685,15 @@ export function ClientCommunicationTrends({
                                             </defs>
                                             <CartesianGrid strokeDasharray="3 3" stroke="#222530" vertical={false} />
                                             <XAxis dataKey="name" stroke="#4b5563" fontSize={9} tickLine={false} />
-                                            <YAxis stroke="#4b5563" fontSize={9} tickLine={false} axisLine={false} />
+                                            <YAxis yAxisId="left" stroke="#4b5563" fontSize={9} tickLine={false} axisLine={false} />
+                                            <YAxis yAxisId="right" orientation="right" stroke="#4b5563" fontSize={9} tickLine={false} axisLine={false} />
                                             <Tooltip contentStyle={{ backgroundColor: '#0c0d12', borderColor: '#222530', borderRadius: '8px', fontSize: '10px' }} />
                                             <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
-                                            <Area type="monotone" dataKey="Forfait (Inclus)" name="Inclus (Gestion, Admin, Compta)" stroke="#818cf8" fillOpacity={1} fill="url(#colorForfait)" strokeWidth={2} />
-                                            <Area type="monotone" dataKey="Exclus (Sinistre/Tech)" name="Hors-Forfait (Sinistres, Tech)" stroke="#f97316" fillOpacity={1} fill="url(#colorExclus)" strokeWidth={1.5} />
-                                        </AreaChart>
+                                            <Area yAxisId="left" type="monotone" dataKey="Forfait (Inclus)" name="Inclus (Gestion, Admin, Compta)" stroke="#818cf8" fillOpacity={1} fill="url(#colorForfait)" strokeWidth={2} />
+                                            <Area yAxisId="left" type="monotone" dataKey="Exclus (Sinistre/Tech)" name="Hors-Forfait (Sinistres, Tech)" stroke="#f97316" fillOpacity={1} fill="url(#colorExclus)" strokeWidth={1.5} />
+                                            <Line yAxisId="right" type="monotone" dataKey="Indice" name="Indice (SDC)" stroke="#38bdf8" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                                            <Line yAxisId="right" type="monotone" dataKey="Moyenne Équipe" name="Indice Moyen Équipe" stroke="#10b981" strokeWidth={2.5} strokeDasharray="4 4" dot={false} />
+                                        </ComposedChart>
                                     </ResponsiveContainer>
                                 ) : (
                                     <div className="h-full flex items-center justify-center text-zinc-600 italic">Aucune donnée mensuelle.</div>
