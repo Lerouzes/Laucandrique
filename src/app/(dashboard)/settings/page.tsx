@@ -65,11 +65,12 @@ export default function SettingsPage() {
             monthly_goal_amount: 0,
             work_types_options: '',
             pdf_template_url: '',
+            communication_target_index: 2.50,
         }
     })
 
     useEffect(() => {
-        getSettings().then(data => {
+        getSettings().then((data: any) => {
             if (data.id) setSettingsId(data.id)
             
             const localTemplate = typeof window !== 'undefined' ? localStorage.getItem('pdf_template_url') || '' : ''
@@ -86,6 +87,7 @@ export default function SettingsPage() {
                 monthly_goal_amount: data.monthly_goal_amount || 0,
                 work_types_options: Array.isArray(data.work_types_options) ? data.work_types_options.join(', ') : '',
                 pdf_template_url: activeTemplate,
+                communication_target_index: data.communication_target_index !== undefined ? data.communication_target_index : 2.50,
             })
 
             if (activeTemplate) {
@@ -319,6 +321,21 @@ export default function SettingsPage() {
                     </CardContent>
                 </Card>
 
+                <Card className="bg-zinc-900 border-zinc-800">
+                    <CardHeader>
+                        <CardTitle className="text-zinc-100">Communications & Suivi</CardTitle>
+                        <CardDescription className="text-zinc-400">Configurez les cibles de charge pour l'analyse des communications.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label className="text-zinc-300">Indice de charge cible (interactions / porte)</Label>
+                            <Input type="number" step="0.01" {...form.register('communication_target_index')} className="bg-zinc-950 border-zinc-800 text-zinc-100 focus-visible:ring-zinc-600" />
+                            <p className="text-xs text-zinc-500">
+                                L'indice cible est utilisé pour évaluer si un syndicat est en surcharge. Par défaut, la valeur est de 2.50.
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
 
                 <Card className="bg-zinc-900 border-zinc-800">
                     <CardHeader>

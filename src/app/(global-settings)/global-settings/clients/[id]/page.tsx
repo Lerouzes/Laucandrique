@@ -9,6 +9,7 @@ import { getManagers } from '@/actions/managers'
 import { getQuotes } from '@/actions/quotes'
 import { getSyndicateWorkloadAction } from '@/actions/team-management'
 import { getCommunicationStatsByClient, getTeamCommunicationComparison } from '@/actions/communication-stats'
+import { getSettings } from '@/actions/settings'
 import { Badge } from '@/components/ui/badge'
 import { ClientDetailForm } from '@/components/features/clients/ClientDetailForm'
 import { ClientTabsContainer } from '@/components/features/clients/ClientTabsContainer'
@@ -21,7 +22,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const supabase = await createClient()
 
   // Fetch client + contract + co-owners + comm stats separately
-  const [client, managers, quotes, contractDirect, workload, coOwnersRes, commStats, teamComparison] = await Promise.all([
+  const [client, managers, quotes, contractDirect, workload, coOwnersRes, commStats, teamComparison, settings] = await Promise.all([
     getClientById(id),
     getManagers(true),
     getQuotes(),
@@ -33,7 +34,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       .eq('client_id', id)
       .order('door_number', { ascending: true }),
     getCommunicationStatsByClient(id),
-    getTeamCommunicationComparison(id)
+    getTeamCommunicationComparison(id),
+    getSettings()
   ])
 
   if (!client) notFound()
@@ -45,7 +47,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const isStatusActive = client.status !== 'inactive'
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6 max-w-full w-full">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b border-zinc-800 pb-4">
         <div>
           <Link href="/global-settings?tab=clients" className="text-xs text-zinc-400 hover:text-zinc-100 flex items-center gap-1 mb-2 transition-colors">
@@ -89,6 +91,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             stats={commStats}
             clientId={id}
             teamComparison={teamComparison}
+            targetIndex={Number((settings as any)?.communication_target_index || 2.50)}
           />
         }
       />

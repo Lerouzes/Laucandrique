@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 
 export async function getSettings() {
     const supabase = await createClient()
-    const { data, error } = await supabase.from('settings').select('*').limit(1).single()
+    const { data, error } = await (supabase.from('settings' as any).select('*').limit(1).single() as any)
 
     if (error || !data) {
         return {
@@ -19,9 +19,10 @@ export async function getSettings() {
             monthly_goal_amount: 0,
             work_types_options: ["Peinture", "Plâtre", "Maçonnerie", "Menuiserie", "Électricité", "Plomberie"],
             pdf_template_url: '',
+            communication_target_index: 2.50,
         }
     }
-    return data
+    return data as any
 }
 
 export async function updateSettingsAction(formData: FormData, hasId: string | null) {
@@ -48,6 +49,7 @@ export async function updateSettingsAction(formData: FormData, hasId: string | n
             .map(s => s.trim())
             .filter(Boolean),
         pdf_template_url: typeof pdfTemplateUrl === 'string' ? pdfTemplateUrl.trim() : null,
+        communication_target_index: parseFloat(formData.get('communication_target_index') as string || '2.50'),
         updated_at: new Date().toISOString()
     }
 
@@ -59,19 +61,20 @@ export async function updateSettingsAction(formData: FormData, hasId: string | n
         qst_rate: payload.qst_rate,
         work_types_options: payload.work_types_options,
         pdf_template_url: payload.pdf_template_url,
+        communication_target_index: payload.communication_target_index,
         updated_at: payload.updated_at,
     }
 
     if (hasId) {
-        let result = await supabase.from('settings').update(payload).eq('id', hasId)
+        let result = await (supabase.from('settings' as any).update(payload).eq('id', hasId) as any)
         if (result.error && (result.error.message.includes('monthly_goal_enabled') || result.error.message.includes('monthly_goal_amount'))) {
-            result = await supabase.from('settings').update(fallbackPayload).eq('id', hasId)
+            result = await (supabase.from('settings' as any).update(fallbackPayload).eq('id', hasId) as any)
         }
         if (result.error) throw new Error(result.error.message)
     } else {
-        let result = await supabase.from('settings').insert(payload)
+        let result = await (supabase.from('settings' as any).insert(payload) as any)
         if (result.error && (result.error.message.includes('monthly_goal_enabled') || result.error.message.includes('monthly_goal_amount'))) {
-            result = await supabase.from('settings').insert(fallbackPayload)
+            result = await (supabase.from('settings' as any).insert(fallbackPayload) as any)
         }
         if (result.error) throw new Error(result.error.message)
     }
