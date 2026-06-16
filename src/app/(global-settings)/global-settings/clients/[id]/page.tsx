@@ -8,7 +8,7 @@ import { getClientById, updateClientAction, getContractForClient } from '@/actio
 import { getManagers } from '@/actions/managers'
 import { getQuotes } from '@/actions/quotes'
 import { getSyndicateWorkloadAction } from '@/actions/team-management'
-import { getCommunicationStatsByClient } from '@/actions/communication-stats'
+import { getCommunicationStatsByClient, getTeamCommunicationComparison } from '@/actions/communication-stats'
 import { Badge } from '@/components/ui/badge'
 import { ClientDetailForm } from '@/components/features/clients/ClientDetailForm'
 import { ClientTabsContainer } from '@/components/features/clients/ClientTabsContainer'
@@ -21,7 +21,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const supabase = await createClient()
 
   // Fetch client + contract + co-owners + comm stats separately
-  const [client, managers, quotes, contractDirect, workload, coOwnersRes, commStats] = await Promise.all([
+  const [client, managers, quotes, contractDirect, workload, coOwnersRes, commStats, teamComparison] = await Promise.all([
     getClientById(id),
     getManagers(true),
     getQuotes(),
@@ -32,7 +32,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       .select('*, resident:maintenance_residents(*)')
       .eq('client_id', id)
       .order('door_number', { ascending: true }),
-    getCommunicationStatsByClient(id)
+    getCommunicationStatsByClient(id),
+    getTeamCommunicationComparison(id)
   ])
 
   if (!client) notFound()
@@ -87,6 +88,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           <ClientCommunicationTrends
             stats={commStats}
             clientId={id}
+            teamComparison={teamComparison}
           />
         }
       />

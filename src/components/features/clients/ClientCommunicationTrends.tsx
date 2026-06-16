@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Info, Mail, Phone, Calendar, TrendingUp, TrendingDown, ArrowRight, Trash2, Network } from 'lucide-react'
+import { Info, Mail, Phone, Calendar, TrendingUp, TrendingDown, ArrowRight, Trash2, Network, Users } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 import { deleteCommunicationStatsAction } from '@/actions/communication-stats'
 import { toast } from 'sonner'
@@ -18,7 +18,8 @@ import {
     ResponsiveContainer,
     Legend,
     BarChart,
-    Bar
+    Bar,
+    Cell
 } from 'recharts'
 
 interface CommStatRecord {
@@ -37,6 +38,7 @@ interface CommStatRecord {
 interface ClientCommunicationTrendsProps {
     stats: CommStatRecord[]
     clientId: string
+    teamComparison?: any[]
 }
 
 const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Technique", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration"]
@@ -54,7 +56,7 @@ const DEPT_COLORS: Record<string, string> = {
     "Conseil d'Administration": "#f59e0b"
 }
 
-export function ClientCommunicationTrends({ stats: initialStats, clientId }: ClientCommunicationTrendsProps) {
+export function ClientCommunicationTrends({ stats: initialStats, clientId, teamComparison = [] }: ClientCommunicationTrendsProps) {
     const [stats, setStats] = useState<CommStatRecord[]>(initialStats)
     const [deletingId, setDeletingId] = useState<string | null>(null)
     const [selectedRunId, setSelectedRunId] = useState<string>('')
@@ -151,7 +153,7 @@ export function ClientCommunicationTrends({ stats: initialStats, clientId }: Cli
 
             return {
                 totalComms: total,
-                emails: null, // split not saved monthly, we'll hide emails/calls text or show total
+                emails: null,
                 calls: null,
                 inclusionsVolume: contract,
                 exclusionsVolume: outOfContract,
@@ -204,48 +206,84 @@ export function ClientCommunicationTrends({ stats: initialStats, clientId }: Cli
         }).sort((a: any, b: any) => a.period.localeCompare(b.period))
     }, [timelineList])
 
-    // Multi-run trend comparisons
-    const multiRunTrend = useMemo(() => {
-        if (stats.length < 2) return null
-        
-        const last = stats[stats.length - 1]
-        const prev = stats[stats.length - 2]
-        
-        const lastUnits = Number(last.analysis_summary?.total_units || 90)
-        const prevUnits = Number(prev.analysis_summary?.total_units || 90)
+    // Normalize team comparison statistics
+    const teamComparisonStats = useMemo(() => {
+        if (!teamComparison || teamComparison.length === 0) return []
 
-        let lastInclusions = 0
-        if (last.analysis_summary?.deptCounts) {
-            Object.entries(last.analysis_summary.deptCounts).forEach(([d, v]) => {
-                if (d !== "Sinistres" && d !== "Technique") lastInclusions += Number(v || 0)
-            })
-        } else {
-            lastInclusions = last.total_communications
-        }
+        return teamComparison.map((tc: any) => {
+            const sum = tc.analysis_summary || {}
+            const units = Number(sum.total_units || 90)
+            
+            let inclusions = 0
+            if (sum.deptCounts) {
+                Object.entries(sum.deptCounts).forEach(([dept, val]) => {
+                    if (dept !== "Sinistres" && dept !== "Technique") {
+                        inclusions += Number(val || 0)
+                    }
+                })
+            } else {
+                inclusions = tc.total_communications
+            }
 
-        let prevInclusions = 0
-        if (prev.analysis_summary?.deptCounts) {
-            Object.entries(prev.analysis_summary.deptCounts).forEach(([d, v]) => {
-                if (d !== "Sinistres" && d !== "Technique") prevInclusions += Number(v || 0)
-            })
-        } else {
-            prevInclusions = prev.total_communications
-        }
+            const loadRate = Number((inclusions / units).toFixed(2))
 
-        const lastLoad = lastInclusions / lastUnits
-        const prevLoad = prevInclusions / prevUnits
+            return {
+                id: tc.client_id,
+                name: tc.clients?.company_name || tc.clients?.full_name || 'Autre SDC',
+                code: tc.clients?.full_name || '',
+                loadRate,
+                totalVolume: tc.total_communications,
+                isCurrent: tc.client_id === clientId
+            }
+        }).sort((a: any, b: any) => b.loadRate - a.loadRate)
+    }, [teamComparison, clientId])
 
-        const change = lastLoad - prevLoad
-        const pct = prevLoad > 0 ? Math.round((change / prevLoad) * 100) : 0
+    // Team average index
+    const teamAverageLoad = useMemo(() => {
+        if (teamComparisonStats.length === 0) return 0
+        const sum = teamComparisonStats.reduce((acc: number, curr: any) => acc + curr.loadRate, 0)
+        return Number((sum / teamComparisonStats.length).toFixed(2))
+    }, [teamComparisonStats])
+
+    // Rank of current client in team
+    const clientRankInTeam = useMemo(() => {
+        if (teamComparisonStats.length === 0 || !filteredStats) return null
+        const idx = teamComparisonStats.findIndex((tc: any) => tc.id === clientId)
+        const deviationPct = teamAverageLoad > 0 
+            ? Math.round(((filteredStats.ratio - teamAverageLoad) / teamAverageLoad) * 100)
+            : 0
 
         return {
-            change,
-            pct: Math.abs(pct),
-            isUp: change > 0,
-            lastLoad: lastLoad.toFixed(2),
-            prevLoad: prevLoad.toFixed(2)
+            rank: idx + 1,
+            total: teamComparisonStats.length,
+            deviationPct,
+            isDeviationUp: deviationPct > 0
         }
-    }, [stats])
+    }, [teamComparisonStats, clientId, filteredStats, teamAverageLoad])
+
+    const getLoadStatus = (rate: number) => {
+        if (rate > 4.5) {
+            return {
+                label: 'Surcharge Critique',
+                css: 'bg-rose-500/10 text-rose-400 border border-rose-500/20',
+                color: 'text-rose-400'
+            }
+        } else if (rate > 2.5) {
+            return {
+                label: 'Surcharge Modérée',
+                css: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
+                color: 'text-amber-400'
+            }
+        } else {
+            return {
+                label: 'Usage Forfaitaire Stable',
+                css: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
+                color: 'text-emerald-400'
+            }
+        }
+    }
+
+    const loadStatus = filteredStats ? getLoadStatus(filteredStats.ratio) : null
 
     return (
         <div className="space-y-6 animate-fade-in text-xs">
@@ -303,69 +341,104 @@ export function ClientCommunicationTrends({ stats: initialStats, clientId }: Cli
                                 </div>
                             )}
                         </div>
-
-                        {multiRunTrend && (
-                            <div className="flex items-center gap-2 text-xxs bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg shrink-0">
-                                <span className="text-zinc-500">Tendance multi-runs:</span>
-                                {multiRunTrend.isUp ? (
-                                    <span className="text-rose-400 font-bold flex items-center gap-0.5">
-                                        <TrendingUp className="h-3 w-3" /> +{multiRunTrend.pct}%
-                                    </span>
-                                ) : (
-                                    <span className="text-emerald-400 font-bold flex items-center gap-0.5">
-                                        <TrendingDown className="h-3 w-3" /> -{multiRunTrend.pct}%
-                                    </span>
-                                )}
-                            </div>
-                        )}
                     </div>
 
-                    {/* Summary Row */}
+                    {/* Highly Visible KPI Summary Row */}
                     {filteredStats && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <Card className="bg-[#16171e]/70 border-zinc-800/80 p-4 shadow-sm flex items-center justify-between">
-                                <div>
-                                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold block">Indice de Charge Réel</span>
-                                    <span className="text-2xl font-black text-white mt-1 block">
-                                        {filteredStats.ratio.toFixed(2)}
-                                    </span>
-                                    <span className="text-[9px] text-zinc-450 block mt-1">
-                                        Moyenne de <strong>{filteredStats.ratio.toFixed(2)}</strong> comms incluses par porte
-                                    </span>
-                                </div>
-                                <div className="h-8 w-8 rounded-lg bg-indigo-950/40 flex items-center justify-center">
-                                    <Network className="h-4 w-4 text-indigo-400" />
-                                </div>
-                            </Card>
-
-                            <Card className="bg-[#16171e]/70 border-zinc-800/80 p-4 shadow-sm flex items-center justify-between">
-                                <div>
-                                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold block">Volume de Communications</span>
-                                    <span className="text-2xl font-black text-zinc-200 mt-1 block">
-                                        {filteredStats.totalComms} <span className="text-xs font-medium text-zinc-500">interactions</span>
-                                    </span>
-                                    {filteredStats.emails !== null ? (
-                                        <span className="text-[9px] text-zinc-450 block mt-1">
-                                            {filteredStats.emails} courriels &middot; {filteredStats.calls} appels
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {/* Card 1: Main Load Index */}
+                            <Card className="bg-gradient-to-tr from-[#16171e] to-indigo-950/15 border-zinc-800/80 shadow-lg relative overflow-hidden">
+                                <CardContent className="p-6">
+                                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-extrabold block">Indice de Charge Réel</span>
+                                    
+                                    <div className="flex items-baseline gap-2 mt-2">
+                                        <span className="text-5xl font-black text-indigo-400 tracking-tight">
+                                            {filteredStats.ratio.toFixed(2)}
                                         </span>
-                                    ) : (
-                                        <span className="text-[9px] text-zinc-450 block mt-1">
-                                            {filteredStats.inclusionsVolume} comms incluses &middot; {filteredStats.exclusionsVolume} exclues
-                                        </span>
-                                    )}
-                                </div>
-                            </Card>
-
-                            <Card className="bg-[#16171e]/70 border-zinc-800/80 p-4 shadow-sm flex items-center justify-between">
-                                <div>
-                                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold block">Période Cible</span>
-                                    <div className="flex items-center gap-2 mt-1.5 text-zinc-200 font-bold text-sm">
-                                        <Calendar className="h-4 w-4 text-indigo-400" />
-                                        <span>{filteredStats.periodText}</span>
+                                        <span className="text-xs text-zinc-400 font-medium">interactions / porte</span>
                                     </div>
-                                    <span className="text-[9px] text-zinc-500 block mt-1">
-                                        Nombre total de portes: <strong>{totalUnits}</strong>
-                                    </span>
+
+                                    {loadStatus && (
+                                        <div className="mt-4 flex items-center gap-2">
+                                            <Badge className={`px-2 py-0.5 rounded text-[10px] font-bold ${loadStatus.css}`}>
+                                                {loadStatus.label}
+                                            </Badge>
+                                            <span className="text-[10px] text-zinc-500 font-medium font-mono">Forfait cible: 2.50</span>
+                                        </div>
+                                    )}
+                                </CardContent>
+                                <div className="absolute right-4 bottom-4 opacity-5 pointer-events-none">
+                                    <Network className="h-24 w-24 text-indigo-400" />
+                                </div>
+                            </Card>
+
+                            {/* Card 2: Communication Volume & Channel Split */}
+                            <Card className="bg-gradient-to-tr from-[#16171e] to-emerald-950/10 border-zinc-800/80 shadow-lg relative overflow-hidden">
+                                <CardContent className="p-6">
+                                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-extrabold block">Volume de Communications</span>
+
+                                    <div className="flex items-baseline gap-2 mt-2">
+                                        <span className="text-5xl font-black text-zinc-100 tracking-tight">
+                                            {filteredStats.totalComms}
+                                        </span>
+                                        <span className="text-xs text-zinc-400 font-medium">comms valides</span>
+                                    </div>
+
+                                    <div className="mt-4 pt-1 flex items-center gap-4 text-[10px]">
+                                        {filteredStats.emails !== null ? (
+                                            <>
+                                                <span className="flex items-center gap-1 font-bold text-zinc-350">
+                                                    <Mail className="h-3.5 w-3.5 text-indigo-400" /> {filteredStats.emails} emails
+                                                </span>
+                                                <span className="flex items-center gap-1 font-bold text-zinc-350">
+                                                    <Phone className="h-3.5 w-3.5 text-emerald-400" /> {filteredStats.calls} appels
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="flex items-center gap-1 font-semibold text-zinc-400">
+                                                    <span className="h-2 w-2 rounded-full bg-indigo-500"></span>
+                                                    {filteredStats.inclusionsVolume} inclusions
+                                                </span>
+                                                <span className="flex items-center gap-1 font-semibold text-zinc-400">
+                                                    <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                                                    {filteredStats.exclusionsVolume} hors-forfait
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Card 3: Team Comparison */}
+                            <Card className="bg-gradient-to-tr from-[#16171e] to-purple-950/10 border-zinc-800/80 shadow-lg relative overflow-hidden">
+                                <CardContent className="p-6">
+                                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-extrabold block">Positionnement Équipe</span>
+
+                                    {clientRankInTeam ? (
+                                        <>
+                                            <div className="flex items-baseline gap-2 mt-2">
+                                                <span className={`text-5xl font-black tracking-tight ${clientRankInTeam.isDeviationUp ? 'text-purple-400' : 'text-emerald-400'}`}>
+                                                    {clientRankInTeam.isDeviationUp ? '+' : ''}{clientRankInTeam.deviationPct}%
+                                                </span>
+                                                <span className="text-xs text-zinc-400 font-medium">vs moyenne équipe</span>
+                                            </div>
+
+                                            <div className="mt-4 flex items-center gap-2">
+                                                <Badge className="bg-purple-950/40 text-purple-400 border border-purple-800/40 px-2 py-0.5 rounded text-[10px] font-bold">
+                                                    Rang: #{clientRankInTeam.rank} / {clientRankInTeam.total}
+                                                </Badge>
+                                                <span className="text-[10px] text-zinc-500 font-medium font-mono">Moyenne: {teamAverageLoad.toFixed(2)}</span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="h-full flex flex-col justify-center text-zinc-500 italic mt-6">
+                                            Aucun autre client dans cette équipe pour comparer.
+                                        </div>
+                                    )}
+                                </CardContent>
+                                <div className="absolute right-4 bottom-4 opacity-5 pointer-events-none">
+                                    <Users className="h-24 w-24 text-purple-450" />
                                 </div>
                             </Card>
                         </div>
@@ -447,6 +520,59 @@ export function ClientCommunicationTrends({ stats: initialStats, clientId }: Cli
                             </CardContent>
                         </Card>
                     </div>
+
+                    {/* 3. Team Comparison Chart */}
+                    {teamComparisonStats.length > 1 && (
+                        <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                            <CardHeader className="pb-2 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                                <div>
+                                    <CardTitle className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Positionnement de l'usage forfaitaire au sein de l'équipe</CardTitle>
+                                    <CardDescription className="text-xxs text-zinc-500">Comparaison de l'indice de charge (interactions/porte) avec les autres syndicats de la même équipe.</CardDescription>
+                                </div>
+                                <div className="text-right text-xxs font-bold text-zinc-450">
+                                    Moyenne Équipe : <span className="text-indigo-400 font-mono">{teamAverageLoad.toFixed(2)}</span>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="h-64 pt-2">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart 
+                                        layout="vertical"
+                                        data={teamComparisonStats}
+                                        margin={{ left: 10, right: 10 }}
+                                    >
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" horizontal={false} />
+                                        <XAxis type="number" stroke="#4b5563" fontSize={9} tickLine={false} />
+                                        <YAxis type="category" dataKey="name" stroke="#4b5563" fontSize={8} tickLine={false} width={120} />
+                                        <Tooltip 
+                                            content={({ active, payload }) => {
+                                                if (active && payload && payload.length) {
+                                                    const data = payload[0].payload
+                                                    return (
+                                                        <div className="bg-[#111827] border border-zinc-700 p-2.5 rounded-lg text-xxs space-y-1 shadow-xl">
+                                                            <div className="font-bold text-white">{data.name} <span className="font-mono text-zinc-400">({data.code})</span></div>
+                                                            <div className="text-indigo-400 font-bold">Indice: {data.loadRate.toFixed(2)} / porte</div>
+                                                            <div className="text-zinc-400">Volume Total: {data.totalVolume} comms</div>
+                                                            {data.isCurrent && <div className="text-amber-400 font-semibold mt-0.5">&middot; Ce syndicat (S671)</div>}
+                                                        </div>
+                                                    )
+                                                }
+                                                return null
+                                            }}
+                                        />
+                                        <Bar dataKey="loadRate" radius={[0, 4, 4, 0]}>
+                                            {teamComparisonStats.map((entry, index) => (
+                                                <Cell 
+                                                    key={`cell-${index}`} 
+                                                    fill={entry.isCurrent ? '#818cf8' : '#3f3f46'} 
+                                                    fillOpacity={entry.isCurrent ? 1 : 0.6}
+                                                />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {/* Historical Runs Table */}
                     <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
