@@ -74,6 +74,13 @@ export function ClientCommunicationTrends({
     const [selectedRunId, setSelectedRunId] = useState<string>('')
     const [doors, setDoors] = useState<any[]>(initialDoors)
     const [unitSearch, setUnitSearch] = useState('')
+    const [visibleDepts, setVisibleDepts] = useState<string[]>([])
+
+    const toggleDeptLine = (dept: string) => {
+        setVisibleDepts(prev => 
+            prev.includes(dept) ? prev.filter(d => d !== dept) : [...prev, dept]
+        )
+    }
 
     useEffect(() => {
         if (initialDoors) {
@@ -380,6 +387,12 @@ export function ClientCommunicationTrends({
             })
             const teamAverage = teamCount > 0 ? Number((sumTeamRatio / teamCount).toFixed(2)) : 0
 
+            const deptIndices: Record<string, number> = {}
+            visibleDepts.forEach(dept => {
+                const count = Number(runSummary.monthlyDeptHistory?.[dept]?.[t.period] || 0)
+                deptIndices[dept] = Number((count / Math.max(1, totalUnits)).toFixed(2))
+            })
+
             return {
                 name: label,
                 period: t.period,
@@ -387,10 +400,11 @@ export function ClientCommunicationTrends({
                 'Exclus (Sinistre/Tech)': t.outOfContractVolume,
                 'Total': t.contractVolume + t.outOfContractVolume,
                 'Indice': t.ratio,
-                'Moyenne Équipe': teamAverage
+                'Moyenne Équipe': teamAverage,
+                ...deptIndices
             }
         }).sort((a: any, b: any) => a.period.localeCompare(b.period))
-    }, [filteredTimelineList, teamComparison])
+    }, [filteredTimelineList, teamComparison, visibleDepts, runSummary, totalUnits])
 
     // Normalize team comparison statistics
     const teamComparisonStats = useMemo(() => {
@@ -669,35 +683,71 @@ export function ClientCommunicationTrends({
                                 <CardTitle className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Évolution de la charge par mois</CardTitle>
                                 <CardDescription className="text-xxs text-zinc-500">Visualisation de la charge de travail forfaitaire (Gestion/Admin/Compta) vs exclue (Sinistres/Tech).</CardDescription>
                             </CardHeader>
-                            <CardContent className="h-72 pt-2">
-                                {runChartData.length > 0 ? (
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <ComposedChart data={runChartData}>
-                                            <defs>
-                                                <linearGradient id="colorForfait" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#818cf8" stopOpacity={0.15}/>
-                                                    <stop offset="95%" stopColor="#818cf8" stopOpacity={0}/>
-                                                </linearGradient>
-                                                <linearGradient id="colorExclus" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.15}/>
-                                                    <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
-                                                </linearGradient>
-                                            </defs>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#222530" vertical={false} />
-                                            <XAxis dataKey="name" stroke="#4b5563" fontSize={9} tickLine={false} />
-                                            <YAxis yAxisId="left" stroke="#4b5563" fontSize={9} tickLine={false} axisLine={false} />
-                                            <YAxis yAxisId="right" orientation="right" stroke="#4b5563" fontSize={9} tickLine={false} axisLine={false} />
-                                            <Tooltip contentStyle={{ backgroundColor: '#0c0d12', borderColor: '#222530', borderRadius: '8px', fontSize: '10px' }} />
-                                            <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
-                                            <Area yAxisId="left" type="monotone" dataKey="Forfait (Inclus)" name="Inclus (Gestion, Admin, Compta)" stroke="#818cf8" fillOpacity={1} fill="url(#colorForfait)" strokeWidth={2} />
-                                            <Area yAxisId="left" type="monotone" dataKey="Exclus (Sinistre/Tech)" name="Hors-Forfait (Sinistres, Tech)" stroke="#f97316" fillOpacity={1} fill="url(#colorExclus)" strokeWidth={1.5} />
-                                            <Line yAxisId="right" type="monotone" dataKey="Indice" name="Indice (SDC)" stroke="#38bdf8" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-                                            <Line yAxisId="right" type="monotone" dataKey="Moyenne Équipe" name="Indice Moyen Équipe" stroke="#10b981" strokeWidth={2.5} strokeDasharray="4 4" dot={false} />
-                                        </ComposedChart>
-                                    </ResponsiveContainer>
-                                ) : (
-                                    <div className="h-full flex items-center justify-center text-zinc-600 italic">Aucune donnée mensuelle.</div>
-                                )}
+                            <CardContent className="pt-2 flex flex-col space-y-4">
+                                <div className="flex flex-wrap items-center gap-1.5 bg-zinc-950/40 p-2.5 border border-zinc-850 rounded-xl">
+                                    <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider mr-1.5">Comparer par service :</span>
+                                    {DEPT_LIST.map(dept => {
+                                        const isActive = visibleDepts.includes(dept)
+                                        const color = DEPT_COLORS[dept] || '#818cf8'
+                                        return (
+                                            <button
+                                                key={dept}
+                                                onClick={() => toggleDeptLine(dept)}
+                                                className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold transition-all border flex items-center gap-1 cursor-pointer ${
+                                                    isActive 
+                                                        ? 'text-white border-transparent shadow-sm' 
+                                                        : 'text-zinc-400 border-zinc-800 bg-zinc-900/10 hover:border-zinc-700'
+                                                }`}
+                                                style={isActive ? { backgroundColor: color } : {}}
+                                            >
+                                                <span className="h-1.5 w-1.5 rounded-full" style={isActive ? { backgroundColor: '#fff' } : { backgroundColor: color }} />
+                                                {dept}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                                <div className="h-72 w-full">
+                                    {runChartData.length > 0 ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <ComposedChart data={runChartData}>
+                                                <defs>
+                                                    <linearGradient id="colorForfait" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#818cf8" stopOpacity={0.15}/>
+                                                        <stop offset="95%" stopColor="#818cf8" stopOpacity={0}/>
+                                                    </linearGradient>
+                                                    <linearGradient id="colorExclus" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.15}/>
+                                                        <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#222530" vertical={false} />
+                                                <XAxis dataKey="name" stroke="#4b5563" fontSize={9} tickLine={false} />
+                                                <YAxis yAxisId="left" stroke="#4b5563" fontSize={9} tickLine={false} axisLine={false} />
+                                                <YAxis yAxisId="right" orientation="right" stroke="#4b5563" fontSize={9} tickLine={false} axisLine={false} />
+                                                <Tooltip contentStyle={{ backgroundColor: '#0c0d12', borderColor: '#222530', borderRadius: '8px', fontSize: '10px' }} />
+                                                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
+                                                <Area yAxisId="left" type="monotone" dataKey="Forfait (Inclus)" name="Inclus (Gestion, Admin, Compta)" stroke="#818cf8" fillOpacity={1} fill="url(#colorForfait)" strokeWidth={2} />
+                                                <Area yAxisId="left" type="monotone" dataKey="Exclus (Sinistre/Tech)" name="Hors-Forfait (Sinistres, Tech)" stroke="#f97316" fillOpacity={1} fill="url(#colorExclus)" strokeWidth={1.5} />
+                                                <Line yAxisId="right" type="monotone" dataKey="Indice" name="Indice (SDC)" stroke="#38bdf8" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                                                <Line yAxisId="right" type="monotone" dataKey="Moyenne Équipe" name="Indice Moyen Équipe" stroke="#10b981" strokeWidth={2.5} strokeDasharray="4 4" dot={false} />
+                                                {visibleDepts.map(dept => (
+                                                    <Line 
+                                                        key={dept}
+                                                        yAxisId="right"
+                                                        type="monotone"
+                                                        dataKey={dept}
+                                                        name={`Indice ${dept}`}
+                                                        stroke={DEPT_COLORS[dept] || '#818cf8'}
+                                                        strokeWidth={2}
+                                                        dot={{ r: 1.5 }}
+                                                    />
+                                                ))}
+                                            </ComposedChart>
+                                        </ResponsiveContainer>
+                                    ) : (
+                                        <div className="h-full flex items-center justify-center text-zinc-600 italic">Aucune donnée mensuelle.</div>
+                                    )}
+                                </div>
                             </CardContent>
                         </Card>
 
