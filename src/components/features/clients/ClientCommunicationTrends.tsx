@@ -273,7 +273,21 @@ export function ClientCommunicationTrends({
                 inclusions = tc.total_communications
             }
 
-            const loadRate = Number((inclusions / units).toFixed(2))
+            // Find months count for this run to compute monthly average index
+            let monthsCount = 1
+            if (sum.timelineList && Array.isArray(sum.timelineList) && sum.timelineList.length > 0) {
+                monthsCount = sum.timelineList.length
+            } else if (tc.period_start && tc.period_end) {
+                try {
+                    const start = new Date(tc.period_start + 'T00:00:00')
+                    const end = new Date(tc.period_end + 'T00:00:00')
+                    const diffY = end.getFullYear() - start.getFullYear()
+                    const diffM = end.getMonth() - start.getMonth()
+                    monthsCount = Math.max(1, (diffY * 12) + diffM + 1)
+                } catch (_) {}
+            }
+
+            const loadRate = Number((inclusions / (units * monthsCount)).toFixed(2))
 
             return {
                 id: tc.client_id,
