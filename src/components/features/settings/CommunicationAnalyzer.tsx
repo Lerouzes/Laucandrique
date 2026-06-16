@@ -234,6 +234,7 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
     const [selectedYear, setSelectedYear] = useState<string>('all')
     const [selectedMonth, setSelectedMonth] = useState<string>('all')
     const [selectedUserFilter, setSelectedUserFilter] = useState<string | null>(null)
+    const [employeeDeptFilter, setEmployeeDeptFilter] = useState<string>('all')
     
     // search states
     const [searchEmployeeQuery, setSearchEmployeeQuery] = useState('')
@@ -709,9 +710,9 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
             counts[r.user] = (counts[r.user] || 0) + 1
         })
         return Object.entries(counts)
-            .map(([name, count]) => ({ name, count }))
+            .map(([name, count]) => ({ name, count, dept: deptMap[name] || "Gestion" }))
             .sort((a, b) => b.count - a.count)
-    }, [rawRows])
+    }, [rawRows, deptMap])
 
     const tab2DrilldownData = useMemo(() => {
         if (!drilldownTab2User || rawRows.length === 0) return null
@@ -1126,20 +1127,36 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                                 <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md lg:col-span-3 flex flex-col h-[580px]">
                                     <CardHeader className="pb-3">
                                         <CardTitle className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Volume par Intervenant</CardTitle>
-                                        <div className="relative mt-2">
-                                            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-550 text-zinc-500" />
-                                            <Input
-                                                type="search"
-                                                placeholder="Chercher un nom..."
-                                                value={searchEmployeeQuery}
-                                                onChange={(e) => setSearchEmployeeQuery(e.target.value)}
-                                                className="w-full bg-[#121318] border-zinc-800 pl-8 h-8 text-xs placeholder:text-zinc-500"
-                                            />
+                                        <div className="flex flex-col gap-2 mt-2">
+                                            <div className="relative">
+                                                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-550 text-zinc-500" />
+                                                <Input
+                                                    type="search"
+                                                    placeholder="Chercher un nom..."
+                                                    value={searchEmployeeQuery}
+                                                    onChange={(e) => setSearchEmployeeQuery(e.target.value)}
+                                                    className="w-full bg-[#121318] border-zinc-800 pl-8 h-8 text-xs placeholder:text-zinc-500"
+                                                />
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <Label className="text-zinc-550 shrink-0 font-bold uppercase tracking-wider text-[8px] select-none">Service :</Label>
+                                                <select
+                                                    value={employeeDeptFilter}
+                                                    onChange={(e) => setEmployeeDeptFilter(e.target.value)}
+                                                    className="w-full bg-[#121318] border border-zinc-800 rounded px-2 h-8 text-zinc-300 text-xxs focus:outline-none"
+                                                >
+                                                    <option value="all">Tous les services</option>
+                                                    {DEPT_LIST.map(dept => (
+                                                        <option key={dept} value={dept}>{dept}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
                                         </div>
                                     </CardHeader>
                                     <CardContent className="flex-1 overflow-y-auto pr-1 text-xxs space-y-1 scrollbar-thin">
                                         {pipelineData.sortedEmployees
                                             .filter(emp => emp.name.toLowerCase().includes(searchEmployeeQuery.toLowerCase()))
+                                            .filter(emp => employeeDeptFilter === 'all' || emp.dept === employeeDeptFilter)
                                             .map(emp => {
                                                 const isActiveFilter = selectedUserFilter === emp.name
                                                 return (
@@ -1306,20 +1323,36 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                             <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md lg:col-span-1 h-[550px] flex flex-col">
                                 <CardHeader className="pb-2">
                                     <Label className="text-[10px] text-zinc-550 uppercase tracking-wider font-bold">Intervenant à Auditer</Label>
-                                    <div className="relative mt-2">
-                                        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-500" />
-                                        <Input
-                                            type="search"
-                                            placeholder="Filtrer la liste..."
-                                            value={searchTab2EmployeeQuery}
-                                            onChange={(e) => setSearchTab2EmployeeQuery(e.target.value)}
-                                            className="w-full bg-[#121318] border-zinc-800 pl-8 h-8 text-xs"
-                                        />
+                                    <div className="flex flex-col gap-2 mt-2">
+                                        <div className="relative">
+                                            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-550 text-zinc-500" />
+                                            <Input
+                                                type="search"
+                                                placeholder="Filtrer la liste..."
+                                                value={searchTab2EmployeeQuery}
+                                                onChange={(e) => setSearchTab2EmployeeQuery(e.target.value)}
+                                                className="w-full bg-[#121318] border-zinc-800 pl-8 h-8 text-xs placeholder:text-zinc-500"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <Label className="text-zinc-550 shrink-0 font-bold uppercase tracking-wider text-[8px] select-none">Service :</Label>
+                                            <select
+                                                value={employeeDeptFilter}
+                                                onChange={(e) => setEmployeeDeptFilter(e.target.value)}
+                                                className="w-full bg-[#121318] border border-zinc-800 rounded px-2 h-8 text-zinc-300 text-xxs focus:outline-none"
+                                            >
+                                                <option value="all">Tous les services</option>
+                                                {DEPT_LIST.map(dept => (
+                                                    <option key={dept} value={dept}>{dept}</option>
+                                                ))}
+                                            </select>
+                                        </div>
                                     </div>
                                 </CardHeader>
                                 <CardContent className="flex-1 overflow-y-auto pr-1 text-xxs space-y-1 scrollbar-thin">
                                     {tab2EmployeesList
                                         .filter(e => e.name.toLowerCase().includes(searchTab2EmployeeQuery.toLowerCase()))
+                                        .filter(e => employeeDeptFilter === 'all' || e.dept === employeeDeptFilter)
                                         .map(emp => {
                                             const isActive = drilldownTab2User === emp.name
                                             return (
@@ -1332,8 +1365,11 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                                                             : 'bg-zinc-950/20 border-zinc-900/60 hover:bg-zinc-900/40 text-zinc-300'
                                                     }`}
                                                 >
-                                                    <span className="truncate max-w-[120px]">{emp.name}</span>
-                                                    <span className="font-mono bg-zinc-950 px-1.5 py-0.5 rounded text-white font-bold">{emp.count}</span>
+                                                    <div className="flex flex-col min-w-0 pr-1">
+                                                        <span className="truncate font-semibold">{emp.name}</span>
+                                                        <span className="text-[8px] text-zinc-500 font-medium truncate">{emp.dept}</span>
+                                                    </div>
+                                                    <span className="font-mono bg-zinc-950 px-1.5 py-0.5 rounded text-white font-bold shrink-0">{emp.count}</span>
                                                 </div>
                                             )
                                         })
