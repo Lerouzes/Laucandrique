@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { createClient } from '@/utils/supabase/server'
 import { SettingsClientPage } from '@/components/features/team-management/SettingsClientPage'
-import { getGustavUsersAction } from '@/actions/team-management'
 
 export default async function SettingsPage() {
     const supabase = await createClient()
@@ -35,16 +34,6 @@ export default async function SettingsPage() {
 
     const userRole = profile?.role || 'Operations'
 
-    // Fetch all users (Master only — safe to call, action handles auth check)
-    let platformUsers: any[] = []
-    if (userRole === 'Master') {
-        try {
-            platformUsers = await getGustavUsersAction()
-        } catch {
-            platformUsers = []
-        }
-    }
-
     return (
         <div className="space-y-6 pb-12">
             <div>
@@ -52,7 +41,7 @@ export default async function SettingsPage() {
                     Configuration Globale
                 </h2>
                 <p className="text-xs text-zinc-400">
-                    Gérez les catégories de plaintes, personnalisez les infobulles d'audits et administrez les comptes de la plateforme.
+                    Gérez les catégories de plaintes et personnalisez les infobulles d'audits et d'assemblées.
                 </p>
             </div>
 
@@ -61,9 +50,8 @@ export default async function SettingsPage() {
                 initialAuditConfigs={auditConfigs || []} 
                 initialAssemblyConfigs={assemblyConfigs || []}
                 userRole={userRole}
-                currentUserId={user?.id || ''}
-                initialUsers={platformUsers}
             />
         </div>
     )
 }
+
