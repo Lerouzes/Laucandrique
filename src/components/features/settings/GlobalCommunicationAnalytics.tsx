@@ -1,6 +1,8 @@
 // @ts-nocheck
 'use client'
 
+import { jsPDF } from 'jspdf'
+import html2canvas from 'html2canvas'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -93,9 +95,6 @@ export function GlobalCommunicationAnalytics({
     const handleExportPDF = async () => {
         setIsExporting(true)
         try {
-            const html2canvas = (await import('html2canvas')).default
-            const { jsPDF } = await import('jspdf')
-            
             const element = document.getElementById('global-analytics-content')
             if (!element) {
                 alert('Contenu à exporter introuvable')
