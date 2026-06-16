@@ -280,6 +280,41 @@ export default async function AuditDetailPage({
                 </Card>
             )}
 
+            {/* Budgets de Cotisations (Fonds) */}
+            <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Budgets de Cotisations (Fonds)</CardTitle>
+                </CardHeader>
+                <CardContent className="text-xxs text-zinc-350 leading-relaxed font-normal">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Fonds d'Exploitation</span>
+                            <strong className="text-xs font-extrabold text-zinc-200 block mt-0.5">
+                                ${(Number(audit.cotisation_fonds_exploitation) || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </strong>
+                        </div>
+                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Fonds de Prévoyance</span>
+                            <strong className="text-xs font-extrabold text-zinc-200 block mt-0.5">
+                                ${(Number(audit.cotisation_fonds_prevoyance) || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </strong>
+                        </div>
+                        <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-xl">
+                            <span className="text-zinc-500 block uppercase font-bold text-[8px]">Fonds d'Assurance</span>
+                            <strong className="text-xs font-extrabold text-zinc-200 block mt-0.5">
+                                ${(Number(audit.cotisation_fonds_assurance) || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </strong>
+                        </div>
+                        <div className="p-3 bg-purple-950/20 border border-purple-900/30 rounded-xl">
+                            <span className="text-purple-400 block uppercase font-bold text-[8px]">Total Cotisations</span>
+                            <strong className="text-sm font-black text-purple-300 block mt-0.5 font-mono">
+                                ${(Number(audit.cotisation_fonds_total) || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </strong>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
             {/* Two-Column Grid Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 

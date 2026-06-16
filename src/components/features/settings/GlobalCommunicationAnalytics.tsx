@@ -37,7 +37,8 @@ import {
     ReferenceLine,
     ScatterChart,
     Scatter,
-    ZAxis
+    ZAxis,
+    Line
 } from 'recharts'
 import Link from 'next/link'
 
@@ -48,13 +49,26 @@ const DEPT_BADGE_CSS: Record<string, string> = {
     "Administration": "bg-teal-500/10 text-teal-400 border border-teal-550/20",
     "Comptabilité": "bg-purple-500/10 text-purple-400 border border-purple-550/20",
     "Technique": "bg-orange-500/10 text-orange-400 border border-orange-550/20",
-    "Sinistres": "bg-rose-500/10 text-rose-450 text-rose-400 border border-rose-550/20",
+    "Sinistres": "bg-rose-500/10 text-rose-455 text-rose-400 border border-rose-550/20",
     "Assurance": "bg-pink-500/10 text-pink-400 border border-pink-550/20",
     "Direction": "bg-zinc-800 text-zinc-400 border border-zinc-700/60",
     "Chargé d’opération": "bg-indigo-500/10 text-indigo-400 border border-indigo-550/20",
     "Chargé d'opération": "bg-indigo-500/10 text-indigo-400 border border-indigo-550/20",
     "Conseil d'Administration": "bg-amber-500/10 text-amber-400 border border-amber-550/20",
     "Marketing": "bg-pink-500/10 text-pink-400 border border-pink-550/20"
+}
+
+const DEPT_COLORS: Record<string, string> = {
+    "Gestion": "#0ea5e9", // sky
+    "Administration": "#14b8a6", // teal
+    "Comptabilité": "#a855f7", // purple
+    "Technique": "#f97316", // orange
+    "Sinistres": "#f43f5e", // rose
+    "Assurance": "#ec4899", // pink
+    "Direction": "#71717a", // zinc
+    "Chargé d’opération": "#6366f1", // indigo
+    "Conseil d'Administration": "#f59e0b", // amber
+    "Marketing": "#db2777" // dark pink
 }
 
 interface GlobalCommunicationAnalyticsProps {
@@ -74,6 +88,7 @@ export function GlobalCommunicationAnalytics({
     const [searchQuery, setSearchQuery] = useState<string>('')
     const [isExporting, setIsExporting] = useState(false)
     const [expandedClientId, setExpandedClientId] = useState<string | null>(null)
+    const [activeDeptLines, setActiveDeptLines] = useState<string[]>([])
 
     const handleExportPDF = async () => {
         setIsExporting(true)
@@ -91,7 +106,14 @@ export function GlobalCommunicationAnalytics({
                 scale: 1.5,
                 useCORS: true,
                 backgroundColor: '#0c0d12',
-                windowWidth: 1400
+                windowWidth: 1400,
+                onclone: (clonedDoc) => {
+                    const containers = clonedDoc.querySelectorAll('.recharts-responsive-container');
+                    containers.forEach((container: any) => {
+                        container.style.width = '600px';
+                        container.style.height = '300px';
+                    });
+                }
             })
 
             const imgData = canvas.toDataURL('image/png')
@@ -452,6 +474,15 @@ export function GlobalCommunicationAnalytics({
             let sumRatio = 0
             let count = 0
 
+            // Accumulators for each department
+            const deptSums: Record<string, number> = {}
+            const deptCounts: Record<string, number> = {}
+
+            DEPT_LIST.forEach(d => {
+                deptSums[d] = 0
+                deptCounts[d] = 0
+            })
+
             latestClientRuns.forEach(run => {
                 const client = run.clients || {}
                 const manager = client.managers || {}
@@ -468,6 +499,16 @@ export function GlobalCommunicationAnalytics({
                     const ratio = match.contractVolume / Math.max(1, doors)
                     sumRatio += ratio
                     count++
+
+                    // Compute department ratios
+                    DEPT_LIST.forEach(d => {
+                        const monthlyDeptHistory = run.analysis_summary?.monthlyDeptHistory || {}
+                        const history = monthlyDeptHistory[d] || monthlyDeptHistory[d.replace('’', "'")] || {}
+                        const val = Number(history[period] || 0)
+                        
+                        deptSums[d] += (val / Math.max(1, doors))
+                        deptCounts[d]++
+                    })
                 }
             })
 
@@ -478,12 +519,72 @@ export function GlobalCommunicationAnalytics({
                 label = date.toLocaleDateString('fr-CA', { month: 'short', year: '2-digit' })
             } catch (_) {}
 
-            return {
+            const resObj: any = {
                 name: label,
                 period,
                 'Index Moyen': Number((sumRatio / Math.max(1, count)).toFixed(2))
             }
+
+            DEPT_LIST.forEach(d => {
+                const s = deptSums[d]
+                const c = deptCounts[d]
+                resObj[d] = c > 0 ? Number((s / c).toFixed(2)) : 0
+            })
+
+            return resObj
         })
+    }, [latestClientRuns, filterTeamId, startPeriod, endPeriod, allPeriods])
+
+    // 12. Department KPIs aggregated across the filtered range
+    const departmentKpis = useMemo(() => {
+        const kpis: Record<string, { totalVolume: number; avgIndex: number }> = {}
+        
+        DEPT_LIST.forEach(d => {
+            kpis[d] = { totalVolume: 0, avgIndex: 0 }
+        })
+
+        if (!startPeriod || !endPeriod) return kpis
+
+        const periodsInRange = allPeriods.filter(p => p >= startPeriod && p <= endPeriod)
+        
+        let totalDoorsWeighted = 0
+
+        latestClientRuns.forEach(run => {
+            const client = run.clients || {}
+            const manager = client.managers || {}
+            const team = manager.manager_teams || {}
+
+            if (client.status === 'inactive') return
+            if (filterTeamId !== 'all' && team.id !== filterTeamId) return
+
+            const doors = Number(client.doors?.length || run.analysis_summary?.total_units || 90)
+            const timelineList = run.analysis_summary?.timelineList || []
+            const activeTimeline = timelineList.filter((t: any) => 
+                t.period >= startPeriod && t.period <= endPeriod
+            )
+
+            if (activeTimeline.length === 0) return
+
+            totalDoorsWeighted += (doors * activeTimeline.length)
+
+            DEPT_LIST.forEach(d => {
+                const monthlyDeptHistory = run.analysis_summary?.monthlyDeptHistory || {}
+                const history = monthlyDeptHistory[d] || monthlyDeptHistory[d.replace('’', "'")] || {}
+                
+                activeTimeline.forEach((t: any) => {
+                    const val = Number(history[t.period] || 0)
+                    kpis[d].totalVolume += val
+                })
+            })
+        })
+
+        DEPT_LIST.forEach(d => {
+            kpis[d].avgIndex = totalDoorsWeighted > 0 
+                ? Number((kpis[d].totalVolume / totalDoorsWeighted).toFixed(3)) 
+                : 0
+        })
+
+        return kpis
     }, [latestClientRuns, filterTeamId, startPeriod, endPeriod, allPeriods])
 
     return (
@@ -864,8 +965,21 @@ export function GlobalCommunicationAnalytics({
                                             <XAxis dataKey="name" stroke="#4b5563" fontSize={9} tickLine={false} />
                                             <YAxis stroke="#4b5563" fontSize={9} tickLine={false} axisLine={false} />
                                             <Tooltip contentStyle={{ backgroundColor: '#0c0d12', borderColor: '#222530', borderRadius: '8px', fontSize: '10px' }} />
+                                            <Legend wrapperStyle={{ fontSize: '8px', paddingTop: '10px' }} />
                                             <ReferenceLine y={targetIndex} stroke="#f59e0b" strokeDasharray="3 3" />
-                                            <Area type="monotone" dataKey="Index Moyen" stroke="#818cf8" fillOpacity={1} fill="url(#colorTrend)" strokeWidth={2} />
+                                            <Area type="monotone" dataKey="Index Moyen" stroke="#818cf8" fillOpacity={1} fill="url(#colorTrend)" strokeWidth={2} name="Moyenne Globale" />
+                                            {activeDeptLines.map(dept => (
+                                                <Area
+                                                    key={dept}
+                                                    type="monotone"
+                                                    dataKey={dept}
+                                                    name={dept}
+                                                    stroke={DEPT_COLORS[dept] || '#ffffff'}
+                                                    fillOpacity={0}
+                                                    strokeWidth={2}
+                                                    dot={{ r: 2 }}
+                                                />
+                                            ))}
                                         </AreaChart>
                                     </ResponsiveContainer>
                                 ) : (
@@ -873,6 +987,89 @@ export function GlobalCommunicationAnalytics({
                                 )}
                             </CardContent>
                         </Card>
+                    </div>
+
+                    {/* NEW SECTION: Department cards with toggles */}
+                    <div className="space-y-3 bg-[#121318]/40 border border-zinc-850 p-5 rounded-2xl shadow-lg">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                            <div>
+                                <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                                    <Activity className="h-4 w-4 text-purple-400" />
+                                    Analyse par Département
+                                </h3>
+                                <p className="text-[10px] text-zinc-550 text-zinc-500 font-medium">
+                                    Cliquez sur "Ajouter au graphique" pour tracer la tendance du département sur la courbe de charge globale.
+                                </p>
+                            </div>
+                            {activeDeptLines.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveDeptLines([])}
+                                    className="text-[10px] text-zinc-400 hover:text-white font-bold hover:underline transition-colors shrink-0 cursor-pointer"
+                                >
+                                    Réinitialiser les courbes
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5 pt-2">
+                            {DEPT_LIST.map(d => {
+                                const isToggled = activeDeptLines.includes(d)
+                                const kpi = departmentKpis[d] || { totalVolume: 0, avgIndex: 0 }
+                                const color = DEPT_COLORS[d] || '#ffffff'
+                                const badgeStyle = DEPT_BADGE_CSS[d] || 'bg-zinc-850 text-zinc-300'
+
+                                return (
+                                    <div 
+                                        key={d} 
+                                        className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between shadow-md ${
+                                            isToggled 
+                                                ? 'bg-[#1b1c24] border-purple-500/40 shadow-purple-500/5' 
+                                                : 'bg-[#16171e]/70 border-zinc-800/80 hover:border-zinc-700'
+                                        }`}
+                                    >
+                                        <div className="space-y-2.5">
+                                            <div className="flex items-center justify-between gap-1.5">
+                                                <Badge className={`px-2 py-0.5 rounded-full text-[8px] font-bold ${badgeStyle} select-none`}>
+                                                    {d}
+                                                </Badge>
+                                                <div 
+                                                    className="h-2 w-2 rounded-full shrink-0" 
+                                                    style={{ backgroundColor: color }} 
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between items-baseline text-xxs">
+                                                    <span className="text-zinc-500 block uppercase font-bold text-[8px] tracking-wide">Volume</span>
+                                                    <span className="font-extrabold text-zinc-200">{kpi.totalVolume} comms</span>
+                                                </div>
+                                                <div className="flex justify-between items-baseline text-xxs">
+                                                    <span className="text-zinc-500 block uppercase font-bold text-[8px] tracking-wide">Indice moyen</span>
+                                                    <span className="font-black text-indigo-400 font-mono">{kpi.avgIndex.toFixed(3)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setActiveDeptLines(prev => 
+                                                    prev.includes(d) 
+                                                        ? prev.filter(x => x !== d) 
+                                                        : [...prev, d]
+                                                )
+                                            }}
+                                            className={`mt-4 w-full py-1 text-[8px] font-black uppercase rounded-lg border tracking-wider transition-all cursor-pointer text-center select-none ${
+                                                isToggled
+                                                    ? 'bg-purple-950/20 border-purple-500/30 text-purple-400 hover:bg-purple-950/40'
+                                                    : 'bg-zinc-900/40 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                                            }`}
+                                        >
+                                            {isToggled ? 'Masquer' : 'Ajouter au graphique'}
+                                        </button>
+                                    </div>
+                                )
+                            })}
+                        </div>
                     </div>
 
                     {/* SDC Outlier List / Registry */}

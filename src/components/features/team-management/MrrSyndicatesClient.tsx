@@ -246,6 +246,20 @@ export function MrrSyndicatesClient({
         return { totalMrr, totalSyndicates, avgMrr, mrrByTeam, mrrByManager, mrrByPackage }
     }, [activeSyndicates, initialStats])
 
+    const totalSalaryCost = useMemo(() => {
+        return Object.values(liveStats.mrrByManager).reduce((acc, curr) => acc + (curr.monthly_cost || 0), 0)
+    }, [liveStats])
+
+    const totalSalaryImpactPct = useMemo(() => {
+        return liveStats.totalMrr > 0 ? (totalSalaryCost / liveStats.totalMrr) * 100 : 0
+    }, [liveStats, totalSalaryCost])
+
+    const getSalaryImpactColor = (pct: number) => {
+        if (pct <= 25) return 'text-emerald-400'
+        if (pct <= 35) return 'text-amber-400'
+        return 'text-rose-400'
+    }
+
     const topManagers = Object.entries(liveStats.mrrByManager)
         .map(([id, v]) => ({ id, ...v }))
         .sort((a, b) => b.mrr - a.mrr)
@@ -347,7 +361,7 @@ export function MrrSyndicatesClient({
             </div>
 
             {/* KPI Cards */}
-            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
                 <StatCard icon={DollarSign} label="MRR (sélection)" value={`$${fmt(liveStats.totalMrr)}`}
                     sub={excludeCount > 0 ? `${excludeCount} exclus · base: $${fmt(initialStats.totalMrr)}` : 'Revenus récurrents mensuels'}
                     color="text-emerald-400" />
@@ -358,6 +372,8 @@ export function MrrSyndicatesClient({
                     sub="Par syndicat inclus" color="text-sky-400" />
                 <StatCard icon={BarChart3} label="Équipes représentées" value={String(Object.keys(liveStats.mrrByTeam).length)}
                     sub="Dans la sélection" color="text-amber-400" />
+                <StatCard icon={Users} label="Ratio Coût Salarial" value={fmtPct(totalSalaryImpactPct)}
+                    sub={`Coût: $${fmt(totalSalaryCost)}/mois`} color={getSalaryImpactColor(totalSalaryImpactPct)} />
             </div>
 
             {/* Charts Row */}

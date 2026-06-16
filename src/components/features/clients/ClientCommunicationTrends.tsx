@@ -114,7 +114,14 @@ export function ClientCommunicationTrends({
                 scale: 1.5,
                 useCORS: true,
                 backgroundColor: '#0c0d12',
-                windowWidth: 1400
+                windowWidth: 1400,
+                onclone: (clonedDoc) => {
+                    const containers = clonedDoc.querySelectorAll('.recharts-responsive-container');
+                    containers.forEach((container: any) => {
+                        container.style.width = '600px';
+                        container.style.height = '300px';
+                    });
+                }
             })
 
             const imgData = canvas.toDataURL('image/png')

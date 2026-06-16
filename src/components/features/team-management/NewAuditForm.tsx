@@ -39,7 +39,8 @@ import {
     Trash2,
     ArrowLeft,
     Star,
-    X
+    X,
+    DollarSign
 } from 'lucide-react'
 import { SearchableClientSelect } from './SearchableClientSelect'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
@@ -240,6 +241,25 @@ export function NewAuditForm({
     const [boardMeetingsFiscalYear, setBoardMeetingsFiscalYear] = useState<number>(initialAudit?.board_meetings_fiscal_year || new Date().getFullYear() - 1)
     const [tasksCompletedCount, setTasksCompletedCount] = useState<string>('')
     const [editingWorkload, setEditingWorkload] = useState<any | null>(null)
+
+    // Cotisation states
+    const [cotisationExploitation, setCotisationExploitation] = useState<string>(
+        initialAudit?.cotisation_fonds_exploitation !== undefined && initialAudit?.cotisation_fonds_exploitation !== null 
+            ? initialAudit.cotisation_fonds_exploitation.toString() 
+            : ''
+    )
+    const [cotisationPrevoyance, setCotisationPrevoyance] = useState<string>(
+        initialAudit?.cotisation_fonds_prevoyance !== undefined && initialAudit?.cotisation_fonds_prevoyance !== null 
+            ? initialAudit.cotisation_fonds_prevoyance.toString() 
+            : ''
+    )
+    const [cotisationAssurance, setCotisationAssurance] = useState<string>(
+        initialAudit?.cotisation_fonds_assurance !== undefined && initialAudit?.cotisation_fonds_assurance !== null 
+            ? initialAudit.cotisation_fonds_assurance.toString() 
+            : ''
+    )
+
+    const totalCotisation = (Number(cotisationExploitation) || 0) + (Number(cotisationPrevoyance) || 0) + (Number(cotisationAssurance) || 0)
 
     const [savingWorkload, setSavingWorkload] = useState(false)
     const [showWorkloadForm, setShowWorkloadForm] = useState(false)
@@ -504,6 +524,10 @@ export function NewAuditForm({
                     current_year_active: currentYearActive,
                     board_meetings_fiscal_year: boardMeetingsFiscalYear,
                     board_meetings_count: boardMeetingsCount === '' ? null : Number(boardMeetingsCount),
+                    cotisation_fonds_exploitation: cotisationExploitation === '' ? null : Number(cotisationExploitation),
+                    cotisation_fonds_prevoyance: cotisationPrevoyance === '' ? null : Number(cotisationPrevoyance),
+                    cotisation_fonds_assurance: cotisationAssurance === '' ? null : Number(cotisationAssurance),
+                    cotisation_fonds_total: totalCotisation,
                     answers
                 })
             } else {
@@ -513,6 +537,10 @@ export function NewAuditForm({
                     current_year_active: currentYearActive,
                     board_meetings_fiscal_year: boardMeetingsFiscalYear,
                     board_meetings_count: boardMeetingsCount === '' ? null : Number(boardMeetingsCount),
+                    cotisation_fonds_exploitation: cotisationExploitation === '' ? null : Number(cotisationExploitation),
+                    cotisation_fonds_prevoyance: cotisationPrevoyance === '' ? null : Number(cotisationPrevoyance),
+                    cotisation_fonds_assurance: cotisationAssurance === '' ? null : Number(cotisationAssurance),
+                    cotisation_fonds_total: totalCotisation,
                     answers
                 })
             }
@@ -625,6 +653,62 @@ export function NewAuditForm({
                                         rows={3}
                                         className="bg-[#121318] border-zinc-850 text-xs text-zinc-200 focus-visible:ring-purple-650 resize-y font-normal" 
                                     />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* NEW SECTION: Budget de Cotisations */}
+                    <Card className="bg-[#16171e]/70 border-zinc-800/80 shadow-md">
+                        <CardHeader>
+                            <CardTitle className="text-xs font-bold text-white uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                                <DollarSign className="h-4 w-4 text-purple-400" />
+                                Budgets de Cotisations (Fonds)
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 text-xxs">
+                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Cotisation Fonds d'Exploitation ($)</Label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={cotisationExploitation}
+                                        onChange={(e) => setCotisationExploitation(e.target.value)}
+                                        className="bg-[#121318] border-zinc-850 h-9 text-xs text-zinc-100 font-semibold"
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Cotisation Fonds de Prévoyance ($)</Label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={cotisationPrevoyance}
+                                        onChange={(e) => setCotisationPrevoyance(e.target.value)}
+                                        className="bg-[#121318] border-zinc-850 h-9 text-xs text-zinc-100 font-semibold"
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Cotisation Fonds d'Assurance ($)</Label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={cotisationAssurance}
+                                        onChange={(e) => setCotisationAssurance(e.target.value)}
+                                        className="bg-[#121318] border-zinc-850 h-9 text-xs text-zinc-100 font-semibold"
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Total des Cotisations ($)</Label>
+                                    <div className="bg-[#121318]/50 border border-zinc-850 rounded-lg px-2.5 flex items-center h-9 text-xs text-purple-400 font-bold">
+                                        ${totalCotisation.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>

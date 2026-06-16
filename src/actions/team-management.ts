@@ -1820,6 +1820,10 @@ export async function createSyndicateAuditAction(data: {
     current_year_active?: boolean
     board_meetings_fiscal_year?: number | null
     board_meetings_count?: number | null
+    cotisation_fonds_exploitation?: number | null
+    cotisation_fonds_prevoyance?: number | null
+    cotisation_fonds_assurance?: number | null
+    cotisation_fonds_total?: number | null
     answers: Array<{ category: 'governance' | 'financial' | 'operations'; question_key: string; score: number; note?: string }>
 }) {
     try {
@@ -1863,7 +1867,11 @@ export async function createSyndicateAuditAction(data: {
                 audited_by,
                 current_year_active: data.current_year_active !== false,
                 board_meetings_fiscal_year: data.board_meetings_fiscal_year || null,
-                board_meetings_count: data.board_meetings_count || null
+                board_meetings_count: data.board_meetings_count || null,
+                cotisation_fonds_exploitation: data.cotisation_fonds_exploitation !== undefined ? data.cotisation_fonds_exploitation : null,
+                cotisation_fonds_prevoyance: data.cotisation_fonds_prevoyance !== undefined ? data.cotisation_fonds_prevoyance : null,
+                cotisation_fonds_assurance: data.cotisation_fonds_assurance !== undefined ? data.cotisation_fonds_assurance : null,
+                cotisation_fonds_total: data.cotisation_fonds_total !== undefined ? data.cotisation_fonds_total : null
             })
             .select()
             .single()
@@ -3002,6 +3010,10 @@ export async function updateSyndicateAuditAction(id: string, data: {
     current_year_active?: boolean
     board_meetings_fiscal_year?: number | null
     board_meetings_count?: number | null
+    cotisation_fonds_exploitation?: number | null
+    cotisation_fonds_prevoyance?: number | null
+    cotisation_fonds_assurance?: number | null
+    cotisation_fonds_total?: number | null
     answers: Array<{ category: 'governance' | 'financial' | 'operations'; question_key: string; score: number; note?: string }>
 }) {
     try {
@@ -3049,7 +3061,11 @@ export async function updateSyndicateAuditAction(id: string, data: {
                 notes: data.notes || null,
                 current_year_active: data.current_year_active !== false,
                 board_meetings_fiscal_year: data.board_meetings_fiscal_year || null,
-                board_meetings_count: data.board_meetings_count || null
+                board_meetings_count: data.board_meetings_count || null,
+                cotisation_fonds_exploitation: data.cotisation_fonds_exploitation !== undefined ? data.cotisation_fonds_exploitation : null,
+                cotisation_fonds_prevoyance: data.cotisation_fonds_prevoyance !== undefined ? data.cotisation_fonds_prevoyance : null,
+                cotisation_fonds_assurance: data.cotisation_fonds_assurance !== undefined ? data.cotisation_fonds_assurance : null,
+                cotisation_fonds_total: data.cotisation_fonds_total !== undefined ? data.cotisation_fonds_total : null
             })
             .eq('id', id)
 
