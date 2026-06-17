@@ -110,6 +110,7 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Line Garand": "Comptabilité",
     "Danielle Guidi": "Comptabilité",
     "Ian Coulombe": "Comptabilité",
+    "Marie-Perle Arseneault": "Comptabilité",
 
     // Administration
     "Reception Laucandrique": "Administration",
@@ -146,6 +147,7 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Patrice Anfosso": "Sinistres",
     "Jean-Philippe Lemieux": "Sinistres",
     "Caroline Lamothe": "Sinistres",
+    "Francisco Leonardo Contreras Ordenes": "Sinistres",
 
     // Chargé d’opération
     "Stéphane Genest": "Chargé d’opération",
@@ -159,6 +161,8 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Genest Stephane": "Chargé d’opération",
     "Gabriel Gauvin": "Chargé d’opération",
     "Patrice Marcil": "Chargé d’opération",
+    "Sylvain Chichillanne": "Chargé d’opération",
+    "Djellany Mohamed Cherif": "Chargé d’opération",
 
     // Technique
     "Angelique Hesbois": "Technique",

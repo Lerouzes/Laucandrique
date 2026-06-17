@@ -83,6 +83,7 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Line Garand": "Comptabilité",
     "Danielle Guidi": "Comptabilité",
     "Ian Coulombe": "Comptabilité",
+    "Marie-Perle Arseneault": "Comptabilité",
 
     // Administration
     "Reception Laucandrique": "Administration",
@@ -119,6 +120,7 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Patrice Anfosso": "Sinistres",
     "Jean-Philippe Lemieux": "Sinistres",
     "Caroline Lamothe": "Sinistres",
+    "Francisco Leonardo Contreras Ordenes": "Sinistres",
 
     // Chargé d’opération
     "Stéphane Genest": "Chargé d’opération",
@@ -132,6 +134,8 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Genest Stephane": "Chargé d’opération",
     "Gabriel Gauvin": "Chargé d’opération",
     "Patrice Marcil": "Chargé d’opération",
+    "Sylvain Chichillanne": "Chargé d’opération",
+    "Djellany Mohamed Cherif": "Chargé d’opération",
 
     // Technique
     "Angelique Hesbois": "Technique",
@@ -621,6 +625,84 @@ export function ClientCommunicationTrends({
                             svg.style.height = '300px';
                         }
                     });
+
+                    // Convert oklch/lab/oklab colors to hex/rgb for html2canvas
+                    const defaultView = clonedDoc.defaultView;
+                    if (defaultView) {
+                        const colorCache: Record<string, string> = {};
+                        const convertColorToRgb = (colorStr: string) => {
+                            if (!colorStr || typeof colorStr !== 'string') return colorStr;
+                            if (colorCache[colorStr]) return colorCache[colorStr];
+                            
+                            const hasModernColor = 
+                                colorStr.includes('oklch') || 
+                                colorStr.includes('oklab') || 
+                                colorStr.includes('lab(') || 
+                                colorStr.includes('lch(') || 
+                                colorStr.includes('color(');
+                            
+                            if (!hasModernColor) {
+                                return colorStr;
+                            }
+                            
+                            // Use regex to find and replace all modern color function occurrences
+                            const regex = /(oklch|oklab|lab|lch|color)\([^)]+\)/g;
+                            const resolvedStr = colorStr.replace(regex, (match) => {
+                                try {
+                                    const canvas = clonedDoc.createElement('canvas');
+                                    canvas.width = 1;
+                                    canvas.height = 1;
+                                    const ctx = canvas.getContext('2d');
+                                    if (ctx) {
+                                        ctx.clearRect(0, 0, 1, 1);
+                                        ctx.fillStyle = match;
+                                        ctx.fillRect(0, 0, 1, 1);
+                                        const imgData = ctx.getImageData(0, 0, 1, 1).data;
+                                        const r = imgData[0];
+                                        const g = imgData[1];
+                                        const b = imgData[2];
+                                        const a = imgData[3] / 255;
+                                        return `rgba(${r}, ${g}, ${b}, ${a})`;
+                                    }
+                                } catch (e) {
+                                    console.error('Failed to convert matched color:', match, e);
+                                }
+                                if (match.includes('foreground') || match.includes('text') || match.includes('white')) {
+                                    return '#ffffff';
+                                }
+                                return '#0c0d12';
+                            });
+                            
+                            colorCache[colorStr] = resolvedStr;
+                            return resolvedStr;
+                        };
+
+                        const originalGetComputedStyle = defaultView.getComputedStyle;
+                        defaultView.getComputedStyle = function(el, pseudoElt) {
+                            const style = originalGetComputedStyle.call(defaultView, el, pseudoElt);
+                            return new Proxy(style, {
+                                get(target, prop, receiver) {
+                                    const desc = Object.getOwnPropertyDescriptor(target, prop);
+                                    if (desc && !desc.writable && !desc.configurable) {
+                                        return Reflect.get(target, prop, receiver);
+                                    }
+                                    const val = Reflect.get(target, prop, receiver);
+                                    if (typeof val === 'string') {
+                                        return convertColorToRgb(val);
+                                    }
+                                    if (typeof val === 'function') {
+                                        if (prop === 'getPropertyValue') {
+                                            return function(propertyName: string) {
+                                                return convertColorToRgb(target.getPropertyValue(propertyName));
+                                            }
+                                        }
+                                        return val.bind(target);
+                                    }
+                                    return val;
+                                }
+                            });
+                        };
+                    }
                 }
             })
 
