@@ -6,11 +6,12 @@ import html2canvas from 'html2canvas'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Info, Mail, Phone, Calendar, TrendingUp, TrendingDown, ArrowRight, Trash2, Network, Users, ShieldAlert, Search, Download, Loader2 } from 'lucide-react'
+import { Info, Mail, Phone, Calendar, TrendingUp, TrendingDown, ArrowRight, Trash2, Network, Users, ShieldAlert, Search, Download, Loader2, Upload, X, CheckCircle2, Save, Eye } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
-import { deleteCommunicationStatsAction } from '@/actions/communication-stats'
+import { deleteCommunicationStatsAction, saveCommunicationStatsAction } from '@/actions/communication-stats'
 import { toggleDoorBoardMemberAction } from '@/actions/clients'
 import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 import {
     AreaChart,
     Area,
@@ -66,6 +67,209 @@ const DEPT_COLORS: Record<string, string> = {
     "Marketing": "#d946ef" // Fuchsia
 }
 
+// Initial Employee Department Map matching the HTML tool precisely
+const INITIAL_DEPT_MAP: Record<string, string> = {
+    // Accounting / Comptabilité
+    "Paul Gauthier": "Comptabilité",
+    "Violeta Bente": "Comptabilité",
+    "Compte Payable Laucandrique": "Comptabilité",
+    "Comptabilité": "Comptabilité",
+    "Comptabilite": "Comptabilité",
+    "Madeleine Cormier": "Comptabilité",
+    "Benoit Morin": "Comptabilité",
+    "Marie-Pierre Martel": "Comptabilité",
+    "Helene Satou Ndour": "Comptabilité",
+    "Nouredine Achouri": "Comptabilité",
+    "Line Garand": "Comptabilité",
+    "Danielle Guidi": "Comptabilité",
+    "Ian Coulombe": "Comptabilité",
+
+    // Administration
+    "Reception Laucandrique": "Administration",
+    "Réception Laucandrique": "Administration",
+    "Tania Senécal": "Administration",
+    "Tania Senecal": "Administration",
+    "Réception - Suzanne Sylvestre": "Administration",
+    "Reception - Suzanne Sylvestre": "Administration",
+    "Hélène Pucacco": "Administration",
+    "Helene Pucacco": "Administration",
+    "Carine Leroux": "Administration",
+    "L'équipe Laucandrique Tremblant": "Administration",
+    "L'equipe Laucandrique Tremblant": "Administration",
+    "Mylene Choiniere": "Administration",
+    "Mylène Choinière": "Administration",
+    "Linda Bouchard": "Administration",
+    "Administration Laucandrique": "Administration",
+    "Maggy Carocha": "Administration",
+    "Suzie Dextraze": "Administration",
+    "Catherine Ducharme": "Administration",
+    "Anne-Marie Sauvageau": "Administration",
+    "Jillian Wise": "Administration",
+    "Janie Beauchemin": "Administration",
+
+    // Sinistres
+    "Département Sinistres": "Sinistres",
+    "Departement Sinistres": "Sinistres",
+    "Sinistre Laucandrique": "Sinistres",
+    "Victoria Ponomarenko": "Sinistres",
+    "Alaa-Eddine Lemrabete": "Sinistres",
+    "Ekampreet Sudhar Singh": "Sinistres",
+    "Halle T. Bellange": "Sinistres",
+    "Nour Hejazin": "Sinistres",
+    "Patrice Anfosso": "Sinistres",
+    "Jean-Philippe Lemieux": "Sinistres",
+    "Caroline Lamothe": "Sinistres",
+
+    // Chargé d’opération
+    "Stéphane Genest": "Chargé d’opération",
+    "Stephane Genest": "Chargé d’opération",
+    "Carlos Villegas": "Chargé d’opération",
+    "Kelly Frost": "Chargé d’opération",
+    "operations": "Chargé d’opération",
+    "operations12": "Chargé d’opération",
+    "opérations": "Chargé d’opération",
+    "Genest Stéphane": "Chargé d’opération",
+    "Genest Stephane": "Chargé d’opération",
+    "Gabriel Gauvin": "Chargé d’opération",
+    "Patrice Marcil": "Chargé d’opération",
+
+    // Technique
+    "Angelique Hesbois": "Technique",
+    "Angélique Hesbois": "Technique",
+    "Victor Dubremetz": "Technique",
+
+    // Assurance
+    "Marie-Camille Benhamou": "Assurance",
+
+    // Marketing
+    "Nada Talbi": "Marketing",
+
+    // Direction
+    "Nicole Rousseau": "Direction",
+    "Marc Boyer": "Direction",
+    "Hélène Vallerand": "Direction",
+    "Jean-Philippe Morin": "Direction",
+    "Francesca Chabot": "Direction",
+
+    // Gestion
+    "Édouard Le Rouzes": "Gestion"
+}
+
+const classifyCommType = (typeStr: string): 'outboundEmail' | 'inboundEmail' | 'chat' | 'phoneCall' | 'other' => {
+    const t = (typeStr || "").toLowerCase()
+    if (t.includes("expédié") || t.includes("expedie") || t.includes("sent")) return 'outboundEmail'
+    if (t.includes("reçu") || t.includes("recu") || t.includes("received")) return 'inboundEmail'
+    if (t.includes("clavardage") || t.includes("chat")) return 'chat'
+    if (t.includes("téléphone") || t.includes("phone") || t.includes("appel") || t.includes("call")) return 'phoneCall'
+    return 'other'
+}
+
+const normalizeEmployeeName = (name: string): string => {
+    if (!name) return ""
+    const clean = name.trim()
+    const lower = clean.toLowerCase()
+    if (lower === "jillian wise" || lower === "wise jillian" || lower === "wise.jillian") return "Jillian Wise"
+    if (lower === "edouard le rouzes" || lower === "édouard le rouzes") return "Édouard Le Rouzes"
+    if (lower === "maggy") return "Maggy Carocha"
+    return clean
+}
+
+const parseDateString = (dateStr: string): Date | null => {
+    if (!dateStr) return null
+    const cleanStr = dateStr.trim().replace(/^"|"$/g, '')
+    
+    let d = new Date(cleanStr)
+    if (!isNaN(d.getTime())) return d
+    
+    if (cleanStr.includes('/')) {
+        const parts = cleanStr.split(' ')
+        const dateParts = parts[0].split('/')
+        if (dateParts.length === 3) {
+            let day = 1, month = 0, year = 2000
+            if (dateParts[0].length === 4) {
+                year = parseInt(dateParts[0], 10)
+                month = parseInt(dateParts[1], 10) - 1
+                day = parseInt(dateParts[2], 10)
+            } else {
+                day = parseInt(dateParts[0], 10)
+                month = parseInt(dateParts[1], 10) - 1
+                year = parseInt(dateParts[2], 10)
+                if (year < 100) year += 2000
+            }
+            
+            let hour = 0, min = 0, sec = 0
+            if (parts[1]) {
+                const timeParts = parts[1].split(':')
+                hour = parseInt(timeParts[0], 10) || 0
+                min = parseInt(timeParts[1], 10) || 0
+                sec = parseInt(timeParts[2], 10) || 0
+            }
+            d = new Date(year, month, day, hour, min, sec)
+            if (!isNaN(d.getTime())) return d
+        }
+    }
+    
+    if (cleanStr.includes('-')) {
+        const parts = cleanStr.split(' ')
+        const dateParts = parts[0].split('-')
+        if (dateParts.length === 3) {
+            let day = 1, month = 0, year = 2000
+            if (dateParts[0].length === 4) {
+                year = parseInt(dateParts[0], 10)
+                month = parseInt(dateParts[1], 10) - 1
+                day = parseInt(dateParts[2], 10)
+            } else {
+                day = parseInt(dateParts[0], 10)
+                month = parseInt(dateParts[1], 10) - 1
+                year = parseInt(dateParts[2], 10)
+                if (year < 100) year += 2000
+            }
+            
+            let hour = 0, min = 0, sec = 0
+            if (parts[1]) {
+                const timeParts = parts[1].split(':')
+                hour = parseInt(timeParts[0], 10) || 0
+                min = parseInt(timeParts[1], 10) || 0
+                sec = parseInt(timeParts[2], 10) || 0
+            }
+            d = new Date(year, month, day, hour, min, sec)
+            if (!isNaN(d.getTime())) return d
+        }
+    }
+    
+    return null
+}
+
+const extractDateMeta = (dateString: string) => {
+    let year = "Unknown"
+    let month = "Unknown"
+    if(!dateString) return { year, month }
+    
+    const parsed = parseDateString(dateString)
+    if (parsed) {
+        year = parsed.getFullYear().toString()
+        const m = parsed.getMonth() + 1 // 1-indexed
+        month = m < 10 ? "0" + m : m.toString()
+    }
+    return { year, month }
+}
+
+const parseCSVLine = (text: string, delimiter: string): string[] => {
+    let p = '', c = '', r: string[] = []
+    let q = false
+    for (let i = 0; i < text.length; i++) {
+        c = text.charAt(i)
+        if (c === '"') {
+            if (q && text.charAt(i+1) === '"') { 
+                if (r.length > 0) r[r.length-1] += '"'; else p += '"';
+                i++; 
+            } else { q = !q; }
+        } else if (c === delimiter && !q) { r.push(p); p = ''; } else { p += c; }
+    }
+    r.push(p)
+    return r
+}
+
 export function ClientCommunicationTrends({ 
     stats: initialStats, 
     clientId, 
@@ -74,6 +278,7 @@ export function ClientCommunicationTrends({
     initialDoors = [],
     clientName = 'Syndicat'
 }: ClientCommunicationTrendsProps) {
+    const router = useRouter()
     const [stats, setStats] = useState<CommStatRecord[]>(initialStats)
     const [deletingId, setDeletingId] = useState<string | null>(null)
     const [selectedRunId, setSelectedRunId] = useState<string>('')
@@ -81,10 +286,298 @@ export function ClientCommunicationTrends({
     const [unitSearch, setUnitSearch] = useState('')
     const [visibleDepts, setVisibleDepts] = useState<string[]>([])
 
+    // Direct Upload / Analyzer states
+    const [csvFile, setCsvFile] = useState<File | null>(null)
+    const [isParsing, setIsParsing] = useState(false)
+    const [rawRows, setRawRows] = useState<any[]>([])
+    const [excludedOtonom, setExcludedOtonom] = useState<any[]>([])
+    const [excludedAssign, setExcludedAssign] = useState<any[]>([])
+    const [isSaving, setIsSaving] = useState(false)
+    const [hasSaved, setHasSaved] = useState(false)
+    const [deptMap, setDeptMap] = useState<Record<string, string>>(INITIAL_DEPT_MAP)
+
+    // Sync initialStats when they change (e.g. after database insert)
+    useEffect(() => {
+        if (initialStats) {
+            setStats(initialStats)
+            if (initialStats.length > 0) {
+                setSelectedRunId(initialStats[initialStats.length - 1].id)
+            }
+        }
+    }, [initialStats])
+
     const toggleDeptLine = (dept: string) => {
         setVisibleDepts(prev => 
             prev.includes(dept) ? prev.filter(d => d !== dept) : [...prev, dept]
         )
+    }
+
+    const parseFile = (file: File) => {
+        setIsParsing(true)
+        setCsvFile(file)
+        setRawRows([])
+        setExcludedOtonom([])
+        setExcludedAssign([])
+        setHasSaved(false)
+
+        const reader = new FileReader()
+        reader.onload = (e) => {
+            try {
+                const text = e.target?.result as string
+                const lines = text.split(/\r?\n/)
+                let headerIndex = -1
+                
+                for(let i=0; i<lines.length; i++) {
+                    const l = lines[i].toLowerCase()
+                    if(l.includes('lot') && l.includes('objet') && (l.includes('ajouté par') || l.includes('ajoute par'))) { 
+                        headerIndex = i
+                        break 
+                    }
+                }
+
+                if(headerIndex === -1) { 
+                    toast.error("Format d'historique invalide : En-tête 'Lot', 'Objet' et 'Ajouté par' introuvable.")
+                    setIsParsing(false)
+                    return 
+                }
+
+                let delimiter = ','
+                if (lines[headerIndex].includes(';')) delimiter = ';'
+                else if (lines[headerIndex].includes('\t')) delimiter = '\t'
+
+                const headers = lines[headerIndex].split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''))
+                const idxLot = headers.findIndex(h => h.toLowerCase() === 'lot')
+                const idxType = headers.findIndex(h => h.toLowerCase() === 'type')
+                const idxDate = headers.findIndex(h => h.toLowerCase() === 'date')
+                const idxUnite = headers.findIndex(h => h.toLowerCase() === 'unité' || h.toLowerCase() === 'unite')
+                const idxDest = headers.findIndex(h => h.toLowerCase() === 'destinataire')
+                const idxTargetObjet = headers.findIndex(h => h.toLowerCase() === 'objet')
+                const idxUser = headers.findIndex(h => h.toLowerCase().includes('ajouté par') || h.toLowerCase().includes('ajoute par'))
+
+                const rows: any[] = []
+                const otonoms: any[] = []
+                const assigns: any[] = []
+
+                for(let i = headerIndex + 1; i < lines.length; i++) {
+                    if(!lines[i].trim()) continue
+                    const row = parseCSVLine(lines[i], delimiter)
+                    
+                    const userRaw = row[idxUser] ? row[idxUser].trim().replace(/^"|"$/g, '') : ""
+                    const objet = row[idxTargetObjet] ? row[idxTargetObjet].trim().replace(/^"|"$/g, '') : ""
+                    const type = row[idxType] ? row[idxType].trim().replace(/^"|"$/g, '') : ""
+                    const dateStr = row[idxDate] ? row[idxDate].trim().replace(/^"|"$/g, '') : ""
+                    const lotId = row[idxLot] ? row[idxLot].trim() : ""
+                    const unitNum = row[idxUnite] ? row[idxUnite].trim().replace(/^"|"$/g, '').replace(/^0+/, '') : ""
+                    const dest = row[idxDest] ? row[idxDest].trim().replace(/^"|"$/g, '') : ""
+
+                    const model: any = { lot: lotId, type: type, date: dateStr, unite: unitNum, destinataire: dest, objet: objet, user: userRaw }
+
+                    if(userRaw === "Otonomsolution") { 
+                        otonoms.push(model)
+                        continue 
+                    }
+                    if(objet.toLowerCase().includes("you have been assigned") || objet.toLowerCase().includes("vous avez été assigné")) {
+                        assigns.push(model)
+                        continue
+                    }
+
+                    const userNormalized = normalizeEmployeeName(userRaw) || "Système Auto"
+                    const dateMeta = extractDateMeta(dateStr)
+                    model.year = dateMeta.year
+                    model.month = dateMeta.month
+                    model.user = userNormalized
+                    
+                    rows.push(model)
+                }
+
+                setRawRows(rows)
+                setExcludedOtonom(otonoms)
+                setExcludedAssign(assigns)
+                toast.success(`${rows.length} communications valides importées.`)
+            } catch (err: any) {
+                console.error(err)
+                toast.error("Impossible de parser le fichier CSV.")
+            } finally {
+                setIsParsing(false)
+            }
+        }
+        reader.readAsText(file)
+    }
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            parseFile(e.target.files[0])
+        }
+    }
+
+    const pipelineData = useMemo(() => {
+        if (rawRows.length === 0) return null
+
+        let cleanVolume = 0
+        let contractInclusionsVolume = 0
+        let outboundEmailsCount = 0
+        let inboundEmailsCount = 0
+        let chatsCount = 0
+        let phoneCallsCount = 0
+        let othersCount = 0
+
+        const deptCounts: Record<string, number> = {}
+        DEPT_LIST.forEach(d => { deptCounts[d] = 0; })
+
+        const timelineChronologyMap: Record<string, { 
+            contractVolume: number; 
+            outOfContractVolume: number;
+            outboundEmails: number;
+            inboundEmails: number;
+            chats: number;
+            phoneCalls: number;
+            others: number;
+        }> = {}
+
+        rawRows.forEach(row => {
+            const resolvedDept = deptMap[row.user] || "Gestion"
+            const timelineKey = (row.year !== "Unknown" && row.month !== "Unknown") ? `${row.year}-${row.month}` : "Unknown"
+
+            if (timelineKey !== "Unknown") {
+                if (!timelineChronologyMap[timelineKey]) {
+                    timelineChronologyMap[timelineKey] = { 
+                        contractVolume: 0, 
+                        outOfContractVolume: 0,
+                        outboundEmails: 0,
+                        inboundEmails: 0,
+                        chats: 0,
+                        phoneCalls: 0,
+                        others: 0
+                    }
+                }
+                if (resolvedDept !== "Sinistres" && resolvedDept !== "Technique") {
+                    timelineChronologyMap[timelineKey].contractVolume++
+                } else {
+                    timelineChronologyMap[timelineKey].outOfContractVolume++
+                }
+
+                const cls = classifyCommType(row.type)
+                if (cls === 'outboundEmail') timelineChronologyMap[timelineKey].outboundEmails++
+                else if (cls === 'inboundEmail') timelineChronologyMap[timelineKey].inboundEmails++
+                else if (cls === 'chat') timelineChronologyMap[timelineKey].chats++
+                else if (cls === 'phoneCall') timelineChronologyMap[timelineKey].phoneCalls++
+                else timelineChronologyMap[timelineKey].others++
+            }
+
+            cleanVolume++
+            
+            if (deptCounts[resolvedDept] !== undefined) {
+                deptCounts[resolvedDept]++
+            }
+
+            if (resolvedDept !== "Sinistres" && resolvedDept !== "Technique") {
+                contractInclusionsVolume++
+            }
+
+            const cls = classifyCommType(row.type)
+            if (cls === 'outboundEmail') outboundEmailsCount++
+            else if (cls === 'inboundEmail') inboundEmailsCount++
+            else if (cls === 'chat') chatsCount++
+            else if (cls === 'phoneCall') phoneCallsCount++
+            else othersCount++
+        })
+
+        const doorsCount = doors.length || 90
+        const timelineList = Object.entries(timelineChronologyMap)
+            .map(([period, data]) => {
+                const ratio = (data.contractVolume / Math.max(1, doorsCount)).toFixed(2)
+                return {
+                    period,
+                    contractVolume: data.contractVolume,
+                    outOfContractVolume: data.outOfContractVolume,
+                    ratio: Number(ratio),
+                    outboundEmails: data.outboundEmails,
+                    inboundEmails: data.inboundEmails,
+                    chats: data.chats,
+                    phoneCalls: data.phoneCalls,
+                    others: data.others
+                }
+            })
+            .sort((a, b) => a.period.localeCompare(b.period))
+
+        const unitCounts: Record<string, number> = {}
+        rawRows.forEach(row => {
+            if (row.unite && row.unite !== "" && row.unite !== "-") {
+                unitCounts[row.unite] = (unitCounts[row.unite] || 0) + 1
+            }
+        })
+        const sortedUnits = Object.entries(unitCounts)
+            .map(([unit, count]) => ({ unit, count }))
+            .sort((a, b) => b.count - a.count)
+
+        return {
+            totalVolume: cleanVolume,
+            contractInclusionsVolume,
+            deptCounts,
+            timelineList,
+            sortedUnits,
+            outboundEmails: outboundEmailsCount,
+            inboundEmails: inboundEmailsCount,
+            chats: chatsCount,
+            phoneCalls: phoneCallsCount,
+            others: othersCount
+        }
+    }, [rawRows, deptMap, doors])
+
+    const handleSaveAnalysis = async () => {
+        if (!clientId || rawRows.length === 0 || !pipelineData) {
+            toast.error("Aucune donnée à sauvegarder.")
+            return
+        }
+
+        setIsSaving(true)
+        try {
+            const activePeriodDates = rawRows
+                .map(r => parseDateString(r.date))
+                .filter((d): d is Date => d !== null)
+                .sort((a, b) => a.getTime() - b.getTime())
+            
+            const period_start = activePeriodDates.length > 0 ? activePeriodDates[0].toISOString().substring(0, 10) : null
+            const period_end = activePeriodDates.length > 0 ? activePeriodDates[activePeriodDates.length - 1].toISOString().substring(0, 10) : null
+
+            const doorsCount = doors.length || 90
+            const summaryPayload = {
+                period_start,
+                period_end,
+                total_emails: pipelineData.outboundEmails + pipelineData.inboundEmails,
+                total_phone_calls: pipelineData.phoneCalls,
+                total_communications: rawRows.length,
+                analysis_date: period_end,
+                analysis_summary: {
+                    total_units: doorsCount,
+                    deptCounts: pipelineData.deptCounts,
+                    timelineList: pipelineData.timelineList,
+                    sortedUnits: pipelineData.sortedUnits,
+                    dynamicDeptMap: deptMap,
+                    analysis_date: period_end || new Date().toISOString(),
+                    typeRecap: {
+                        outboundEmails: pipelineData.outboundEmails,
+                        inboundEmails: pipelineData.inboundEmails,
+                        chats: pipelineData.chats,
+                        phoneCalls: pipelineData.phoneCalls,
+                        others: pipelineData.others
+                    }
+                }
+            }
+
+            const res = await saveCommunicationStatsAction(clientId, summaryPayload)
+            if (res.success) {
+                toast.success("Statistiques de l'audit de communication enregistrées !")
+                setHasSaved(true)
+                setRawRows([])
+                setCsvFile(null)
+                router.refresh()
+            }
+        } catch (err: any) {
+            toast.error(err.message || "Erreur lors de la sauvegarde.")
+        } finally {
+            setIsSaving(false)
+        }
     }
 
     useEffect(() => {
@@ -109,7 +602,8 @@ export function ClientCommunicationTrends({
                 return
             }
 
-            const canvas = await html2canvas(element, {
+            const html2CanvasFn = (html2canvas as any).default || html2canvas
+            const canvas = await html2CanvasFn(element, {
                 scale: 1.5,
                 useCORS: true,
                 backgroundColor: '#0c0d12',
@@ -119,6 +613,13 @@ export function ClientCommunicationTrends({
                     containers.forEach((container: any) => {
                         container.style.width = '600px';
                         container.style.height = '300px';
+                        const svg = container.querySelector('svg');
+                        if (svg) {
+                            svg.setAttribute('width', '600');
+                            svg.setAttribute('height', '300');
+                            svg.style.width = '600px';
+                            svg.style.height = '300px';
+                        }
                     });
                 }
             })
@@ -145,8 +646,9 @@ export function ClientCommunicationTrends({
             const dateStr = new Date().toLocaleDateString('fr-CA')
             const cleanName = clientName.replace(/[^a-zA-Z0-9]/g, '_')
             pdf.save(`analyse_communications_${cleanName}_${dateStr}.pdf`)
-        } catch (error) {
+        } catch (error: any) {
             console.error('PDF export failed:', error)
+            toast.error(`Erreur lors de l'export PDF: ${error.message || error}`)
         } finally {
             setIsExporting(false)
         }
@@ -600,13 +1102,144 @@ export function ClientCommunicationTrends({
     return (
         <div className="space-y-8 animate-fade-in text-xs w-full max-w-full">
             {stats.length === 0 ? (
-                <Card className="bg-[#0c0d12] border border-zinc-850 py-16 flex flex-col items-center justify-center text-center rounded-2xl shadow-xl">
-                    <Info className="h-10 w-10 text-zinc-600 mb-3 animate-pulse" />
-                    <h3 className="text-sm font-bold text-zinc-350">Aucune statistique de communication disponible</h3>
-                    <p className="text-xs text-zinc-500 mt-1 max-w-sm">
-                        Rendez-vous dans la <strong>Configuration Globale &gt; Analyse Communications</strong> pour importer et analyser les volumes de ce syndicat.
-                    </p>
-                </Card>
+                <div className="space-y-6 animate-fade-in">
+                    {/* If we haven't loaded any rawRows yet, show the dropzone */}
+                    {rawRows.length === 0 ? (
+                        <Card className="bg-[#0c0d12] border border-zinc-850 py-16 flex flex-col items-center justify-center text-center rounded-2xl shadow-xl">
+                            <Info className="h-10 w-10 text-zinc-600 mb-3 animate-pulse" />
+                            <h3 className="text-sm font-bold text-zinc-350">Aucune statistique de communication disponible</h3>
+                            <p className="text-xs text-zinc-500 mt-1 max-w-sm">
+                                Glissez-déposez un fichier d'historique CSV ci-dessous pour analyser ce syndicat directement.
+                            </p>
+                            <div className="relative w-full max-w-lg mt-6 px-4">
+                                <input
+                                    type="file"
+                                    accept=".csv"
+                                    onChange={handleFileChange}
+                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                                />
+                                <div className="border border-dashed border-zinc-800 rounded-xl p-8 flex flex-col items-center justify-center bg-[#16171e]/70 hover:bg-[#16171e] transition-all">
+                                    {isParsing ? (
+                                        <>
+                                            <Loader2 className="h-8 w-8 text-indigo-500 mb-2 animate-spin" />
+                                            <span className="text-zinc-300 font-medium text-xs">Calcul en cours...</span>
+                                            <span className="text-[9px] text-zinc-550 mt-1">Lecture et indexation des communications...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Upload className="h-8 w-8 text-zinc-500 mb-2" />
+                                            <span className="text-zinc-300 font-medium text-xs font-semibold text-center">
+                                                Glissez-déposez le fichier d'historique CSV ici ou cliquez pour le parcourir.
+                                            </span>
+                                            <span className="text-[9px] text-zinc-550 mt-1">Colonnes requises: Lot, Type, Date, Unité, Destinataire, Objet, Agent (Ajouté par).</span>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </Card>
+                    ) : (
+                        /* If rawRows are loaded, show the analysis preview before saving */
+                        <div className="space-y-6">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#0d0e12]/80 p-4 border border-zinc-850 rounded-xl">
+                                <div>
+                                    <h3 className="text-sm font-bold text-zinc-200">Analyse de communication en cours pour {clientName}</h3>
+                                    <p className="text-xs text-zinc-500">{rawRows.length} lignes valides détectées.</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            setRawRows([])
+                                            setCsvFile(null)
+                                        }}
+                                        className="border-zinc-800 text-xs"
+                                    >
+                                        Réinitialiser
+                                    </Button>
+                                    <Button
+                                        onClick={handleSaveAnalysis}
+                                        disabled={isSaving}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                                    >
+                                        {isSaving ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                            <Save className="h-3.5 w-3.5" />
+                                        )}
+                                        Enregistrer cette analyse
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Executive summary cards */}
+                            {pipelineData && (
+                                <>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <Card className="bg-gradient-to-tr from-[#16171e] to-indigo-950/20 border-zinc-800/80 shadow-md">
+                                            <CardContent className="p-6">
+                                                <span className="text-[10px] text-zinc-550 uppercase tracking-wider font-black block">Volume de Gestion Forfaitaire Inclus</span>
+                                                <div className="text-3xl font-black text-white mt-1 block">
+                                                    {pipelineData.contractInclusionsVolume}
+                                                </div>
+                                                <span className="text-[10px] text-zinc-450 mt-1.5 block">Communications totales nettes (Exclut les Sinistres et le Technique)</span>
+                                            </CardContent>
+                                        </Card>
+                                        <Card className="bg-gradient-to-tr from-[#16171e] to-emerald-950/20 border-zinc-800/80 shadow-md">
+                                            <CardContent className="p-6">
+                                                <span className="text-[10px] text-zinc-550 uppercase tracking-wider font-black block">Indice de Charge Réel du Forfait (PM Inclusions Load)</span>
+                                                <div className="text-3xl font-black text-emerald-400 mt-1 block">
+                                                    {(pipelineData.contractInclusionsVolume / Math.max(1, totalUnits)).toFixed(2)}
+                                                </div>
+                                                <span className="text-[10px] text-zinc-450 mt-1.5 block">Moyenne d'interactions incluses par porte / mois</span>
+                                            </CardContent>
+                                        </Card>
+                                        <Card className="bg-gradient-to-tr from-[#16171e] to-zinc-950/40 border-zinc-800/80 shadow-md">
+                                            <CardContent className="p-6">
+                                                <span className="text-[10px] text-zinc-550 uppercase tracking-wider font-black block">Répartition par Canal</span>
+                                                <div className="mt-3.5 space-y-1.5 text-[10px]">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-zinc-450 font-medium">Courriels Sortants (Out) :</span>
+                                                        <span className="font-bold font-mono text-zinc-200">{pipelineData.outboundEmails}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-zinc-450 font-medium">Courriels Entrants (In) :</span>
+                                                        <span className="font-bold font-mono text-zinc-200">{pipelineData.inboundEmails}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center pt-1 border-t border-zinc-900/40">
+                                                        <span className="text-zinc-450 font-medium">Clavardages :</span>
+                                                        <span className="font-bold font-mono text-zinc-200">{pipelineData.chats}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-zinc-450 font-medium">Appels Téléphoniques :</span>
+                                                        <span className="font-bold font-mono text-zinc-200">{pipelineData.phoneCalls}</span>
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+
+                                    {/* Departments Breakdown */}
+                                    <div className="space-y-2">
+                                        <h4 className="text-[10px] font-bold text-zinc-550 uppercase tracking-wider">Répartition des charges opérationnelles par porte :</h4>
+                                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                                            {DEPT_LIST.map(d => {
+                                                const count = pipelineData.deptCounts[d] || 0
+                                                const loadRate = (count / Math.max(1, totalUnits)).toFixed(2)
+                                                return (
+                                                    <Card key={d} className="border border-zinc-850 p-3 bg-zinc-900/10">
+                                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">{d}</span>
+                                                        <div className="text-lg font-extrabold text-white mt-1 block">{loadRate}</div>
+                                                        <span className="text-[9px] text-zinc-550 block">{count.toLocaleString()} comms</span>
+                                                    </Card>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
             ) : (
                 <>
                     {/* Control Row: Select Analysis Run & Date Filters */}

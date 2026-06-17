@@ -508,6 +508,12 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
         let cleanVolume = 0
         let inbound = 0
         let contractInclusionsVolume = 0
+
+        let outboundEmailsCount = 0
+        let inboundEmailsCount = 0
+        let chatsCount = 0
+        let phoneCallsCount = 0
+        let othersCount = 0
         
         const deptCounts: Record<string, number> = {}
         DEPT_LIST.forEach(d => { deptCounts[d] = 0; })
@@ -602,6 +608,13 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
             cleanVolume++
             filteredList.push(row)
 
+            const cls = classifyCommType(row.type)
+            if (cls === 'outboundEmail') outboundEmailsCount++
+            else if (cls === 'inboundEmail') inboundEmailsCount++
+            else if (cls === 'chat') chatsCount++
+            else if (cls === 'phoneCall') phoneCallsCount++
+            else othersCount++
+
             const typeLower = (row.type || "").toLowerCase()
             if (typeLower.includes("courriel reçu") || typeLower.includes("clavardage") || typeLower.includes("email received") || typeLower.includes("inbound")) {
                 inbound++
@@ -659,7 +672,12 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
             filteredList,
             monthlyDeptHistory,
             monthlyUnitHistory,
-            yearlyHistoricAggregates: localYearlyAgg
+            yearlyHistoricAggregates: localYearlyAgg,
+            outboundEmails: outboundEmailsCount,
+            inboundEmails: inboundEmailsCount,
+            chats: chatsCount,
+            phoneCalls: phoneCallsCount,
+            others: othersCount
         }
     }, [rawRows, deptMap, selectedYear, selectedMonth, selectedUserFilter, unitCount])
 
@@ -1011,7 +1029,7 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                     {activeTab === 'dashboard' && pipelineData && (
                         <div className="space-y-6">
                             {/* Executive summary cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <Card className="bg-gradient-to-tr from-[#16171e] to-indigo-950/20 border-zinc-800/80 shadow-md">
                                     <CardContent className="p-6">
                                         <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-black block">Volume de Gestion Forfaitaire Inclus</span>
@@ -1028,6 +1046,29 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                                             {(pipelineData.contractInclusionsVolume / Math.max(1, unitCount)).toFixed(2)}
                                         </div>
                                         <span className="text-[10px] text-zinc-450 mt-1.5 block">Moyenne d'interactions incluses par porte / année cible</span>
+                                    </CardContent>
+                                </Card>
+                                <Card className="bg-gradient-to-tr from-[#16171e] to-zinc-950/40 border-zinc-800/80 shadow-md">
+                                    <CardContent className="p-6">
+                                        <span className="text-[10px] text-zinc-555 uppercase tracking-wider font-black block">Répartition par Canal</span>
+                                        <div className="mt-3.5 space-y-1.5 text-[10px]">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-zinc-450 font-medium">Courriels Sortants (Out) :</span>
+                                                <span className="font-bold font-mono text-zinc-200">{pipelineData.outboundEmails}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-zinc-450 font-medium">Courriels Entrants (In) :</span>
+                                                <span className="font-bold font-mono text-zinc-200">{pipelineData.inboundEmails}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center pt-1 border-t border-zinc-900/40">
+                                                <span className="text-zinc-450 font-medium">Clavardages :</span>
+                                                <span className="font-bold font-mono text-zinc-200">{pipelineData.chats}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-zinc-450 font-medium">Appels Téléphoniques :</span>
+                                                <span className="font-bold font-mono text-zinc-200">{pipelineData.phoneCalls}</span>
+                                            </div>
+                                        </div>
                                     </CardContent>
                                 </Card>
                             </div>

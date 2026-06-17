@@ -4,6 +4,7 @@
 import { jsPDF } from 'jspdf'
 import html2canvas from 'html2canvas'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -101,7 +102,8 @@ export function GlobalCommunicationAnalytics({
                 return
             }
 
-            const canvas = await html2canvas(element, {
+            const html2CanvasFn = (html2canvas as any).default || html2canvas
+            const canvas = await html2CanvasFn(element, {
                 scale: 1.5,
                 useCORS: true,
                 backgroundColor: '#0c0d12',
@@ -111,6 +113,13 @@ export function GlobalCommunicationAnalytics({
                     containers.forEach((container: any) => {
                         container.style.width = '600px';
                         container.style.height = '300px';
+                        const svg = container.querySelector('svg');
+                        if (svg) {
+                            svg.setAttribute('width', '600');
+                            svg.setAttribute('height', '300');
+                            svg.style.width = '600px';
+                            svg.style.height = '300px';
+                        }
                     });
                 }
             })
@@ -135,8 +144,9 @@ export function GlobalCommunicationAnalytics({
             }
             
             pdf.save(`analyse_globale_communications_${startPeriod}_to_${endPeriod}.pdf`)
-        } catch (error) {
+        } catch (error: any) {
             console.error('PDF export failed:', error)
+            toast.error(`Erreur lors de l'export PDF: ${error.message || error}`)
         } finally {
             setIsExporting(false)
         }
