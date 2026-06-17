@@ -164,7 +164,8 @@ export function GlobalCommunicationAnalytics({
                 useCORS: true,
                 backgroundColor: '#0c0d12',
                 windowWidth: 1400,
-                onclone: (clonedDoc) => {
+                onclone: (clonedDoc: Document) => {
+                    // Fix Recharts SVG dimensions
                     const containers = clonedDoc.querySelectorAll('.recharts-responsive-container');
                     containers.forEach((container: any) => {
                         container.style.width = '600px';
@@ -178,83 +179,92 @@ export function GlobalCommunicationAnalytics({
                         }
                     });
 
-                    // Convert oklch/lab/oklab colors to hex/rgb for html2canvas
-                    const defaultView = clonedDoc.defaultView;
-                    if (defaultView) {
-                        const colorCache: Record<string, string> = {};
-                        const convertColorToRgb = (colorStr: string) => {
-                            if (!colorStr || typeof colorStr !== 'string') return colorStr;
-                            if (colorCache[colorStr]) return colorCache[colorStr];
-                            
-                            const hasModernColor = 
-                                colorStr.includes('oklch') || 
-                                colorStr.includes('oklab') || 
-                                colorStr.includes('lab(') || 
-                                colorStr.includes('lch(') || 
-                                colorStr.includes('color(');
-                            
-                            if (!hasModernColor) {
-                                return colorStr;
-                            }
-                            
-                            // Use regex to find and replace all modern color function occurrences
-                            const regex = /(oklch|oklab|lab|lch|color)\([^)]+\)/g;
-                            const resolvedStr = colorStr.replace(regex, (match) => {
-                                try {
-                                    const canvas = clonedDoc.createElement('canvas');
-                                    canvas.width = 1;
-                                    canvas.height = 1;
-                                    const ctx = canvas.getContext('2d');
-                                    if (ctx) {
-                                        ctx.clearRect(0, 0, 1, 1);
-                                        ctx.fillStyle = match;
-                                        ctx.fillRect(0, 0, 1, 1);
-                                        const imgData = ctx.getImageData(0, 0, 1, 1).data;
-                                        const r = imgData[0];
-                                        const g = imgData[1];
-                                        const b = imgData[2];
-                                        const a = imgData[3] / 255;
-                                        return `rgba(${r}, ${g}, ${b}, ${a})`;
-                                    }
-                                } catch (e) {
-                                    console.error('Failed to convert matched color:', match, e);
-                                }
-                                if (match.includes('foreground') || match.includes('text') || match.includes('white')) {
-                                    return '#ffffff';
-                                }
-                                return '#0c0d12';
-                            });
-                            
-                            colorCache[colorStr] = resolvedStr;
-                            return resolvedStr;
-                        };
+                    // Convert a modern CSS color string to rgba() by rendering on a 1x1 canvas.
+                    // We use the MAIN document's canvas (not the cloned one) so it has a real GPU context.
+                    const helperCanvas = document.createElement('canvas');
+                    helperCanvas.width = 1;
+                    helperCanvas.height = 1;
+                    const helperCtx = helperCanvas.getContext('2d');
+                    const colorCache: Record<string, string> = {};
 
-                        const originalGetComputedStyle = defaultView.getComputedStyle;
-                        defaultView.getComputedStyle = function(el, pseudoElt) {
-                            const style = originalGetComputedStyle.call(defaultView, el, pseudoElt);
-                            return new Proxy(style, {
-                                get(target, prop, receiver) {
-                                    const desc = Object.getOwnPropertyDescriptor(target, prop);
-                                    if (desc && !desc.writable && !desc.configurable) {
-                                        return Reflect.get(target, prop, receiver);
-                                    }
-                                    const val = Reflect.get(target, prop, receiver);
-                                    if (typeof val === 'string') {
-                                        return convertColorToRgb(val);
-                                    }
-                                    if (typeof val === 'function') {
-                                        if (prop === 'getPropertyValue') {
-                                            return function(propertyName: string) {
-                                                return convertColorToRgb(target.getPropertyValue(propertyName));
-                                            }
-                                        }
-                                        return val.bind(target);
-                                    }
-                                    return val;
+                    const modernColorRe = /(oklch|oklab|lab|lch)\s*\([^)]*\)|color\s*\([^)]*\)/gi;
+
+                    const resolveColor = (raw: string): string => {
+                        if (!raw || typeof raw !== 'string') return raw;
+                        if (!modernColorRe.test(raw)) return raw;
+                        modernColorRe.lastIndex = 0; // reset after .test()
+                        if (colorCache[raw]) return colorCache[raw];
+
+                        const resolved = raw.replace(modernColorRe, (match) => {
+                            if (colorCache[match]) return colorCache[match];
+                            let result = '#0c0d12'; // safe dark fallback
+                            if (helperCtx) {
+                                try {
+                                    helperCtx.clearRect(0, 0, 1, 1);
+                                    helperCtx.fillStyle = match;
+                                    helperCtx.fillRect(0, 0, 1, 1);
+                                    const px = helperCtx.getImageData(0, 0, 1, 1).data;
+                                    result = `rgba(${px[0]},${px[1]},${px[2]},${(px[3] / 255).toFixed(3)})`;
+                                } catch (_) { /* keep fallback */ }
+                            }
+                            colorCache[match] = result;
+                            return result;
+                        });
+                        colorCache[raw] = resolved;
+                        return resolved;
+                    };
+
+                    // Walk every element in the cloned document and inline converted colors
+                    // so html2canvas's own parser never encounters modern color functions.
+                    const COLOR_PROPS = [
+                        'color', 'backgroundColor', 'borderColor',
+                        'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor',
+                        'outlineColor', 'textDecorationColor', 'fill', 'stroke',
+                        'boxShadow', 'caretColor',
+                    ] as const;
+
+                    const allEls = clonedDoc.querySelectorAll('*');
+                    allEls.forEach((el: any) => {
+                        try {
+                            // Get computed style from the MAIN document's window by finding the
+                            // same element (we need to look it up in the main document).
+                            // Since we can't easily cross-reference, compute against cloned el
+                            // using the clonedDoc's defaultView if available, otherwise skip.
+                            const view = clonedDoc.defaultView;
+                            if (!view) return;
+                            const computed = view.getComputedStyle(el);
+                            COLOR_PROPS.forEach((prop) => {
+                                const val = computed[prop as any] as string;
+                                if (val && modernColorRe.test(val)) {
+                                    modernColorRe.lastIndex = 0;
+                                    el.style[prop as any] = resolveColor(val);
                                 }
                             });
-                        };
-                    }
+                            // Also fix any inline style that may have modern colors
+                            if (el.style) {
+                                COLOR_PROPS.forEach((prop) => {
+                                    const inlineVal = el.style[prop as any] as string;
+                                    if (inlineVal && modernColorRe.test(inlineVal)) {
+                                        modernColorRe.lastIndex = 0;
+                                        el.style[prop as any] = resolveColor(inlineVal);
+                                    }
+                                });
+                            }
+                        } catch (_) { /* skip inaccessible elements */ }
+                    });
+
+                    // Force the clone's CSS variables to be overridden with plain dark bg/text
+                    // to avoid oklch in :root custom properties bleeding through.
+                    const styleOverride = clonedDoc.createElement('style');
+                    styleOverride.textContent = `
+                        *, *::before, *::after {
+                            --background: #0c0d12 !important;
+                            --foreground: #fafafa !important;
+                            --border: #27272a !important;
+                            --ring: #6366f1 !important;
+                        }
+                    `;
+                    clonedDoc.head.appendChild(styleOverride);
                 }
             })
 
