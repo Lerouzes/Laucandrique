@@ -155,123 +155,33 @@ export function GlobalCommunicationAnalytics({
     const handleExportPDF = async () => {
         setIsExporting(true)
         try {
-            const element = document.getElementById('global-analytics-content')
-            if (!element) {
-                alert('Contenu à exporter introuvable')
-                return
-            }
-
-            // --- Color resolution helper (runs on MAIN document, has real GPU context) ---
-            const helperCanvas = document.createElement('canvas')
-            helperCanvas.width = 1
-            helperCanvas.height = 1
-            const helperCtx = helperCanvas.getContext('2d')
-            const colorCache: Record<string, string> = {}
-
-            // Matches oklch(...), oklab(...), lab(...), lch(...), color(...)
-            // Uses a non-greedy match to handle optional slash-alpha: e.g. oklch(0.5 0.1 200 / 50%)
-            const modernColorRe = /\b(oklch|oklab|lab|lch|color)\s*\([^)]*\)/gi
-
-            const resolveMatch = (match: string): string => {
-                if (colorCache[match] !== undefined) return colorCache[match]
-                let result = 'rgba(12,13,18,1)'
-                if (helperCtx) {
-                    try {
-                        helperCtx.clearRect(0, 0, 1, 1)
-                        helperCtx.fillStyle = match
-                        helperCtx.fillRect(0, 0, 1, 1)
-                        const px = helperCtx.getImageData(0, 0, 1, 1).data
-                        result = `rgba(${px[0]},${px[1]},${px[2]},${(px[3] / 255).toFixed(3)})`
-                    } catch (_) { /* keep fallback */ }
-                }
-                colorCache[match] = result
-                return result
-            }
-
-            const scrubColors = (text: string): string => {
-                if (!text) return text
-                modernColorRe.lastIndex = 0
-                if (!modernColorRe.test(text)) return text
-                modernColorRe.lastIndex = 0
-                return text.replace(modernColorRe, resolveMatch)
-            }
-
-            const html2CanvasFn = (html2canvas as any).default || html2canvas
-            const canvas = await html2CanvasFn(element, {
-                scale: 1.5,
-                useCORS: true,
-                backgroundColor: '#0c0d12',
-                windowWidth: 1400,
-                onclone: (clonedDoc: Document) => {
-                    // ── STEP 1: Scrub ALL <style> element CSS text ──────────────────────────
-                    // This is the root cause: globals.css contains oklch() in :root variables.
-                    // html2canvas parses this CSS text directly, before getComputedStyle is called.
-                    clonedDoc.querySelectorAll('style').forEach((styleEl: any) => {
-                        if (styleEl.textContent) {
-                            styleEl.textContent = scrubColors(styleEl.textContent)
-                        }
-                    })
-
-                    // ── STEP 2: Fix Recharts SVG dimensions ─────────────────────────────────
-                    clonedDoc.querySelectorAll('.recharts-responsive-container').forEach((container: any) => {
-                        container.style.width = '600px'
-                        container.style.height = '300px'
-                        const svg = container.querySelector('svg')
-                        if (svg) {
-                            svg.setAttribute('width', '600')
-                            svg.setAttribute('height', '300')
-                            svg.style.width = '600px'
-                            svg.style.height = '300px'
-                        }
-                    })
-
-                    // ── STEP 3: Patch getComputedStyle on the cloned window ─────────────────
-                    // Safety net for any runtime-computed colors that survived step 1.
-                    const view = clonedDoc.defaultView
-                    if (view) {
-                        const origGCS = view.getComputedStyle.bind(view)
-                        ;(view as any).getComputedStyle = function (el: Element, pseudo?: string | null) {
-                            const style = origGCS(el, pseudo)
-                            return new Proxy(style, {
-                                get (target: any, prop: string | symbol, receiver: any) {
-                                    const val = Reflect.get(target, prop, receiver)
-                                    if (typeof val === 'string') {
-                                        return scrubColors(val)
-                                    }
-                                    if (typeof val === 'function') {
-                                        if (prop === 'getPropertyValue') {
-                                            return (name: string) => scrubColors(target.getPropertyValue(name))
-                                        }
-                                        return val.bind(target)
-                                    }
-                                    return val
-                                }
-                            })
-                        }
-                    }
-                }
-            })
-
-            const imgData = canvas.toDataURL('image/png')
-            const imgWidth = 210
-            const pageHeight = 297
-            const imgHeight = (canvas.height * imgWidth) / canvas.width
-            
+            const pageIds = ['print-page-1', 'print-page-2', 'print-page-3']
             const pdf = new jsPDF('p', 'mm', 'a4')
-            let heightLeft = imgHeight
-            let position = 0
-            
-            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-            heightLeft -= pageHeight
-            
-            while (heightLeft > 0) {
-                position = heightLeft - imgHeight
-                pdf.addPage()
-                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-                heightLeft -= pageHeight
+            const html2CanvasFn = (html2canvas as any).default || html2canvas
+
+            for (let i = 0; i < pageIds.length; i++) {
+                const element = document.getElementById(pageIds[i])
+                if (!element) {
+                    throw new Error(`Élément ${pageIds[i]} introuvable dans le document.`)
+                }
+
+                const canvas = await html2CanvasFn(element, {
+                    scale: 2, // High resolution capture
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    windowWidth: 800,
+                    windowHeight: 1130
+                })
+
+                const imgData = canvas.toDataURL('image/png')
+                if (i > 0) {
+                    pdf.addPage()
+                }
+                pdf.addImage(imgData, 'PNG', 0, 0, 210, 297)
             }
-            
-            pdf.save(`analyse_globale_communications_${startPeriod}_to_${endPeriod}.pdf`)
+
+            pdf.save(`rapport_analyse_communications_${startPeriod}_a_${endPeriod}.pdf`)
+            toast.success("Rapport PDF exporté avec succès.")
         } catch (error: any) {
             console.error('PDF export failed:', error)
             toast.error(`Erreur lors de l'export PDF: ${error.message || error}`)
@@ -898,6 +808,38 @@ export function GlobalCommunicationAnalytics({
 
         return kpis
     }, [latestClientRuns, filterTeamId, startPeriod, endPeriod, allPeriods, selectedManagerIds, selectedSyndicateIds])
+
+    // 13. Dynamic fields for PDF report cover page and department chart
+    const selectedTeamName = useMemo(() => {
+        if (filterTeamId === 'all') return 'Toutes les équipes'
+        const team = teams.find(t => t.id === filterTeamId)
+        return team ? team.name : 'Inconnue'
+    }, [filterTeamId, teams])
+
+    const selectedManagersNames = useMemo(() => {
+        if (selectedManagerIds.length === 0) return 'Tous les managers'
+        const names = selectedManagerIds.map(id => managersList.find(m => m.id === id)?.name).filter(Boolean) as string[]
+        if (names.length <= 3) return names.join(', ')
+        return `${names.slice(0, 3).join(', ')} et ${names.length - 3} autres`
+    }, [selectedManagerIds, managersList])
+
+    const selectedSyndicatesNames = useMemo(() => {
+        if (selectedSyndicateIds.length === 0) return 'Tous les syndicats'
+        const names = selectedSyndicateIds.map(id => {
+            const found = syndicatesList.find(s => s.id === id)
+            return found ? `${found.code}` : ''
+        }).filter(Boolean) as string[]
+        if (names.length <= 6) return names.join(', ')
+        return `${names.slice(0, 6).join(', ')} et ${names.length - 6} autres`
+    }, [selectedSyndicateIds, syndicatesList])
+
+    const departmentChartData = useMemo(() => {
+        return DEPT_LIST.map(d => ({
+            name: d,
+            'Indice de charge': departmentKpis[d]?.avgIndex || 0,
+            'Volume': departmentKpis[d]?.totalVolume || 0
+        })).sort((a, b) => b['Indice de charge'] - a['Indice de charge'])
+    }, [departmentKpis])
 
     return (
         <div className="space-y-6 text-xs w-full max-w-full">
@@ -1600,6 +1542,357 @@ export function GlobalCommunicationAnalytics({
                     </Card>
                 </div>
             )}
+
+            {/* Template d'impression PDF hors-écran */}
+            <div id="global-analytics-pdf-print-template" style={{ position: 'absolute', left: '-9999px', top: '-9999px', width: '800px', height: 'auto', overflow: 'hidden', pointerEvents: 'none' }}>
+                {/* Page 1: Page de Garde */}
+                <div id="print-page-1" style={{
+                    width: '800px',
+                    height: '1130px',
+                    padding: '60px 50px',
+                    boxSizing: 'border-box',
+                    backgroundColor: '#ffffff',
+                    color: '#18181b',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    fontFamily: 'Inter, system-ui, -apple-system, sans-serif'
+                }}>
+                    <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #18181b', paddingBottom: '15px' }}>
+                            <span style={{ fontSize: '18px', fontWeight: 900, color: '#18181b' }}>LAUCANDRIQUE</span>
+                            <span style={{ fontSize: '10px', color: '#71717a', fontWeight: 650, letterSpacing: '0.05em' }}>RAPPORT D'ANALYSE</span>
+                        </div>
+                        
+                        <div style={{ marginTop: '50px' }}>
+                            <h1 style={{ fontSize: '32px', fontWeight: 900, color: '#18181b', lineHeight: 1.1, letterSpacing: '-0.02em' }}>
+                                Rapport d'Analyse Globale des Communications
+                            </h1>
+                            <p style={{ fontSize: '14px', color: '#71717a', marginTop: '12px', fontWeight: 500 }}>
+                                Période : <span style={{ color: '#18181b', fontWeight: 700 }}>{formatMonthLabel(startPeriod)}</span> à <span style={{ color: '#18181b', fontWeight: 700 }}>{formatMonthLabel(endPeriod)}</span>
+                            </p>
+                        </div>
+
+                        {/* Filters Box */}
+                        <div style={{ marginTop: '35px', padding: '20px', border: '1px solid #e4e4e7', borderRadius: '12px', backgroundColor: '#fafafa' }}>
+                            <h3 style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#71717a', marginBottom: '10px' }}>Filtres Appliqués</h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', fontSize: '11px' }}>
+                                <div>
+                                    <span style={{ color: '#71717a', display: 'block' }}>Équipe :</span>
+                                    <strong style={{ color: '#18181b' }}>{selectedTeamName}</strong>
+                                </div>
+                                <div>
+                                    <span style={{ color: '#71717a', display: 'block' }}>Gestionnaire(s) :</span>
+                                    <strong style={{ color: '#18181b', wordBreak: 'break-all' }}>{selectedManagersNames}</strong>
+                                </div>
+                                <div style={{ gridColumn: 'span 2' }}>
+                                    <span style={{ color: '#71717a', display: 'block' }}>Syndicat(s) :</span>
+                                    <strong style={{ color: '#18181b', wordBreak: 'break-all' }}>{selectedSyndicatesNames}</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* KPIs Section */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', margin: '40px 0' }}>
+                        <h2 style={{ fontSize: '14px', fontWeight: 800, textTransform: 'uppercase', color: '#71717a', marginBottom: '20px', borderBottom: '1px solid #e4e4e7', paddingBottom: '6px' }}>
+                            Indicateurs Clés de Performance
+                        </h2>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+                            {/* KPI 1 */}
+                            <div style={{ padding: '20px', border: '1px solid #e4e4e7', borderRadius: '12px', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                <div>
+                                    <span style={{ fontSize: '10px', color: '#71717a', fontWeight: 800, textTransform: 'uppercase' }}>Indice de charge moyen</span>
+                                    <div style={{ fontSize: '28px', fontWeight: 900, color: '#18181b', margin: '8px 0 4px 0' }}>{kpis.avgRatio.toFixed(2)}</div>
+                                    <span style={{ fontSize: '9px', color: '#71717a' }}>interactions / porte / mois</span>
+                                </div>
+                                {popTrends && (
+                                    <div style={{ marginTop: '12px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        {popTrends.ratioDiff > 0 ? (
+                                            <span style={{ color: '#d97706', fontWeight: 700 }}>▲ +{popTrends.ratioDiff.toFixed(2)} (+{popTrends.ratioPercent.toFixed(1)}%)</span>
+                                        ) : popTrends.ratioDiff < 0 ? (
+                                            <span style={{ color: '#059669', fontWeight: 700 }}>▼ {popTrends.ratioDiff.toFixed(2)} ({popTrends.ratioPercent.toFixed(1)}%)</span>
+                                        ) : (
+                                            <span style={{ color: '#71717a' }}>Stable</span>
+                                        )}
+                                        <span style={{ color: '#a1a1aa' }}>vs YoY</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* KPI 2 */}
+                            <div style={{ padding: '20px', border: '1px solid #e4e4e7', borderRadius: '12px', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                <div>
+                                    <span style={{ fontSize: '10px', color: '#71717a', fontWeight: 800, textTransform: 'uppercase' }}>Volume global</span>
+                                    <div style={{ fontSize: '28px', fontWeight: 900, color: '#18181b', margin: '8px 0 4px 0' }}>{kpis.totalComms}</div>
+                                    <span style={{ fontSize: '9px', color: '#71717a' }}>communications totales</span>
+                                </div>
+                                {popTrends && (
+                                    <div style={{ marginTop: '12px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        {popTrends.commsDiff > 0 ? (
+                                            <span style={{ color: '#d97706', fontWeight: 700 }}>▲ +{popTrends.commsDiff} (+{popTrends.commsPercent.toFixed(1)}%)</span>
+                                        ) : popTrends.commsDiff < 0 ? (
+                                            <span style={{ color: '#059669', fontWeight: 700 }}>▼ {popTrends.commsDiff} ({popTrends.commsPercent.toFixed(1)}%)</span>
+                                        ) : (
+                                            <span style={{ color: '#71717a' }}>Stable</span>
+                                        )}
+                                        <span style={{ color: '#a1a1aa' }}>vs YoY</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* KPI 3 */}
+                            <div style={{ padding: '20px', border: '1px solid #e4e4e7', borderRadius: '12px', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                <div>
+                                    <span style={{ fontSize: '10px', color: '#71717a', fontWeight: 800, textTransform: 'uppercase' }}>Taux de surcharge (CA)</span>
+                                    <div style={{ fontSize: '28px', fontWeight: 900, color: kpis.surchargePct > 30 ? '#ef4444' : '#10b981', margin: '8px 0 4px 0' }}>{kpis.surchargePct}%</div>
+                                    <span style={{ fontSize: '9px', color: '#71717a' }}>cible : {targetIndex.toFixed(2)} / porte / mois</span>
+                                </div>
+                                {popTrends && (
+                                    <div style={{ marginTop: '12px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        {popTrends.surchargeDiff > 0 ? (
+                                            <span style={{ color: '#ef4444', fontWeight: 700 }}>▲ +{popTrends.surchargeDiff}%</span>
+                                        ) : popTrends.surchargeDiff < 0 ? (
+                                            <span style={{ color: '#059669', fontWeight: 700 }}>▼ {popTrends.surchargeDiff}%</span>
+                                        ) : (
+                                            <span style={{ color: '#71717a' }}>Stable</span>
+                                        )}
+                                        <span style={{ color: '#a1a1aa' }}>vs YoY</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* KPI 4 */}
+                            <div style={{ padding: '20px', border: '1px solid #e4e4e7', borderRadius: '12px', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                <div>
+                                    <span style={{ fontSize: '10px', color: '#71717a', fontWeight: 800, textTransform: 'uppercase' }}>Plus forte surcharge</span>
+                                    {kpis.topOutlier ? (
+                                        <>
+                                            <div style={{ fontSize: '28px', fontWeight: 900, color: '#ef4444', margin: '8px 0 4px 0' }}>{kpis.topOutlier.ratio.toFixed(2)}</div>
+                                            <span style={{ fontSize: '9px', color: '#71717a', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={kpis.topOutlier.name}>
+                                                {kpis.topOutlier.name}
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <div style={{ fontSize: '14px', color: '#71717a', fontStyle: 'italic', margin: '20px 0' }}>Aucune surcharge</div>
+                                    )}
+                                </div>
+                                {kpis.topOutlier && (
+                                    <div style={{ marginTop: '12px', fontSize: '9px', color: '#71717a' }}>
+                                        Manager : <strong style={{ color: '#18181b' }}>{kpis.topOutlier.managerName}</strong>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e4e4e7', paddingTop: '15px', fontSize: '9px', color: '#a1a1aa' }}>
+                        <span>Généré par Gustav le {new Date().toLocaleDateString('fr-CA')}</span>
+                        <span style={{ fontWeight: 'bold' }}>Page 1 / 3</span>
+                    </div>
+                </div>
+
+                {/* Page 2: Analyse par Département */}
+                <div id="print-page-2" style={{
+                    width: '800px',
+                    height: '1130px',
+                    padding: '60px 50px',
+                    boxSizing: 'border-box',
+                    backgroundColor: '#ffffff',
+                    color: '#18181b',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    fontFamily: 'Inter, system-ui, -apple-system, sans-serif'
+                }}>
+                    <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #18181b', paddingBottom: '15px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: 900, color: '#18181b' }}>ANALYSE PAR DÉPARTEMENT</span>
+                            <span style={{ fontSize: '9px', color: '#71717a' }}>RAPPORT D'ANALYSE DES COMMUNICATIONS</span>
+                        </div>
+                        
+                        <div style={{ marginTop: '20px' }}>
+                            <p style={{ fontSize: '11px', color: '#71717a', marginBottom: '15px' }}>
+                                Ce tableau et ce graphique présentent le volume global de communications ainsi que l'indice de charge moyen par département sur la période sélectionnée.
+                            </p>
+                            
+                            {/* Table */}
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '2px solid #e4e4e7', color: '#71717a', textAlign: 'left' }}>
+                                        <th style={{ padding: '8px 6px', fontWeight: 850 }}>Département</th>
+                                        <th style={{ padding: '8px 6px', fontWeight: 850, textAlign: 'right' }}>Volume global</th>
+                                        <th style={{ padding: '8px 6px', fontWeight: 850, textAlign: 'right' }}>Indice moyen</th>
+                                        <th style={{ padding: '8px 6px', fontWeight: 850, textAlign: 'center' }}>Statut de charge</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {DEPT_LIST.map(d => {
+                                        const kpi = departmentKpis[d] || { totalVolume: 0, avgIndex: 0 }
+                                        const loadStyle = getLoadStyle(kpi.avgIndex)
+                                        return (
+                                            <tr key={d} style={{ borderBottom: '1px solid #f4f4f5' }}>
+                                                <td style={{ padding: '8px 6px', fontWeight: 'bold' }}>{d}</td>
+                                                <td style={{ padding: '8px 6px', textAlign: 'right', fontFamily: 'monospace' }}>{kpi.totalVolume} comms</td>
+                                                <td style={{ padding: '8px 6px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 'bold', color: '#4f46e5' }}>{kpi.avgIndex.toFixed(3)}</td>
+                                                <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+                                                    <span style={{
+                                                        fontSize: '8px',
+                                                        fontWeight: 800,
+                                                        padding: '2px 8px',
+                                                        borderRadius: '9999px',
+                                                        backgroundColor: loadStyle.bg.includes('emerald') ? '#d1fae5' : loadStyle.bg.includes('amber') ? '#fef3c7' : '#fee2e2',
+                                                        color: loadStyle.bg.includes('emerald') ? '#065f46' : loadStyle.bg.includes('amber') ? '#92400e' : '#991b1b'
+                                                    }}>
+                                                        {loadStyle.label}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Bar Chart Section */}
+                    <div style={{ marginTop: '30px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                        <h3 style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#71717a', marginBottom: '15px' }}>
+                            Indices de Charge Moyen par Département
+                        </h3>
+                        <div style={{ width: '700px', height: '320px' }}>
+                            <BarChart width={700} height={320} data={departmentChartData} margin={{ top: 20, right: 20, bottom: 50, left: 10 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
+                                <XAxis dataKey="name" stroke="#71717a" fontSize={9} tickLine={false} interval={0} angle={-30} textAnchor="end" />
+                                <YAxis stroke="#71717a" fontSize={9} tickLine={false} axisLine={false} />
+                                <Bar dataKey="Indice de charge" fill="#4f46e5" radius={[4, 4, 0, 0]}>
+                                    {departmentChartData.map((entry, index) => {
+                                        const color = DEPT_COLORS[entry.name] || '#4f46e5'
+                                        return <Cell key={`cell-${index}`} fill={color} />
+                                    })}
+                                </Bar>
+                            </BarChart>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e4e4e7', paddingTop: '15px', fontSize: '9px', color: '#a1a1aa' }}>
+                        <span>Généré par Gustav le {new Date().toLocaleDateString('fr-CA')}</span>
+                        <span style={{ fontWeight: 'bold' }}>Page 2 / 3</span>
+                    </div>
+                </div>
+
+                {/* Page 3: Tendances Temporelles & Dispersion */}
+                <div id="print-page-3" style={{
+                    width: '800px',
+                    height: '1130px',
+                    padding: '60px 50px',
+                    boxSizing: 'border-box',
+                    backgroundColor: '#ffffff',
+                    color: '#18181b',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    fontFamily: 'Inter, system-ui, -apple-system, sans-serif'
+                }}>
+                    <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #18181b', paddingBottom: '15px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: 900, color: '#18181b' }}>TENDANCES ET DISPERSION DE CHARGE</span>
+                            <span style={{ fontSize: '9px', color: '#71717a' }}>RAPPORT D'ANALYSE DES COMMUNICATIONS</span>
+                        </div>
+                    </div>
+
+                    {/* Trend Chart */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', margin: '20px 0' }}>
+                        <h3 style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#71717a', marginBottom: '8px' }}>
+                            Évolution Mensuelle de l'Indice Moyen
+                        </h3>
+                        <p style={{ fontSize: '9px', color: '#71717a', marginBottom: '15px' }}>
+                            Évolution chronologique de la charge moyenne globale calculée sur l'ensemble des syndicats actifs et filtres sélectionnés.
+                        </p>
+                        <div style={{ width: '700px', height: '280px' }}>
+                            {timelineTrendData.length > 0 ? (
+                                <AreaChart width={700} height={280} data={timelineTrendData} margin={{ top: 10, right: 20, bottom: 10, left: 10 }}>
+                                    <defs>
+                                        <linearGradient id="printColorTrend" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.15}/>
+                                            <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
+                                    <XAxis dataKey="name" stroke="#71717a" fontSize={9} tickLine={false} />
+                                    <YAxis stroke="#71717a" fontSize={9} tickLine={false} axisLine={false} />
+                                    <ReferenceLine y={targetIndex} stroke="#d97706" strokeDasharray="3 3" />
+                                    <Area type="monotone" dataKey="Index Moyen" stroke="#4f46e5" fillOpacity={1} fill="url(#printColorTrend)" strokeWidth={2} name="Moyenne Globale" />
+                                </AreaChart>
+                            ) : (
+                                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyStyle: 'center', color: '#71717a', fontStyle: 'italic', fontSize: '11px' }}>
+                                    Aucune donnée de tendance temporelle disponible.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Scatter Chart */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', margin: '20px 0', borderTop: '1px solid #e4e4e7', paddingTop: '20px' }}>
+                        <h3 style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#71717a', marginBottom: '8px' }}>
+                            Matrice des Surcharges (Portes vs Indice de charge)
+                        </h3>
+                        <p style={{ fontSize: '9px', color: '#71717a', marginBottom: '15px' }}>
+                            Dispersion de chaque syndicat selon sa taille en nombre de portes (Axe X) et son indice de charge (Axe Y). La ligne en pointillés indique le seuil cible.
+                        </p>
+                        <div style={{ width: '700px', height: '280px' }}>
+                            {scatterData.length > 0 ? (
+                                <ScatterChart width={700} height={280} margin={{ top: 10, right: 20, bottom: 20, left: 10 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
+                                    <XAxis 
+                                        type="number" 
+                                        dataKey="doors" 
+                                        name="Portes" 
+                                        stroke="#71717a" 
+                                        fontSize={8} 
+                                        tickLine={false}
+                                        label={{ value: 'Nombre de portes', fill: '#71717a', fontSize: 8, position: 'bottom', offset: 5 }} 
+                                    />
+                                    <YAxis 
+                                        type="number" 
+                                        dataKey="ratio" 
+                                        name="Indice" 
+                                        stroke="#71717a" 
+                                        fontSize={8} 
+                                        tickLine={false} 
+                                        axisLine={false}
+                                        label={{ value: 'Indice / porte / mois', fill: '#71717a', fontSize: 8, angle: -90, position: 'left', offset: 0 }} 
+                                    />
+                                    <ZAxis type="number" dataKey="totalComms" range={[40, 300]} name="Communications" />
+                                    <ReferenceLine 
+                                        y={targetIndex} 
+                                        stroke="#d97706" 
+                                        strokeDasharray="4 4" 
+                                    />
+                                    <Scatter name="Syndicats" data={scatterData}>
+                                        {scatterData.map((entry, index) => {
+                                            const style = getLoadStyle(entry.ratio)
+                                            return <Cell key={`cell-${index}`} fill={style.color} fillOpacity={0.8} />
+                                        })}
+                                    </Scatter>
+                                </ScatterChart>
+                            ) : (
+                                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#71717a', fontStyle: 'italic', fontSize: '11px' }}>
+                                    Aucune donnée de dispersion disponible.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e4e4e7', paddingTop: '15px', fontSize: '9px', color: '#a1a1aa' }}>
+                        <span>Généré par Gustav le {new Date().toLocaleDateString('fr-CA')}</span>
+                        <span style={{ fontWeight: 'bold' }}>Page 3 / 3</span>
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }
