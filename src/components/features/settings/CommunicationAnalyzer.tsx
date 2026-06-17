@@ -251,6 +251,7 @@ export function CommunicationAnalyzer({ clients, stats }: CommunicationAnalyzerP
     
     // CSV uploader states
     const [csvFile, setCsvFile] = useState<File | null>(null)
+    const [fileQueue, setFileQueue] = useState<File[]>([])
     const [isParsing, setIsParsing] = useState(false)
     const [rawRows, setRawRows] = useState<ParsedRow[]>([])
     const [excludedOtonom, setExcludedOtonom] = useState<ParsedRow[]>([])
@@ -307,7 +308,34 @@ export function CommunicationAnalyzer({ clients, stats }: CommunicationAnalyzerP
         setSelectedMonth('all')
         setSelectedUserFilter(null)
         setActiveTab('dashboard')
-        setDeptMap(INITIAL_DEPT_MAP)
+        // Preserving custom employee-to-department mappings across resets so users don't lose their session setup.
+    }
+
+    const processNextFile = (queueToUse?: File[]) => {
+        const activeQueue = queueToUse || fileQueue
+        if (activeQueue.length === 0) return
+        
+        const nextFile = activeQueue[0]
+        const remaining = activeQueue.slice(1)
+        setFileQueue(remaining)
+        
+        setSelectedClientId('')
+        setSdcSearch('')
+        setIsParsing(false)
+        setRawRows([])
+        setExcludedOtonom([])
+        setExcludedAssign([])
+        setDiscoveredUsers([])
+        setHasSaved(false)
+        setIsSaving(false)
+        setDrilldownTab2User(null)
+        setSystemInspectionMode(null)
+        setSelectedYear('all')
+        setSelectedMonth('all')
+        setSelectedUserFilter(null)
+        setActiveTab('dashboard')
+        
+        parseFile(nextFile)
     }
 
     const normalizeEmployeeName = (name: string): string => {
@@ -545,8 +573,24 @@ export function CommunicationAnalyzer({ clients, stats }: CommunicationAnalyzerP
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
-            parseFile(e.target.files[0])
+            const files = Array.from(e.target.files)
+            if (csvFile) {
+                // If a file is already loaded, append new files to the queue
+                setFileQueue(prev => [...prev, ...files])
+                toast.success(`${files.length} fichier(s) ajouté(s) à la file d'attente.`)
+            } else {
+                // Otherwise, load the first file and queue the rest
+                const first = files[0]
+                const rest = files.slice(1)
+                if (rest.length > 0) {
+                    setFileQueue(prev => [...prev, ...rest])
+                }
+                setSelectedClientId('')
+                setSdcSearch('')
+                parseFile(first)
+            }
         }
+        e.target.value = ''
     }
 
     // Dynamic lists of unique years and months detected in CSV
@@ -881,6 +925,44 @@ export function CommunicationAnalyzer({ clients, stats }: CommunicationAnalyzerP
 
     return (
         <div className="space-y-6">
+            {/* File Queue Banner */}
+            {fileQueue.length > 0 && (
+                <div className="bg-indigo-950/40 border border-indigo-800/60 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-indigo-300 animate-in fade-in duration-200">
+                    <div className="flex items-center gap-2">
+                        <FileSpreadsheet className="h-5 w-5 text-indigo-400 shrink-0" />
+                        <div>
+                            <span className="font-bold text-zinc-100">File d'attente active : </span>
+                            <span className="font-semibold">{fileQueue.length} fichier(s) en attente</span>
+                            <span className="text-[10px] text-zinc-400 block mt-0.5">
+                                Prochain fichier : <span className="font-semibold text-indigo-200">{fileQueue[0].name}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                                setFileQueue([])
+                                toast.info("File d'attente vidée.")
+                            }}
+                            className="border-indigo-850/60 text-indigo-400 hover:bg-indigo-950/80 hover:text-indigo-200 text-[10px] h-8 w-full sm:w-auto"
+                        >
+                            Vider la file
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => processNextFile()}
+                            className="bg-indigo-650 hover:bg-indigo-700 text-white font-semibold text-[10px] h-8 w-full sm:w-auto"
+                        >
+                            Ignorer et charger le suivant
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             {/* SDC selection banner & Config controls */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-zinc-950 border border-zinc-850 p-4 rounded-xl">
                 <div className="space-y-1 md:col-span-2 relative">
@@ -1003,11 +1085,20 @@ export function CommunicationAnalyzer({ clients, stats }: CommunicationAnalyzerP
                         {hasSaved && (
                             <Button
                                 type="button"
-                                onClick={handleResetAll}
+                                onClick={() => {
+                                    if (fileQueue.length > 0) {
+                                        processNextFile()
+                                    } else {
+                                        handleResetAll()
+                                    }
+                                }}
                                 className="w-full font-bold h-9 rounded-lg flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md text-xs animate-in fade-in slide-in-from-bottom-2 duration-200"
                             >
                                 <RefreshCw className="h-4 w-4" />
-                                Faire un autre syndicat
+                                {fileQueue.length > 0 
+                                    ? `Traiter le fichier suivant (${fileQueue.length} en attente)` 
+                                    : "Faire un autre syndicat"
+                                }
                             </Button>
                         )}
                     </div>
@@ -1019,6 +1110,7 @@ export function CommunicationAnalyzer({ clients, stats }: CommunicationAnalyzerP
                 <input
                     type="file"
                     accept=".csv"
+                    multiple
                     onChange={handleFileChange}
                     id="dropzone-file-input"
                     className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"

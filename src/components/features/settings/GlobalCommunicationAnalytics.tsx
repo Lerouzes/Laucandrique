@@ -93,6 +93,62 @@ export function GlobalCommunicationAnalytics({
     const [expandedClientId, setExpandedClientId] = useState<string | null>(null)
     const [activeDeptLines, setActiveDeptLines] = useState<string[]>([])
 
+    const handleQuickDateSelect = (option: string) => {
+        if (allPeriods.length === 0) return
+        
+        const lastIndex = allPeriods.length - 1
+        const latestPeriod = allPeriods[lastIndex]
+        const [latestYearStr] = latestPeriod.split('-')
+        const latestYear = Number(latestYearStr)
+
+        let start = allPeriods[0]
+        let end = latestPeriod
+
+        switch(option) {
+            case 'last-month':
+                start = latestPeriod
+                end = latestPeriod
+                break
+            case 'last-3-months':
+                start = allPeriods[Math.max(0, allPeriods.length - 3)]
+                end = latestPeriod
+                break
+            case 'last-6-months':
+                start = allPeriods[Math.max(0, allPeriods.length - 6)]
+                end = latestPeriod
+                break
+            case 'last-12-months':
+                start = allPeriods[Math.max(0, allPeriods.length - 12)]
+                end = latestPeriod
+                break
+            case 'current-year': {
+                const yearPeriods = allPeriods.filter(p => p.startsWith(latestYearStr))
+                if (yearPeriods.length > 0) {
+                    start = yearPeriods[0]
+                    end = yearPeriods[yearPeriods.length - 1]
+                }
+                break
+            }
+            case 'last-year': {
+                const lastYearStr = (latestYear - 1).toString()
+                const yearPeriods = allPeriods.filter(p => p.startsWith(lastYearStr))
+                if (yearPeriods.length > 0) {
+                    start = yearPeriods[0]
+                    end = yearPeriods[yearPeriods.length - 1]
+                }
+                break
+            }
+            case 'all':
+            default:
+                start = allPeriods[0]
+                end = latestPeriod
+                break
+        }
+
+        setStartPeriod(start)
+        setEndPeriod(end)
+    }
+
     const handleExportPDF = async () => {
         setIsExporting(true)
         try {
@@ -695,31 +751,54 @@ export function GlobalCommunicationAnalytics({
                     </div>
 
                     {/* Date Range selectors */}
-                    {allPeriods.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-bold text-zinc-500 uppercase tracking-wider text-[10px]">Période De :</span>
-                            <select
-                                value={startPeriod}
-                                onChange={(e) => setStartPeriod(e.target.value)}
-                                className="bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 font-semibold outline-none focus:border-indigo-650 focus:ring-1 focus:ring-indigo-650/30 cursor-pointer transition-all"
-                            >
-                                {allPeriods.map(p => (
-                                    <option key={p} value={p}>{formatMonthLabel(p)}</option>
-                                ))}
-                            </select>
+                    {allPeriods.length > 0 && (() => {
+                        const latestPeriod = allPeriods[allPeriods.length - 1] || ''
+                        const latestYearStr = latestPeriod ? latestPeriod.split('-')[0] : ''
+                        const latestYear = latestYearStr ? Number(latestYearStr) : new Date().getFullYear()
 
-                            <span className="font-bold text-zinc-500 uppercase tracking-wider text-[10px]">À :</span>
-                            <select
-                                value={endPeriod}
-                                onChange={(e) => setEndPeriod(e.target.value)}
-                                className="bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 font-semibold outline-none focus:border-indigo-650 focus:ring-1 focus:ring-indigo-650/30 cursor-pointer transition-all"
-                            >
-                                {allPeriods.map(p => (
-                                    <option key={p} value={p} disabled={p < startPeriod}>{formatMonthLabel(p)}</option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
+                        return (
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-bold text-zinc-500 uppercase tracking-wider text-[10px]">Période De :</span>
+                                <select
+                                    value={startPeriod}
+                                    onChange={(e) => setStartPeriod(e.target.value)}
+                                    className="bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 font-semibold outline-none focus:border-indigo-650 focus:ring-1 focus:ring-indigo-650/30 cursor-pointer transition-all"
+                                >
+                                    {allPeriods.map(p => (
+                                        <option key={p} value={p}>{formatMonthLabel(p)}</option>
+                                    ))}
+                                </select>
+
+                                <span className="font-bold text-zinc-500 uppercase tracking-wider text-[10px]">À :</span>
+                                <select
+                                    value={endPeriod}
+                                    onChange={(e) => setEndPeriod(e.target.value)}
+                                    className="bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 font-semibold outline-none focus:border-indigo-650 focus:ring-1 focus:ring-indigo-650/30 cursor-pointer transition-all"
+                                >
+                                    {allPeriods.map(p => (
+                                        <option key={p} value={p} disabled={p < startPeriod}>{formatMonthLabel(p)}</option>
+                                    ))}
+                                </select>
+
+                                <span className="font-bold text-zinc-550 text-zinc-500 uppercase tracking-wider text-[10px] ml-2">Raccourci :</span>
+                                <select
+                                    onChange={(e) => handleQuickDateSelect(e.target.value)}
+                                    defaultValue="all"
+                                    className="bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 font-semibold outline-none focus:border-indigo-650 focus:ring-1 focus:ring-indigo-650/30 cursor-pointer transition-all"
+                                >
+                                    <option value="all">Toute la période</option>
+                                    <option value="last-month">Dernier mois</option>
+                                    <option value="last-3-months">Derniers 3 mois</option>
+                                    <option value="last-6-months">Derniers 6 mois</option>
+                                    <option value="last-12-months">Derniers 12 mois</option>
+                                    <option value="current-year">Cette année ({latestYearStr})</option>
+                                    {allPeriods.some(p => p.startsWith((latestYear - 1).toString())) && (
+                                        <option value="last-year">L'année passée ({(latestYear - 1).toString()})</option>
+                                    )}
+                                </select>
+                            </div>
+                        )
+                    })()}
                 </div>
 
                 {/* SDC Search & PDF Export */}
