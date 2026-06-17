@@ -158,6 +158,41 @@ export function GlobalCommunicationAnalytics({
                 return
             }
 
+            // --- Color resolution helper (runs on MAIN document, has real GPU context) ---
+            const helperCanvas = document.createElement('canvas')
+            helperCanvas.width = 1
+            helperCanvas.height = 1
+            const helperCtx = helperCanvas.getContext('2d')
+            const colorCache: Record<string, string> = {}
+
+            // Matches oklch(...), oklab(...), lab(...), lch(...), color(...)
+            // Uses a non-greedy match to handle optional slash-alpha: e.g. oklch(0.5 0.1 200 / 50%)
+            const modernColorRe = /\b(oklch|oklab|lab|lch|color)\s*\([^)]*\)/gi
+
+            const resolveMatch = (match: string): string => {
+                if (colorCache[match] !== undefined) return colorCache[match]
+                let result = 'rgba(12,13,18,1)'
+                if (helperCtx) {
+                    try {
+                        helperCtx.clearRect(0, 0, 1, 1)
+                        helperCtx.fillStyle = match
+                        helperCtx.fillRect(0, 0, 1, 1)
+                        const px = helperCtx.getImageData(0, 0, 1, 1).data
+                        result = `rgba(${px[0]},${px[1]},${px[2]},${(px[3] / 255).toFixed(3)})`
+                    } catch (_) { /* keep fallback */ }
+                }
+                colorCache[match] = result
+                return result
+            }
+
+            const scrubColors = (text: string): string => {
+                if (!text) return text
+                modernColorRe.lastIndex = 0
+                if (!modernColorRe.test(text)) return text
+                modernColorRe.lastIndex = 0
+                return text.replace(modernColorRe, resolveMatch)
+            }
+
             const html2CanvasFn = (html2canvas as any).default || html2canvas
             const canvas = await html2CanvasFn(element, {
                 scale: 1.5,
@@ -165,106 +200,52 @@ export function GlobalCommunicationAnalytics({
                 backgroundColor: '#0c0d12',
                 windowWidth: 1400,
                 onclone: (clonedDoc: Document) => {
-                    // Fix Recharts SVG dimensions
-                    const containers = clonedDoc.querySelectorAll('.recharts-responsive-container');
-                    containers.forEach((container: any) => {
-                        container.style.width = '600px';
-                        container.style.height = '300px';
-                        const svg = container.querySelector('svg');
+                    // ── STEP 1: Scrub ALL <style> element CSS text ──────────────────────────
+                    // This is the root cause: globals.css contains oklch() in :root variables.
+                    // html2canvas parses this CSS text directly, before getComputedStyle is called.
+                    clonedDoc.querySelectorAll('style').forEach((styleEl: any) => {
+                        if (styleEl.textContent) {
+                            styleEl.textContent = scrubColors(styleEl.textContent)
+                        }
+                    })
+
+                    // ── STEP 2: Fix Recharts SVG dimensions ─────────────────────────────────
+                    clonedDoc.querySelectorAll('.recharts-responsive-container').forEach((container: any) => {
+                        container.style.width = '600px'
+                        container.style.height = '300px'
+                        const svg = container.querySelector('svg')
                         if (svg) {
-                            svg.setAttribute('width', '600');
-                            svg.setAttribute('height', '300');
-                            svg.style.width = '600px';
-                            svg.style.height = '300px';
+                            svg.setAttribute('width', '600')
+                            svg.setAttribute('height', '300')
+                            svg.style.width = '600px'
+                            svg.style.height = '300px'
                         }
-                    });
+                    })
 
-                    // Convert a modern CSS color string to rgba() by rendering on a 1x1 canvas.
-                    // We use the MAIN document's canvas (not the cloned one) so it has a real GPU context.
-                    const helperCanvas = document.createElement('canvas');
-                    helperCanvas.width = 1;
-                    helperCanvas.height = 1;
-                    const helperCtx = helperCanvas.getContext('2d');
-                    const colorCache: Record<string, string> = {};
-
-                    const modernColorRe = /(oklch|oklab|lab|lch)\s*\([^)]*\)|color\s*\([^)]*\)/gi;
-
-                    const resolveColor = (raw: string): string => {
-                        if (!raw || typeof raw !== 'string') return raw;
-                        if (!modernColorRe.test(raw)) return raw;
-                        modernColorRe.lastIndex = 0; // reset after .test()
-                        if (colorCache[raw]) return colorCache[raw];
-
-                        const resolved = raw.replace(modernColorRe, (match) => {
-                            if (colorCache[match]) return colorCache[match];
-                            let result = '#0c0d12'; // safe dark fallback
-                            if (helperCtx) {
-                                try {
-                                    helperCtx.clearRect(0, 0, 1, 1);
-                                    helperCtx.fillStyle = match;
-                                    helperCtx.fillRect(0, 0, 1, 1);
-                                    const px = helperCtx.getImageData(0, 0, 1, 1).data;
-                                    result = `rgba(${px[0]},${px[1]},${px[2]},${(px[3] / 255).toFixed(3)})`;
-                                } catch (_) { /* keep fallback */ }
-                            }
-                            colorCache[match] = result;
-                            return result;
-                        });
-                        colorCache[raw] = resolved;
-                        return resolved;
-                    };
-
-                    // Walk every element in the cloned document and inline converted colors
-                    // so html2canvas's own parser never encounters modern color functions.
-                    const COLOR_PROPS = [
-                        'color', 'backgroundColor', 'borderColor',
-                        'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor',
-                        'outlineColor', 'textDecorationColor', 'fill', 'stroke',
-                        'boxShadow', 'caretColor',
-                    ] as const;
-
-                    const allEls = clonedDoc.querySelectorAll('*');
-                    allEls.forEach((el: any) => {
-                        try {
-                            // Get computed style from the MAIN document's window by finding the
-                            // same element (we need to look it up in the main document).
-                            // Since we can't easily cross-reference, compute against cloned el
-                            // using the clonedDoc's defaultView if available, otherwise skip.
-                            const view = clonedDoc.defaultView;
-                            if (!view) return;
-                            const computed = view.getComputedStyle(el);
-                            COLOR_PROPS.forEach((prop) => {
-                                const val = computed[prop as any] as string;
-                                if (val && modernColorRe.test(val)) {
-                                    modernColorRe.lastIndex = 0;
-                                    el.style[prop as any] = resolveColor(val);
-                                }
-                            });
-                            // Also fix any inline style that may have modern colors
-                            if (el.style) {
-                                COLOR_PROPS.forEach((prop) => {
-                                    const inlineVal = el.style[prop as any] as string;
-                                    if (inlineVal && modernColorRe.test(inlineVal)) {
-                                        modernColorRe.lastIndex = 0;
-                                        el.style[prop as any] = resolveColor(inlineVal);
+                    // ── STEP 3: Patch getComputedStyle on the cloned window ─────────────────
+                    // Safety net for any runtime-computed colors that survived step 1.
+                    const view = clonedDoc.defaultView
+                    if (view) {
+                        const origGCS = view.getComputedStyle.bind(view)
+                        ;(view as any).getComputedStyle = function (el: Element, pseudo?: string | null) {
+                            const style = origGCS(el, pseudo)
+                            return new Proxy(style, {
+                                get (target: any, prop: string | symbol, receiver: any) {
+                                    const val = Reflect.get(target, prop, receiver)
+                                    if (typeof val === 'string') {
+                                        return scrubColors(val)
                                     }
-                                });
-                            }
-                        } catch (_) { /* skip inaccessible elements */ }
-                    });
-
-                    // Force the clone's CSS variables to be overridden with plain dark bg/text
-                    // to avoid oklch in :root custom properties bleeding through.
-                    const styleOverride = clonedDoc.createElement('style');
-                    styleOverride.textContent = `
-                        *, *::before, *::after {
-                            --background: #0c0d12 !important;
-                            --foreground: #fafafa !important;
-                            --border: #27272a !important;
-                            --ring: #6366f1 !important;
+                                    if (typeof val === 'function') {
+                                        if (prop === 'getPropertyValue') {
+                                            return (name: string) => scrubColors(target.getPropertyValue(name))
+                                        }
+                                        return val.bind(target)
+                                    }
+                                    return val
+                                }
+                            })
                         }
-                    `;
-                    clonedDoc.head.appendChild(styleOverride);
+                    }
                 }
             })
 
@@ -295,6 +276,7 @@ export function GlobalCommunicationAnalytics({
             setIsExporting(false)
         }
     }
+
 
     // 1. Filter stats to only keep the latest run per client_id
     const latestClientRuns = useMemo(() => {
