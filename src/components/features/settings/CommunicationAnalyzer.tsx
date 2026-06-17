@@ -51,6 +51,8 @@ interface Client {
 interface CommunicationAnalyzerProps {
     clients: Client[]
     stats?: any[]
+    externalQueue?: File[]
+    setExternalQueue?: React.Dispatch<React.SetStateAction<File[]>>
 }
 
 interface ParsedRow {
@@ -202,7 +204,12 @@ const classifyCommType = (typeStr: string): 'outboundEmail' | 'inboundEmail' | '
     return 'other'
 }
 
-export function CommunicationAnalyzer({ clients, stats }: CommunicationAnalyzerProps) {
+export function CommunicationAnalyzer({ 
+    clients, 
+    stats,
+    externalQueue,
+    setExternalQueue
+}: CommunicationAnalyzerProps) {
     const [selectedClientId, setSelectedClientId] = useState<string>('')
     const [sdcSearch, setSdcSearch] = useState('')
     const [isSdcDropdownOpen, setIsSdcDropdownOpen] = useState(false)
@@ -251,7 +258,9 @@ export function CommunicationAnalyzer({ clients, stats }: CommunicationAnalyzerP
     
     // CSV uploader states
     const [csvFile, setCsvFile] = useState<File | null>(null)
-    const [fileQueue, setFileQueue] = useState<File[]>([])
+    const [localFileQueue, setLocalFileQueue] = useState<File[]>([])
+    const fileQueue = externalQueue !== undefined ? externalQueue : localFileQueue
+    const setFileQueue = setExternalQueue !== undefined ? setExternalQueue : setLocalFileQueue
     const [isParsing, setIsParsing] = useState(false)
     const [rawRows, setRawRows] = useState<ParsedRow[]>([])
     const [excludedOtonom, setExcludedOtonom] = useState<ParsedRow[]>([])
@@ -337,6 +346,13 @@ export function CommunicationAnalyzer({ clients, stats }: CommunicationAnalyzerP
         
         parseFile(nextFile)
     }
+
+    // Auto-process first file in queue if active file is null and queue has items
+    useEffect(() => {
+        if (!csvFile && fileQueue.length > 0 && !isParsing && !hasSaved && !isSaving) {
+            processNextFile(fileQueue)
+        }
+    }, [fileQueue, csvFile, isParsing, hasSaved, isSaving])
 
     const normalizeEmployeeName = (name: string): string => {
         if (!name) return ""

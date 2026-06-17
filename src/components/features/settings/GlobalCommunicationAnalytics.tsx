@@ -44,6 +44,7 @@ import {
     Line
 } from 'recharts'
 import Link from 'next/link'
+import { MultiSearchableSelect } from '@/components/ui/multi-searchable-select'
 
 const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Travaux Majeurs", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
 
@@ -86,6 +87,8 @@ export function GlobalCommunicationAnalytics({
     targetIndex = 2.50
 }: GlobalCommunicationAnalyticsProps) {
     const [filterTeamId, setFilterTeamId] = useState<string>('all')
+    const [selectedManagerIds, setSelectedManagerIds] = useState<string[]>([])
+    const [selectedSyndicateIds, setSelectedSyndicateIds] = useState<string[]>([])
     const [startPeriod, setStartPeriod] = useState<string>('')
     const [endPeriod, setEndPeriod] = useState<string>('')
     const [searchQuery, setSearchQuery] = useState<string>('')
@@ -290,6 +293,41 @@ export function GlobalCommunicationAnalytics({
         return Array.from(latestMap.values())
     }, [stats])
 
+    // We extract the list of distinct managers from the stats data
+    const managersList = useMemo(() => {
+        const managersMap = new Map<string, string>()
+        latestClientRuns.forEach(run => {
+            const client = run.clients || {}
+            const manager = client.managers || {}
+            if (manager.id) {
+                const name = manager.first_name && manager.last_name 
+                    ? `${manager.first_name} ${manager.last_name}` 
+                    : 'Non assigné'
+                managersMap.set(manager.id, name)
+            }
+        })
+        const list = Array.from(managersMap.entries()).map(([id, name]) => ({ id, name }))
+        list.sort((a, b) => a.name.localeCompare(b.name))
+        return list
+    }, [latestClientRuns])
+
+    // We extract the list of distinct active/imported syndicates
+    const syndicatesList = useMemo(() => {
+        const syndMap = new Map<string, { code: string; name: string }>()
+        latestClientRuns.forEach(run => {
+            const client = run.clients || {}
+            if (client.id && client.status !== 'inactive') {
+                syndMap.set(client.id, {
+                    code: client.full_name || '',
+                    name: client.company_name || 'Syndicat sans nom'
+                })
+            }
+        })
+        const list = Array.from(syndMap.entries()).map(([id, data]) => ({ id, ...data }))
+        list.sort((a, b) => a.code.localeCompare(b.code))
+        return list
+    }, [latestClientRuns])
+
     // 2. Extract all distinct chronological monthly periods
     const allPeriods = useMemo(() => {
         const periods = new Set<string>()
@@ -336,6 +374,16 @@ export function GlobalCommunicationAnalytics({
             // Team Filter
             if (filterTeamId !== 'all') {
                 if (team.id !== filterTeamId) return null
+            }
+
+            // Manager Filter
+            if (selectedManagerIds.length > 0) {
+                if (!manager.id || !selectedManagerIds.includes(manager.id)) return null
+            }
+
+            // Syndicate Filter
+            if (selectedSyndicateIds.length > 0) {
+                if (!client.id || !selectedSyndicateIds.includes(client.id)) return null
             }
 
             const timelineList = run.analysis_summary?.timelineList || []
@@ -441,7 +489,7 @@ export function GlobalCommunicationAnalytics({
                 deptCounts
             }
         }).filter(Boolean) as any[]
-    }, [latestClientRuns, filterTeamId, startPeriod, endPeriod])
+    }, [latestClientRuns, filterTeamId, startPeriod, endPeriod, selectedManagerIds, selectedSyndicateIds])
 
     // 5. Apply search query
     const searchedClients = useMemo(() => {
@@ -524,6 +572,92 @@ export function GlobalCommunicationAnalytics({
             hasGranularTypes
         }
     }, [processedClients, targetIndex])
+
+    // Calculate Prior Period KPIs for period-over-period comparison
+    const priorKpis = useMemo(() => {
+        if (!startPeriod || !endPeriod || allPeriods.length === 0) return null
+
+        const startIndex = allPeriods.indexOf(startPeriod)
+        const endIndex = allPeriods.indexOf(endPeriod)
+        
+        if (startIndex === -1 || endIndex === -1) return null
+
+        const length = endIndex - startIndex + 1
+        const priorStartIndex = startIndex - length
+        const priorEndIndex = startIndex - 1
+
+        if (priorStartIndex < 0) return null
+
+        const priorStart = allPeriods[priorStartIndex]
+        const priorEnd = allPeriods[priorEndIndex]
+
+        const priorProcessed = latestClientRuns.map(run => {
+            const client = run.clients || {}
+            const manager = client.managers || {}
+            const team = manager.manager_teams || {}
+
+            if (client.status === 'inactive') return null
+            if (filterTeamId !== 'all' && team.id !== filterTeamId) return null
+            if (selectedManagerIds.length > 0 && (!manager.id || !selectedManagerIds.includes(manager.id))) return null
+            if (selectedSyndicateIds.length > 0 && (!client.id || !selectedSyndicateIds.includes(client.id))) return null
+
+            const timelineList = run.analysis_summary?.timelineList || []
+            const activeTimeline = timelineList.filter((t: any) => 
+                t.period >= priorStart && t.period <= priorEnd
+            )
+
+            if (activeTimeline.length === 0) return null
+
+            let inclusions = 0
+            activeTimeline.forEach((t: any) => {
+                inclusions += Number(t.contractVolume || 0)
+            })
+
+            const monthsCount = activeTimeline.length
+            const doors = Number(client.doors?.length || run.analysis_summary?.total_units || 90)
+            const ratio = Number((inclusions / Math.max(1, doors * monthsCount)).toFixed(2))
+
+            return { ratio, totalComms: inclusions }
+        }).filter(Boolean) as any[]
+
+        const totalClients = priorProcessed.length
+        if (totalClients === 0) return null
+
+        const sumRatio = priorProcessed.reduce((acc, curr) => acc + curr.ratio, 0)
+        const avgRatio = Number((sumRatio / totalClients).toFixed(2))
+        const totalComms = priorProcessed.reduce((acc, curr) => acc + curr.totalComms, 0)
+
+        const surchargeCount = priorProcessed.filter(c => c.ratio > targetIndex).length
+        const surchargePct = Math.round((surchargeCount / totalClients) * 100)
+
+        return {
+            avgRatio,
+            totalComms,
+            surchargePct,
+            start: priorStart,
+            end: priorEnd
+        }
+    }, [latestClientRuns, filterTeamId, startPeriod, endPeriod, allPeriods, selectedManagerIds, selectedSyndicateIds, targetIndex])
+
+    const popTrends = useMemo(() => {
+        if (!priorKpis) return null
+
+        const ratioDiff = kpis.avgRatio - priorKpis.avgRatio
+        const ratioPercent = priorKpis.avgRatio > 0 ? (ratioDiff / priorKpis.avgRatio) * 100 : 0
+
+        const commsDiff = kpis.totalComms - priorKpis.totalComms
+        const commsPercent = priorKpis.totalComms > 0 ? (commsDiff / priorKpis.totalComms) * 100 : 0
+
+        const surchargeDiff = kpis.surchargePct - priorKpis.surchargePct
+
+        return {
+            ratioDiff,
+            ratioPercent,
+            commsDiff,
+            commsPercent,
+            surchargeDiff
+        }
+    }, [kpis, priorKpis])
 
     // 7. Get Load Rating Styling
     const getLoadStyle = (rate: number) => {
@@ -625,6 +759,8 @@ export function GlobalCommunicationAnalytics({
 
                 if (client.status === 'inactive') return
                 if (filterTeamId !== 'all' && team.id !== filterTeamId) return
+                if (selectedManagerIds.length > 0 && (!manager.id || !selectedManagerIds.includes(manager.id))) return
+                if (selectedSyndicateIds.length > 0 && (!client.id || !selectedSyndicateIds.includes(client.id))) return
 
                 const timelineList = run.analysis_summary?.timelineList || []
                 const match = timelineList.find((t: any) => t.period === period)
@@ -668,7 +804,7 @@ export function GlobalCommunicationAnalytics({
 
             return resObj
         })
-    }, [latestClientRuns, filterTeamId, startPeriod, endPeriod, allPeriods])
+    }, [latestClientRuns, filterTeamId, startPeriod, endPeriod, allPeriods, selectedManagerIds, selectedSyndicateIds])
 
     // 12. Department KPIs aggregated across the filtered range
     const departmentKpis = useMemo(() => {
@@ -691,6 +827,8 @@ export function GlobalCommunicationAnalytics({
 
             if (client.status === 'inactive') return
             if (filterTeamId !== 'all' && team.id !== filterTeamId) return
+            if (selectedManagerIds.length > 0 && (!manager.id || !selectedManagerIds.includes(manager.id))) return
+            if (selectedSyndicateIds.length > 0 && (!client.id || !selectedSyndicateIds.includes(client.id))) return
 
             const doors = Number(client.doors?.length || run.analysis_summary?.total_units || 90)
             const timelineList = run.analysis_summary?.timelineList || []
@@ -720,7 +858,7 @@ export function GlobalCommunicationAnalytics({
         })
 
         return kpis
-    }, [latestClientRuns, filterTeamId, startPeriod, endPeriod, allPeriods])
+    }, [latestClientRuns, filterTeamId, startPeriod, endPeriod, allPeriods, selectedManagerIds, selectedSyndicateIds])
 
     return (
         <div className="space-y-6 text-xs w-full max-w-full">
@@ -740,6 +878,32 @@ export function GlobalCommunicationAnalytics({
                                 <option key={t.id} value={t.id}>{t.name}</option>
                             ))}
                         </select>
+                    </div>
+
+                    {/* Manager Filter */}
+                    <div className="flex items-center gap-2 min-w-[170px]">
+                        <span className="font-bold text-zinc-550 text-zinc-500 uppercase tracking-wider text-[10px]">Manager :</span>
+                        <MultiSearchableSelect
+                            value={selectedManagerIds}
+                            onChange={setSelectedManagerIds}
+                            options={managersList.map(m => ({ value: m.id, label: m.name }))}
+                            placeholder="Tous les managers"
+                            searchPlaceholder="Rechercher un manager..."
+                            className="bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1 text-xs text-zinc-300 font-semibold cursor-pointer max-w-[200px]"
+                        />
+                    </div>
+
+                    {/* Syndicate Filter */}
+                    <div className="flex items-center gap-2 min-w-[200px]">
+                        <span className="font-bold text-zinc-550 text-zinc-500 uppercase tracking-wider text-[10px]">Syndicat :</span>
+                        <MultiSearchableSelect
+                            value={selectedSyndicateIds}
+                            onChange={setSelectedSyndicateIds}
+                            options={syndicatesList.map(s => ({ value: s.id, label: `${s.code} - ${s.name}` }))}
+                            placeholder="Tous les syndicats"
+                            searchPlaceholder="Rechercher un syndicat..."
+                            className="bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1 text-xs text-zinc-300 font-semibold cursor-pointer max-w-[240px]"
+                        />
                     </div>
 
                     {/* Date Range selectors */}
@@ -847,11 +1011,29 @@ export function GlobalCommunicationAnalytics({
                                     </span>
                                     <span className="text-xs text-zinc-500 font-medium">interactions / porte / mois</span>
                                 </div>
-                                <div className="mt-3 flex items-center gap-1 text-[10px]">
+                                <div className="mt-3 flex items-center gap-1 text-[10px] flex-wrap">
                                     <Badge className={`px-2 py-0.5 rounded-full ${getLoadStyle(kpis.avgRatio).bg}`}>
                                         {getLoadStyle(kpis.avgRatio).label}
                                     </Badge>
                                 </div>
+                                {popTrends && (
+                                    <div className="mt-2.5 text-[10px] flex items-center gap-1">
+                                        {popTrends.ratioDiff > 0 ? (
+                                            <span className="text-amber-500 font-bold flex items-center gap-0.5">
+                                                <TrendingUp className="h-3.5 w-3.5" />
+                                                +{popTrends.ratioDiff.toFixed(2)} (+{popTrends.ratioPercent.toFixed(1)}%)
+                                            </span>
+                                        ) : popTrends.ratioDiff < 0 ? (
+                                            <span className="text-emerald-400 font-bold flex items-center gap-0.5">
+                                                <TrendingDown className="h-3.5 w-3.5" />
+                                                {popTrends.ratioDiff.toFixed(2)} ({popTrends.ratioPercent.toFixed(1)}%)
+                                            </span>
+                                        ) : (
+                                            <span className="text-zinc-500 font-semibold">Stable</span>
+                                        )}
+                                        <span className="text-zinc-550">vs période préc.</span>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
 
@@ -866,6 +1048,24 @@ export function GlobalCommunicationAnalytics({
                                         </span>
                                         <span className="text-[10px] text-zinc-550 font-semibold uppercase font-bold">comms</span>
                                     </div>
+                                    {popTrends && (
+                                        <div className="mt-2 text-[10px] flex items-center gap-1">
+                                            {popTrends.commsDiff > 0 ? (
+                                                <span className="text-amber-500 font-bold flex items-center gap-0.5">
+                                                    <TrendingUp className="h-3.5 w-3.5" />
+                                                    +{popTrends.commsDiff} (+{popTrends.commsPercent.toFixed(1)}%)
+                                                </span>
+                                            ) : popTrends.commsDiff < 0 ? (
+                                                <span className="text-emerald-400 font-bold flex items-center gap-0.5">
+                                                    <TrendingDown className="h-3.5 w-3.5" />
+                                                    {popTrends.commsDiff} ({popTrends.commsPercent.toFixed(1)}%)
+                                                </span>
+                                            ) : (
+                                                <span className="text-zinc-500 font-semibold">Stable</span>
+                                            )}
+                                            <span className="text-zinc-550">vs période préc.</span>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="mt-3.5 pt-2.5 border-t border-zinc-900/60 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[9px] text-zinc-400 font-medium">
                                     {kpis.hasGranularTypes ? (
@@ -913,10 +1113,28 @@ export function GlobalCommunicationAnalytics({
                                     </span>
                                     <span className="text-xs text-zinc-500 font-medium">excluent la cible de {targetIndex.toFixed(2)}</span>
                                 </div>
-                                <div className="mt-3.5 text-[10px] text-zinc-500 font-medium flex items-center gap-1">
-                                    <AlertTriangle className={`h-3.5 w-3.5 ${kpis.surchargePct > 30 ? 'text-rose-400' : 'text-emerald-400'}`} />
+                                <div className="mt-3.5 text-[10px] text-zinc-550 text-zinc-500 font-medium flex items-center gap-1">
+                                    <AlertTriangle className={`h-3.5 w-3.5 ${kpis.surchargePct > 30 ? 'text-rose-455 text-rose-450' : 'text-emerald-450 text-emerald-400'}`} />
                                     <span>{processedClients.filter(c => c.ratio > targetIndex).length} syndicats surchargés</span>
                                 </div>
+                                {popTrends && (
+                                    <div className="mt-2 text-[10px] flex items-center gap-1">
+                                        {popTrends.surchargeDiff > 0 ? (
+                                            <span className="text-rose-455 text-rose-400 font-bold flex items-center gap-0.5">
+                                                <TrendingUp className="h-3.5 w-3.5" />
+                                                +{popTrends.surchargeDiff}%
+                                            </span>
+                                        ) : popTrends.surchargeDiff < 0 ? (
+                                            <span className="text-emerald-450 text-emerald-400 font-bold flex items-center gap-0.5">
+                                                <TrendingDown className="h-3.5 w-3.5" />
+                                                {popTrends.surchargeDiff}%
+                                            </span>
+                                        ) : (
+                                            <span className="text-zinc-500 font-semibold">Stable</span>
+                                        )}
+                                        <span className="text-zinc-550">vs période préc.</span>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
 

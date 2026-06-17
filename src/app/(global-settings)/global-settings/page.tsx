@@ -21,6 +21,7 @@ import { getManagers, getManagerTeams } from '@/actions/managers'
 import { getAllCommunicationStats } from '@/actions/communication-stats'
 import { getSettings } from '@/actions/settings'
 import { GlobalCommunicationAnalytics } from '@/components/features/settings/GlobalCommunicationAnalytics'
+import { LaucandriqueExtractor } from '@/components/features/settings/LaucandriqueExtractor'
 
 // Tabs component
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -35,6 +36,7 @@ export default function GlobalSettingsPage() {
     const [snapshots, setSnapshots] = useState<any[]>([])
     const [managers, setManagers] = useState<any[]>([])
     const [allCommsStats, setAllCommsStats] = useState<any[]>([])
+    const [extractorQueue, setExtractorQueue] = useState<File[]>([])
     const [targetIndex, setTargetIndex] = useState<number>(2.50)
     const [searchVal, setSearchVal] = useState('')
     const [userRole, setUserRole] = useState<string>('Agent')
@@ -138,6 +140,10 @@ export default function GlobalSettingsPage() {
                         <MessageSquare className="h-4 w-4 text-indigo-400" />
                         Analytics Communications
                     </TabsTrigger>
+                    <TabsTrigger value="extractor" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
+                        <FileSpreadsheet className="h-4 w-4 text-emerald-450 text-emerald-400" />
+                        Extracteur Laucandrique
+                    </TabsTrigger>
                     {userRole === 'Master' && (
                         <TabsTrigger value="accounts" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
                             <Users className="h-4 w-4" />
@@ -222,7 +228,22 @@ export default function GlobalSettingsPage() {
 
                 {/* TAB 3: COMMUNICATIONS ANALYZER */}
                 <TabsContent value="communications" className="outline-none">
-                    <CommunicationAnalyzer clients={filteredClients} stats={allCommsStats} />
+                    <CommunicationAnalyzer 
+                        clients={filteredClients} 
+                        stats={allCommsStats} 
+                        externalQueue={extractorQueue}
+                        setExternalQueue={setExtractorQueue}
+                    />
+                </TabsContent>
+
+                {/* TAB extractor: LAUCANDRIQUE EXTRACTOR */}
+                <TabsContent value="extractor" className="outline-none">
+                    <LaucandriqueExtractor 
+                        onSendToAnalyzer={(files) => {
+                            setExtractorQueue(files)
+                            handleTabChange('communications')
+                        }}
+                    />
                 </TabsContent>
 
                 {/* TAB 4: GLOBAL COMMUNICATIONS ANALYTICS */}
