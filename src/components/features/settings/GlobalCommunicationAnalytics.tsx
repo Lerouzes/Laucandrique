@@ -573,23 +573,62 @@ export function GlobalCommunicationAnalytics({
         }
     }, [processedClients, targetIndex])
 
-    // Calculate Prior Period KPIs for period-over-period comparison
+    // Helper to find the latest period with actual communications data
+    const latestPeriodWithData = useMemo(() => {
+        let latest = ""
+        stats.forEach(run => {
+            const timeline = run.analysis_summary?.timelineList || []
+            timeline.forEach((t: any) => {
+                const vol = Number(t.contractVolume || 0) + Number(t.outOfContractVolume || 0)
+                if (vol > 0 && (!latest || t.period > latest)) {
+                    latest = t.period
+                }
+            })
+        })
+        return latest || allPeriods[allPeriods.length - 1] || ""
+    }, [stats, allPeriods])
+
+    // Helper to format prior period range labels nicely (e.g. vs janv. 25 - juin 25)
+    const formatPriorRangeLabel = (start: string, end: string) => {
+        if (!start || !end) return "vs période préc."
+        try {
+            const formatShort = (p: string) => {
+                const [y, m] = p.split('-')
+                const date = new Date(Number(y), Number(m) - 1, 1)
+                return date.toLocaleDateString('fr-CA', { month: 'short', year: '2-digit' })
+            }
+            if (start === end) {
+                return `vs ${formatShort(start)}`
+            }
+            return `vs ${formatShort(start)} - ${formatShort(end)}`
+        } catch (_) {
+            return "vs période préc."
+        }
+    }
+
+    // Calculate Prior Period KPIs for period-over-period comparison (YoY same timeframe)
     const priorKpis = useMemo(() => {
-        if (!startPeriod || !endPeriod || allPeriods.length === 0) return null
+        if (!startPeriod || !endPeriod || allPeriods.length === 0 || !latestPeriodWithData) return null
 
-        const startIndex = allPeriods.indexOf(startPeriod)
-        const endIndex = allPeriods.indexOf(endPeriod)
+        // If the selected end period goes past our latest month with actual data,
+        // restrict the comparison range to months that actually have data.
+        const effectiveEnd = endPeriod > latestPeriodWithData ? latestPeriodWithData : endPeriod
         
-        if (startIndex === -1 || endIndex === -1) return null
+        if (startPeriod > effectiveEnd) return null
 
-        const length = endIndex - startIndex + 1
-        const priorStartIndex = startIndex - length
-        const priorEndIndex = startIndex - 1
+        // Subtract exactly 1 year to get the same seasonal period
+        const getYoYPeriod = (periodStr: string): string => {
+            if (!periodStr) return ""
+            const [y, m] = periodStr.split('-')
+            const priorYear = Number(y) - 1
+            return `${priorYear}-${m}`
+        }
 
-        if (priorStartIndex < 0) return null
+        const priorStart = getYoYPeriod(startPeriod)
+        const priorEnd = getYoYPeriod(effectiveEnd)
 
-        const priorStart = allPeriods[priorStartIndex]
-        const priorEnd = allPeriods[priorEndIndex]
+        // Ensure we actually have data for this prior range
+        if (allPeriods[0] > priorEnd) return null
 
         const priorProcessed = latestClientRuns.map(run => {
             const client = run.clients || {}
@@ -637,7 +676,7 @@ export function GlobalCommunicationAnalytics({
             start: priorStart,
             end: priorEnd
         }
-    }, [latestClientRuns, filterTeamId, startPeriod, endPeriod, allPeriods, selectedManagerIds, selectedSyndicateIds, targetIndex])
+    }, [latestClientRuns, filterTeamId, startPeriod, endPeriod, allPeriods, selectedManagerIds, selectedSyndicateIds, targetIndex, latestPeriodWithData])
 
     const popTrends = useMemo(() => {
         if (!priorKpis) return null
@@ -1031,7 +1070,7 @@ export function GlobalCommunicationAnalytics({
                                         ) : (
                                             <span className="text-zinc-500 font-semibold">Stable</span>
                                         )}
-                                        <span className="text-zinc-550">vs période préc.</span>
+                                        <span className="text-zinc-550">{priorKpis ? formatPriorRangeLabel(priorKpis.start, priorKpis.end) : "vs période préc."}</span>
                                     </div>
                                 )}
                             </CardContent>
@@ -1063,7 +1102,7 @@ export function GlobalCommunicationAnalytics({
                                             ) : (
                                                 <span className="text-zinc-500 font-semibold">Stable</span>
                                             )}
-                                            <span className="text-zinc-550">vs période préc.</span>
+                                            <span className="text-zinc-550">{priorKpis ? formatPriorRangeLabel(priorKpis.start, priorKpis.end) : "vs période préc."}</span>
                                         </div>
                                     )}
                                 </div>
@@ -1132,7 +1171,7 @@ export function GlobalCommunicationAnalytics({
                                         ) : (
                                             <span className="text-zinc-500 font-semibold">Stable</span>
                                         )}
-                                        <span className="text-zinc-550">vs période préc.</span>
+                                        <span className="text-zinc-550">{priorKpis ? formatPriorRangeLabel(priorKpis.start, priorKpis.end) : "vs période préc."}</span>
                                     </div>
                                 )}
                             </CardContent>
