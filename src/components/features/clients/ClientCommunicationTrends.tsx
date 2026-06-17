@@ -51,13 +51,13 @@ interface ClientCommunicationTrendsProps {
     clientName?: string
 }
 
-const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Technique", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
+const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Travaux Majeurs", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
 
 const DEPT_COLORS: Record<string, string> = {
     "Gestion": "#3b82f6", // Blue
     "Administration": "#0d9488", // Teal
     "Comptabilité": "#8b5cf6", // Purple
-    "Technique": "#f97316", // Orange
+    "Travaux Majeurs": "#f97316", // Orange
     "Sinistres": "#ef4444", // Red
     "Assurance": "#ec4899", // Pink
     "Direction": "#64748b", // Slate
@@ -137,10 +137,11 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Sylvain Chichillanne": "Chargé d’opération",
     "Djellany Mohamed Cherif": "Chargé d’opération",
 
-    // Technique
-    "Angelique Hesbois": "Technique",
-    "Angélique Hesbois": "Technique",
-    "Victor Dubremetz": "Technique",
+    // Travaux Majeurs
+    "Angelique Hesbois": "Travaux Majeurs",
+    "Angélique Hesbois": "Travaux Majeurs",
+    "Victor Dubremetz": "Travaux Majeurs",
+    "Patrice Asselin": "Travaux Majeurs",
 
     // Assurance
     "Marie-Camille Benhamou": "Assurance",
@@ -454,7 +455,7 @@ export function ClientCommunicationTrends({
                         others: 0
                     }
                 }
-                if (resolvedDept !== "Sinistres" && resolvedDept !== "Technique") {
+                if (resolvedDept !== "Sinistres" && resolvedDept !== "Travaux Majeurs") {
                     timelineChronologyMap[timelineKey].contractVolume++
                 } else {
                     timelineChronologyMap[timelineKey].outOfContractVolume++
@@ -474,7 +475,7 @@ export function ClientCommunicationTrends({
                 deptCounts[resolvedDept]++
             }
 
-            if (resolvedDept !== "Sinistres" && resolvedDept !== "Technique") {
+            if (resolvedDept !== "Sinistres" && resolvedDept !== "Travaux Majeurs") {
                 contractInclusionsVolume++
             }
 
@@ -1095,7 +1096,7 @@ export function ClientCommunicationTrends({
             let inclusions = 0
             if (sum.deptCounts) {
                 Object.entries(sum.deptCounts).forEach(([dept, val]) => {
-                    if (dept !== "Sinistres" && dept !== "Technique") {
+                    if (dept !== "Sinistres" && dept !== "Travaux Majeurs") {
                         inclusions += Number(val || 0)
                     }
                 })
@@ -1263,7 +1264,7 @@ export function ClientCommunicationTrends({
                                                 <div className="text-3xl font-black text-white mt-1 block">
                                                     {pipelineData.contractInclusionsVolume}
                                                 </div>
-                                                <span className="text-[10px] text-zinc-450 mt-1.5 block">Communications totales nettes (Exclut les Sinistres et le Technique)</span>
+                                                <span className="text-[10px] text-zinc-450 mt-1.5 block">Communications totales nettes (Exclut les Sinistres et les Travaux Majeurs)</span>
                                             </CardContent>
                                         </Card>
                                         <Card className="bg-gradient-to-tr from-[#16171e] to-emerald-950/20 border-zinc-800/80 shadow-md">
@@ -1902,7 +1903,7 @@ export function ClientCommunicationTrends({
                                             let inclusionsVolume = 0
                                             if (row.analysis_summary?.deptCounts) {
                                                 Object.entries(row.analysis_summary.deptCounts).forEach(([d, v]) => {
-                                                    if (d !== "Sinistres" && d !== "Technique") inclusionsVolume += Number(v || 0)
+                                                    if (d !== "Sinistres" && d !== "Travaux Majeurs") inclusionsVolume += Number(v || 0)
                                                 })
                                             } else {
                                                 inclusionsVolume = row.total_communications

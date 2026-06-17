@@ -64,13 +64,13 @@ interface ParsedRow {
 }
 
 // 7 Departments + Council (as in the HTML code)
-const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Technique", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
+const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Travaux Majeurs", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
 
 const DEPT_COLORS: Record<string, string> = {
     "Gestion": "border-l-sky-500 bg-sky-950/10",
     "Administration": "border-l-teal-500 bg-teal-950/10",
     "Comptabilité": "border-l-purple-500 bg-purple-950/10",
-    "Technique": "border-l-orange-500 bg-orange-950/10",
+    "Travaux Majeurs": "border-l-orange-500 bg-orange-950/10",
     "Sinistres": "border-l-rose-500 bg-rose-950/10",
     "Assurance": "border-l-pink-500 bg-pink-950/10",
     "Direction": "border-l-zinc-500 bg-zinc-900/40",
@@ -84,8 +84,8 @@ const DEPT_BADGE_CSS: Record<string, string> = {
     "Gestion": "bg-sky-500/10 text-sky-400 border border-sky-550/20",
     "Administration": "bg-teal-500/10 text-teal-400 border border-teal-550/20",
     "Comptabilité": "bg-purple-500/10 text-purple-400 border border-purple-550/20",
-    "Technique": "bg-orange-500/10 text-orange-400 border border-orange-550/20",
-    "Sinistres": "bg-rose-500/10 text-rose-450 text-rose-400 border border-rose-550/20",
+    "Travaux Majeurs": "bg-orange-500/10 text-orange-400 border border-orange-550/20",
+    "Sinistres": "bg-rose-500/10 text-rose-455 text-rose-400 border border-rose-550/20",
     "Assurance": "bg-pink-500/10 text-pink-400 border border-pink-550/20",
     "Direction": "bg-zinc-800 text-zinc-400 border border-zinc-700/60",
     "Chargé d’opération": "bg-indigo-500/10 text-indigo-400 border border-indigo-550/20",
@@ -164,10 +164,11 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Sylvain Chichillanne": "Chargé d’opération",
     "Djellany Mohamed Cherif": "Chargé d’opération",
 
-    // Technique
-    "Angelique Hesbois": "Technique",
-    "Angélique Hesbois": "Technique",
-    "Victor Dubremetz": "Technique",
+    // Travaux Majeurs
+    "Angelique Hesbois": "Travaux Majeurs",
+    "Angélique Hesbois": "Travaux Majeurs",
+    "Victor Dubremetz": "Travaux Majeurs",
+    "Patrice Asselin": "Travaux Majeurs",
 
     // Assurance
     "Marie-Camille Benhamou": "Assurance",
@@ -565,7 +566,7 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                         others: 0
                     }
                 }
-                if (resolvedDept !== "Sinistres" && resolvedDept !== "Technique") {
+                if (resolvedDept !== "Sinistres" && resolvedDept !== "Travaux Majeurs") {
                     timelineChronologyMap[timelineKey].contractVolume++
                 } else {
                     timelineChronologyMap[timelineKey].outOfContractVolume++
@@ -628,7 +629,7 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                 deptCounts[resolvedDept]++
             }
 
-            if (resolvedDept !== "Sinistres" && resolvedDept !== "Technique") {
+            if (resolvedDept !== "Sinistres" && resolvedDept !== "Travaux Majeurs") {
                 contractInclusionsVolume++
             }
 
@@ -1040,7 +1041,7 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                                         <div className="text-3xl font-black text-white mt-1 block">
                                             {pipelineData.contractInclusionsVolume}
                                         </div>
-                                        <span className="text-[10px] text-zinc-450 mt-1.5 block">Communications totales nettes (Exclut les Sinistres et le Technique)</span>
+                                        <span className="text-[10px] text-zinc-450 mt-1.5 block">Communications totales nettes (Exclut les Sinistres et les Travaux Majeurs)</span>
                                     </CardContent>
                                 </Card>
                                 <Card className="bg-gradient-to-tr from-[#16171e] to-emerald-950/20 border-zinc-800/80 shadow-md">
@@ -1374,7 +1375,7 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                             <CardHeader>
                                 <CardTitle className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Historique Global du Syndicat (Mois par Mois)</CardTitle>
                                 <CardDescription className="text-xxs text-zinc-500">
-                                    Dégage l'évolution de la charge forfaitaire par rapport aux communications exclues du forfait (Technique & Sinistres).
+                                    Dégage l'évolution de la charge forfaitaire par rapport aux communications exclues du forfait (Travaux Majeurs & Sinistres).
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-6">

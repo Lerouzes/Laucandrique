@@ -45,13 +45,13 @@ import {
 } from 'recharts'
 import Link from 'next/link'
 
-const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Technique", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
+const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Travaux Majeurs", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
 
 const DEPT_BADGE_CSS: Record<string, string> = {
     "Gestion": "bg-sky-500/10 text-sky-400 border border-sky-550/20",
     "Administration": "bg-teal-500/10 text-teal-400 border border-teal-550/20",
     "Comptabilité": "bg-purple-500/10 text-purple-400 border border-purple-550/20",
-    "Technique": "bg-orange-500/10 text-orange-400 border border-orange-550/20",
+    "Travaux Majeurs": "bg-orange-500/10 text-orange-400 border border-orange-550/20",
     "Sinistres": "bg-rose-500/10 text-rose-455 text-rose-400 border border-rose-550/20",
     "Assurance": "bg-pink-500/10 text-pink-400 border border-pink-550/20",
     "Direction": "bg-zinc-800 text-zinc-400 border border-zinc-700/60",
@@ -65,7 +65,7 @@ const DEPT_COLORS: Record<string, string> = {
     "Gestion": "#0ea5e9", // sky
     "Administration": "#14b8a6", // teal
     "Comptabilité": "#a855f7", // purple
-    "Technique": "#f97316", // orange
+    "Travaux Majeurs": "#f97316", // orange
     "Sinistres": "#f43f5e", // rose
     "Assurance": "#ec4899", // pink
     "Direction": "#71717a", // zinc

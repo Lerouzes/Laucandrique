@@ -1600,7 +1600,6 @@ export function OneOnOneDetailView({
                                     const clientDoors = stat.doors_count || 90
                                     const monthsCount = timeline.length
                                     const clientRatio = Number((inclusions / Math.max(1, clientDoors * monthsCount)).toFixed(2))
-                                    
                                     sumRatios += clientRatio
                                     countRatios++
                                     if (clientRatio > targetIndex) {
@@ -1608,7 +1607,7 @@ export function OneOnOneDetailView({
                                     }
                                 } else {
                                     // Fallback to overall ratio
-                                    const clientRatio = Number(((stat.total_communications - (stat.analysis_summary?.deptCounts?.Sinistres || 0) - (stat.analysis_summary?.deptCounts?.Technique || 0)) / Math.max(1, stat.doors_count || 90)).toFixed(2))
+                                    const clientRatio = Number(((stat.total_communications - (stat.analysis_summary?.deptCounts?.Sinistres || 0) - (stat.analysis_summary?.deptCounts?.["Travaux Majeurs"] || stat.analysis_summary?.deptCounts?.Technique || 0)) / Math.max(1, stat.doors_count || 90)).toFixed(2))
                                     sumRatios += clientRatio
                                     countRatios++
                                     if (clientRatio > targetIndex) {
@@ -1686,7 +1685,7 @@ export function OneOnOneDetailView({
                                             const doors = stat.doors_count || 90
                                             const ratio = timeline.length > 0
                                                 ? Number((inclusions / (doors * monthsCount)).toFixed(2))
-                                                : Number(((stat.total_communications - (stat.analysis_summary?.deptCounts?.Sinistres || 0) - (stat.analysis_summary?.deptCounts?.Technique || 0)) / doors).toFixed(2))
+                                                : Number(((stat.total_communications - (stat.analysis_summary?.deptCounts?.Sinistres || 0) - (stat.analysis_summary?.deptCounts?.["Travaux Majeurs"] || stat.analysis_summary?.deptCounts?.Technique || 0)) / doors).toFixed(2))
 
                                             // Surcharge badge for this client
                                             let sbadge = null
