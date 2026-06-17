@@ -25,7 +25,8 @@ import {
     ListFilter,
     FolderSync,
     X,
-    Eye
+    Eye,
+    RefreshCw
 } from 'lucide-react'
 import { saveCommunicationStatsAction } from '@/actions/communication-stats'
 import { toast } from 'sonner'
@@ -49,6 +50,7 @@ interface Client {
 
 interface CommunicationAnalyzerProps {
     clients: Client[]
+    stats?: any[]
 }
 
 interface ParsedRow {
@@ -111,6 +113,9 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Danielle Guidi": "Comptabilité",
     "Ian Coulombe": "Comptabilité",
     "Marie-Perle Arseneault": "Comptabilité",
+    "Marc-Evens Elyse": "Comptabilité",
+    "Wilfried Hessede": "Comptabilité",
+    "Alessandra Monique Tavares": "Comptabilité",
 
     // Administration
     "Reception Laucandrique": "Administration",
@@ -163,6 +168,7 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Patrice Marcil": "Chargé d’opération",
     "Sylvain Chichillanne": "Chargé d’opération",
     "Djellany Mohamed Cherif": "Chargé d’opération",
+    "Sacha Mihajlovic": "Chargé d’opération",
 
     // Travaux Majeurs
     "Angelique Hesbois": "Travaux Majeurs",
@@ -196,10 +202,24 @@ const classifyCommType = (typeStr: string): 'outboundEmail' | 'inboundEmail' | '
     return 'other'
 }
 
-export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
+export function CommunicationAnalyzer({ clients, stats }: CommunicationAnalyzerProps) {
     const [selectedClientId, setSelectedClientId] = useState<string>('')
     const [sdcSearch, setSdcSearch] = useState('')
     const [isSdcDropdownOpen, setIsSdcDropdownOpen] = useState(false)
+
+    const clientStats = useMemo(() => {
+        if (!stats || !selectedClientId) return []
+        return stats.filter((s: any) => s.client_id === selectedClientId)
+    }, [stats, selectedClientId])
+
+    const existingRanges = useMemo(() => {
+        return clientStats
+            .filter((s: any) => s.period_start && s.period_end)
+            .map((s: any) => ({
+                startStr: s.period_start,
+                endStr: s.period_end
+            }))
+    }, [clientStats])
 
     const selectedClient = useMemo(() => {
         return clients.find(c => c.id === selectedClientId) || null
@@ -269,6 +289,26 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
     // registry list pagination
     const [mainVisibleCount, setMainVisibleCount] = useState(50)
     const [empVisibleCount, setEmpVisibleCount] = useState(50)
+
+    const handleResetAll = () => {
+        setSelectedClientId('')
+        setSdcSearch('')
+        setCsvFile(null)
+        setIsParsing(false)
+        setRawRows([])
+        setExcludedOtonom([])
+        setExcludedAssign([])
+        setDiscoveredUsers([])
+        setHasSaved(false)
+        setIsSaving(false)
+        setDrilldownTab2User(null)
+        setSystemInspectionMode(null)
+        setSelectedYear('all')
+        setSelectedMonth('all')
+        setSelectedUserFilter(null)
+        setActiveTab('dashboard')
+        setDeptMap(INITIAL_DEPT_MAP)
+    }
 
     const normalizeEmployeeName = (name: string): string => {
         if (!name) return ""
@@ -429,6 +469,7 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                 const otonoms: ParsedRow[] = []
                 const assigns: ParsedRow[] = []
                 const localDiscoveredUsers = new Set<string>()
+                let skippedOverlapCount = 0
 
                 for(let i = headerIndex + 1; i < lines.length; i++) {
                     if(!lines[i].trim()) continue
@@ -441,6 +482,16 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                     const lotId = row[idxLot] ? row[idxLot].trim() : ""
                     const unitNum = row[idxUnite] ? row[idxUnite].trim().replace(/^"|"$/g, '').replace(/^0+/, '') : ""
                     const dest = row[idxDest] ? row[idxDest].trim().replace(/^"|"$/g, '') : ""
+
+                    const rowDateObj = parseDateString(dateStr)
+                    if (rowDateObj) {
+                        const rowDateStr = rowDateObj.toISOString().substring(0, 10)
+                        const isOverlap = existingRanges.some(r => rowDateStr >= r.startStr && rowDateStr <= r.endStr)
+                        if (isOverlap) {
+                            skippedOverlapCount++
+                            continue
+                        }
+                    }
 
                     const model: ParsedRow = { lot: lotId, type: type, date: dateStr, unite: unitNum, destinataire: dest, objet: objet, user: userRaw }
 
@@ -478,6 +529,9 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                 setExcludedAssign(assigns)
                 setDiscoveredUsers(Array.from(localDiscoveredUsers).sort())
                 
+                if (skippedOverlapCount > 0) {
+                    toast.info(`${skippedOverlapCount} lignes ignorées car elles chevauchent des dates déjà importées pour ce syndicat.`)
+                }
                 toast.success(`${rows.length} communications valides importées (${otonoms.length} lignes Otonom et ${assigns.length} assignations exclues).`)
             } catch (err: any) {
                 console.error(err)
@@ -884,6 +938,27 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
                             )}
                         </div>
                     )}
+                    {selectedClientId && (
+                        <div className="mt-2 text-[10px] space-y-1">
+                            {clientStats.length > 0 ? (
+                                <div className="bg-amber-955 bg-amber-600/10 border border-amber-500/20 rounded-lg p-2 text-amber-300 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    <span className="font-bold block text-[10px]">⚠️ Données déjà importées pour ce syndicat :</span>
+                                    <div className="mt-1 space-y-0.5 max-h-24 overflow-y-auto scrollbar-thin">
+                                        {clientStats.map((s: any, idx: number) => (
+                                            <div key={s.id || idx} className="flex justify-between font-mono text-[9px] opacity-90">
+                                                <span>Du {s.period_start} au {s.period_end}</span>
+                                                <span>({s.total_communications} comms)</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="bg-emerald-955 bg-emerald-600/10 border border-emerald-500/20 rounded-lg p-2 text-emerald-400 font-medium text-[9px] flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    ✓ Prêt pour un nouvel import (aucune donnée existante).
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
                 
                 <div className="space-y-1">
@@ -900,30 +975,42 @@ export function CommunicationAnalyzer({ clients }: CommunicationAnalyzerProps) {
 
                 <div className="space-y-1">
                     <Label className="text-[10px] text-zinc-550 uppercase tracking-wider font-bold">Enregistrement</Label>
-                    <Button
-                        type="button"
-                        disabled={!selectedClientId || rawRows.length === 0 || isSaving || hasSaved}
-                        onClick={handleSaveAnalysis}
-                        className={`w-full font-bold h-9 rounded-lg flex items-center justify-center gap-1.5 transition-all text-xs ${
-                            hasSaved 
-                                ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-900/40' 
-                                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md'
-                        }`}
-                    >
-                        {isSaving ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : hasSaved ? (
-                            <>
-                                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                                Enregistré avec succès !
-                            </>
-                        ) : (
-                            <>
-                                <Save className="h-4 w-4" />
-                                Enregistrer l'analyse
-                            </>
+                    <div className="flex flex-col gap-2">
+                        <Button
+                            type="button"
+                            disabled={!selectedClientId || rawRows.length === 0 || isSaving || hasSaved}
+                            onClick={handleSaveAnalysis}
+                            className={`w-full font-bold h-9 rounded-lg flex items-center justify-center gap-1.5 transition-all text-xs ${
+                                hasSaved 
+                                    ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-900/40' 
+                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md'
+                            }`}
+                        >
+                            {isSaving ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : hasSaved ? (
+                                <>
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                                    Enregistré avec succès !
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="h-4 w-4" />
+                                    Enregistrer l'analyse
+                                </>
+                            )}
+                        </Button>
+                        {hasSaved && (
+                            <Button
+                                type="button"
+                                onClick={handleResetAll}
+                                className="w-full font-bold h-9 rounded-lg flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md text-xs animate-in fade-in slide-in-from-bottom-2 duration-200"
+                            >
+                                <RefreshCw className="h-4 w-4" />
+                                Faire un autre syndicat
+                            </Button>
                         )}
-                    </Button>
+                    </div>
                 </div>
             </div>
 

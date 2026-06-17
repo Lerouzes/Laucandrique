@@ -84,6 +84,9 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Danielle Guidi": "Comptabilité",
     "Ian Coulombe": "Comptabilité",
     "Marie-Perle Arseneault": "Comptabilité",
+    "Marc-Evens Elyse": "Comptabilité",
+    "Wilfried Hessede": "Comptabilité",
+    "Alessandra Monique Tavares": "Comptabilité",
 
     // Administration
     "Reception Laucandrique": "Administration",
@@ -136,6 +139,7 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Patrice Marcil": "Chargé d’opération",
     "Sylvain Chichillanne": "Chargé d’opération",
     "Djellany Mohamed Cherif": "Chargé d’opération",
+    "Sacha Mihajlovic": "Chargé d’opération",
 
     // Travaux Majeurs
     "Angelique Hesbois": "Travaux Majeurs",
@@ -359,9 +363,17 @@ export function ClientCommunicationTrends({
                 const idxTargetObjet = headers.findIndex(h => h.toLowerCase() === 'objet')
                 const idxUser = headers.findIndex(h => h.toLowerCase().includes('ajouté par') || h.toLowerCase().includes('ajoute par'))
 
+                const existingRanges = stats
+                    .filter((s: any) => s.period_start && s.period_end)
+                    .map((s: any) => ({
+                        startStr: s.period_start,
+                        endStr: s.period_end
+                    }))
+
                 const rows: any[] = []
                 const otonoms: any[] = []
                 const assigns: any[] = []
+                let skippedOverlapCount = 0
 
                 for(let i = headerIndex + 1; i < lines.length; i++) {
                     if(!lines[i].trim()) continue
@@ -374,6 +386,16 @@ export function ClientCommunicationTrends({
                     const lotId = row[idxLot] ? row[idxLot].trim() : ""
                     const unitNum = row[idxUnite] ? row[idxUnite].trim().replace(/^"|"$/g, '').replace(/^0+/, '') : ""
                     const dest = row[idxDest] ? row[idxDest].trim().replace(/^"|"$/g, '') : ""
+
+                    const rowDateObj = parseDateString(dateStr)
+                    if (rowDateObj) {
+                        const rowDateStr = rowDateObj.toISOString().substring(0, 10)
+                        const isOverlap = existingRanges.some(r => rowDateStr >= r.startStr && rowDateStr <= r.endStr)
+                        if (isOverlap) {
+                            skippedOverlapCount++
+                            continue
+                        }
+                    }
 
                     const model: any = { lot: lotId, type: type, date: dateStr, unite: unitNum, destinataire: dest, objet: objet, user: userRaw }
 
@@ -398,6 +420,10 @@ export function ClientCommunicationTrends({
                 setRawRows(rows)
                 setExcludedOtonom(otonoms)
                 setExcludedAssign(assigns)
+                
+                if (skippedOverlapCount > 0) {
+                    toast.info(`${skippedOverlapCount} lignes ignorées car elles chevauchent des dates déjà importées pour ce syndicat.`)
+                }
                 toast.success(`${rows.length} communications valides importées.`)
             } catch (err: any) {
                 console.error(err)

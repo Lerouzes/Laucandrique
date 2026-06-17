@@ -71,13 +71,15 @@ export default function GlobalSettingsPage() {
     }, [activeTab, searchVal])
 
     useEffect(() => {
-        if (activeTab === 'comms-analytics') {
+        if (activeTab === 'comms-analytics' || activeTab === 'communications') {
             getAllCommunicationStats().then(setAllCommsStats)
-            getSettings().then(data => {
-                if (data?.communication_target_index) {
-                    setTargetIndex(Number(data.communication_target_index))
-                }
-            })
+            if (activeTab === 'comms-analytics') {
+                getSettings().then(data => {
+                    if (data?.communication_target_index) {
+                        setTargetIndex(Number(data.communication_target_index))
+                    }
+                })
+            }
         }
     }, [activeTab])
 
@@ -88,6 +90,7 @@ export default function GlobalSettingsPage() {
     const refreshData = () => {
         if (activeTab === 'clients' || activeTab === 'communications') {
             getClients(searchVal).then(setClients)
+            getAllCommunicationStats().then(setAllCommsStats)
         } else if (activeTab === 'snapshots') {
             getSnapshotsAction().then(setSnapshots)
         } else if (activeTab === 'comms-analytics') {
@@ -219,7 +222,7 @@ export default function GlobalSettingsPage() {
 
                 {/* TAB 3: COMMUNICATIONS ANALYZER */}
                 <TabsContent value="communications" className="outline-none">
-                    <CommunicationAnalyzer clients={filteredClients} />
+                    <CommunicationAnalyzer clients={filteredClients} stats={allCommsStats} />
                 </TabsContent>
 
                 {/* TAB 4: GLOBAL COMMUNICATIONS ANALYTICS */}
