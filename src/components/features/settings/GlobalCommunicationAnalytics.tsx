@@ -2,7 +2,7 @@
 'use client'
 
 import { jsPDF } from 'jspdf'
-import html2canvas from 'html2canvas'
+import html2canvas from 'html2canvas-pro'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
