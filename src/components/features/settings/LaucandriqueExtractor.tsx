@@ -25,6 +25,20 @@ interface LaucandriqueExtractorProps {
 
 const FINAL_HEADERS = ["Lot", "Type", "Date", "Unité", "Destinataire", "Objet", "Ajouté par", "Ajouté quand", "Notes"]
 
+const getSentReceivedCounts = (rows: any[]) => {
+  let sent = 0
+  let received = 0
+  rows.forEach(row => {
+    const type = (row["Type"] || "").toLowerCase()
+    if (type.includes("expedi") || type.includes("sent") || type.includes("envoi")) {
+      sent++
+    } else if (type.includes("recu") || type.includes("received")) {
+      received++
+    }
+  })
+  return { sent, received }
+}
+
 export function LaucandriqueExtractor({ onSendToAnalyzer }: LaucandriqueExtractorProps) {
   const [exportFormat, setExportFormat] = useState<"xlsx" | "csv">("csv")
   const [isParsing, setIsParsing] = useState(false)
@@ -437,11 +451,18 @@ export function LaucandriqueExtractor({ onSendToAnalyzer }: LaucandriqueExtracto
                 </thead>
                 <tbody className="divide-y divide-zinc-900 text-zinc-300 font-semibold bg-zinc-900/10">
                   {lots.map(lot => {
-                    const count = dataByLot[lot].length
+                    const rows = dataByLot[lot]
+                    const count = rows.length
+                    const { sent, received } = getSentReceivedCounts(rows)
                     return (
                       <tr key={lot} className="hover:bg-zinc-900/50 transition-colors">
                         <td className="px-4 py-2.5 font-bold font-mono text-zinc-200 text-xs">{lot}</td>
-                        <td className="px-4 py-2.5 text-zinc-500 font-semibold text-xxs">{count} lignes</td>
+                        <td className="px-4 py-2.5 text-zinc-500 font-semibold text-xxs">
+                          {count} lignes
+                          <span className="ml-2 text-zinc-400 font-normal">
+                            ({sent} {sent > 1 ? 'expédiés' : 'expédié'} / {received} {received > 1 ? 'reçus' : 'reçu'})
+                          </span>
+                        </td>
                         <td className="px-4 py-2.5 text-right">
                           <Button 
                             onClick={() => downloadSingleLot(lot)}

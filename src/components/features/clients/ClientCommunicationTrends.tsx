@@ -456,11 +456,12 @@ export function ClientCommunicationTrends({
         }
 
         const isUserAManager = (userStr: string) => {
+            const cleanUser = cleanStringForMatch(userStr)
+            if (cleanUser === "marie-camille benhamou" || cleanUser === "marie camille benhamou") return false
             const configuredDept = deptMap[userStr]
             if (configuredDept === "Gestionnaire") return true
 
             if (!userStr || !managers || managers.length === 0) return false
-            const cleanUser = cleanStringForMatch(userStr)
             
             return managers.some(m => {
                 const first = m.first_name || ""
@@ -502,7 +503,20 @@ export function ClientCommunicationTrends({
         }> = {}
 
         rawRows.forEach(row => {
+            const cleanUser = cleanStringForMatch(row.user)
+            const isMarieCamille = (cleanUser === "marie-camille benhamou" || cleanUser === "marie camille benhamou")
+            
             let resolvedDept = deptMap[row.user] || "Gestion"
+            if (isMarieCamille) {
+                const rowDate = parseDateString(row.date)
+                const isBefore2025 = rowDate ? (rowDate.getFullYear() < 2025) : false
+                if (isBefore2025) {
+                    resolvedDept = "Gestion"
+                } else {
+                    resolvedDept = "Assurance"
+                }
+            }
+
             if (resolvedDept === "Gestionnaire") {
                 resolvedDept = "Gestion"
             }
@@ -540,7 +554,18 @@ export function ClientCommunicationTrends({
             if (deptCounts[resolvedDept] !== undefined) {
                 deptCounts[resolvedDept]++
             }
-            const isMgr = isUserAManager(row.user)
+            
+            let isMgr = isUserAManager(row.user)
+            if (isMarieCamille) {
+                const rowDate = parseDateString(row.date)
+                const isBefore2025 = rowDate ? (rowDate.getFullYear() < 2025) : false
+                if (isBefore2025) {
+                    isMgr = true
+                } else {
+                    isMgr = false
+                }
+            }
+            
             if (isMgr && deptCounts["Gestionnaire"] !== undefined) {
                 deptCounts["Gestionnaire"]++
             }
@@ -1296,7 +1321,14 @@ export function ClientCommunicationTrends({
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#0d0e12]/80 p-4 border border-zinc-850 rounded-xl">
                                 <div>
                                     <h3 className="text-sm font-bold text-zinc-200">Analyse de communication en cours pour {clientName}</h3>
-                                    <p className="text-xs text-zinc-500">{rawRows.length} lignes valides détectées.</p>
+                                    <p className="text-xs text-zinc-500">
+                                        {rawRows.length} lignes valides détectées
+                                        {pipelineData && (
+                                            <span className="text-zinc-400 font-normal">
+                                                {" "}({pipelineData.outboundEmails} expédiés / {pipelineData.inboundEmails} reçus)
+                                            </span>
+                                        )}
+                                    </p>
                                 </div>
                                 <div className="flex gap-2">
                                     <Button

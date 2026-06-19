@@ -712,13 +712,14 @@ export function CommunicationAnalyzer({
         }
 
         const isUserAManager = (userStr: string) => {
+            const cleanUser = cleanStringForMatch(userStr)
+            if (cleanUser === "marie-camille benhamou" || cleanUser === "marie camille benhamou") return false
             const configuredDept = deptMap[userStr]
             if (configuredDept === "Gestionnaire") return true
 
             if (isUserMatchingManager(userStr)) return true
 
             if (!userStr || !managers || managers.length === 0) return false
-            const cleanUser = cleanStringForMatch(userStr)
             
             return managers.some(m => {
                 const first = m.first_name || ""
@@ -739,13 +740,36 @@ export function CommunicationAnalyzer({
         }
 
         rawRows.forEach(row => {
+            const cleanUser = cleanStringForMatch(row.user)
+            const isMarieCamille = (cleanUser === "marie-camille benhamou" || cleanUser === "marie camille benhamou")
+            
             let resolvedDept = deptMap[row.user] || "Gestion"
+            if (isMarieCamille) {
+                const rowDate = parseDateString(row.date)
+                const isBefore2025 = rowDate ? (rowDate.getFullYear() < 2025) : false
+                if (isBefore2025) {
+                    resolvedDept = "Gestion"
+                } else {
+                    resolvedDept = "Assurance"
+                }
+            }
+
             if (resolvedDept === "Gestionnaire") {
                 resolvedDept = "Gestion"
             }
 
             const timelineKey = (row.year !== "Unknown" && row.month !== "Unknown") ? `${row.year}-${row.month}` : "Unknown"
-            const isMgr = isUserAManager(row.user)
+            
+            let isMgr = isUserAManager(row.user)
+            if (isMarieCamille) {
+                const rowDate = parseDateString(row.date)
+                const isBefore2025 = rowDate ? (rowDate.getFullYear() < 2025) : false
+                if (isBefore2025) {
+                    isMgr = true
+                } else {
+                    isMgr = false
+                }
+            }
 
             if (timelineKey !== "Unknown") {
                 // Monthly history for cards expanded drawer
@@ -1276,6 +1300,31 @@ export function CommunicationAnalyzer({
                     )}
                 </div>
             </div>
+
+            {csvFile && rawRows.length > 0 && pipelineData && (
+                <div className="bg-zinc-950/60 border border-zinc-850 p-4 rounded-xl space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                        <span className="text-zinc-400">Fichier chargé : <strong className="text-zinc-200 font-mono">{csvFile.name}</strong></span>
+                        <Badge variant="outline" className="bg-indigo-950/30 text-indigo-400 border-indigo-900/50">
+                            {rawRows.length} lignes valides
+                        </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-zinc-900/40">
+                        <div className="bg-[#121318] p-2.5 rounded-lg border border-zinc-800/40 text-center">
+                            <span className="block text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Courriels Envoyés (Out)</span>
+                            <span className="text-lg font-bold font-mono text-emerald-450 text-emerald-400 mt-1 block">
+                                {pipelineData.outboundEmails}
+                            </span>
+                        </div>
+                        <div className="bg-[#121318] p-2.5 rounded-lg border border-zinc-800/40 text-center">
+                            <span className="block text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Courriels Reçus (In)</span>
+                            <span className="text-lg font-bold font-mono text-sky-400 mt-1 block">
+                                {pipelineData.inboundEmails}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Tabs */}
             {rawRows.length > 0 && (
