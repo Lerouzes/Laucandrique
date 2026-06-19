@@ -62,6 +62,7 @@ interface CommunicationAnalyzerProps {
     stats?: any[]
     externalQueue?: File[]
     setExternalQueue?: React.Dispatch<React.SetStateAction<File[]>>
+    managers?: any[]
 }
 
 interface ParsedRow {
@@ -217,7 +218,8 @@ export function CommunicationAnalyzer({
     clients, 
     stats,
     externalQueue,
-    setExternalQueue
+    setExternalQueue,
+    managers = []
 }: CommunicationAnalyzerProps) {
     const [selectedClientId, setSelectedClientId] = useState<string>('')
     const [sdcSearch, setSdcSearch] = useState('')

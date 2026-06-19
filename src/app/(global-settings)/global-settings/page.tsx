@@ -233,6 +233,7 @@ export default function GlobalSettingsPage() {
                         stats={allCommsStats} 
                         externalQueue={extractorQueue}
                         setExternalQueue={setExtractorQueue}
+                        managers={managers}
                     />
                 </TabsContent>
 
