@@ -55,7 +55,12 @@ export default async function OneOnOneDetailPage({
             training_requested,
             escalation_needed,
             operational_blockers,
-            conflict_resolution
+            conflict_resolution,
+            calls_total,
+            calls_answered,
+            emails_over_48h,
+            late_tasks,
+            bills_no_notes_over_7d
         `)
         .eq('manager_id', oneOnOne.manager_id)
         .eq('status', 'completed')

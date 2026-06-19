@@ -1214,6 +1214,24 @@ export async function createOneOnOneAction(data: {
     training_needed?: string
     meeting_score?: number
     summary?: string
+    // Redesign fields
+    checkin_portfolio_status?: string
+    checkin_completed_at?: string | null
+    checkin_went_well?: string
+    checkin_most_concerning?: string
+    checkin_slowing_down?: string
+    checkin_support_needed?: string
+    coaching_success?: string
+    coaching_improvement?: string
+    coaching_clarification?: string
+    coaching_promised?: string
+    conclusion_portfolio_status?: string
+    conclusion_going_well?: string
+    conclusion_needs_attention?: string
+    conclusion_decisions?: string
+    conclusion_priorities?: string
+    next_meeting_date?: string | null
+    priorities?: any[]
     commitments?: Array<{
         commitment_text: string
         owner?: string
@@ -1316,7 +1334,25 @@ export async function createOneOnOneAction(data: {
             support_needed: data.support_needed || null,
             training_needed: data.training_needed || null,
             meeting_score: data.meeting_score || null,
-            summary: data.summary || null
+            summary: data.summary || null,
+            // Redesign fields
+            checkin_portfolio_status: data.checkin_portfolio_status || null,
+            checkin_completed_at: data.checkin_completed_at || null,
+            checkin_went_well: data.checkin_went_well || null,
+            checkin_most_concerning: data.checkin_most_concerning || null,
+            checkin_slowing_down: data.checkin_slowing_down || null,
+            checkin_support_needed: data.checkin_support_needed || null,
+            coaching_success: data.coaching_success || null,
+            coaching_improvement: data.coaching_improvement || null,
+            coaching_clarification: data.coaching_clarification || null,
+            coaching_promised: data.coaching_promised || null,
+            conclusion_portfolio_status: data.conclusion_portfolio_status || null,
+            conclusion_going_well: data.conclusion_going_well || null,
+            conclusion_needs_attention: data.conclusion_needs_attention || null,
+            conclusion_decisions: data.conclusion_decisions || null,
+            conclusion_priorities: data.conclusion_priorities || null,
+            next_meeting_date: data.next_meeting_date || null,
+            priorities: data.priorities || []
         })
         .select()
         .single()
@@ -1497,6 +1533,24 @@ export async function updateOneOnOneAction(id: string, data: {
     training_needed?: string
     meeting_score?: number
     summary?: string
+    // Redesign fields
+    checkin_portfolio_status?: string
+    checkin_completed_at?: string | null
+    checkin_went_well?: string
+    checkin_most_concerning?: string
+    checkin_slowing_down?: string
+    checkin_support_needed?: string
+    coaching_success?: string
+    coaching_improvement?: string
+    coaching_clarification?: string
+    coaching_promised?: string
+    conclusion_portfolio_status?: string
+    conclusion_going_well?: string
+    conclusion_needs_attention?: string
+    conclusion_decisions?: string
+    conclusion_priorities?: string
+    next_meeting_date?: string | null
+    priorities?: any[]
     commitments: Array<{
         id?: string
         commitment_text: string
@@ -1610,7 +1664,25 @@ export async function updateOneOnOneAction(id: string, data: {
             support_needed: data.support_needed || null,
             training_needed: data.training_needed || null,
             meeting_score: data.meeting_score || null,
-            summary: data.summary || null
+            summary: data.summary || null,
+            // Redesign fields
+            checkin_portfolio_status: data.checkin_portfolio_status || null,
+            checkin_completed_at: data.checkin_completed_at || null,
+            checkin_went_well: data.checkin_went_well || null,
+            checkin_most_concerning: data.checkin_most_concerning || null,
+            checkin_slowing_down: data.checkin_slowing_down || null,
+            checkin_support_needed: data.checkin_support_needed || null,
+            coaching_success: data.coaching_success || null,
+            coaching_improvement: data.coaching_improvement || null,
+            coaching_clarification: data.coaching_clarification || null,
+            coaching_promised: data.coaching_promised || null,
+            conclusion_portfolio_status: data.conclusion_portfolio_status || null,
+            conclusion_going_well: data.conclusion_going_well || null,
+            conclusion_needs_attention: data.conclusion_needs_attention || null,
+            conclusion_decisions: data.conclusion_decisions || null,
+            conclusion_priorities: data.conclusion_priorities || null,
+            next_meeting_date: data.next_meeting_date || null,
+            priorities: data.priorities || []
         })
         .eq('id', id)
 
@@ -3589,6 +3661,251 @@ export async function getManagerTaskCountsAction(managerId: string) {
         late_tasks: log ? (log.value || 0) : 0
     }
 }
+
+// ==========================================
+// 4b. REDESIGNED ONE-ON-ONE ITEM NOTES ACTIONS
+// ==========================================
+
+export async function addOneOnOneItemNoteAction(data: {
+    one_on_one_id: string
+    item_type: 'metric' | 'risk' | 'complaint' | 'audit' | 'assembly' | 'commitment'
+    item_id: string
+    note_text: string
+    author_name: string
+}) {
+    const supabase = await createClient()
+    const { data: note, error } = await supabase
+        .from('one_on_one_item_notes')
+        .insert({
+            one_on_one_id: data.one_on_one_id,
+            item_type: data.item_type,
+            item_id: data.item_id,
+            note_text: data.note_text,
+            author_name: data.author_name
+        })
+        .select()
+        .single()
+
+    if (error) throw new Error(error.message)
+    revalidatePath(`/team-management/one-on-ones/${data.one_on_one_id}`)
+    return note
+}
+
+export async function getOneOnOneItemNotesAction(oneOnOneId: string) {
+    const supabase = await createClient()
+    const { data: notes, error } = await supabase
+        .from('one_on_one_item_notes')
+        .select('*')
+        .eq('one_on_one_id', oneOnOneId)
+        .order('created_at', { ascending: true })
+
+    if (error) throw new Error(error.message)
+    return notes || []
+}
+
+// ==========================================
+// 4c. ANNUAL ASSEMBLY TRACKING ACTIONS
+// ==========================================
+
+export async function getAssemblyTrackingForManagerAction(managerId: string) {
+    const supabase = await createClient()
+
+    // 1. Fetch active clients for manager
+    const { data: clients } = await supabase
+        .from('clients')
+        .select('*, contracts(*)')
+        .eq('manager_id', managerId)
+        .eq('status', 'active')
+
+    if (clients && clients.length > 0) {
+        const today = new Date()
+        for (const client of clients) {
+            // Find contract
+            const con = Array.isArray(client.contracts) 
+                ? client.contracts.find((c: any) => c.active === true) || client.contracts[0]
+                : client.contracts
+
+            if (con && con.start_date) {
+                const parseStart = new Date(con.start_date)
+                if (!isNaN(parseStart.getTime())) {
+                    const month = parseStart.getMonth()
+                    const date = parseStart.getDate()
+                    
+                    // Fiscal year end for current year
+                    const fyCurrent = new Date(today.getFullYear(), month, date)
+                    const dayAfterCurrent = new Date(fyCurrent)
+                    dayAfterCurrent.setDate(dayAfterCurrent.getDate() + 1)
+                    
+                    let fyEnd
+                    if (dayAfterCurrent <= today) {
+                        fyEnd = fyCurrent
+                    } else {
+                        fyEnd = new Date(today.getFullYear() - 1, month, date)
+                    }
+                    
+                    const fyEndStr = fyEnd.toISOString().substring(0, 10)
+                    
+                    // Check if tracking record exists
+                    const { data: existing } = await supabase
+                        .from('client_assembly_tracking')
+                        .select('id')
+                        .eq('client_id', client.id)
+                        .eq('fiscal_year_end', fyEndStr)
+                        .maybeSingle()
+
+                    if (!existing) {
+                        const deadlineDays = client.aga_deadline_days || 90
+                        const targetDate = new Date(fyEnd)
+                        targetDate.setDate(targetDate.getDate() + deadlineDays)
+                        const targetDateStr = targetDate.toISOString().substring(0, 10)
+
+                        // Insert new tracking cycle
+                        await supabase
+                            .from('client_assembly_tracking')
+                            .insert({
+                                client_id: client.id,
+                                fiscal_year_end: fyEndStr,
+                                target_date: targetDateStr,
+                                status: 'to_prepare',
+                                notes: [],
+                                date_history: []
+                            })
+                            .maybeSingle()
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Fetch all tracking items
+    const { data: trackings, error } = await supabase
+        .from('client_assembly_tracking')
+        .select('*, clients(id, company_name, full_name, manager_id, aga_planned_date, aga_completed_date, aga_status, aga_deadline_days)')
+        .order('fiscal_year_end', { ascending: false })
+
+    if (error) throw new Error(error.message)
+
+    // Filter to only manager's clients
+    return (trackings || []).filter((t: any) => t.clients?.manager_id === managerId)
+}
+
+export async function updateAssemblyTrackingAction(id: string, data: {
+    planned_date?: string | null
+    status?: 'to_prepare' | 'scheduled' | 'completed'
+    next_followup_date?: string | null
+    notes?: any[]
+    date_history?: any[]
+}) {
+    const supabase = await createClient()
+    
+    const { data: tracking } = await supabase
+        .from('client_assembly_tracking')
+        .select('client_id, target_date')
+        .eq('id', id)
+        .single()
+
+    const updateFields: any = {}
+    if (data.planned_date !== undefined) updateFields.planned_date = data.planned_date
+    if (data.status !== undefined) updateFields.status = data.status
+    if (data.next_followup_date !== undefined) updateFields.next_followup_date = data.next_followup_date
+    if (data.notes !== undefined) updateFields.notes = data.notes
+    if (data.date_history !== undefined) updateFields.date_history = data.date_history
+    updateFields.updated_at = new Date().toISOString()
+
+    const { error } = await supabase
+        .from('client_assembly_tracking')
+        .update(updateFields)
+        .eq('id', id)
+
+    if (error) throw new Error(error.message)
+
+    // Sync back to clients record
+    if (tracking) {
+        const clientUpdates: any = {}
+        if (data.planned_date !== undefined) clientUpdates.aga_planned_date = data.planned_date
+        if (data.status !== undefined) clientUpdates.aga_status = data.status
+        
+        if (Object.keys(clientUpdates).length > 0) {
+            await supabase
+                .from('clients')
+                .update(clientUpdates)
+                .eq('id', tracking.client_id)
+        }
+    }
+
+    revalidatePath('/team-management/one-on-ones')
+}
+
+export async function confirmAssemblyCompletedAction(id: string, data: {
+    actual_assembly_date: string
+    confirmed_by: string
+}) {
+    const supabase = await createClient()
+    
+    const { data: tracking } = await supabase
+        .from('client_assembly_tracking')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+    if (!tracking) throw new Error("Assembly tracking record not found")
+
+    const nextNotes = [...(tracking.notes || []), {
+        note: `Assemblée confirmée complétée le ${new Date(data.actual_assembly_date).toLocaleDateString('fr-CA')} par ${data.confirmed_by}.`,
+        author: data.confirmed_by,
+        timestamp: new Date().toISOString()
+    }]
+
+    const { error } = await supabase
+        .from('client_assembly_tracking')
+        .update({
+            completed_date: data.actual_assembly_date,
+            status: 'completed',
+            notes: nextNotes,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+
+    if (error) throw new Error(error.message)
+
+    // Update client record
+    await supabase
+        .from('clients')
+        .update({
+            aga_completed_date: data.actual_assembly_date,
+            aga_status: 'completed'
+        })
+        .eq('id', tracking.client_id)
+
+    // Reopen new assembly tracking cycle for next year
+    const nextFYEnd = new Date(tracking.fiscal_year_end)
+    nextFYEnd.setFullYear(nextFYEnd.getFullYear() + 1)
+    
+    const { data: client } = await supabase
+        .from('clients')
+        .select('aga_deadline_days')
+        .eq('id', tracking.client_id)
+        .single()
+        
+    const deadlineDays = client?.aga_deadline_days || 90
+    const nextTargetDate = new Date(nextFYEnd)
+    nextTargetDate.setDate(nextTargetDate.getDate() + deadlineDays)
+
+    await supabase
+        .from('client_assembly_tracking')
+        .insert({
+            client_id: tracking.client_id,
+            fiscal_year_end: nextFYEnd.toISOString().substring(0, 10),
+            target_date: nextTargetDate.toISOString().substring(0, 10),
+            status: 'to_prepare',
+            notes: [],
+            date_history: []
+        })
+        .maybeSingle()
+
+    revalidatePath('/team-management/one-on-ones')
+}
+
 
 
 
