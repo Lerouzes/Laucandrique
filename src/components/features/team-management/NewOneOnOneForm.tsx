@@ -2506,16 +2506,17 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
 
                             <div className="space-y-1">
                                 <Label className="text-zinc-400">Copropriété (Optionnel)</Label>
-                                <select
-                                    value={modalAuditClientId}
-                                    onChange={(e) => setModalAuditClientId(e.target.value)}
-                                    className="bg-[#121318] border border-zinc-800 text-zinc-300 text-xs rounded-lg p-2.5 w-full outline-none"
-                                >
-                                    <option value="">Aucune copropriété</option>
-                                    {clientsList.map(c => (
-                                        <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>
-                                    ))}
-                                </select>
+                                <SearchableClientSelect
+                                    clients={clientsList.map(c => ({
+                                        id: c.id,
+                                        name: c.company_name || c.full_name,
+                                        sdc: c.full_name
+                                    }))}
+                                    name="modal_audit_client_id"
+                                    placeholder="Aucune copropriété"
+                                    defaultValue={modalAuditClientId}
+                                    onChange={(val) => setModalAuditClientId(val)}
+                                />
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2670,16 +2671,17 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-zinc-400">Copropriété (Optionnel)</Label>
-                                    <select
-                                        value={modalRiskClientId}
-                                        onChange={(e) => setModalRiskClientId(e.target.value)}
-                                        className="bg-[#121318] border border-zinc-800 text-zinc-300 text-xs rounded-lg p-2.5 w-full outline-none"
-                                    >
-                                        <option value="">Aucune copropriété</option>
-                                        {clientsList.map(c => (
-                                            <option key={c.id} value={c.id}>{c.company_name || c.full_name}</option>
-                                        ))}
-                                    </select>
+                                    <SearchableClientSelect
+                                        clients={clientsList.map(c => ({
+                                            id: c.id,
+                                            name: c.company_name || c.full_name,
+                                            sdc: c.full_name
+                                        }))}
+                                        name="modal_risk_client_id"
+                                        placeholder="Aucune copropriété"
+                                        defaultValue={modalRiskClientId}
+                                        onChange={(val) => setModalRiskClientId(val)}
+                                    />
                                 </div>
                             </div>
 
