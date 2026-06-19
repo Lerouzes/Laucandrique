@@ -658,6 +658,45 @@ export function CommunicationAnalyzer({
 
         const filteredList: ParsedRow[] = []
 
+        // Resolve manager info
+        const managerName = selectedClient?.managers
+            ? `${selectedClient.managers.first_name} ${selectedClient.managers.last_name}`.trim()
+            : null
+
+        let managerCommsCount = 0
+        let managerOutboundEmails = 0
+        let managerInboundEmails = 0
+        let managerChats = 0
+        let managerPhoneCalls = 0
+        let managerOthers = 0
+
+        const cleanStringForMatch = (str: string) => {
+            return str
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .trim()
+        }
+
+        const cleanManagerName = managerName ? cleanStringForMatch(managerName) : null
+        
+        const isUserMatchingManager = (userStr: string) => {
+            if (!userStr || !cleanManagerName) return false
+            const cleanUser = cleanStringForMatch(userStr)
+            if (cleanUser === cleanManagerName) return true
+            if (cleanUser.includes(cleanManagerName) || cleanManagerName.includes(cleanUser)) return true
+            
+            // Check first and last name separately
+            const firstPart = cleanStringForMatch(selectedClient?.managers?.first_name || '')
+            const lastPart = cleanStringForMatch(selectedClient?.managers?.last_name || '')
+            if (firstPart && lastPart) {
+                if (cleanUser === `${firstPart} ${lastPart}`) return true
+                if (cleanUser === `${lastPart} ${firstPart}`) return true
+                if (cleanUser === firstPart || cleanUser === lastPart) return true
+            }
+            return false
+        }
+
         rawRows.forEach(row => {
             const resolvedDept = deptMap[row.user] || "Gestion"
             const timelineKey = (row.year !== "Unknown" && row.month !== "Unknown") ? `${row.year}-${row.month}` : "Unknown"
@@ -713,6 +752,18 @@ export function CommunicationAnalyzer({
                     }
                     monthlyUnitHistory[row.unite][timelineKey] = (monthlyUnitHistory[row.unite][timelineKey] || 0) + 1
                 }
+            }
+
+            // Check if this row matches the manager
+            const isMgr = isUserMatchingManager(row.user)
+            if (isMgr) {
+                managerCommsCount++
+                const cls = classifyCommType(row.type)
+                if (cls === 'outboundEmail') managerOutboundEmails++
+                else if (cls === 'inboundEmail') managerInboundEmails++
+                else if (cls === 'chat') managerChats++
+                else if (cls === 'phoneCall') managerPhoneCalls++
+                else managerOthers++
             }
 
             // Apply filters
@@ -796,9 +847,17 @@ export function CommunicationAnalyzer({
             inboundEmails: inboundEmailsCount,
             chats: chatsCount,
             phoneCalls: phoneCallsCount,
-            others: othersCount
+            others: othersCount,
+            // Manager metrics
+            managerName,
+            managerCommsCount,
+            managerOutboundEmails,
+            managerInboundEmails,
+            managerChats,
+            managerPhoneCalls,
+            managerOthers
         }
-    }, [rawRows, deptMap, selectedYear, selectedMonth, selectedUserFilter, unitCount])
+    }, [rawRows, deptMap, selectedYear, selectedMonth, selectedUserFilter, unitCount, selectedClient])
 
     // Save Analysis to Database
     const handleSaveAnalysis = async () => {
@@ -938,6 +997,13 @@ export function CommunicationAnalyzer({
             setDrilldownTab2User(tab2EmployeesList[0].name)
         }
     }, [tab2EmployeesList, drilldownTab2User])
+
+    const isUserAssociatedManager = (userName: string) => {
+        if (!userName || !pipelineData?.managerName) return false
+        const cleanUser = userName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+        const cleanManager = pipelineData.managerName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+        return cleanUser === cleanManager || cleanUser.includes(cleanManager) || cleanManager.includes(cleanUser)
+    }
 
     return (
         <div className="space-y-6">
@@ -1229,7 +1295,7 @@ export function CommunicationAnalyzer({
                     {activeTab === 'dashboard' && pipelineData && (
                         <div className="space-y-6">
                             {/* Executive summary cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                                 <Card className="bg-gradient-to-tr from-[#16171e] to-indigo-950/20 border-zinc-800/80 shadow-md">
                                     <CardContent className="p-6">
                                         <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-black block">Volume de Gestion Forfaitaire Inclus</span>
@@ -1246,6 +1312,49 @@ export function CommunicationAnalyzer({
                                             {(pipelineData.contractInclusionsVolume / Math.max(1, unitCount)).toFixed(2)}
                                         </div>
                                         <span className="text-[10px] text-zinc-450 mt-1.5 block">Moyenne d'interactions incluses par porte / année cible</span>
+                                    </CardContent>
+                                </Card>
+                                <Card className="bg-gradient-to-tr from-[#16171e] to-indigo-950/20 border-zinc-800/80 shadow-md">
+                                    <CardContent className="p-6 flex flex-col justify-between h-full">
+                                        <div>
+                                            <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-black block">Gestionnaire Associé</span>
+                                            {pipelineData.managerName ? (
+                                                <>
+                                                    <div className="text-sm font-black text-white mt-1.5 truncate" title={pipelineData.managerName}>
+                                                        {pipelineData.managerName}
+                                                    </div>
+                                                    <div className="text-3xl font-black text-indigo-400 mt-1 block font-mono">
+                                                        {pipelineData.managerCommsCount} <span className="text-xxs text-zinc-450 font-normal uppercase">comms</span>
+                                                    </div>
+                                                    <span className="text-[9px] text-zinc-450 mt-1 block">
+                                                        Responsable de <strong className="text-zinc-200">{Math.round((pipelineData.managerCommsCount / Math.max(1, rawRows.length)) * 100)}%</strong> du volume global ({rawRows.length} comms au total).
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="text-[11px] font-semibold text-zinc-500 italic mt-2">
+                                                        Aucun gestionnaire assigné
+                                                    </div>
+                                                    <span className="text-[9px] text-zinc-550 mt-2 block leading-relaxed">
+                                                        Associez un gestionnaire à ce syndicat pour suivre sa charge automatiquement.
+                                                    </span>
+                                                </>
+                                            )}
+                                        </div>
+                                        {pipelineData.managerName && pipelineData.managerCommsCount > 0 && (
+                                            <div className="mt-3 pt-2.5 border-t border-zinc-900/50 space-y-1 text-[9px]">
+                                                <div className="flex justify-between items-center text-zinc-450">
+                                                    <span>Courriels (In/Out) :</span>
+                                                    <span className="font-bold text-zinc-200 font-mono">
+                                                        {pipelineData.managerInboundEmails + pipelineData.managerOutboundEmails} ({pipelineData.managerInboundEmails} In / {pipelineData.managerOutboundEmails} Out)
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-zinc-450">
+                                                    <span>Appels téléphoniques :</span>
+                                                    <span className="font-bold text-zinc-200 font-mono">{pipelineData.managerPhoneCalls}</span>
+                                                </div>
+                                            </div>
+                                        )}
                                     </CardContent>
                                 </Card>
                                 <Card className="bg-gradient-to-tr from-[#16171e] to-zinc-950/40 border-zinc-800/80 shadow-md">
@@ -1463,6 +1572,7 @@ export function CommunicationAnalyzer({
                                             .filter(emp => employeeDeptFilter === 'all' || emp.dept === employeeDeptFilter)
                                             .map(emp => {
                                                 const isActiveFilter = selectedUserFilter === emp.name
+                                                const isAssocManager = isUserAssociatedManager(emp.name)
                                                 return (
                                                     <div 
                                                         key={emp.name} 
@@ -1473,7 +1583,14 @@ export function CommunicationAnalyzer({
                                                                 : 'bg-zinc-950/20 border-zinc-900/60 hover:bg-zinc-900/40 text-zinc-300'
                                                         }`}
                                                     >
-                                                        <span className="truncate max-w-[150px]">{emp.name}</span>
+                                                        <span className="truncate max-w-[120px] flex items-center gap-1.5">
+                                                            {emp.name}
+                                                            {isAssocManager && (
+                                                                <Badge className="bg-indigo-500/10 text-indigo-400 border border-indigo-550/20 text-[7px] px-1 py-0 rounded font-bold uppercase select-none shrink-0">
+                                                                    Gestionnaire
+                                                                </Badge>
+                                                            )}
+                                                        </span>
                                                         <div className="flex items-center gap-1.5 shrink-0">
                                                             <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${DEPT_BADGE_CSS[emp.dept] || 'bg-zinc-800'}`}>
                                                                 {emp.dept}
