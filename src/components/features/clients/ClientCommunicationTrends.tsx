@@ -49,12 +49,14 @@ interface ClientCommunicationTrendsProps {
     targetIndex?: number
     initialDoors?: any[]
     clientName?: string
+    managers?: any[]
 }
 
-const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Travaux Majeurs", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
+const DEPT_LIST = ["Gestion", "Gestionnaire", "Administration", "Comptabilité", "Travaux Majeurs", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
 
 const DEPT_COLORS: Record<string, string> = {
     "Gestion": "#3b82f6", // Blue
+    "Gestionnaire": "#4f46e5", // Indigo
     "Administration": "#0d9488", // Teal
     "Comptabilité": "#8b5cf6", // Purple
     "Travaux Majeurs": "#f97316", // Orange
@@ -285,7 +287,8 @@ export function ClientCommunicationTrends({
     teamComparison = [], 
     targetIndex = 2.50,
     initialDoors = [],
-    clientName = 'Syndicat'
+    clientName = 'Syndicat',
+    managers = []
 }: ClientCommunicationTrendsProps) {
     const router = useRouter()
     const [stats, setStats] = useState<CommStatRecord[]>(initialStats)
@@ -444,6 +447,39 @@ export function ClientCommunicationTrends({
     const pipelineData = useMemo(() => {
         if (rawRows.length === 0) return null
 
+        const cleanStringForMatch = (str: string) => {
+            return str
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .trim()
+        }
+
+        const isUserAManager = (userStr: string) => {
+            const configuredDept = deptMap[userStr]
+            if (configuredDept === "Gestionnaire") return true
+
+            if (!userStr || !managers || managers.length === 0) return false
+            const cleanUser = cleanStringForMatch(userStr)
+            
+            return managers.some(m => {
+                const first = m.first_name || ""
+                const last = m.last_name || ""
+                const cleanFirst = cleanStringForMatch(first)
+                const cleanLast = cleanStringForMatch(last)
+                if (!cleanFirst && !cleanLast) return false
+                
+                const cleanFull = `${cleanFirst} ${cleanLast}`.trim()
+                if (cleanUser === cleanFull) return true
+                if (cleanUser.includes(cleanFull) || cleanFull.includes(cleanUser)) return true
+                
+                if (cleanFirst && cleanLast) {
+                    if (cleanUser === `${cleanLast} ${cleanFirst}`) return true
+                }
+                return false
+            })
+        }
+
         let cleanVolume = 0
         let contractInclusionsVolume = 0
         let outboundEmailsCount = 0
@@ -466,7 +502,11 @@ export function ClientCommunicationTrends({
         }> = {}
 
         rawRows.forEach(row => {
-            const resolvedDept = deptMap[row.user] || "Gestion"
+            let resolvedDept = deptMap[row.user] || "Gestion"
+            if (resolvedDept === "Gestionnaire") {
+                resolvedDept = "Gestion"
+            }
+
             const timelineKey = (row.year !== "Unknown" && row.month !== "Unknown") ? `${row.year}-${row.month}` : "Unknown"
 
             if (timelineKey !== "Unknown") {
@@ -499,6 +539,10 @@ export function ClientCommunicationTrends({
             
             if (deptCounts[resolvedDept] !== undefined) {
                 deptCounts[resolvedDept]++
+            }
+            const isMgr = isUserAManager(row.user)
+            if (isMgr && deptCounts["Gestionnaire"] !== undefined) {
+                deptCounts["Gestionnaire"]++
             }
 
             if (resolvedDept !== "Sinistres" && resolvedDept !== "Travaux Majeurs") {

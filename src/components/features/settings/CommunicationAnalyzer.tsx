@@ -78,10 +78,11 @@ interface ParsedRow {
 }
 
 // 7 Departments + Council (as in the HTML code)
-const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Travaux Majeurs", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
+const DEPT_LIST = ["Gestion", "Gestionnaire", "Administration", "Comptabilité", "Travaux Majeurs", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
 
 const DEPT_COLORS: Record<string, string> = {
     "Gestion": "border-l-sky-500 bg-sky-950/10",
+    "Gestionnaire": "border-l-indigo-650 bg-indigo-950/10",
     "Administration": "border-l-teal-500 bg-teal-950/10",
     "Comptabilité": "border-l-purple-500 bg-purple-950/10",
     "Travaux Majeurs": "border-l-orange-500 bg-orange-950/10",
@@ -96,6 +97,7 @@ const DEPT_COLORS: Record<string, string> = {
 
 const DEPT_BADGE_CSS: Record<string, string> = {
     "Gestion": "bg-sky-500/10 text-sky-400 border border-sky-550/20",
+    "Gestionnaire": "bg-indigo-600/10 text-indigo-400 border border-indigo-550/20",
     "Administration": "bg-teal-500/10 text-teal-400 border border-teal-550/20",
     "Comptabilité": "bg-purple-500/10 text-purple-400 border border-purple-550/20",
     "Travaux Majeurs": "bg-orange-500/10 text-orange-400 border border-orange-550/20",
@@ -107,6 +109,7 @@ const DEPT_BADGE_CSS: Record<string, string> = {
     "Conseil d'Administration": "bg-amber-500/10 text-amber-400 border border-amber-550/20",
     "Marketing": "bg-pink-500/10 text-pink-400 border border-pink-550/20"
 }
+
 
 // Initial Employee Department Map matching the HTML tool precisely
 const INITIAL_DEPT_MAP: Record<string, string> = {
@@ -708,14 +711,49 @@ export function CommunicationAnalyzer({
             return false
         }
 
+        const isUserAManager = (userStr: string) => {
+            const configuredDept = deptMap[userStr]
+            if (configuredDept === "Gestionnaire") return true
+
+            if (isUserMatchingManager(userStr)) return true
+
+            if (!userStr || !managers || managers.length === 0) return false
+            const cleanUser = cleanStringForMatch(userStr)
+            
+            return managers.some(m => {
+                const first = m.first_name || ""
+                const last = m.last_name || ""
+                const cleanFirst = cleanStringForMatch(first)
+                const cleanLast = cleanStringForMatch(last)
+                if (!cleanFirst && !cleanLast) return false
+                
+                const cleanFull = `${cleanFirst} ${cleanLast}`.trim()
+                if (cleanUser === cleanFull) return true
+                if (cleanUser.includes(cleanFull) || cleanFull.includes(cleanUser)) return true
+                
+                if (cleanFirst && cleanLast) {
+                    if (cleanUser === `${cleanLast} ${cleanFirst}`) return true
+                }
+                return false
+            })
+        }
+
         rawRows.forEach(row => {
-            const resolvedDept = deptMap[row.user] || "Gestion"
+            let resolvedDept = deptMap[row.user] || "Gestion"
+            if (resolvedDept === "Gestionnaire") {
+                resolvedDept = "Gestion"
+            }
+
             const timelineKey = (row.year !== "Unknown" && row.month !== "Unknown") ? `${row.year}-${row.month}` : "Unknown"
+            const isMgr = isUserAManager(row.user)
 
             if (timelineKey !== "Unknown") {
                 // Monthly history for cards expanded drawer
                 if (monthlyDeptHistory[resolvedDept]) {
                     monthlyDeptHistory[resolvedDept][timelineKey] = (monthlyDeptHistory[resolvedDept][timelineKey] || 0) + 1
+                }
+                if (isMgr && monthlyDeptHistory["Gestionnaire"]) {
+                    monthlyDeptHistory["Gestionnaire"][timelineKey] = (monthlyDeptHistory["Gestionnaire"][timelineKey] || 0) + 1
                 }
 
                 // Chronology timeline map
@@ -754,6 +792,9 @@ export function CommunicationAnalyzer({
                 if (localYearlyAgg[yearVal][resolvedDept] !== undefined) {
                     localYearlyAgg[yearVal][resolvedDept]++
                 }
+                if (isMgr && localYearlyAgg[yearVal]["Gestionnaire"] !== undefined) {
+                    localYearlyAgg[yearVal]["Gestionnaire"]++
+                }
             }
 
             if (row.unite && row.unite !== "" && row.unite !== "-") {
@@ -766,7 +807,6 @@ export function CommunicationAnalyzer({
             }
 
             // Check if this row matches the manager
-            const isMgr = isUserMatchingManager(row.user)
             if (isMgr) {
                 managerCommsCount++
                 const cls = classifyCommType(row.type)
@@ -804,6 +844,9 @@ export function CommunicationAnalyzer({
             if (deptCounts[resolvedDept] !== undefined) {
                 deptCounts[resolvedDept]++
             }
+            if (isMgr && deptCounts["Gestionnaire"] !== undefined) {
+                deptCounts["Gestionnaire"]++
+            }
 
             if (resolvedDept !== "Sinistres" && resolvedDept !== "Travaux Majeurs") {
                 contractInclusionsVolume++
@@ -839,7 +882,13 @@ export function CommunicationAnalyzer({
 
         // Get sorted employee list
         const sortedEmployees = Object.entries(employeeCounts)
-            .map(([name, count]) => ({ name, count, dept: deptMap[name] || "Gestion" }))
+            .map(([name, count]) => {
+                let dept = deptMap[name] || "Gestion"
+                if (isUserAManager(name)) {
+                    dept = "Gestionnaire"
+                }
+                return { name, count, dept }
+            })
             .sort((a, b) => b.count - a.count)
 
         return {
@@ -866,7 +915,8 @@ export function CommunicationAnalyzer({
             managerInboundEmails,
             managerChats,
             managerPhoneCalls,
-            managerOthers
+            managerOthers,
+            isUserAManager
         }
     }, [rawRows, deptMap, selectedYear, selectedMonth, selectedUserFilter, unitCount, selectedClient])
 
@@ -1583,7 +1633,7 @@ export function CommunicationAnalyzer({
                                             .filter(emp => employeeDeptFilter === 'all' || emp.dept === employeeDeptFilter)
                                             .map(emp => {
                                                 const isActiveFilter = selectedUserFilter === emp.name
-                                                const isAssocManager = isUserAssociatedManager(emp.name)
+                                                const isAssocManager = pipelineData.isUserAManager(emp.name)
                                                 return (
                                                     <div 
                                                         key={emp.name} 

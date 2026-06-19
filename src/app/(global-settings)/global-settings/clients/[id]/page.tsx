@@ -94,6 +94,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             targetIndex={Number((settings as any)?.communication_target_index || 2.50)}
             initialDoors={coOwnersRes.data || []}
             clientName={client.company_name || client.full_name}
+            managers={managers}
           />
         }
       />

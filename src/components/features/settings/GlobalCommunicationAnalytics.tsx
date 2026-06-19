@@ -46,10 +46,11 @@ import {
 import Link from 'next/link'
 import { MultiSearchableSelect } from '@/components/ui/multi-searchable-select'
 
-const DEPT_LIST = ["Gestion", "Administration", "Comptabilité", "Travaux Majeurs", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
+const DEPT_LIST = ["Gestion", "Gestionnaire", "Administration", "Comptabilité", "Travaux Majeurs", "Sinistres", "Assurance", "Direction", "Chargé d’opération", "Conseil d'Administration", "Marketing"]
 
 const DEPT_BADGE_CSS: Record<string, string> = {
     "Gestion": "bg-sky-500/10 text-sky-400 border border-sky-550/20",
+    "Gestionnaire": "bg-indigo-600/10 text-indigo-400 border border-indigo-550/20",
     "Administration": "bg-teal-500/10 text-teal-400 border border-teal-550/20",
     "Comptabilité": "bg-purple-500/10 text-purple-400 border border-purple-550/20",
     "Travaux Majeurs": "bg-orange-500/10 text-orange-400 border border-orange-550/20",
@@ -64,6 +65,7 @@ const DEPT_BADGE_CSS: Record<string, string> = {
 
 const DEPT_COLORS: Record<string, string> = {
     "Gestion": "#0ea5e9", // sky
+    "Gestionnaire": "#4f46e5", // indigo
     "Administration": "#14b8a6", // teal
     "Comptabilité": "#a855f7", // purple
     "Travaux Majeurs": "#f97316", // orange
