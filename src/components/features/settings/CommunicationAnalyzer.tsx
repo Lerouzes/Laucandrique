@@ -46,6 +46,15 @@ interface Client {
     company_name: string | null
     full_name: string
     doors?: { id: string }[]
+    managers?: {
+        first_name: string
+        last_name: string
+        email?: string | null
+        manager_teams?: {
+            id: string
+            name: string
+        } | null
+    } | null
 }
 
 interface CommunicationAnalyzerProps {
