@@ -979,7 +979,7 @@ export function OneOnOneDetailView({
             <div className="mb-2">
                 <Link
                     href="/team-management/one-on-ones"
-                    className="text-xs text-zinc-500 hover:text-zinc-300 font-bold flex items-center gap-1.5 w-fit transition-colors"
+                    className="text-sm text-zinc-500 hover:text-zinc-300 font-bold flex items-center gap-1.5 w-fit transition-colors"
                 >
                     <ArrowLeft className="h-4 w-4" />
                     Retour à la liste des séances
@@ -993,11 +993,11 @@ export function OneOnOneDetailView({
                         <Handshake className="h-6 w-6 text-purple-400" />
                     </div>
                     <div>
-                        <h2 className="text-lg font-bold text-white uppercase tracking-tight flex items-center gap-2">
+                        <h2 className="text-xl font-bold text-white uppercase tracking-tight flex items-center gap-2">
                             Alignement 1-à-1 avec {manager.first_name} {manager.last_name}
                             {oneOnOne.status === 'completed' && <Lock className="h-4 w-4 text-zinc-500" />}
                         </h2>
-                        <p className="text-xs text-zinc-400 mt-0.5">
+                        <p className="text-sm text-zinc-400 mt-0.5">
                             Séance tenue le {new Date(meetingDate).toLocaleDateString('fr-CA')} · 
                             Animé par : <strong className="text-zinc-300">{oneOnOne.profiles?.full_name || 'Évaluateur'}</strong> · 
                             Statut : 
@@ -1013,7 +1013,7 @@ export function OneOnOneDetailView({
                         <Button 
                             onClick={handleRevertToDraft}
                             disabled={loading}
-                            className="bg-amber-600 hover:bg-amber-700 text-white text-xs h-9 px-4 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-amber-900/20"
+                            className="bg-amber-600 hover:bg-amber-700 text-white text-sm h-9 px-4 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-amber-900/20"
                         >
                             <Unlock className="h-4 w-4" />
                             Remettre en Brouillon
@@ -1023,7 +1023,7 @@ export function OneOnOneDetailView({
                     {oneOnOne.status === 'draft' && !isEditing && (
                         <Button 
                             onClick={() => setIsEditing(true)}
-                            className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-9 px-4 rounded-xl font-bold shadow-lg shadow-purple-900/20"
+                            className="bg-purple-600 hover:bg-purple-700 text-white text-sm h-9 px-4 rounded-xl font-bold shadow-lg shadow-purple-900/20"
                         >
                             Modifier le Brouillon
                         </Button>
@@ -1035,14 +1035,14 @@ export function OneOnOneDetailView({
                                 onClick={() => handleSave('draft')}
                                 disabled={loading}
                                 variant="outline" 
-                                className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850 text-xs h-9 px-4 rounded-xl font-bold"
+                                className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850 text-sm h-9 px-4 rounded-xl font-bold"
                             >
                                 Enregistrer Brouillon
                             </Button>
                             <Button 
                                 onClick={() => handleSave('completed')}
                                 disabled={loading}
-                                className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-9 px-4 rounded-xl font-bold shadow-lg shadow-purple-900/20"
+                                className="bg-purple-600 hover:bg-purple-700 text-white text-sm h-9 px-4 rounded-xl font-bold shadow-lg shadow-purple-900/20"
                             >
                                 Finaliser &amp; Verrouiller
                             </Button>
@@ -1052,7 +1052,7 @@ export function OneOnOneDetailView({
                     <Button 
                         onClick={() => setDeleteConfirmOpen(true)}
                         disabled={loading}
-                        className="bg-rose-600/90 hover:bg-rose-700 text-white text-xs h-9 px-4 rounded-xl font-bold flex items-center gap-1.5 shadow-lg shadow-rose-900/20"
+                        className="bg-rose-600/90 hover:bg-rose-700 text-white text-sm h-9 px-4 rounded-xl font-bold flex items-center gap-1.5 shadow-lg shadow-rose-900/20"
                     >
                         <Trash2 className="h-4 w-4" />
                         Supprimer
@@ -1064,40 +1064,40 @@ export function OneOnOneDetailView({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <Card className="bg-zinc-900/40 border-zinc-800 shadow-md col-span-2">
                     <CardHeader className="pb-3 border-b border-zinc-800/40">
-                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                        <CardTitle className="text-base font-bold text-white flex items-center gap-2">
                             <Sliders className="h-4 w-4 text-purple-400" />
                             1. Objectifs &amp; Informations Générales
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6 space-y-4">
                         <div className="space-y-1.5">
-                            <Label className="text-zinc-400 text-xs font-semibold">Objectif Principal de la Rencontre</Label>
+                            <Label className="text-zinc-400 text-sm font-semibold">Objectif Principal de la Rencontre</Label>
                             {isEditing ? (
                                 <Input 
                                     value={mainObjectives} 
                                     onChange={(e) => setMainObjectives(e.target.value)} 
                                     placeholder="Ex. Confirmer que le portefeuille est sous contrôle, prioriser les tâches complexes..."
-                                    className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-xl h-10"
+                                    className="bg-zinc-950 border-zinc-800 text-sm text-white rounded-xl h-10"
                                 />
                             ) : (
-                                <p className="text-xs text-zinc-300 p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/40 italic">
+                                <p className="text-sm text-zinc-300 p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/40 italic">
                                     {mainObjectives || "Aucun objectif défini."}
                                 </p>
                             )}
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label className="text-zinc-400 text-xs font-semibold">Notes Générales de la Rencontre</Label>
+                            <Label className="text-zinc-400 text-sm font-semibold">Notes Générales de la Rencontre</Label>
                             {isEditing ? (
                                 <Textarea 
                                     value={summary} 
                                     onChange={(e) => setSummary(e.target.value)} 
                                     placeholder="Observations générales, notes de contexte, résumé des discussions..."
                                     rows={4}
-                                    className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-xl p-3"
+                                    className="bg-zinc-950 border-zinc-800 text-sm text-white rounded-xl p-3"
                                 />
                             ) : (
-                                <p className="text-xs text-zinc-300 p-4 bg-zinc-950/50 rounded-xl border border-zinc-800/40 whitespace-pre-wrap">
+                                <p className="text-sm text-zinc-300 p-4 bg-zinc-950/50 rounded-xl border border-zinc-800/40 whitespace-pre-wrap">
                                     {summary || "Aucune note générale rédigée."}
                                 </p>
                             )}
@@ -1107,12 +1107,12 @@ export function OneOnOneDetailView({
 
                 <Card className="bg-zinc-900/40 border-zinc-800 shadow-md">
                     <CardHeader className="pb-3 border-b border-zinc-800/40">
-                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                        <CardTitle className="text-base font-bold text-white flex items-center gap-2">
                             <Calendar className="h-4 w-4 text-purple-400" />
                             Dates Clés
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-6 space-y-4 text-xs">
+                    <CardContent className="p-6 space-y-4 text-sm">
                         <div className="space-y-1.5">
                             <Label className="text-zinc-400 text-[11px]">Date de la Session Actuelle</Label>
                             <Input 
@@ -1120,7 +1120,7 @@ export function OneOnOneDetailView({
                                 value={meetingDate}
                                 onChange={(e) => setMeetingDate(e.target.value)}
                                 disabled={!isEditing}
-                                className="bg-zinc-950 border-zinc-800 h-9 text-xs text-white rounded-lg" 
+                                className="bg-zinc-950 border-zinc-800 h-9 text-sm text-white rounded-lg" 
                             />
                         </div>
 
@@ -1131,7 +1131,7 @@ export function OneOnOneDetailView({
                                 value={nextMeetingDate}
                                 onChange={(e) => setNextMeetingDate(e.target.value)}
                                 disabled={!isEditing}
-                                className="bg-zinc-950 border-zinc-800 h-9 text-xs text-white rounded-lg" 
+                                className="bg-zinc-950 border-zinc-800 h-9 text-sm text-white rounded-lg" 
                             />
                         </div>
 
@@ -1148,7 +1148,7 @@ export function OneOnOneDetailView({
             <Card className="bg-zinc-900/40 border-zinc-800 shadow-md">
                 <CardHeader className="pb-3 border-b border-zinc-800/40">
                     <div className="flex justify-between items-center">
-                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                        <CardTitle className="text-base font-bold text-white flex items-center gap-2">
                             <User className="h-4 w-4 text-purple-400" />
                             2. Check-in de l'employé
                         </CardTitle>
@@ -1162,12 +1162,12 @@ export function OneOnOneDetailView({
                 <CardContent className="p-6 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                         <div className="space-y-1.5 md:col-span-1">
-                            <Label className="text-zinc-400 text-xs font-semibold">État Général du Portefeuille</Label>
+                            <Label className="text-zinc-400 text-sm font-semibold">État Général du Portefeuille</Label>
                             {isEditing ? (
                                 <select 
                                     value={checkinPortfolioStatus} 
                                     onChange={(e) => setCheckinPortfolioStatus(e.target.value)}
-                                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
                                 >
                                     <option value="">Sélectionner...</option>
                                     <option value="under_control">Sous contrôle</option>
@@ -1175,7 +1175,7 @@ export function OneOnOneDetailView({
                                     <option value="difficult">Difficile à gérer</option>
                                 </select>
                             ) : (
-                                <div className="text-xs font-bold capitalize">
+                                <div className="text-sm font-bold capitalize">
                                     {checkinPortfolioStatus === 'under_control' && <span className="text-emerald-400">✔ Sous contrôle</span>}
                                     {checkinPortfolioStatus === 'needs_attention' && <span className="text-amber-400">⚠ Nécessite de l'attention</span>}
                                     {checkinPortfolioStatus === 'difficult' && <span className="text-rose-500">❌ Difficile à gérer</span>}
@@ -1186,38 +1186,38 @@ export function OneOnOneDetailView({
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-3">
                             <div className="space-y-1.5">
-                                <Label className="text-zinc-400 text-xs font-semibold">Qu'est-ce qui s'est bien passé depuis la dernière rencontre ?</Label>
+                                <Label className="text-zinc-400 text-sm font-semibold">Qu'est-ce qui s'est bien passé depuis la dernière rencontre ?</Label>
                                 {isEditing ? (
-                                    <Input value={checkinWentWell} onChange={(e) => setCheckinWentWell(e.target.value)} className="bg-zinc-950 border-zinc-800 text-xs text-white" />
+                                    <Input value={checkinWentWell} onChange={(e) => setCheckinWentWell(e.target.value)} className="bg-zinc-950 border-zinc-800 text-sm text-white" />
                                 ) : (
-                                    <p className="text-xs text-zinc-300 p-2.5 bg-zinc-950/40 rounded-lg">{checkinWentWell || 'N/A'}</p>
+                                    <p className="text-sm text-zinc-300 p-2.5 bg-zinc-950/40 rounded-lg">{checkinWentWell || 'N/A'}</p>
                                 )}
                             </div>
 
                             <div className="space-y-1.5">
-                                <Label className="text-zinc-400 text-xs font-semibold">Quel dossier ou syndicat vous préoccupe le plus ?</Label>
+                                <Label className="text-zinc-400 text-sm font-semibold">Quel dossier ou syndicat vous préoccupe le plus ?</Label>
                                 {isEditing ? (
-                                    <Input value={checkinMostConcerning} onChange={(e) => setCheckinMostConcerning(e.target.value)} className="bg-zinc-950 border-zinc-800 text-xs text-white" />
+                                    <Input value={checkinMostConcerning} onChange={(e) => setCheckinMostConcerning(e.target.value)} className="bg-zinc-950 border-zinc-800 text-sm text-white" />
                                 ) : (
-                                    <p className="text-xs text-zinc-300 p-2.5 bg-zinc-950/40 rounded-lg">{checkinMostConcerning || 'N/A'}</p>
+                                    <p className="text-sm text-zinc-300 p-2.5 bg-zinc-950/40 rounded-lg">{checkinMostConcerning || 'N/A'}</p>
                                 )}
                             </div>
 
                             <div className="space-y-1.5">
-                                <Label className="text-zinc-400 text-xs font-semibold">Qu'est-ce qui vous ralentit actuellement ?</Label>
+                                <Label className="text-zinc-400 text-sm font-semibold">Qu'est-ce qui vous ralentit actuellement ?</Label>
                                 {isEditing ? (
-                                    <Input value={checkinSlowingDown} onChange={(e) => setCheckinSlowingDown(e.target.value)} className="bg-zinc-950 border-zinc-800 text-xs text-white" />
+                                    <Input value={checkinSlowingDown} onChange={(e) => setCheckinSlowingDown(e.target.value)} className="bg-zinc-950 border-zinc-800 text-sm text-white" />
                                 ) : (
-                                    <p className="text-xs text-zinc-300 p-2.5 bg-zinc-950/40 rounded-lg">{checkinSlowingDown || 'N/A'}</p>
+                                    <p className="text-sm text-zinc-300 p-2.5 bg-zinc-950/40 rounded-lg">{checkinSlowingDown || 'N/A'}</p>
                                 )}
                             </div>
 
                             <div className="space-y-1.5">
-                                <Label className="text-zinc-400 text-xs font-semibold">Quel soutien ou décision attendez-vous de votre chef d'équipe ?</Label>
+                                <Label className="text-zinc-400 text-sm font-semibold">Quel soutien ou décision attendez-vous de votre chef d'équipe ?</Label>
                                 {isEditing ? (
-                                    <Input value={checkinSupportNeeded} onChange={(e) => setCheckinSupportNeeded(e.target.value)} className="bg-zinc-950 border-zinc-800 text-xs text-white" />
+                                    <Input value={checkinSupportNeeded} onChange={(e) => setCheckinSupportNeeded(e.target.value)} className="bg-zinc-950 border-zinc-800 text-sm text-white" />
                                 ) : (
-                                    <p className="text-xs text-zinc-300 p-2.5 bg-zinc-950/40 rounded-lg">{checkinSupportNeeded || 'N/A'}</p>
+                                    <p className="text-sm text-zinc-300 p-2.5 bg-zinc-950/40 rounded-lg">{checkinSupportNeeded || 'N/A'}</p>
                                 )}
                             </div>
                         </div>
@@ -1229,11 +1229,11 @@ export function OneOnOneDetailView({
             <Card className="bg-zinc-900/40 border-zinc-800 shadow-md">
                 <CardHeader className="pb-3 border-b border-zinc-800/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div>
-                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                        <CardTitle className="text-base font-bold text-white flex items-center gap-2">
                             <ClipboardList className="h-4 w-4 text-purple-400" />
                             3. Priorités de la rencontre (Ordre du jour)
                         </CardTitle>
-                        <CardDescription className="text-xxs text-zinc-500">
+                        <CardDescription className="text-xs text-zinc-500">
                             Points clés identifiés automatiquement ou manuellement à aborder pendant la séance. Utilisez les flèches pour les réordonner.
                         </CardDescription>
                     </div>
@@ -1243,10 +1243,10 @@ export function OneOnOneDetailView({
                                 value={manualPriorityText} 
                                 onChange={(e) => setManualPriorityText(e.target.value)} 
                                 placeholder="Ajouter un sujet manuellement..."
-                                className="bg-zinc-950 border-zinc-800 text-xxs h-8 w-full sm:w-64 rounded-lg"
+                                className="bg-zinc-950 border-zinc-800 text-xs h-8 w-full sm:w-64 rounded-lg"
                                 onKeyDown={(e) => e.key === 'Enter' && handleAddManualPriority()}
                             />
-                            <Button onClick={handleAddManualPriority} className="h-8 px-3 text-xxs bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center gap-1">
+                            <Button onClick={handleAddManualPriority} className="h-8 px-3 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center gap-1">
                                 <Plus className="h-3 w-3" /> Ajouter
                             </Button>
                         </div>
@@ -1254,7 +1254,7 @@ export function OneOnOneDetailView({
                 </CardHeader>
                 <CardContent className="p-6">
                     {prioritiesList.length === 0 ? (
-                        <p className="italic text-zinc-500 text-xs text-center py-6">Aucune priorité identifiée pour cette rencontre.</p>
+                        <p className="italic text-zinc-500 text-sm text-center py-6">Aucune priorité identifiée pour cette rencontre.</p>
                     ) : (
                         <div className="space-y-3">
                             {prioritiesList.map((item, idx) => {
@@ -1267,9 +1267,9 @@ export function OneOnOneDetailView({
                                                 <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 border-purple-900/60 bg-purple-950/20 text-purple-400">
                                                     {item.type}
                                                 </Badge>
-                                                <h4 className="text-xs font-bold text-white">{item.title}</h4>
+                                                <h4 className="text-sm font-bold text-white">{item.title}</h4>
                                             </div>
-                                            <p className="text-xxs text-zinc-400">{item.subtitle}</p>
+                                            <p className="text-xs text-zinc-400">{item.subtitle}</p>
                                             
                                             {/* Historic notes list inside priorities card */}
                                             {notesForItem.length > 0 && (
@@ -1308,7 +1308,7 @@ export function OneOnOneDetailView({
                                                     <select 
                                                         value={item.status} 
                                                         onChange={(e) => handlePriorityStatusChange(item.id, e.target.value)}
-                                                        className="bg-zinc-900 border border-zinc-800 text-xxs p-1.5 rounded-lg text-white"
+                                                        className="bg-zinc-900 border border-zinc-800 text-xs p-1.5 rounded-lg text-white"
                                                     >
                                                         <option value="to_discuss">À aborder</option>
                                                         <option value="discussed">Discuté</option>
@@ -1349,14 +1349,14 @@ export function OneOnOneDetailView({
             {/* 4. PREVIOUS COMMITMENTS SECTION */}
             <Card className="bg-zinc-900/40 border-zinc-800 shadow-md">
                 <CardHeader className="pb-3 border-b border-zinc-800/40">
-                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                    <CardTitle className="text-base font-bold text-white flex items-center gap-2">
                         <CheckSquare className="h-4 w-4 text-purple-400" />
                         4. Suivi des engagements précédents
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
                     {previousCommitments.length === 0 ? (
-                        <p className="italic text-zinc-500 text-xs text-center py-6">Aucun engagement précédent à suivre.</p>
+                        <p className="italic text-zinc-500 text-sm text-center py-6">Aucun engagement précédent à suivre.</p>
                     ) : (
                         <div className="space-y-4">
                             {previousCommitments.map((comm, idx) => {
@@ -1369,7 +1369,7 @@ export function OneOnOneDetailView({
                                     <div key={comm.id} className="p-4 bg-zinc-950/30 border border-zinc-850 rounded-xl space-y-3">
                                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                                             <div className="space-y-0.5">
-                                                <h4 className="text-xs font-extrabold text-white">{comm.commitment_text}</h4>
+                                                <h4 className="text-sm font-extrabold text-white">{comm.commitment_text}</h4>
                                                 <p className="text-[10px] text-zinc-500">
                                                     Responsable : <strong className="text-zinc-350">{comm.owner}</strong> · 
                                                     Échéance : <span className="text-zinc-400">{comm.due_date ? new Date(comm.due_date).toLocaleDateString('fr-CA') : 'Prochaine revue'}</span>
@@ -1382,7 +1382,7 @@ export function OneOnOneDetailView({
                                                     <select 
                                                         value={comm.status} 
                                                         onChange={(e) => handlePrevCommitmentChange(idx, 'status', e.target.value)}
-                                                        className="bg-zinc-900 border border-zinc-850 text-xxs p-2 rounded-lg text-white"
+                                                        className="bg-zinc-900 border border-zinc-850 text-xs p-2 rounded-lg text-white"
                                                     >
                                                         <option value="Open">En cours</option>
                                                         <option value="Resolved">Résolu (Complété)</option>
@@ -1404,7 +1404,7 @@ export function OneOnOneDetailView({
 
                                         {/* Suggested Closure Alert */}
                                         {showSuggestion && (
-                                            <div className="p-2.5 bg-emerald-950/25 border border-emerald-900/40 rounded-lg flex items-center justify-between text-xxs text-emerald-400">
+                                            <div className="p-2.5 bg-emerald-950/25 border border-emerald-900/40 rounded-lg flex items-center justify-between text-xs text-emerald-400">
                                                 <span>💡 Cet engagement visait à vider le retard opérationnel. Tâches en retard actuelles : <strong>0</strong>.</span>
                                                 {isEditing && (
                                                     <Button 
@@ -1456,17 +1456,17 @@ export function OneOnOneDetailView({
             {/* 5. ANNUAL ASSEMBLIES TO TRACK SECTION */}
             <Card className="bg-zinc-900/40 border-zinc-800 shadow-md">
                 <CardHeader className="pb-3 border-b border-zinc-800/40">
-                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                    <CardTitle className="text-base font-bold text-white flex items-center gap-2">
                         <Network className="h-4 w-4 text-purple-400" />
                         5. Suivi des Assemblées Annuelles (Track)
                     </CardTitle>
-                    <CardDescription className="text-xxs text-zinc-500">
+                    <CardDescription className="text-xs text-zinc-500">
                         Période cible : 90 jours après la fin d'exercice fiscal (FYE) du syndicat.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="p-6">
                     {assemblyTrackings.length === 0 ? (
-                        <p className="italic text-zinc-500 text-xs text-center py-6">Aucun syndicat actif sous gestion n'a de date de fin d'exercice fiscal définie.</p>
+                        <p className="italic text-zinc-500 text-sm text-center py-6">Aucun syndicat actif sous gestion n'a de date de fin d'exercice fiscal définie.</p>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {assemblyTrackings.map((assembly) => {
@@ -1483,7 +1483,7 @@ export function OneOnOneDetailView({
                                     <div key={assembly.id} className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-3.5 hover:border-zinc-800 transition-colors">
                                         <div className="flex justify-between items-start gap-2.5">
                                             <div className="space-y-0.5">
-                                                <h4 className="text-xs font-bold text-white">{assembly.clients?.company_name || 'Syndicat'}</h4>
+                                                <h4 className="text-sm font-bold text-white">{assembly.clients?.company_name || 'Syndicat'}</h4>
                                                 <p className="text-[10px] text-zinc-500">
                                                     Fin d'exercice fiscal : <strong className="text-zinc-400">{new Date(assembly.fiscal_year_end).toLocaleDateString('fr-CA')}</strong> · 
                                                     Période cible : <span className="text-zinc-400">{new Date(assembly.target_date).toLocaleDateString('fr-CA')}</span>
@@ -1495,10 +1495,10 @@ export function OneOnOneDetailView({
                                             </Badge>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-3.5 text-xxs border-t border-zinc-900 pt-3">
+                                        <div className="grid grid-cols-2 gap-3.5 text-xs border-t border-zinc-900 pt-3">
                                             <div>
                                                 <span className="text-zinc-500 block">Jours restants / retard :</span>
-                                                <strong className={`font-mono text-xs ${diffDays < 0 ? 'text-rose-500' : 'text-zinc-200'}`}>
+                                                <strong className={`font-mono text-sm ${diffDays < 0 ? 'text-rose-500' : 'text-zinc-200'}`}>
                                                     {diffDays < 0 ? `${Math.abs(diffDays)}j retard` : `${diffDays}j restants`}
                                                 </strong>
                                             </div>
@@ -1512,7 +1512,7 @@ export function OneOnOneDetailView({
                                                         className="bg-zinc-950 border-zinc-800 text-[10px] h-7 mt-0.5 p-1 text-white rounded"
                                                     />
                                                 ) : (
-                                                    <strong className="font-mono text-xs text-zinc-200">
+                                                    <strong className="font-mono text-sm text-zinc-200">
                                                         {assembly.planned_date ? new Date(assembly.planned_date).toLocaleDateString('fr-CA') : 'Non planifiée'}
                                                     </strong>
                                                 )}
@@ -1526,7 +1526,7 @@ export function OneOnOneDetailView({
                                                 <select 
                                                     value={assembly.status}
                                                     onChange={(e) => handleAssemblyStatusChange(assembly, e.target.value)}
-                                                    className="w-full bg-zinc-900 border border-zinc-850 rounded text-xxs p-1.5 text-white"
+                                                    className="w-full bg-zinc-900 border border-zinc-850 rounded text-xs p-1.5 text-white"
                                                 >
                                                     <option value="to_prepare">À préparer (Brouillon)</option>
                                                     <option value="scheduled">Planifiée / Date fixée</option>
@@ -1607,14 +1607,14 @@ export function OneOnOneDetailView({
             {/* 6. ACTIVE RISKS, COMPLAINTS, AND CONCERNS SECTION */}
             <Card className="bg-zinc-900/40 border-zinc-800 shadow-md">
                 <CardHeader className="pb-3 border-b border-zinc-800/40">
-                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                    <CardTitle className="text-base font-bold text-white flex items-center gap-2">
                         <ShieldAlert className="h-4 w-4 text-purple-400" />
                         6. Risques Actifs, Plaintes et Alertes Clientèle
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
                     {managerComplaints.length === 0 && operationalRisks.length === 0 ? (
-                        <p className="italic text-zinc-500 text-xs text-center py-6">Aucun risque ou plainte active à signaler.</p>
+                        <p className="italic text-zinc-500 text-sm text-center py-6">Aucun risque ou plainte active à signaler.</p>
                     ) : (
                         <div className="space-y-4">
                             {/* Grouped list of risks & complaints */}
@@ -1626,9 +1626,9 @@ export function OneOnOneDetailView({
                                             <div>
                                                 <div className="flex items-center gap-2">
                                                     <Badge className="text-[9px] bg-rose-955 bg-rose-600/10 text-rose-500 font-bold border border-rose-500/20">Plainte</Badge>
-                                                    <h4 className="text-xs font-bold text-white">{comp.title || 'Plainte client'}</h4>
+                                                    <h4 className="text-sm font-bold text-white">{comp.title || 'Plainte client'}</h4>
                                                 </div>
-                                                <p className="text-xxs text-zinc-400 mt-1">{comp.description}</p>
+                                                <p className="text-xs text-zinc-400 mt-1">{comp.description}</p>
                                                 <span className="text-[10px] text-zinc-550 block mt-1">Syndicat : <strong className="text-zinc-400">{comp.clients?.company_name || comp.clients?.full_name}</strong></span>
                                             </div>
                                             <Badge variant="outline" className="text-[8px] uppercase border-rose-900 bg-rose-950/15 text-rose-455">
@@ -1674,7 +1674,7 @@ export function OneOnOneDetailView({
                                             <div>
                                                 <div className="flex items-center gap-2">
                                                     <Badge className="text-[9px] bg-amber-955 bg-amber-600/10 text-amber-450 border border-amber-500/20">Risque</Badge>
-                                                    <h4 className="text-xs font-bold text-white">{risk.description}</h4>
+                                                    <h4 className="text-sm font-bold text-white">{risk.description}</h4>
                                                 </div>
                                                 {risk.client_id && <span className="text-[10px] text-zinc-500 block mt-1">Syndicat : <strong className="text-zinc-400">{getClientName(risk.client_id)}</strong></span>}
                                             </div>
@@ -1724,7 +1724,7 @@ export function OneOnOneDetailView({
             {((syndicateAudits && syndicateAudits.length > 0) || (assemblyEvaluations && assemblyEvaluations.length > 0)) && (
                 <Card className="bg-zinc-900/40 border-zinc-800 shadow-md">
                     <CardHeader className="pb-3 border-b border-zinc-800/40">
-                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                        <CardTitle className="text-base font-bold text-white flex items-center gap-2">
                             <BookOpen className="h-4 w-4 text-purple-400" />
                             7. Audits et Revue de Qualité Récents
                         </CardTitle>
@@ -1737,10 +1737,10 @@ export function OneOnOneDetailView({
                                         <Badge className="text-[8px] bg-zinc-900 border border-zinc-850 text-zinc-350 font-bold uppercase">Audit Syndicat</Badge>
                                         <span className="text-[10px] text-zinc-500">{new Date(audit.audit_date).toLocaleDateString('fr-CA')}</span>
                                     </div>
-                                    <h4 className="text-xs font-bold text-white">{audit.clients?.company_name || 'Syndicat'}</h4>
-                                    <div className="flex justify-between items-center pt-2.5 text-xxs text-zinc-400">
+                                    <h4 className="text-sm font-bold text-white">{audit.clients?.company_name || 'Syndicat'}</h4>
+                                    <div className="flex justify-between items-center pt-2.5 text-xs text-zinc-400">
                                         <span>Score de santé :</span>
-                                        <strong className={`font-mono text-sm ${audit.health_score >= 80 ? 'text-emerald-400' : audit.health_score >= 60 ? 'text-amber-400' : 'text-rose-500'}`}>
+                                        <strong className={`font-mono text-base ${audit.health_score >= 80 ? 'text-emerald-400' : audit.health_score >= 60 ? 'text-amber-400' : 'text-rose-500'}`}>
                                             {audit.health_score}%
                                         </strong>
                                     </div>
@@ -1753,8 +1753,8 @@ export function OneOnOneDetailView({
                                         <Badge className="text-[8px] bg-zinc-900 border border-zinc-850 text-zinc-350 font-bold uppercase">Évaluation Assemblée</Badge>
                                         <span className="text-[10px] text-zinc-500">{new Date(evalItem.assembly_date).toLocaleDateString('fr-CA')}</span>
                                     </div>
-                                    <h4 className="text-xs font-bold text-white">{evalItem.clients?.company_name || 'Syndicat'}</h4>
-                                    <p className="text-xxs text-zinc-400 italic">Notes: {evalItem.notes || 'Sans notes.'}</p>
+                                    <h4 className="text-sm font-bold text-white">{evalItem.clients?.company_name || 'Syndicat'}</h4>
+                                    <p className="text-xs text-zinc-400 italic">Notes: {evalItem.notes || 'Sans notes.'}</p>
                                 </div>
                             ))}
                         </div>
@@ -1765,17 +1765,17 @@ export function OneOnOneDetailView({
             {/* 8. SUPPORT AND COACHING SECTION */}
             <Card className="bg-zinc-900/40 border-zinc-800 shadow-md">
                 <CardHeader className="pb-3 border-b border-zinc-800/40">
-                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                    <CardTitle className="text-base font-bold text-white flex items-center gap-2">
                         <Sparkles className="h-4 w-4 text-purple-400" />
                         8. Soutien, Accompagnement et Coaching
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-sm">
                         <div className="space-y-1.5">
                             <Label className="text-zinc-400 font-semibold">Succès, progrès ou bon coup à reconnaître</Label>
                             {isEditing ? (
-                                <Textarea value={coachingSuccess} onChange={(e) => setCoachingSuccess(e.target.value)} placeholder="Reconnaissance, améliorations concrètes de l'employé..." rows={3} className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-xl" />
+                                <Textarea value={coachingSuccess} onChange={(e) => setCoachingSuccess(e.target.value)} placeholder="Reconnaissance, améliorations concrètes de l'employé..." rows={3} className="bg-zinc-950 border-zinc-800 text-sm text-white rounded-xl" />
                             ) : (
                                 <p className="p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/40 min-h-[70px] whitespace-pre-wrap">{coachingSuccess || 'Aucune observation.'}</p>
                             )}
@@ -1784,7 +1784,7 @@ export function OneOnOneDetailView({
                         <div className="space-y-1.5">
                             <Label className="text-zinc-400 font-semibold">Axe de développement, compétence ou habitude à améliorer</Label>
                             {isEditing ? (
-                                <Textarea value={coachingImprovement} onChange={(e) => setCoachingImprovement(e.target.value)} placeholder="Prochain focus d'amélioration..." rows={3} className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-xl" />
+                                <Textarea value={coachingImprovement} onChange={(e) => setCoachingImprovement(e.target.value)} placeholder="Prochain focus d'amélioration..." rows={3} className="bg-zinc-950 border-zinc-800 text-sm text-white rounded-xl" />
                             ) : (
                                 <p className="p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/40 min-h-[70px] whitespace-pre-wrap">{coachingImprovement || 'Aucune observation.'}</p>
                             )}
@@ -1793,7 +1793,7 @@ export function OneOnOneDetailView({
                         <div className="space-y-1.5">
                             <Label className="text-zinc-400 font-semibold">Processus, règle ou point de méthode à clarifier</Label>
                             {isEditing ? (
-                                <Textarea value={coachingClarification} onChange={(e) => setCoachingClarification(e.target.value)} placeholder="Besoin de formation, clarification de processus..." rows={3} className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-xl" />
+                                <Textarea value={coachingClarification} onChange={(e) => setCoachingClarification(e.target.value)} placeholder="Besoin de formation, clarification de processus..." rows={3} className="bg-zinc-950 border-zinc-800 text-sm text-white rounded-xl" />
                             ) : (
                                 <p className="p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/40 min-h-[70px] whitespace-pre-wrap">{coachingClarification || 'Aucune observation.'}</p>
                             )}
@@ -1802,7 +1802,7 @@ export function OneOnOneDetailView({
                         <div className="space-y-1.5">
                             <Label className="text-zinc-400 font-semibold">Soutien promis par le chef d'équipe (Promesses &amp; Décisions)</Label>
                             {isEditing ? (
-                                <Textarea value={coachingPromised} onChange={(e) => setCoachingPromised(e.target.value)} placeholder="Actions concrètes ou décisions promises de votre part..." rows={3} className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-xl" />
+                                <Textarea value={coachingPromised} onChange={(e) => setCoachingPromised(e.target.value)} placeholder="Actions concrètes ou décisions promises de votre part..." rows={3} className="bg-zinc-950 border-zinc-800 text-sm text-white rounded-xl" />
                             ) : (
                                 <p className="p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/40 min-h-[70px] whitespace-pre-wrap">{coachingPromised || 'Aucune promesse enregistrée.'}</p>
                             )}
@@ -1814,11 +1814,11 @@ export function OneOnOneDetailView({
             {/* 9. NEW RECIPROCAL COMMITMENTS SECTION */}
             <Card className="bg-zinc-900/40 border-zinc-800 shadow-md">
                 <CardHeader className="pb-3 border-b border-zinc-800/40">
-                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                    <CardTitle className="text-base font-bold text-white flex items-center gap-2">
                         <CheckSquare className="h-4 w-4 text-purple-400" />
                         9. Nouveaux Engagements Réciproques
                     </CardTitle>
-                    <CardDescription className="text-xxs text-zinc-500">
+                    <CardDescription className="text-xs text-zinc-500">
                         Ajoutez des engagements précis et quantifiables pour chacun. Recommandé : max 3 pour le gestionnaire, max 2 pour le chef d'équipe.
                     </CardDescription>
                 </CardHeader>
@@ -1827,21 +1827,21 @@ export function OneOnOneDetailView({
                     {isEditing && (
                         <div className="p-4 bg-zinc-950/50 border border-zinc-850 rounded-xl space-y-4">
                             <span className="text-[10px] font-black uppercase text-purple-400 tracking-wider">Ajouter un engagement</span>
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-end text-xs">
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-end text-sm">
                                 <div className="md:col-span-4 space-y-1.5">
                                     <Label className="text-zinc-500 text-[10px]">Action concrète à réaliser</Label>
-                                    <Input value={newActionText} onChange={(e) => setNewActionText(e.target.value)} placeholder="Ex. Envoyer 3 dates d'assemblée au CA par écrit..." className="bg-zinc-950 border-zinc-800 text-xs text-white" />
+                                    <Input value={newActionText} onChange={(e) => setNewActionText(e.target.value)} placeholder="Ex. Envoyer 3 dates d'assemblée au CA par écrit..." className="bg-zinc-950 border-zinc-800 text-sm text-white" />
                                 </div>
                                 <div className="md:col-span-2 space-y-1.5">
                                     <Label className="text-zinc-500 text-[10px]">Propriétaire</Label>
-                                    <select value={newActionOwner} onChange={(e) => setNewActionOwner(e.target.value as any)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-purple-600 h-9">
+                                    <select value={newActionOwner} onChange={(e) => setNewActionOwner(e.target.value as any)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-purple-600 h-9">
                                         <option value="Employee">Gestionnaire (Employé)</option>
                                         <option value="Team Leader">Chef d'équipe (Superviseur)</option>
                                     </select>
                                 </div>
                                 <div className="md:col-span-2 space-y-1.5">
                                     <Label className="text-zinc-500 text-[10px]">Échéance</Label>
-                                    <Input type="date" value={newActionDueDate} onChange={(e) => setNewActionDueDate(e.target.value)} className="bg-zinc-950 border-zinc-800 text-xs text-white h-9" />
+                                    <Input type="date" value={newActionDueDate} onChange={(e) => setNewActionDueDate(e.target.value)} className="bg-zinc-950 border-zinc-800 text-sm text-white h-9" />
                                 </div>
                                 <div className="md:col-span-2 space-y-1.5">
                                     <Label className="text-zinc-500 text-[10px]">Syndicat lié (Optionnel)</Label>
@@ -1849,11 +1849,11 @@ export function OneOnOneDetailView({
                                 </div>
                                 <div className="md:col-span-2 space-y-1.5">
                                     <Label className="text-zinc-500 text-[10px]">Résultat attendu / Critère</Label>
-                                    <Input value={newActionExpectedResult} onChange={(e) => setNewActionExpectedResult(e.target.value)} placeholder="Ex. Confirmation écrite reçue..." className="bg-zinc-950 border-zinc-800 text-xs text-white h-9" />
+                                    <Input value={newActionExpectedResult} onChange={(e) => setNewActionExpectedResult(e.target.value)} placeholder="Ex. Confirmation écrite reçue..." className="bg-zinc-950 border-zinc-800 text-sm text-white h-9" />
                                 </div>
                             </div>
                             <div className="flex justify-end pt-1">
-                                <Button onClick={handleAddNewCommitment} className="h-8.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg px-4 flex items-center gap-1">
+                                <Button onClick={handleAddNewCommitment} className="h-8.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold rounded-lg px-4 flex items-center gap-1">
                                     <Plus className="h-4 w-4" /> Ajouter l'engagement
                                 </Button>
                             </div>
@@ -1864,20 +1864,20 @@ export function OneOnOneDetailView({
                         {/* Employee Commitments column */}
                         <div className="space-y-3.5">
                             <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
-                                <h4 className="text-xs font-black uppercase text-zinc-350 tracking-wider flex items-center gap-2">
+                                <h4 className="text-sm font-black uppercase text-zinc-350 tracking-wider flex items-center gap-2">
                                     <User className="h-4 w-4 text-purple-400" />
                                     Engagements du Gestionnaire ({newAgreedActions.filter(a => a.owner === 'Employee').length} / 3)
                                 </h4>
                             </div>
 
                             {newAgreedActions.filter(a => a.owner === 'Employee').length === 0 ? (
-                                <p className="italic text-zinc-650 text-xxs py-4 pl-1">Aucun engagement défini pour l'employé.</p>
+                                <p className="italic text-zinc-650 text-xs py-4 pl-1">Aucun engagement défini pour l'employé.</p>
                             ) : (
                                 <div className="space-y-2">
                                     {newAgreedActions.filter(a => a.owner === 'Employee').map((comm, idx) => (
-                                        <div key={idx} className="p-3 bg-zinc-950/45 border border-zinc-850 rounded-xl text-xxs flex justify-between items-start gap-3">
+                                        <div key={idx} className="p-3 bg-zinc-950/45 border border-zinc-850 rounded-xl text-xs flex justify-between items-start gap-3">
                                             <div className="space-y-1 flex-1">
-                                                <strong className="text-zinc-200 block text-xs">{comm.commitment_text}</strong>
+                                                <strong className="text-zinc-200 block text-sm">{comm.commitment_text}</strong>
                                                 <div className="text-[10px] text-zinc-550 space-y-0.5">
                                                     <div>Échéance : <span className="text-zinc-400 font-mono">{comm.due_date ? new Date(comm.due_date).toLocaleDateString('fr-CA') : 'Prochaine revue'}</span></div>
                                                     {comm.client_id && <div>Syndicat : <span className="text-zinc-400">{getClientName(comm.client_id)}</span></div>}
@@ -1898,20 +1898,20 @@ export function OneOnOneDetailView({
                         {/* Team Leader Commitments column */}
                         <div className="space-y-3.5">
                             <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
-                                <h4 className="text-xs font-black uppercase text-zinc-350 tracking-wider flex items-center gap-2">
+                                <h4 className="text-sm font-black uppercase text-zinc-350 tracking-wider flex items-center gap-2">
                                     <User className="h-4 w-4 text-purple-400" />
                                     Engagements du Chef d'équipe ({newAgreedActions.filter(a => a.owner === 'Team Leader').length} / 2)
                                 </h4>
                             </div>
 
                             {newAgreedActions.filter(a => a.owner === 'Team Leader').length === 0 ? (
-                                <p className="italic text-zinc-650 text-xxs py-4 pl-1">Aucun engagement défini pour le superviseur.</p>
+                                <p className="italic text-zinc-650 text-xs py-4 pl-1">Aucun engagement défini pour le superviseur.</p>
                             ) : (
                                 <div className="space-y-2">
                                     {newAgreedActions.filter(a => a.owner === 'Team Leader').map((comm, idx) => (
-                                        <div key={idx} className="p-3 bg-zinc-950/45 border border-zinc-850 rounded-xl text-xxs flex justify-between items-start gap-3">
+                                        <div key={idx} className="p-3 bg-zinc-950/45 border border-zinc-850 rounded-xl text-xs flex justify-between items-start gap-3">
                                             <div className="space-y-1 flex-1">
-                                                <strong className="text-zinc-200 block text-xs">{comm.commitment_text}</strong>
+                                                <strong className="text-zinc-200 block text-sm">{comm.commitment_text}</strong>
                                                 <div className="text-[10px] text-zinc-550 space-y-0.5">
                                                     <div>Échéance : <span className="text-zinc-400 font-mono">{comm.due_date ? new Date(comm.due_date).toLocaleDateString('fr-CA') : 'Prochaine revue'}</span></div>
                                                     {comm.client_id && <div>Syndicat : <span className="text-zinc-400">{getClientName(comm.client_id)}</span></div>}
@@ -1935,7 +1935,7 @@ export function OneOnOneDetailView({
             {/* 10. MEETING CONCLUSION SECTION */}
             <Card className="bg-zinc-900/40 border-zinc-800 shadow-md">
                 <CardHeader className="pb-3 border-b border-zinc-800/40">
-                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                    <CardTitle className="text-base font-bold text-white flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-purple-400" />
                         10. Conclusion de la rencontre
                     </CardTitle>
@@ -1943,12 +1943,12 @@ export function OneOnOneDetailView({
                 <CardContent className="p-6 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                         <div className="space-y-1.5 md:col-span-1">
-                            <Label className="text-zinc-400 text-xs font-semibold">Statut Global Final du Portefeuille</Label>
+                            <Label className="text-zinc-400 text-sm font-semibold">Statut Global Final du Portefeuille</Label>
                             {isEditing ? (
                                 <select 
                                     value={conclusionPortfolioStatus} 
                                     onChange={(e) => setConclusionPortfolioStatus(e.target.value)}
-                                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
                                 >
                                     <option value="">Sélectionner...</option>
                                     <option value="under_control">Sous contrôle</option>
@@ -1956,7 +1956,7 @@ export function OneOnOneDetailView({
                                     <option value="critical">Critique / Alerte rouge</option>
                                 </select>
                             ) : (
-                                <div className="text-xs font-bold capitalize">
+                                <div className="text-sm font-bold capitalize">
                                     {conclusionPortfolioStatus === 'under_control' && <span className="text-emerald-400">✔ Sous contrôle</span>}
                                     {conclusionPortfolioStatus === 'needs_attention' && <span className="text-amber-400">⚠ Nécessite de l'attention</span>}
                                     {conclusionPortfolioStatus === 'critical' && <span className="text-rose-500">❌ Critique / Alerte</span>}
@@ -1965,40 +1965,40 @@ export function OneOnOneDetailView({
                             )}
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-3 text-xs">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-3 text-sm">
                             <div className="space-y-1.5">
                                 <Label className="text-zinc-400 font-semibold">Ce qui va bien dans le portefeuille</Label>
                                 {isEditing ? (
-                                    <Input value={conclusionGoingWell} onChange={(e) => setConclusionGoingWell(e.target.value)} className="bg-zinc-950 border-zinc-800 text-xs text-white" />
+                                    <Input value={conclusionGoingWell} onChange={(e) => setConclusionGoingWell(e.target.value)} className="bg-zinc-950 border-zinc-800 text-sm text-white" />
                                 ) : (
-                                    <p className="text-xs text-zinc-300 p-2.5 bg-zinc-950/40 rounded-lg">{conclusionGoingWell || 'N/A'}</p>
+                                    <p className="text-sm text-zinc-300 p-2.5 bg-zinc-950/40 rounded-lg">{conclusionGoingWell || 'N/A'}</p>
                                 )}
                             </div>
 
                             <div className="space-y-1.5">
                                 <Label className="text-zinc-400 font-semibold">Ce qui requiert une attention particulière</Label>
                                 {isEditing ? (
-                                    <Input value={conclusionNeedsAttention} onChange={(e) => setConclusionNeedsAttention(e.target.value)} className="bg-zinc-950 border-zinc-800 text-xs text-white" />
+                                    <Input value={conclusionNeedsAttention} onChange={(e) => setConclusionNeedsAttention(e.target.value)} className="bg-zinc-950 border-zinc-800 text-sm text-white" />
                                 ) : (
-                                    <p className="text-xs text-zinc-300 p-2.5 bg-zinc-950/40 rounded-lg">{conclusionNeedsAttention || 'N/A'}</p>
+                                    <p className="text-sm text-zinc-300 p-2.5 bg-zinc-950/40 rounded-lg">{conclusionNeedsAttention || 'N/A'}</p>
                                 )}
                             </div>
 
                             <div className="space-y-1.5">
                                 <Label className="text-zinc-400 font-semibold">Décisions arrêtées</Label>
                                 {isEditing ? (
-                                    <Input value={conclusionDecisions} onChange={(e) => setConclusionDecisions(e.target.value)} className="bg-zinc-950 border-zinc-800 text-xs text-white" />
+                                    <Input value={conclusionDecisions} onChange={(e) => setConclusionDecisions(e.target.value)} className="bg-zinc-950 border-zinc-800 text-sm text-white" />
                                 ) : (
-                                    <p className="text-xs text-zinc-300 p-2.5 bg-zinc-950/40 rounded-lg">{conclusionDecisions || 'N/A'}</p>
+                                    <p className="text-sm text-zinc-300 p-2.5 bg-zinc-950/40 rounded-lg">{conclusionDecisions || 'N/A'}</p>
                                 )}
                             </div>
 
                             <div className="space-y-1.5">
                                 <Label className="text-zinc-400 font-semibold">Priorités principales d'ici le prochain suivi</Label>
                                 {isEditing ? (
-                                    <Input value={conclusionPriorities} onChange={(e) => setConclusionPriorities(e.target.value)} className="bg-zinc-950 border-zinc-800 text-xs text-white" />
+                                    <Input value={conclusionPriorities} onChange={(e) => setConclusionPriorities(e.target.value)} className="bg-zinc-950 border-zinc-800 text-sm text-white" />
                                 ) : (
-                                    <p className="text-xs text-zinc-300 p-2.5 bg-zinc-950/40 rounded-lg">{conclusionPriorities || 'N/A'}</p>
+                                    <p className="text-sm text-zinc-300 p-2.5 bg-zinc-950/40 rounded-lg">{conclusionPriorities || 'N/A'}</p>
                                 )}
                             </div>
                         </div>
@@ -2014,32 +2014,32 @@ export function OneOnOneDetailView({
                 >
                     <div className="flex items-center gap-2.5">
                         <TrendingUp className="h-4.5 w-4.5 text-purple-400" />
-                        <span className="text-sm font-bold text-white uppercase tracking-tight">11. Consulter les statistiques de performance détaillées</span>
+                        <span className="text-base font-bold text-white uppercase tracking-tight">11. Consulter les statistiques de performance détaillées</span>
                     </div>
                     {statsCollapsed ? <ChevronDown className="h-4 w-4 text-zinc-400" /> : <ChevronUp className="h-4 w-4 text-zinc-400" />}
                 </button>
 
                 {!statsCollapsed && (
                     <div className="p-6 border-t border-zinc-800/80 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xxs">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
                             <div className="p-4 bg-zinc-900/30 border border-zinc-850 rounded-xl space-y-1">
                                 <span className="text-zinc-550 block font-bold uppercase tracking-wider">Score Gustav</span>
-                                <strong className="text-lg text-purple-400 block">{computedScore}% ({rating.label})</strong>
+                                <strong className="text-xl text-purple-400 block">{computedScore}% ({rating.label})</strong>
                                 <span className="text-zinc-500 font-medium">Imputabilité globale</span>
                             </div>
                             <div className="p-4 bg-zinc-900/30 border border-zinc-850 rounded-xl space-y-1">
                                 <span className="text-zinc-550 block font-bold uppercase tracking-wider">Appels Répondus</span>
-                                <strong className="text-lg text-emerald-400 block">{callsTotal > 0 ? `${Math.round(callsPct)}%` : 'N/A'}</strong>
+                                <strong className="text-xl text-emerald-400 block">{callsTotal > 0 ? `${Math.round(callsPct)}%` : 'N/A'}</strong>
                                 <span className="text-zinc-500 font-medium">{callsAnswered} répondus / {callsTotal} total</span>
                             </div>
                             <div className="p-4 bg-zinc-900/30 border border-zinc-850 rounded-xl space-y-1">
                                 <span className="text-zinc-550 block font-bold uppercase tracking-wider">Hygiène Tâches en retard</span>
-                                <strong className="text-lg text-amber-400 block">{taskHygiene}%</strong>
+                                <strong className="text-xl text-amber-400 block">{taskHygiene}%</strong>
                                 <span className="text-zinc-500 font-medium">{lateTasks} tâches en retard</span>
                             </div>
                             <div className="p-4 bg-zinc-900/30 border border-zinc-850 rounded-xl space-y-1">
                                 <span className="text-zinc-550 block font-bold uppercase tracking-wider">Hygiène Factures en retard</span>
-                                <strong className="text-lg text-zinc-200 block">{billHygiene}%</strong>
+                                <strong className="text-xl text-zinc-200 block">{billHygiene}%</strong>
                                 <span className="text-zinc-500 font-medium">{billsNoNotes} sans note &gt;7j</span>
                             </div>
                         </div>
@@ -2048,7 +2048,7 @@ export function OneOnOneDetailView({
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-2">
                             <Card className="bg-[#121318]/50 border-zinc-800">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-xs font-bold text-white uppercase tracking-wider">Historique mensuel des appels</CardTitle>
+                                    <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Historique mensuel des appels</CardTitle>
                                 </CardHeader>
                                 <CardContent className="p-4">
                                     <CallsStatsPanel managerId={manager.id} title="" />
@@ -2056,9 +2056,9 @@ export function OneOnOneDetailView({
                             </Card>
                             <Card className="bg-[#121318]/50 border-zinc-800">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-xs font-bold text-white uppercase tracking-wider">Volume de communications (SDCs)</CardTitle>
+                                    <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Volume de communications (SDCs)</CardTitle>
                                 </CardHeader>
-                                <CardContent className="p-4 space-y-2 text-xxs text-zinc-400">
+                                <CardContent className="p-4 space-y-2 text-xs text-zinc-400">
                                     <div className="flex justify-between border-b border-zinc-900 pb-1.5">
                                         <span>Total syndicats sous gestion :</span>
                                         <strong className="text-white font-mono">{syndicatesCount}</strong>
@@ -2082,27 +2082,27 @@ export function OneOnOneDetailView({
             <Dialog open={confirmingAssemblyId !== null} onOpenChange={() => setConfirmingAssemblyId(null)}>
                 <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 max-w-sm rounded-xl">
                     <DialogHeader>
-                        <DialogTitle className="text-sm font-bold text-white">Confirmer l'assemblée complétée</DialogTitle>
-                        <DialogDescription className="text-xxs text-zinc-400 mt-1">
+                        <DialogTitle className="text-base font-bold text-white">Confirmer l'assemblée complétée</DialogTitle>
+                        <DialogDescription className="text-xs text-zinc-400 mt-1">
                             Veuillez entrer la date réelle à laquelle l'assemblée annuelle s'est tenue. Cela mettra à jour la fiche du syndicat et ouvrira le cycle de suivi pour l'année suivante.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-3 pt-2 text-xs">
+                    <div className="space-y-3 pt-2 text-sm">
                         <div className="space-y-1.5">
                             <Label className="text-zinc-400">Date réelle de l'assemblée</Label>
                             <Input 
                                 type="date" 
                                 value={actualAssemblyDate} 
                                 onChange={(e) => setActualAssemblyDate(e.target.value)} 
-                                className="bg-zinc-950 border-zinc-800 text-xs text-white"
+                                className="bg-zinc-950 border-zinc-800 text-sm text-white"
                             />
                         </div>
                     </div>
                     <DialogFooter className="pt-2">
-                        <Button variant="outline" onClick={() => setConfirmingAssemblyId(null)} className="h-8.5 text-xxs bg-zinc-900 border-zinc-800 text-zinc-300">
+                        <Button variant="outline" onClick={() => setConfirmingAssemblyId(null)} className="h-8.5 text-xs bg-zinc-900 border-zinc-800 text-zinc-300">
                             Annuler
                         </Button>
-                        <Button onClick={handleConfirmAssemblyCompleted} disabled={!actualAssemblyDate} className="h-8.5 text-xxs bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
+                        <Button onClick={handleConfirmAssemblyCompleted} disabled={!actualAssemblyDate} className="h-8.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
                             Confirmer la complétion
                         </Button>
                     </DialogFooter>
