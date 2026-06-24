@@ -181,6 +181,23 @@ function SearchableSelect({
     )
 }
 
+// Helper to format city names cleanly (handles French prepositions, accents, casing, and hyphens)
+function formatCityName(city: string): string {
+    const trimmed = city.trim();
+    if (!trimmed) return "";
+    return trimmed
+        .toLowerCase()
+        .split(/([\s\-\']+)/)
+        .map(part => {
+            if (part === 'l' || part === 'd' || part === 'de') return part;
+            if (part.length > 0 && /^[a-zà-ÿ]/.test(part)) {
+                return part.charAt(0).toUpperCase() + part.slice(1);
+            }
+            return part;
+        })
+        .join('');
+}
+
 // Haversine distance helper
 function getHaversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
     const R = 6371 // Radius of the Earth in km
@@ -209,11 +226,16 @@ export function MapPageView({ initialClients, managers, teams }: MapPageViewProp
 
     // Compute cities list for dropdown
     const citiesList = useMemo(() => {
-        const cities = new Set<string>()
+        const uniqueCities = new Map<string, string>()
         clients.forEach(c => {
-            if (c.city) cities.add(c.city.trim())
+            if (c.city) {
+                const formatted = formatCityName(c.city)
+                if (formatted) {
+                    uniqueCities.set(formatted.toLowerCase(), formatted)
+                }
+            }
         })
-        return Array.from(cities).sort()
+        return Array.from(uniqueCities.values()).sort((a, b) => a.localeCompare(b))
     }, [clients])
 
     // Options for searchable selects
@@ -284,7 +306,7 @@ export function MapPageView({ initialClients, managers, teams }: MapPageViewProp
             const managerMatch = selectedManagerId === 'all' || c.manager_id === selectedManagerId
 
             // City filter
-            const cityMatch = selectedCity === 'all' || (c.city && c.city.trim() === selectedCity)
+            const cityMatch = selectedCity === 'all' || (c.city && formatCityName(c.city) === selectedCity)
 
             // Team filter
             const teamIdOfManager = c.managers?.manager_teams?.id
@@ -354,6 +376,26 @@ export function MapPageView({ initialClients, managers, teams }: MapPageViewProp
         return clients.find(c => c.id === proximityCenterId)
     }, [clients, proximityCenterId])
 
+    const hasActiveFilters = useMemo(() => {
+        return (
+            searchQuery !== '' ||
+            selectedManagerId !== 'all' ||
+            selectedCity !== 'all' ||
+            selectedTeamId !== 'all' ||
+            onlyShowSelected ||
+            proximityCenterId !== null
+        )
+    }, [searchQuery, selectedManagerId, selectedCity, selectedTeamId, onlyShowSelected, proximityCenterId])
+
+    const handleClearFilters = () => {
+        setSearchQuery('')
+        setSelectedManagerId('all')
+        setSelectedCity('all')
+        setSelectedTeamId('all')
+        setOnlyShowSelected(false)
+        setProximityCenterId(null)
+    }
+
     return (
         <div className="flex flex-col h-[calc(100vh-8rem)] w-full text-zinc-100 font-sans gap-4">
             
@@ -374,7 +416,18 @@ export function MapPageView({ initialClients, managers, teams }: MapPageViewProp
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5">
+                        {hasActiveFilters && (
+                            <Button 
+                                size="sm"
+                                onClick={handleClearFilters}
+                                variant="outline"
+                                className="bg-zinc-950 border-zinc-800 hover:bg-zinc-900 text-zinc-300 text-xs font-bold rounded-lg px-3 h-8.5 flex items-center gap-1.5"
+                            >
+                                <X className="h-3.5 w-3.5 text-zinc-400" />
+                                Réinitialiser les filtres
+                            </Button>
+                        )}
                         {stats.missing > 0 && (
                             <Button 
                                 size="sm"
@@ -466,7 +519,7 @@ export function MapPageView({ initialClients, managers, teams }: MapPageViewProp
                 {/* Map area */}
                 <div className="flex-1 h-full min-h-0 bg-zinc-900/40 border border-white/10 rounded-2xl overflow-hidden shadow-xl">
                     <MapComponent
-                        clients={clients}
+                        clients={filteredClients}
                         selectedClientIds={selectedClientIds}
                         focusClientId={focusClientId}
                         proximityCenterId={proximityCenterId}
