@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, FileText, CalendarDays, BarChart, Settings, HardHat, Receipt, ChevronDown, Layers, RefreshCw, Wrench } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, CalendarDays, BarChart, Settings, HardHat, Receipt, ChevronDown, Layers, RefreshCw, Wrench, Map } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Database } from '@/types/supabase'
@@ -13,6 +13,7 @@ const navItems = [
     { name: 'Tableau de bord', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Soumissions', href: '/quotes', icon: FileText },
     { name: 'Planification', href: '/planification', icon: CalendarDays },
+    { name: 'Cartographie', href: '/map', icon: Map },
     { name: 'Contracteurs', href: '/contractors', icon: HardHat },
     { name: 'Factures', href: '/bills', icon: Receipt },
     { name: 'Analytiques', href: '/analytics', icon: BarChart },

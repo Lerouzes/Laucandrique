@@ -379,6 +379,8 @@ export type Database = {
           postal_code: string | null
           province: string | null
           status: string | null
+          latitude: number | null
+          longitude: number | null
         }
         Insert: {
           address?: string | null
@@ -396,6 +398,8 @@ export type Database = {
           postal_code?: string | null
           province?: string | null
           status?: string | null
+          latitude?: number | null
+          longitude?: number | null
         }
         Update: {
           address?: string | null
@@ -413,6 +417,8 @@ export type Database = {
           postal_code?: string | null
           province?: string | null
           status?: string | null
+          latitude?: number | null
+          longitude?: number | null
         }
         Relationships: [
           {

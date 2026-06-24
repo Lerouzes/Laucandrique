@@ -752,3 +752,132 @@ export async function toggleDoorBoardMemberAction(doorId: string, isBoardMember:
         return { success: false, error: err.message }
     }
 }
+
+export async function updateClientCoordinatesAction(clientId: string, lat: number, lng: number) {
+    try {
+        const supabase = await createClient()
+        const { error } = await supabase
+            .from('clients')
+            .update({ latitude: lat, longitude: lng })
+            .eq('id', clientId)
+
+        if (error) {
+            console.error('Error updating client coordinates:', error)
+            return { success: false, error: error.message }
+        }
+
+        revalidatePath('/map')
+        revalidatePath(`/global-settings/clients/${clientId}`)
+        return { success: true }
+    } catch (err: any) {
+        console.error('updateClientCoordinatesAction exception:', err)
+        return { success: false, error: err.message }
+    }
+}
+
+export async function triggerMissingGeocodingAction() {
+    try {
+        const supabase = await createClient()
+        
+        // Fetch active clients without coordinates
+        const { data: clients, error: fetchErr } = await supabase
+            .from('clients')
+            .select('id, address, city, postal_code, company_name')
+            .eq('status', 'active')
+            .or('latitude.is.null,longitude.is.null')
+
+        if (fetchErr) {
+            console.error('Error fetching clients for geocoding:', fetchErr)
+            return { success: false, error: fetchErr.message }
+        }
+
+        if (!clients || clients.length === 0) {
+            return { success: true, count: 0 }
+        }
+
+        let geocodedCount = 0
+
+        for (const client of clients) {
+            const addressStr = client.address ? client.address.trim() : ""
+            const cityStr = client.city ? client.city.trim() : ""
+
+            if (!addressStr || !cityStr) continue
+
+            // Build Nominatim query
+            const cleanAddress = addressStr.replace(/\r?\n|\r/g, " ").replace(/\s+/g, " ")
+            const query = `${cleanAddress}, ${cityStr}, QC, Canada`
+            
+            try {
+                const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`
+                const res = await fetch(url, {
+                    headers: {
+                        'User-Agent': 'GustavOperationsMapApp/1.0 (contact@laucandrique.com)'
+                    }
+                })
+
+                if (!res.ok) {
+                    await new Promise(resolve => setTimeout(resolve, 1200))
+                    continue
+                }
+
+                const data = await res.json()
+                let lat: number | null = null
+                let lon: number | null = null
+
+                if (data && data.length > 0) {
+                    lat = parseFloat(data[0].lat)
+                    lon = parseFloat(data[0].lon)
+                } else if (client.postal_code) {
+                    // Fallback to postal code
+                    const pcQuery = `${client.postal_code.trim()}, Canada`
+                    await new Promise(resolve => setTimeout(resolve, 1200))
+                    const pcRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(pcQuery)}&format=json&limit=1`, {
+                        headers: { 'User-Agent': 'GustavOperationsMapApp/1.0' }
+                    })
+                    if (pcRes.ok) {
+                        const pcData = await pcRes.json()
+                        if (pcData && pcData.length > 0) {
+                            lat = parseFloat(pcData[0].lat)
+                            lon = parseFloat(pcData[0].lon)
+                        }
+                    }
+                }
+
+                if (lat === null) {
+                    // Fallback to city
+                    const cityQuery = `${cityStr}, QC, Canada`
+                    await new Promise(resolve => setTimeout(resolve, 1200))
+                    const cityRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityQuery)}&format=json&limit=1`, {
+                        headers: { 'User-Agent': 'GustavOperationsMapApp/1.0' }
+                    })
+                    if (cityRes.ok) {
+                        const cityData = await cityRes.json()
+                        if (cityData && cityData.length > 0) {
+                            lat = parseFloat(cityData[0].lat)
+                            lon = parseFloat(cityData[0].lon)
+                        }
+                    }
+                }
+
+                if (lat !== null && lon !== null) {
+                    await supabase
+                        .from('clients')
+                        .update({ latitude: lat, longitude: lon })
+                        .eq('id', client.id)
+                    geocodedCount++
+                }
+
+                // Respect OSM usage limits (max 1 req/sec)
+                await new Promise(resolve => setTimeout(resolve, 1200))
+            } catch (innerErr) {
+                console.error(`Error geocoding single client ${client.id}:`, innerErr)
+            }
+        }
+
+        revalidatePath('/map')
+        return { success: true, count: geocodedCount }
+    } catch (err: any) {
+        console.error('triggerMissingGeocodingAction exception:', err)
+        return { success: false, error: err.message }
+    }
+}
