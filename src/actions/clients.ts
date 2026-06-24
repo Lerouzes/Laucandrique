@@ -800,63 +800,63 @@ export async function triggerMissingGeocodingAction() {
         for (const client of clients) {
             const addressStr = client.address ? client.address.trim() : ""
             const cityStr = client.city ? client.city.trim() : ""
+            const postalCodeStr = client.postal_code ? client.postal_code.trim() : ""
 
-            if (!addressStr || !cityStr) continue
+            let lat: number | null = null
+            let lon: number | null = null
 
-            // Build Nominatim query
-            const cleanAddress = addressStr.replace(/\r?\n|\r/g, " ").replace(/\s+/g, " ")
-            const query = `${cleanAddress}, ${cityStr}, QC, Canada`
-            
             try {
-                const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`
-                const res = await fetch(url, {
-                    headers: {
-                        'User-Agent': 'GustavOperationsMapApp/1.0 (contact@laucandrique.com)'
-                    }
-                })
-
-                if (!res.ok) {
-                    await new Promise(resolve => setTimeout(resolve, 1200))
-                    continue
-                }
-
-                const data = await res.json()
-                let lat: number | null = null
-                let lon: number | null = null
-
-                if (data && data.length > 0) {
-                    lat = parseFloat(data[0].lat)
-                    lon = parseFloat(data[0].lon)
-                } else if (client.postal_code) {
-                    // Fallback to postal code
-                    const pcQuery = `${client.postal_code.trim()}, Canada`
-                    await new Promise(resolve => setTimeout(resolve, 1200))
-                    const pcRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(pcQuery)}&format=json&limit=1`, {
-                        headers: { 'User-Agent': 'GustavOperationsMapApp/1.0' }
+                // 1. Try Postal Code first if available
+                if (postalCodeStr) {
+                    const pcQuery = `${postalCodeStr}`
+                    const pcUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(pcQuery)}&countrycodes=ca&format=json&limit=1`
+                    const res = await fetch(pcUrl, {
+                        headers: { 'User-Agent': 'GustavOperationsMapApp/1.0 (contact@laucandrique.com)' }
                     })
-                    if (pcRes.ok) {
-                        const pcData = await pcRes.json()
-                        if (pcData && pcData.length > 0) {
-                            lat = parseFloat(pcData[0].lat)
-                            lon = parseFloat(pcData[0].lon)
+                    if (res.ok) {
+                        const data = await res.json()
+                        if (data && data.length > 0) {
+                            lat = parseFloat(data[0].lat)
+                            lon = parseFloat(data[0].lon)
                         }
                     }
+                    // Respect OSM usage limits (max 1 req/sec)
+                    await new Promise(resolve => setTimeout(resolve, 1200))
                 }
 
-                if (lat === null) {
-                    // Fallback to city
+                // 2. Fallback to Street Address + City if postal code failed or was missing
+                if (lat === null && addressStr && cityStr) {
+                    const cleanAddress = addressStr.replace(/\r?\n|\r/g, " ").replace(/\s+/g, " ")
+                    const query = `${cleanAddress}, ${cityStr}, QC, Canada`
+                    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=ca&format=json&limit=1`
+                    const res = await fetch(url, {
+                        headers: { 'User-Agent': 'GustavOperationsMapApp/1.0 (contact@laucandrique.com)' }
+                    })
+                    if (res.ok) {
+                        const data = await res.json()
+                        if (data && data.length > 0) {
+                            lat = parseFloat(data[0].lat)
+                            lon = parseFloat(data[0].lon)
+                        }
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 1200))
+                }
+
+                // 3. Fallback to City only if both failed
+                if (lat === null && cityStr) {
                     const cityQuery = `${cityStr}, QC, Canada`
-                    await new Promise(resolve => setTimeout(resolve, 1200))
-                    const cityRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityQuery)}&format=json&limit=1`, {
-                        headers: { 'User-Agent': 'GustavOperationsMapApp/1.0' }
+                    const cityUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityQuery)}&countrycodes=ca&format=json&limit=1`
+                    const res = await fetch(cityUrl, {
+                        headers: { 'User-Agent': 'GustavOperationsMapApp/1.0 (contact@laucandrique.com)' }
                     })
-                    if (cityRes.ok) {
-                        const cityData = await cityRes.json()
-                        if (cityData && cityData.length > 0) {
-                            lat = parseFloat(cityData[0].lat)
-                            lon = parseFloat(cityData[0].lon)
+                    if (res.ok) {
+                        const data = await res.json()
+                        if (data && data.length > 0) {
+                            lat = parseFloat(data[0].lat)
+                            lon = parseFloat(data[0].lon)
                         }
                     }
+                    await new Promise(resolve => setTimeout(resolve, 1200))
                 }
 
                 if (lat !== null && lon !== null) {
@@ -866,9 +866,6 @@ export async function triggerMissingGeocodingAction() {
                         .eq('id', client.id)
                     geocodedCount++
                 }
-
-                // Respect OSM usage limits (max 1 req/sec)
-                await new Promise(resolve => setTimeout(resolve, 1200))
             } catch (innerErr) {
                 console.error(`Error geocoding single client ${client.id}:`, innerErr)
             }

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
-import { MapPin, Search, User, Compass, Layers, RefreshCw, CheckSquare, Square, Locate } from 'lucide-react'
+import { MapPin, Search, User, Compass, Layers, RefreshCw, CheckSquare, Square, Locate, ChevronDown, Check, X } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,12 +27,129 @@ interface Client {
         first_name: string
         last_name: string
         email: string
+        manager_teams?: {
+            id: string
+            name: string
+        } | null
     } | null
 }
 
 interface MapPageViewProps {
     initialClients: Client[]
     managers: any[]
+    teams: any[]
+}
+
+interface SearchableOption {
+    value: string
+    label: string
+}
+
+interface SearchableSelectProps {
+    options: SearchableOption[]
+    value: string
+    onChange: (val: string) => void
+    placeholder: string
+    emptyMessage?: string
+}
+
+function SearchableSelect({ 
+    options, 
+    value, 
+    onChange, 
+    placeholder, 
+    emptyMessage = "Aucun résultat trouvé" 
+}: SearchableSelectProps) {
+    const [isOpen, setIsOpen] = useState(false)
+    const [search, setSearch] = useState('')
+    const containerRef = useRef<HTMLDivElement>(null)
+
+    // Close dropdown on click outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setIsOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [])
+
+    const filtered = useMemo(() => {
+        return options.filter(opt => 
+            opt.label.toLowerCase().includes(search.toLowerCase())
+        )
+    }, [options, search])
+
+    const selectedOption = options.find(opt => opt.value === value)
+
+    return (
+        <div ref={containerRef} className="relative w-full">
+            <button
+                type="button"
+                onClick={() => setIsOpen(prev => !prev)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 h-9 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500 flex items-center justify-between text-left transition-all hover:border-zinc-700"
+            >
+                <span className="truncate">
+                    {selectedOption ? selectedOption.label : placeholder}
+                </span>
+                <ChevronDown className="h-3.5 w-3.5 text-zinc-400 shrink-0 ml-1" />
+            </button>
+
+            {isOpen && (
+                <div className="absolute z-[1000] w-full mt-1 bg-zinc-950/95 border border-zinc-800 rounded-xl shadow-xl overflow-hidden backdrop-blur-md">
+                    <div className="p-2 border-b border-zinc-850 flex items-center gap-1.5 bg-zinc-950">
+                        <Search className="h-3.5 w-3.5 text-zinc-550 shrink-0" />
+                        <input
+                            type="text"
+                            placeholder="Rechercher..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="bg-transparent border-none text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-0 w-full h-6 p-0"
+                            autoFocus
+                        />
+                        {search && (
+                            <button 
+                                onClick={() => setSearch('')}
+                                className="text-zinc-550 hover:text-white"
+                            >
+                                <X className="h-3 w-3" />
+                            </button>
+                        )}
+                    </div>
+                    <ul className="max-h-48 overflow-y-auto py-1">
+                        {filtered.length === 0 ? (
+                            <li className="px-3 py-2 text-xxs text-zinc-500 italic">
+                                {emptyMessage}
+                            </li>
+                        ) : (
+                            filtered.map(opt => {
+                                const isSelected = opt.value === value
+                                return (
+                                    <li
+                                        key={opt.value}
+                                        onClick={() => {
+                                            onChange(opt.value)
+                                            setIsOpen(false)
+                                            setSearch('')
+                                        }}
+                                        className={`px-3 py-1.5 text-xs flex items-center justify-between cursor-pointer hover:bg-purple-950/40 hover:text-white transition-colors ${
+                                            isSelected ? 'text-purple-400 bg-purple-950/20 font-medium' : 'text-zinc-300'
+                                        }`}
+                                    >
+                                        <span className="truncate">{opt.label}</span>
+                                        {isSelected && <Check className="h-3.5 w-3.5 text-purple-400 shrink-0 ml-1" />}
+                                    </li>
+                                )
+                            })
+                        )}
+                    </ul>
+                </div>
+            )}
+        </div>
+    )
 }
 
 // Haversine distance helper
@@ -48,11 +165,12 @@ function getHaversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: 
     return R * c
 }
 
-export function MapPageView({ initialClients, managers }: MapPageViewProps) {
+export function MapPageView({ initialClients, managers, teams }: MapPageViewProps) {
     const [clients, setClients] = useState<Client[]>(initialClients)
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedManagerId, setSelectedManagerId] = useState('all')
     const [selectedCity, setSelectedCity] = useState('all')
+    const [selectedTeamId, setSelectedTeamId] = useState('all')
     const [selectedClientIds, setSelectedClientIds] = useState<string[]>([])
     const [focusClientId, setFocusClientId] = useState<string | null>(null)
     const [proximityCenterId, setProximityCenterId] = useState<string | null>(null)
@@ -68,6 +186,33 @@ export function MapPageView({ initialClients, managers }: MapPageViewProps) {
         })
         return Array.from(cities).sort()
     }, [clients])
+
+    // Options for searchable selects
+    const managerOptions = useMemo(() => {
+        const list = [{ value: 'all', label: 'Tous les gestionnaires' }]
+        managers.forEach(m => {
+            list.push({ value: m.id, label: `${m.first_name} ${m.last_name}` })
+        })
+        return list
+    }, [managers])
+
+    const cityOptions = useMemo(() => {
+        const list = [{ value: 'all', label: 'Toutes les municipalités' }]
+        citiesList.forEach(c => {
+            list.push({ value: c, label: c })
+        })
+        return list
+    }, [citiesList])
+
+    const teamOptions = useMemo(() => {
+        const list = [{ value: 'all', label: 'Toutes les équipes' }]
+        teams.forEach(t => {
+            if (t.id && t.name) {
+                list.push({ value: t.id, label: t.name })
+            }
+        })
+        return list
+    }, [teams])
 
     // Get statistics on geocoding
     const stats = useMemo(() => {
@@ -112,13 +257,17 @@ export function MapPageView({ initialClients, managers }: MapPageViewProps) {
             // City filter
             const cityMatch = selectedCity === 'all' || (c.city && c.city.trim() === selectedCity)
 
+            // Team filter
+            const teamIdOfManager = c.managers?.manager_teams?.id
+            const teamMatch = selectedTeamId === 'all' || (teamIdOfManager && teamIdOfManager === selectedTeamId)
+
             // Selection toggle filter
             const selectionMatch = !onlyShowSelected || selectedClientIds.includes(c.id)
 
             // If a proximity center is active, we also filter list items to match selection logic, but center is always visible
             const proximityCenterMatch = c.id === proximityCenterId || !proximityCenterId || c.isWithinRadius
 
-            return textMatch && managerMatch && cityMatch && selectionMatch && proximityCenterMatch
+            return textMatch && managerMatch && cityMatch && teamMatch && selectionMatch && proximityCenterMatch
         })
 
         // Sort: if proximity center is active, sort by distance, otherwise by name
@@ -135,7 +284,7 @@ export function MapPageView({ initialClients, managers }: MapPageViewProps) {
         }
 
         return list
-    }, [clients, searchQuery, selectedManagerId, selectedCity, selectedClientIds, onlyShowSelected, proximityCenterId, proximityRadiusKm])
+    }, [clients, searchQuery, selectedManagerId, selectedCity, selectedTeamId, selectedClientIds, onlyShowSelected, proximityCenterId, proximityRadiusKm])
 
     const handleSelectClient = (id: string, selected: boolean) => {
         setSelectedClientIds(prev => 
@@ -210,11 +359,10 @@ export function MapPageView({ initialClients, managers }: MapPageViewProps) {
                         )}
                     </div>
                 </div>
-
-                {/* Filter Controls Row */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                           {/* Filter Controls Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                     <div className="relative">
-                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-550" />
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-555" />
                         <Input
                             type="text"
                             placeholder="Rechercher par code ou nom..."
@@ -225,34 +373,35 @@ export function MapPageView({ initialClients, managers }: MapPageViewProps) {
                     </div>
 
                     <div>
-                        <select
-                            value={selectedManagerId}
-                            onChange={(e) => setSelectedManagerId(e.target.value)}
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 h-9 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
-                        >
-                            <option value="all">Tous les gestionnaires</option>
-                            {managers.map(m => (
-                                <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
-                            ))}
-                        </select>
+                        <SearchableSelect
+                            options={teamOptions}
+                            value={selectedTeamId}
+                            onChange={setSelectedTeamId}
+                            placeholder="Toutes les équipes"
+                        />
                     </div>
 
                     <div>
-                        <select
+                        <SearchableSelect
+                            options={managerOptions}
+                            value={selectedManagerId}
+                            onChange={setSelectedManagerId}
+                            placeholder="Tous les gestionnaires"
+                        />
+                    </div>
+
+                    <div>
+                        <SearchableSelect
+                            options={cityOptions}
                             value={selectedCity}
-                            onChange={(e) => setSelectedCity(e.target.value)}
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 h-9 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
-                        >
-                            <option value="all">Toutes les municipalités</option>
-                            {citiesList.map(c => (
-                                <option key={c} value={c}>{c}</option>
-                            ))}
-                        </select>
+                            onChange={setSelectedCity}
+                            placeholder="Toutes les municipalités"
+                        />
                     </div>
 
                     {/* Proximity Analysis controls inline if center active */}
                     {proximityCenterClient ? (
-                        <div className="p-2 bg-pink-955 bg-pink-600/10 border border-pink-900/40 rounded-xl flex items-center justify-between gap-3 text-xxs text-pink-400 px-3.5">
+                        <div className="p-2 bg-pink-955 bg-pink-600/10 border border-pink-900/40 rounded-xl flex items-center justify-between gap-3 text-xxs text-pink-400 px-3.5 h-9">
                             <div className="flex-1 space-y-0.5 min-w-0">
                                 <span className="font-bold truncate block">Rayon: {proximityRadiusKm} km</span>
                                 <input
@@ -266,17 +415,17 @@ export function MapPageView({ initialClients, managers }: MapPageViewProps) {
                                 />
                             </div>
                             <Button 
-                                size="icon" 
+                                size="xs" 
                                 variant="ghost" 
-                                className="h-6 w-6 text-pink-400 hover:text-white hover:bg-pink-950 rounded-md shrink-0 ml-1.5"
+                                className="h-6 text-pink-400 hover:text-white hover:bg-pink-950 rounded-md shrink-0 ml-1.5 text-[10px] px-1.5"
                                 onClick={() => setProximityCenterId(null)}
                             >
                                 Fermer
                             </Button>
                         </div>
                     ) : (
-                        <div className="flex items-center text-xs text-zinc-500 justify-center italic bg-zinc-950/20 border border-dashed border-zinc-800 rounded-xl h-9 px-3">
-                            Sélectionnez un syndicat pour la recherche de proximité
+                        <div className="flex items-center text-xs text-zinc-550 justify-center italic bg-zinc-950/20 border border-dashed border-zinc-800 rounded-xl h-9 px-3 text-center">
+                            Sélectionnez un syndicat pour la recherche
                         </div>
                     )}
                 </div>

@@ -12,7 +12,7 @@ interface Client {
     postal_code: string | null
     latitude: number | null
     longitude: number | null
-    manager?: {
+    managers?: {
         first_name: string
         last_name: string
         email: string
@@ -167,9 +167,8 @@ export default function MapComponent({
 
             markersRef.current[c.id] = marker
 
-            // Popup HTML
-            const managerName = c.manager 
-                ? `${c.manager.first_name} ${c.manager.last_name}` 
+            const managerName = c.managers 
+                ? `${c.managers.first_name} ${c.managers.last_name}` 
                 : 'Non assigné'
 
             const popupContent = document.createElement('div')
