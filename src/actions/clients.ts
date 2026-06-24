@@ -775,6 +775,25 @@ export async function updateClientCoordinatesAction(clientId: string, lat: numbe
     }
 }
 
+function cleanAddressForGeocoding(address: string): string {
+    let clean = address.replace(/\r?\n|\r/g, " ").replace(/\s+/g, " ");
+    
+    // Replace "ET" or "et" or "and" with comma
+    clean = clean.replace(/\s+ET\s+/gi, ", ");
+    
+    // Match range patterns like "621 à 631" or "321-331" at the start
+    const rangeMatch = clean.match(/^(\d+)\s+(?:à|to|-)\s+\d+\s+(.*)$/i);
+    if (rangeMatch) {
+        clean = `${rangeMatch[1]} ${rangeMatch[2]}`;
+    }
+    
+    // Split on ranges like "1801 - 7051" or similar
+    clean = clean.split(/\s+\d+\s*-/)[0];
+    clean = clean.split(',')[0]; // take the part before any comma
+    
+    return clean.trim();
+}
+
 export async function triggerMissingGeocodingAction() {
     try {
         const supabase = await createClient()
@@ -806,10 +825,10 @@ export async function triggerMissingGeocodingAction() {
             let lon: number | null = null
 
             try {
-                // 1. Try Postal Code first if available
+                // 1. Try Structured Postal Code first if available
                 if (postalCodeStr) {
-                    const pcQuery = `${postalCodeStr}`
-                    const pcUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(pcQuery)}&countrycodes=ca&format=json&limit=1`
+                    const cleanPostal = postalCodeStr.replace(/\s+/g, "").toUpperCase()
+                    const pcUrl = `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(cleanPostal)}&countrycodes=ca&format=json&limit=1`
                     const res = await fetch(pcUrl, {
                         headers: { 'User-Agent': 'GustavOperationsMapApp/1.0 (contact@laucandrique.com)' }
                     })
@@ -820,14 +839,29 @@ export async function triggerMissingGeocodingAction() {
                             lon = parseFloat(data[0].lon)
                         }
                     }
-                    // Respect OSM usage limits (max 1 req/sec)
                     await new Promise(resolve => setTimeout(resolve, 1200))
                 }
 
-                // 2. Fallback to Street Address + City if postal code failed or was missing
+                // 2. Try Freeform Postal Code if structured failed or was missing
+                if (lat === null && postalCodeStr) {
+                    const pcUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(postalCodeStr)}&countrycodes=ca&format=json&limit=1`
+                    const res = await fetch(pcUrl, {
+                        headers: { 'User-Agent': 'GustavOperationsMapApp/1.0 (contact@laucandrique.com)' }
+                    })
+                    if (res.ok) {
+                        const data = await res.json()
+                        if (data && data.length > 0) {
+                            lat = parseFloat(data[0].lat)
+                            lon = parseFloat(data[0].lon)
+                        }
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 1200))
+                }
+
+                // 3. Try Cleaned Street Address + City
                 if (lat === null && addressStr && cityStr) {
-                    const cleanAddress = addressStr.replace(/\r?\n|\r/g, " ").replace(/\s+/g, " ")
-                    const query = `${cleanAddress}, ${cityStr}, QC, Canada`
+                    const cleanAddr = cleanAddressForGeocoding(addressStr)
+                    const query = `${cleanAddr}, ${cityStr}, QC, Canada`
                     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=ca&format=json&limit=1`
                     const res = await fetch(url, {
                         headers: { 'User-Agent': 'GustavOperationsMapApp/1.0 (contact@laucandrique.com)' }
@@ -842,7 +876,25 @@ export async function triggerMissingGeocodingAction() {
                     await new Promise(resolve => setTimeout(resolve, 1200))
                 }
 
-                // 3. Fallback to City only if both failed
+                // 4. Try Raw Street Address + City if cleaned version failed
+                if (lat === null && addressStr && cityStr) {
+                    const rawClean = addressStr.replace(/\r?\n|\r/g, " ").replace(/\s+/g, " ")
+                    const query = `${rawClean}, ${cityStr}, QC, Canada`
+                    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=ca&format=json&limit=1`
+                    const res = await fetch(url, {
+                        headers: { 'User-Agent': 'GustavOperationsMapApp/1.0 (contact@laucandrique.com)' }
+                    })
+                    if (res.ok) {
+                        const data = await res.json()
+                        if (data && data.length > 0) {
+                            lat = parseFloat(data[0].lat)
+                            lon = parseFloat(data[0].lon)
+                        }
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 1200))
+                }
+
+                // 5. Fallback to City only if all above failed
                 if (lat === null && cityStr) {
                     const cityQuery = `${cityStr}, QC, Canada`
                     const cityUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityQuery)}&countrycodes=ca&format=json&limit=1`
@@ -860,11 +912,17 @@ export async function triggerMissingGeocodingAction() {
                 }
 
                 if (lat !== null && lon !== null) {
-                    await supabase
-                        .from('clients')
-                        .update({ latitude: lat, longitude: lon })
-                        .eq('id', client.id)
-                    geocodedCount++
+                    // Check if coordinates lie strictly within Quebec/Canada boundaries
+                    const isWithinQuebec = lat >= 44.0 && lat <= 63.0 && lon >= -81.0 && lon <= -56.0
+                    if (isWithinQuebec) {
+                        await supabase
+                            .from('clients')
+                            .update({ latitude: lat, longitude: lon })
+                            .eq('id', client.id)
+                        geocodedCount++
+                    } else {
+                        console.warn(`Geocoded coordinates for client ${client.id} (${lat}, ${lon}) are outside Quebec boundaries. Skipping.`);
+                    }
                 }
             } catch (innerErr) {
                 console.error(`Error geocoding single client ${client.id}:`, innerErr)
@@ -878,3 +936,4 @@ export async function triggerMissingGeocodingAction() {
         return { success: false, error: err.message }
     }
 }
+

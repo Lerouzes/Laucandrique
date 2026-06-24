@@ -63,6 +63,16 @@ function SearchableSelect({
     const [isOpen, setIsOpen] = useState(false)
     const [search, setSearch] = useState('')
     const containerRef = useRef<HTMLDivElement>(null)
+    const inputRef = useRef<HTMLInputElement>(null)
+
+    const selectedOption = options.find(opt => opt.value === value)
+
+    // Sync input text with selected option label when not typing/searching
+    useEffect(() => {
+        if (!isOpen) {
+            setSearch(selectedOption ? selectedOption.label : '')
+        }
+    }, [isOpen, selectedOption])
 
     // Close dropdown on click outside
     useEffect(() => {
@@ -78,50 +88,69 @@ function SearchableSelect({
     }, [])
 
     const filtered = useMemo(() => {
+        // If search is empty or matches the selected label, show all options
+        if (!search || (selectedOption && search === selectedOption.label)) {
+            return options
+        }
         return options.filter(opt => 
             opt.label.toLowerCase().includes(search.toLowerCase())
         )
-    }, [options, search])
-
-    const selectedOption = options.find(opt => opt.value === value)
+    }, [options, search, selectedOption])
 
     return (
         <div ref={containerRef} className="relative w-full">
-            <button
-                type="button"
-                onClick={() => setIsOpen(prev => !prev)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 h-9 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500 flex items-center justify-between text-left transition-all hover:border-zinc-700"
-            >
-                <span className="truncate">
-                    {selectedOption ? selectedOption.label : placeholder}
-                </span>
-                <ChevronDown className="h-3.5 w-3.5 text-zinc-400 shrink-0 ml-1" />
-            </button>
+            <div className="relative">
+                <input
+                    ref={inputRef}
+                    type="text"
+                    placeholder={placeholder}
+                    value={search}
+                    onFocus={() => {
+                        setIsOpen(true)
+                        if (selectedOption && search === selectedOption.label) {
+                            // Select all text on focus to make it easy to type over
+                            setTimeout(() => inputRef.current?.select(), 50)
+                        }
+                    }}
+                    onChange={(e) => {
+                        setSearch(e.target.value)
+                        setIsOpen(true)
+                    }}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-3 pr-8 h-9 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all hover:border-zinc-700 placeholder-zinc-550 font-medium"
+                />
+                <div className="absolute right-2 top-2 flex items-center gap-0.5">
+                    {search && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSearch('')
+                                onChange('all')
+                                inputRef.current?.focus()
+                            }}
+                            className="text-zinc-500 hover:text-white p-0.5"
+                        >
+                            <X className="h-3 w-3" />
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            setIsOpen(prev => !prev)
+                            inputRef.current?.focus()
+                        }}
+                        className="text-zinc-500 hover:text-white p-0.5"
+                    >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                    </button>
+                </div>
+            </div>
 
             {isOpen && (
-                <div className="absolute z-[1000] w-full mt-1 bg-zinc-950/95 border border-zinc-800 rounded-xl shadow-xl overflow-hidden backdrop-blur-md">
-                    <div className="p-2 border-b border-zinc-850 flex items-center gap-1.5 bg-zinc-950">
-                        <Search className="h-3.5 w-3.5 text-zinc-550 shrink-0" />
-                        <input
-                            type="text"
-                            placeholder="Rechercher..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="bg-transparent border-none text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-0 w-full h-6 p-0"
-                            autoFocus
-                        />
-                        {search && (
-                            <button 
-                                onClick={() => setSearch('')}
-                                className="text-zinc-550 hover:text-white"
-                            >
-                                <X className="h-3 w-3" />
-                            </button>
-                        )}
-                    </div>
+                <div className="absolute z-[2000] w-full mt-1 bg-zinc-950 border border-zinc-800 rounded-xl shadow-xl overflow-hidden backdrop-blur-md">
                     <ul className="max-h-48 overflow-y-auto py-1">
                         {filtered.length === 0 ? (
-                            <li className="px-3 py-2 text-xxs text-zinc-500 italic">
+                            <li className="px-3 py-2 text-xs text-zinc-500 italic">
                                 {emptyMessage}
                             </li>
                         ) : (
@@ -133,7 +162,7 @@ function SearchableSelect({
                                         onClick={() => {
                                             onChange(opt.value)
                                             setIsOpen(false)
-                                            setSearch('')
+                                            setSearch(opt.label)
                                         }}
                                         className={`px-3 py-1.5 text-xs flex items-center justify-between cursor-pointer hover:bg-purple-950/40 hover:text-white transition-colors ${
                                             isSelected ? 'text-purple-400 bg-purple-950/20 font-medium' : 'text-zinc-300'
@@ -329,7 +358,7 @@ export function MapPageView({ initialClients, managers, teams }: MapPageViewProp
         <div className="flex flex-col h-[calc(100vh-8rem)] w-full text-zinc-100 font-sans gap-4">
             
             {/* Header controls panel */}
-            <div className="p-4 bg-zinc-900/60 border border-white/10 rounded-2xl flex flex-col gap-3 shadow-xl backdrop-blur-md">
+            <div className="p-4 bg-zinc-900/60 border border-white/10 rounded-2xl flex flex-col gap-3 shadow-xl backdrop-blur-md relative z-[1010]">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-purple-950/20 border border-purple-800/60 flex items-center justify-center">
