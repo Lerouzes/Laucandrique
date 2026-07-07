@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Check, ChevronsUpDown } from 'lucide-react'
+import { Check, ChevronsUpDown, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ClientOption {
@@ -104,19 +104,48 @@ export function SearchableClientSelect({
                     onChange={(e) => {
                         setInputValue(e.target.value)
                         setIsOpen(true)
+                        if (e.target.value === '') {
+                            setSelectedId('')
+                            if (onChange) onChange('')
+                        }
                     }}
                     onFocus={() => {
                         setIsOpen(true)
                         inputRef.current?.select()
                     }}
-                    className="w-full bg-[#121318] border border-zinc-800 rounded-lg pl-3 pr-8 flex items-center justify-between text-white outline-none focus:border-purple-600 h-9 text-xs"
+                    className="w-full bg-[#121318] border border-zinc-800 rounded-lg pl-3 pr-10 flex items-center justify-between text-white outline-none focus:border-purple-600 h-9 text-xs"
                 />
-                <ChevronsUpDown className="absolute right-2.5 h-3.5 w-3.5 text-zinc-500 pointer-events-none" />
+                {selectedId && (
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            handleSelect('', '')
+                        }}
+                        className="absolute right-7 p-0.5 text-zinc-500 hover:text-white rounded-full hover:bg-zinc-800 transition-colors"
+                    >
+                        <X className="h-3 w-3" />
+                    </button>
+                )}
+                <ChevronsUpDown className="absolute right-2.5 h-3.5 w-3.5 text-zinc-550 pointer-events-none" />
             </div>
 
             {/* Dropdown Panel */}
             {isOpen && (
                 <div className="absolute z-[100] mt-1 w-full rounded-lg border border-zinc-800 bg-[#121318] shadow-2xl p-1 animate-in fade-in duration-100 max-h-56 overflow-y-auto divide-y divide-zinc-900/50">
+                    {!required && (
+                        <button
+                            type="button"
+                            onClick={() => handleSelect('', '')}
+                            className={cn(
+                                "w-full text-left px-2 py-1.5 rounded-md hover:bg-purple-950/20 hover:text-purple-400 text-xxs flex items-center justify-between text-zinc-400 transition-colors mb-0.5",
+                                !selectedId && "bg-purple-950/30 text-purple-400 font-bold"
+                            )}
+                        >
+                            <span className="truncate italic">-- Aucun syndicat --</span>
+                            {!selectedId && <Check className="h-3 w-3 text-purple-400 shrink-0" />}
+                        </button>
+                    )}
                     {filteredClients.length === 0 ? (
                         <div className="text-zinc-650 text-center py-3 text-xxs italic">
                             Aucun syndicat trouvé
@@ -131,7 +160,7 @@ export function SearchableClientSelect({
                                     type="button"
                                     onClick={() => handleSelect(client.id, displayName)}
                                     className={cn(
-                                        "w-full text-left px-2 py-1.5 rounded-md hover:bg-purple-950/20 hover:text-purple-400 text-xxs flex items-center justify-between text-zinc-300 transition-colors",
+                                        "w-full text-left px-2 py-1.5 rounded-md hover:bg-purple-950/20 hover:text-purple-400 text-xxs flex items-center justify-between text-zinc-350 transition-colors",
                                         isSelected && "bg-purple-950/30 text-purple-400 font-bold"
                                     )}
                                 >

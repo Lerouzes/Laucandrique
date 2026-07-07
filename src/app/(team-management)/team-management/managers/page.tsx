@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { recordLostSyndicateAction, recordPackageChangeAction, recordNewSyndicateAction } from '@/actions/team-management'
 import { SearchableClientSelect } from '@/components/features/team-management/SearchableClientSelect'
+import { SearchableManagerSelect } from '@/components/features/team-management/SearchableManagerSelect'
 import Link from 'next/link'
 import { 
     UserCheck, 
@@ -112,11 +113,14 @@ export default async function ManagersControlTowerPage() {
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                                <div>
+                                <div className="space-y-0.5">
                                     <Label className="text-zinc-500 mb-0.5 block">Gestionnaire</Label>
-                                    <select name="manager_id" className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-8 text-xs" required>
-                                        {managersList.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
-                                    </select>
+                                    <SearchableManagerSelect
+                                        managers={managersList}
+                                        name="manager_id"
+                                        placeholder="Sélectionner..."
+                                        required
+                                    />
                                 </div>
                                 <div>
                                     <Label className="text-zinc-500 mb-0.5 block">Forfait Contrat</Label>

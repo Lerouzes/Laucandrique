@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Loader2, Plus, Calendar, User, FileText, FolderOpen } from 'lucide-react'
 import { SearchableManagerSelect } from './SearchableManagerSelect'
+import { SearchableClientSelect } from './SearchableClientSelect'
 
 interface Manager {
     id: string
@@ -125,18 +126,18 @@ export function DashboardQuickNote({ managers = [], categories = [], clients = [
                             <FolderOpen className="h-3 w-3 text-purple-400" />
                             Syndicat / Client (Optionnel)
                         </Label>
-                        <select
-                            value={clientId}
-                            onChange={(e) => setClientId(e.target.value)}
-                            className="h-9 text-xs bg-zinc-950 border border-zinc-850 text-white rounded-lg px-2 w-full focus:outline-none focus:border-purple-500"
-                        >
-                            <option value="" className="bg-zinc-950">Aucun syndicat (Note globale)</option>
-                            {filteredClients.map(c => (
-                                <option key={c.id} value={c.id} className="bg-zinc-950">
-                                    {c.company_name || c.full_name}
-                                </option>
-                            ))}
-                        </select>
+                        <SearchableClientSelect
+                            clients={filteredClients.map(c => ({
+                                id: c.id,
+                                name: c.company_name || c.full_name || 'Syndicat sans nom',
+                                sdc: c.full_name || undefined
+                            }))}
+                            name="client_id"
+                            placeholder="Aucun syndicat (Note globale)"
+                            required={false}
+                            defaultValue={clientId}
+                            onChange={(val) => setClientId(val)}
+                        />
                     </div>
 
                     {/* Category & Date in grid */}
