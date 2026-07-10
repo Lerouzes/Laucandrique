@@ -10,11 +10,13 @@ import { getQuotes } from '@/actions/quotes'
 import { getSyndicateWorkloadAction } from '@/actions/team-management'
 import { getCommunicationStatsByClient, getTeamCommunicationComparison } from '@/actions/communication-stats'
 import { getSettings } from '@/actions/settings'
+import { getSyndicateStatsAction } from '@/actions/syndicate-stats'
 import { Badge } from '@/components/ui/badge'
 import { ClientDetailForm } from '@/components/features/clients/ClientDetailForm'
 import { ClientTabsContainer } from '@/components/features/clients/ClientTabsContainer'
 import { CoOwnersManager } from '@/components/features/clients/CoOwnersManager'
 import { ClientCommunicationTrends } from '@/components/features/clients/ClientCommunicationTrends'
+import { SyndicateStatsManager } from '@/components/features/clients/SyndicateStatsManager'
 import { ArrowLeft } from 'lucide-react'
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -22,7 +24,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const supabase = await createClient()
 
   // Fetch client + contract + co-owners + comm stats separately
-  const [client, managers, quotes, contractDirect, workload, coOwnersRes, commStats, teamComparison, settings] = await Promise.all([
+  const [client, managers, quotes, contractDirect, workload, coOwnersRes, commStats, teamComparison, settings, syndicateStats] = await Promise.all([
     getClientById(id),
     getManagers(true),
     getQuotes(),
@@ -35,7 +37,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       .order('door_number', { ascending: true }),
     getCommunicationStatsByClient(id),
     getTeamCommunicationComparison(id),
-    getSettings()
+    getSettings(),
+    getSyndicateStatsAction(id)
   ])
 
   if (!client) notFound()
@@ -95,6 +98,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             initialDoors={coOwnersRes.data || []}
             clientName={client.company_name || client.full_name}
             managers={managers}
+          />
+        }
+        statsTab={
+          <SyndicateStatsManager
+            clientId={id}
+            initialStats={syndicateStats}
           />
         }
       />

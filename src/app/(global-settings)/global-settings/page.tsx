@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Search, RefreshCw, List, FileSpreadsheet, Users, MessageSquare } from 'lucide-react'
+import { Search, RefreshCw, List, FileSpreadsheet, Users, MessageSquare, Home } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -22,6 +22,8 @@ import { getAllCommunicationStats } from '@/actions/communication-stats'
 import { getSettings } from '@/actions/settings'
 import { GlobalCommunicationAnalytics } from '@/components/features/settings/GlobalCommunicationAnalytics'
 import { LaucandriqueExtractor } from '@/components/features/settings/LaucandriqueExtractor'
+import { getGlobalSyndicateStatsAction } from '@/actions/syndicate-stats'
+import { GlobalRealEstateStats } from '@/components/features/settings/GlobalRealEstateStats'
 
 // Tabs component
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -36,6 +38,7 @@ export default function GlobalSettingsPage() {
     const [snapshots, setSnapshots] = useState<any[]>([])
     const [managers, setManagers] = useState<any[]>([])
     const [allCommsStats, setAllCommsStats] = useState<any[]>([])
+    const [globalStats, setGlobalStats] = useState<any[]>([])
     const [extractorQueue, setExtractorQueue] = useState<File[]>([])
     const [targetIndex, setTargetIndex] = useState<number>(2.50)
     const [searchVal, setSearchVal] = useState('')
@@ -85,6 +88,12 @@ export default function GlobalSettingsPage() {
         }
     }, [activeTab])
 
+    useEffect(() => {
+        if (activeTab === 'real-estate') {
+            getGlobalSyndicateStatsAction().then(setGlobalStats)
+        }
+    }, [activeTab])
+
     const handleTabChange = (tab: string) => {
         router.push(`/global-settings?tab=${tab}`, { scroll: false })
     }
@@ -97,6 +106,8 @@ export default function GlobalSettingsPage() {
             getSnapshotsAction().then(setSnapshots)
         } else if (activeTab === 'comms-analytics') {
             getAllCommunicationStats().then(setAllCommsStats)
+        } else if (activeTab === 'real-estate') {
+            getGlobalSyndicateStatsAction().then(setGlobalStats)
         }
     }
 
@@ -128,6 +139,10 @@ export default function GlobalSettingsPage() {
                         <List className="h-4 w-4" />
                         Liste Maîtresse SDC
                     </TabsTrigger>
+                    <TabsTrigger value="real-estate" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
+                        <Home className="h-4 w-4 text-cyan-405 text-cyan-400" />
+                        Données Immobilières
+                    </TabsTrigger>
                     <TabsTrigger value="snapshots" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
                         <FileSpreadsheet className="h-4 w-4" />
                         Snapshots & Synchro
@@ -141,7 +156,7 @@ export default function GlobalSettingsPage() {
                         Analytics Communications
                     </TabsTrigger>
                     <TabsTrigger value="extractor" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
-                        <FileSpreadsheet className="h-4 w-4 text-emerald-450 text-emerald-400" />
+                        <FileSpreadsheet className="h-4 w-4 text-emerald-400" />
                         Extracteur Laucandrique
                     </TabsTrigger>
                     {userRole === 'Master' && (
@@ -157,7 +172,7 @@ export default function GlobalSettingsPage() {
                     <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 flex-1">
                             <div className="relative w-full max-w-sm">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-550 text-zinc-500" />
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-500" />
                                 <Input
                                     type="search"
                                     placeholder="Rechercher un client..."
@@ -214,6 +229,11 @@ export default function GlobalSettingsPage() {
                             <ClientsTable data={filteredClients} />
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                {/* TAB real-estate: GLOBAL REAL ESTATE STATS */}
+                <TabsContent value="real-estate" className="outline-none">
+                    <GlobalRealEstateStats data={globalStats} />
                 </TabsContent>
 
                 {/* TAB 2: SNAPSHOTS */}
