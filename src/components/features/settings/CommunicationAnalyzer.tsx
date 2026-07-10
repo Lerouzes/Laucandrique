@@ -209,11 +209,25 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
 }
 
 const classifyCommType = (typeStr: string): 'outboundEmail' | 'inboundEmail' | 'chat' | 'phoneCall' | 'other' => {
-    const t = (typeStr || "").toLowerCase()
-    if (t.includes("expédié") || t.includes("expedie") || t.includes("sent")) return 'outboundEmail'
-    if (t.includes("reçu") || t.includes("recu") || t.includes("received")) return 'inboundEmail'
+    let t = (typeStr || "").toLowerCase().trim()
+    
+    // Handle potential mojibake/UTF-8 double encoding issues
+    t = t.replace(/expã©diã©/g, "expedie")
+         .replace(/reã§u/g, "recu")
+         .replace(/expã©/g, "expe")
+         .replace(/reã§/g, "rec")
+         .replace(/expÃ©diÃ©/g, "expedie")
+         .replace(/reÃ§u/g, "recu")
+         .replace(/expÃ©/g, "expe")
+         .replace(/reÃ§/g, "rec")
+         
+    // Normalize accents
+    t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    
+    if (t.includes("expedi") || t.includes("sent") || t.includes("envoi")) return 'outboundEmail'
+    if (t.includes("recu") || t.includes("received")) return 'inboundEmail'
     if (t.includes("clavardage") || t.includes("chat")) return 'chat'
-    if (t.includes("téléphone") || t.includes("phone") || t.includes("appel") || t.includes("call")) return 'phoneCall'
+    if (t.includes("telephone") || t.includes("phone") || t.includes("appel") || t.includes("call")) return 'phoneCall'
     return 'other'
 }
 
@@ -860,8 +874,7 @@ export function CommunicationAnalyzer({
             else if (cls === 'phoneCall') phoneCallsCount++
             else othersCount++
 
-            const typeLower = (row.type || "").toLowerCase()
-            if (typeLower.includes("courriel reçu") || typeLower.includes("clavardage") || typeLower.includes("email received") || typeLower.includes("inbound")) {
+            if (cls === 'inboundEmail' || cls === 'chat') {
                 inbound++
             }
             

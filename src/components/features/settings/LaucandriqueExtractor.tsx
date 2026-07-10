@@ -29,7 +29,21 @@ const getSentReceivedCounts = (rows: any[]) => {
   let sent = 0
   let received = 0
   rows.forEach(row => {
-    const type = (row["Type"] || "").toLowerCase()
+    let type = (row["Type"] || "").toLowerCase().trim()
+    
+    // Handle potential mojibake/UTF-8 double encoding issues
+    type = type.replace(/expã©diã©/g, "expedie")
+               .replace(/reã§u/g, "recu")
+               .replace(/expã©/g, "expe")
+               .replace(/reã§/g, "rec")
+               .replace(/expÃ©diÃ©/g, "expedie")
+               .replace(/reÃ§u/g, "recu")
+               .replace(/expÃ©/g, "expe")
+               .replace(/reÃ§/g, "rec")
+         
+    // Normalize accents
+    type = type.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+
     if (type.includes("expedi") || type.includes("sent") || type.includes("envoi")) {
       sent++
     } else if (type.includes("recu") || type.includes("received")) {
@@ -156,18 +170,73 @@ export function LaucandriqueExtractor({ onSendToAnalyzer }: LaucandriqueExtracto
     const cleanedData: Record<string, any[]> = {}
     let headerIndex = -1
 
-    // Detect header row containing 'syndicat'
+    // Detect header row by checking for key columns
     for (let i = 0; i < rawRows.length; i++) {
       if (rawRows[i] && rawRows[i].length > 0) {
+        let matchCount = 0
         for (let j = 0; j < rawRows[i].length; j++) {
           const cellStr = standardizeString(rawRows[i][j])
-          if (cellStr.includes("syndicat")) {
-            headerIndex = i
-            break
+          if (
+            cellStr.includes("syndicat") || 
+            cellStr.includes("copropriete") || 
+            cellStr.includes("client") || 
+            cellStr.includes("immeuble") || 
+            cellStr.includes("lot")
+          ) {
+            matchCount++
+          } else if (
+            cellStr.includes("type") || 
+            cellStr.includes("communication") || 
+            cellStr.includes("canal") || 
+            cellStr.includes("mode") ||
+            cellStr.includes("methode")
+          ) {
+            matchCount++
+          } else if (cellStr.includes("date")) {
+            matchCount++
+          } else if (
+            cellStr.includes("objet") || 
+            cellStr.includes("sujet") || 
+            cellStr.includes("titre") || 
+            cellStr.includes("description")
+          ) {
+            matchCount++
+          } else if (
+            cellStr.includes("ajoute") || 
+            cellStr.includes("auteur") || 
+            cellStr.includes("user") || 
+            cellStr.includes("utilisateur")
+          ) {
+            matchCount++
           }
         }
+        if (matchCount >= 3) {
+          headerIndex = i
+          break
+        }
       }
-      if (headerIndex !== -1) break
+    }
+
+    // Fallback: search for a single syndicate or lot header cell
+    if (headerIndex === -1) {
+      for (let i = 0; i < rawRows.length; i++) {
+        if (rawRows[i] && rawRows[i].length > 0) {
+          for (let j = 0; j < rawRows[i].length; j++) {
+            const cellStr = standardizeString(rawRows[i][j])
+            if (
+              cellStr.includes("syndicat") || 
+              cellStr.includes("copropriete") || 
+              cellStr.includes("immeuble") || 
+              cellStr.includes("lot") ||
+              cellStr.includes("client")
+            ) {
+              headerIndex = i
+              break
+            }
+          }
+        }
+        if (headerIndex !== -1) break
+      }
     }
 
     if (headerIndex === -1) {
@@ -183,15 +252,15 @@ export function LaucandriqueExtractor({ onSendToAnalyzer }: LaucandriqueExtracto
     const fileHeaders = rawRows[headerIndex].map(h => standardizeString(h))
 
     const indexMap = {
-      syndicat: fileHeaders.findIndex(h => h.includes("syndicat")),
-      type: fileHeaders.findIndex(h => h.includes("type")),
+      syndicat: fileHeaders.findIndex(h => h.includes("syndicat") || h.includes("lot") || h.includes("copropriete") || h.includes("client") || h.includes("immeuble")),
+      type: fileHeaders.findIndex(h => h.includes("type") || h.includes("communication") || h.includes("canal") || h.includes("mode") || h.includes("methode")),
       date: fileHeaders.findIndex(h => h.includes("date")),
-      unite: fileHeaders.findIndex(h => h.includes("unite")),
-      destinataire: fileHeaders.findIndex(h => h.includes("destinataire")),
-      objet: fileHeaders.findIndex(h => h.includes("objet")),
-      ajoutepar: fileHeaders.findIndex(h => h.includes("ajoutepar")),
-      ajoutequand: fileHeaders.findIndex(h => h.includes("ajoutequand")),
-      notes: fileHeaders.findIndex(h => h.includes("note"))
+      unite: fileHeaders.findIndex(h => h.includes("unite") || h.includes("app") || h.includes("suite")),
+      destinataire: fileHeaders.findIndex(h => h.includes("destinataire") || h.includes("dest") || h.includes("envoye") || h.includes("destin")),
+      objet: fileHeaders.findIndex(h => h.includes("objet") || h.includes("sujet") || h.includes("titre") || h.includes("desc")),
+      ajoutepar: fileHeaders.findIndex(h => h.includes("ajoutepar") || h.includes("ajoutépar") || h.includes("auteur") || h.includes("user") || h.includes("utilisateur")),
+      ajoutequand: fileHeaders.findIndex(h => h.includes("ajoutequand") || h.includes("ajoutéquand") || h.includes("quand") || h.includes("heure") || h.includes("cree")),
+      notes: fileHeaders.findIndex(h => h.includes("note") || h.includes("comment") || h.includes("remarque"))
     }
 
     const syndIdx = indexMap.syndicat !== -1 ? indexMap.syndicat : 0
