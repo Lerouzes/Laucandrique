@@ -1605,6 +1605,10 @@ export function CommunicationAnalyzer({
                                                     <span>Appels téléphoniques :</span>
                                                     <span className="font-bold text-zinc-200 font-mono">{pipelineData.managerPhoneCalls}</span>
                                                 </div>
+                                                <div className="flex justify-between items-center text-zinc-450">
+                                                    <span>Lettres expédiées :</span>
+                                                    <span className="font-bold text-zinc-200 font-mono">{pipelineData.managerLettersSent}</span>
+                                                </div>
                                             </div>
                                         )}
                                     </CardContent>
@@ -1620,6 +1624,10 @@ export function CommunicationAnalyzer({
                                             <div className="flex justify-between items-center">
                                                 <span className="text-zinc-450 font-medium">Courriels Entrants (In) :</span>
                                                 <span className="font-bold font-mono text-zinc-200">{pipelineData.inboundEmails}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-zinc-450 font-medium">Lettres Expédiées :</span>
+                                                <span className="font-bold font-mono text-zinc-200">{pipelineData.lettersSent}</span>
                                             </div>
                                             <div className="flex justify-between items-center pt-1 border-t border-zinc-900/40">
                                                 <span className="text-zinc-450 font-medium">Clavardages :</span>
