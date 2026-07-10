@@ -358,6 +358,7 @@ export default async function TeamManagementDashboard(props: {
                         fromMonth={from}
                         toMonth={to}
                         teamId={teamId}
+                        managers={managers}
                     />
                 </CardContent>
             </Card>

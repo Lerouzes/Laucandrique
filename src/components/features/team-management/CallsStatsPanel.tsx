@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useTransition, useCallback } from 'react'
+import { useState, useEffect, useTransition, useCallback, useMemo } from 'react'
 import { getCallsHistoryAction, getWorkloadHistoryAction } from '@/actions/team-management'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -313,6 +313,8 @@ interface CallsStatsPanelProps {
     managerId?: string
     /** Title override */
     title?: string
+    /** Optional managers list */
+    managers?: any[]
 }
 
 export function CallsStatsPanel({ 
@@ -321,12 +323,42 @@ export function CallsStatsPanel({
     toMonth: globalToMonth,
     teamId,
     managerId, 
-    title 
+    title,
+    managers: managersProp = []
 }: CallsStatsPanelProps) {
     const [isPending, startTransition] = useTransition()
     const [isMounted, setIsMounted] = useState(false)
     const [currentMonth, setCurrentMonth] = useState(nowYearMonth())
     const [rows, setRows] = useState<CallRow[]>([])
+
+    const [selectedManagerId, setSelectedManagerId] = useState(managerId || "")
+    const [localManagers, setLocalManagers] = useState<any[]>([])
+
+    // Sync selectedManagerId if managerId prop changes
+    useEffect(() => {
+        if (managerId) {
+            setSelectedManagerId(managerId)
+        } else {
+            setSelectedManagerId("")
+        }
+    }, [managerId])
+
+    // Load managers as fallback
+    useEffect(() => {
+        if (!managersProp || managersProp.length === 0) {
+            import('@/actions/managers').then(({ getManagers }) => {
+                getManagers().then(setLocalManagers)
+            })
+        }
+    }, [managersProp])
+
+    const managersList = useMemo(() => {
+        const list = managersProp && managersProp.length > 0 ? managersProp : localManagers
+        return (list || []).map(m => ({
+            id: m.id,
+            name: `${m.first_name} ${m.last_name}`
+        })).sort((a, b) => a.name.localeCompare(b.name, 'fr-CA'))
+    }, [managersProp, localManagers])
 
     // Activity & View Modes
     const [activityType, setActivityType] = useState<'calls' | 'tasks' | 'emails'>('calls')
@@ -387,9 +419,10 @@ export function CallsStatsPanel({
 
     const load = useCallback(() => {
         startTransition(async () => {
+            const activeManagerId = selectedManagerId || managerId || undefined
             const opts = useRange
-                ? { managerId, teamId, fromMonth, toMonth }
-                : { managerId, teamId, fromMonth: currentMonth, toMonth: currentMonth }
+                ? { managerId: activeManagerId, teamId, fromMonth, toMonth }
+                : { managerId: activeManagerId, teamId, fromMonth: currentMonth, toMonth: currentMonth }
 
             const data = activityType === 'calls'
                 ? await getCallsHistoryAction(opts)
@@ -397,12 +430,12 @@ export function CallsStatsPanel({
 
             setRows(data as CallRow[])
         })
-    }, [managerId, teamId, useRange, currentMonth, fromMonth, toMonth, activityType])
+    }, [selectedManagerId, managerId, teamId, useRange, currentMonth, fromMonth, toMonth, activityType])
 
     useEffect(() => { load() }, [load])
 
     // Aggregate for range mode: group by manager, average percentage rate
-    const displayRows: (CallRow & { monthCount?: number })[] = useRange
+    const displayRows: (CallRow & { monthCount?: number })[] = (useRange && !selectedManagerId)
         ? (() => {
             const map: Record<string, { managerId: string; managerName: string; totalVal1: number; totalVal2: number; count: number }> = {}
             rows.forEach(r => {
@@ -447,6 +480,20 @@ export function CallsStatsPanel({
             }).sort((a: any, b: any) => activityType === 'emails' ? (b.communicationsReceived ?? 0) - (a.communicationsReceived ?? 0) : ((b.pct ?? -1) - (a.pct ?? -1)))
         })()
         : [...rows].sort((a: any, b: any) => activityType === 'emails' ? (b.communicationsReceived ?? 0) - (a.communicationsReceived ?? 0) : ((b.pct ?? -1) - (a.pct ?? -1)))
+
+    const tableRows = useMemo(() => {
+        if (selectedManagerId) {
+            return [...displayRows].sort((a, b) => b.yearMonth.localeCompare(a.yearMonth))
+        }
+        return displayRows
+    }, [displayRows, selectedManagerId])
+
+    const chartRows = useMemo(() => {
+        if (selectedManagerId) {
+            return [...displayRows].sort((a, b) => a.yearMonth.localeCompare(b.yearMonth))
+        }
+        return displayRows
+    }, [displayRows, selectedManagerId])
 
     // Global stats summary values
     let totalAll = 0
@@ -539,28 +586,48 @@ export function CallsStatsPanel({
                     </button>
                 </div>
 
-                {/* View Selection: Table / Chart */}
-                <div className="flex bg-zinc-900/60 p-0.5 rounded-lg border border-zinc-800/80 w-fit">
-                    <button
-                        onClick={() => setViewMode('table')}
-                        className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${
-                            viewMode === 'table'
-                                ? 'bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/40'
-                                : 'text-zinc-500 hover:text-zinc-300'
-                        }`}
-                    >
-                        📋 Tableau
-                    </button>
-                    <button
-                        onClick={() => setViewMode('chart')}
-                        className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${
-                            viewMode === 'chart'
-                                ? 'bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/40'
-                                : 'text-zinc-500 hover:text-zinc-300'
-                        }`}
-                    >
-                        📊 Graphique
-                    </button>
+                {/* View Selection & Manager Filter */}
+                <div className="flex items-center gap-2 flex-wrap">
+                    {!managerId && (
+                        <div className="flex items-center gap-1.5 bg-zinc-900/60 px-2.5 py-1.5 rounded-lg border border-zinc-800/80">
+                            <span className="text-[10px] text-zinc-500 font-bold">Gestionnaire:</span>
+                            <select
+                                value={selectedManagerId}
+                                onChange={(e) => setSelectedManagerId(e.target.value)}
+                                className="bg-transparent border-none text-[10px] font-bold text-zinc-300 focus:outline-none cursor-pointer pr-4 hover:text-white"
+                            >
+                                <option value="" className="bg-zinc-950 text-zinc-350">Tous les gestionnaires</option>
+                                {managersList.map((m) => (
+                                    <option key={m.id} value={m.id} className="bg-zinc-950 text-zinc-350">
+                                        {m.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    <div className="flex bg-zinc-900/60 p-0.5 rounded-lg border border-zinc-800/80 w-fit">
+                        <button
+                            onClick={() => setViewMode('table')}
+                            className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${
+                                viewMode === 'table'
+                                    ? 'bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/40'
+                                    : 'text-zinc-500 hover:text-zinc-300'
+                            }`}
+                        >
+                            📋 Tableau
+                        </button>
+                        <button
+                            onClick={() => setViewMode('chart')}
+                            className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${
+                                viewMode === 'chart'
+                                    ? 'bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/40'
+                                    : 'text-zinc-500 hover:text-zinc-300'
+                            }`}
+                        >
+                            📊 Graphique
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -648,14 +715,19 @@ export function CallsStatsPanel({
                         </div>
                     ) : (
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={displayRows} margin={{ left: -25, right: 10, top: 10, bottom: 5 }}>
+                            <BarChart data={chartRows} margin={{ left: -25, right: 10, top: 10, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f1f23" />
                             <XAxis
-                                dataKey="managerName"
+                                dataKey={selectedManagerId ? "yearMonth" : "managerName"}
                                 stroke="#71717a"
                                 fontSize={10}
                                 tickLine={false}
                                 axisLine={false}
+                                tickFormatter={selectedManagerId ? (ym) => {
+                                    const [_, m] = ym.split('-')
+                                    const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jui', 'Jui', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+                                    return months[parseInt(m, 10) - 1]
+                                } : undefined}
                             />
                             <YAxis
                                 stroke="#71717a"
@@ -678,7 +750,9 @@ export function CallsStatsPanel({
                                     const rate = data.pct !== null ? `${data.pct}%` : 'N/A'
                                     return (
                                         <div className="bg-zinc-950 border border-zinc-805 p-3 rounded-lg text-xs space-y-1.5 shadow-2xl">
-                                            <p className="font-bold text-white">{data.managerName}</p>
+                                            <p className="font-bold text-white">
+                                                {selectedManagerId ? formatYearMonth(data.yearMonth) : data.managerName}
+                                            </p>
                                             {activityType !== 'emails' && <p className="text-purple-400">
                                                 {activityType === 'calls' ? "Taux de Réponse" : "Taux de Complétion"} : <span className="font-extrabold">{rate}</span>
                                             </p>}
@@ -700,7 +774,7 @@ export function CallsStatsPanel({
                                 }}
                             />
                             <Bar dataKey={activityType === 'emails' ? 'communicationsReceived' : 'pct'} radius={[4, 4, 0, 0]} maxBarSize={40}>
-                                {displayRows.map((entry, index) => {
+                                {chartRows.map((entry, index) => {
                                     const rate = entry.pct ?? 0
                                     const color = activityType === 'emails' ? '#a855f7' : (rate >= 80 ? '#10b981' : rate > 55 ? '#f59e0b' : '#ef4444')
                                     return <Cell key={`cell-${index}`} fill={color} />
@@ -716,8 +790,14 @@ export function CallsStatsPanel({
                     <table className="w-full text-left text-xs">
                         <thead>
                             <tr className="border-b border-zinc-800 text-zinc-400 uppercase text-[10px] font-bold tracking-wider bg-zinc-900/40">
-                                {!managerId && <th className="p-3">Gestionnaire</th>}
-                                {useRange && <th className="p-3 text-center">Mois</th>}
+                                {selectedManagerId ? (
+                                    <th className="p-3">Mois</th>
+                                ) : (
+                                    <>
+                                        {!managerId && <th className="p-3">Gestionnaire</th>}
+                                        {useRange && <th className="p-3 text-center">Mois</th>}
+                                    </>
+                                )}
                                 <th className="p-3 text-center">
                                     {activityType === 'calls' ? "Total Appels" : activityType === 'tasks' ? "Total Tâches" : "Courriels Reçus"}
                                 </th>
@@ -726,23 +806,29 @@ export function CallsStatsPanel({
                                 </th>}
                                 {activityType !== 'emails' && <th className="p-3 text-center">Taux</th>}
                                 {activityType !== 'emails' && <th className="p-3">Progression</th>}
-                                {!managerId && <th className="p-3 text-right">Historique</th>}
+                                {!managerId && !selectedManagerId && <th className="p-3 text-right">Historique</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-900">
-                            {displayRows.map((r) => {
+                            {tableRows.map((r) => {
                                 const totalVal = activityType === 'calls' ? r.totalCalls : activityType === 'tasks' ? ((r.openTasks ?? 0) + (r.closedTasks ?? 0)) : r.communicationsReceived
                                 const answeredVal = activityType === 'calls' ? r.answeredCalls : r.closedTasks
 
                                 return (
                                     <tr key={`${r.managerId}-${r.yearMonth}`} className="hover:bg-zinc-900/20 transition-colors">
-                                        {!managerId && (
-                                            <td className="p-3 font-semibold text-zinc-200">{r.managerName}</td>
-                                        )}
-                                        {useRange && (
-                                            <td className="p-3 text-center text-zinc-500 text-[10px]">
-                                                {r.monthCount} mois
-                                            </td>
+                                        {selectedManagerId ? (
+                                            <td className="p-3 font-semibold text-zinc-200">{formatYearMonth(r.yearMonth)}</td>
+                                        ) : (
+                                            <>
+                                                {!managerId && (
+                                                    <td className="p-3 font-semibold text-zinc-200">{r.managerName}</td>
+                                                )}
+                                                {useRange && (
+                                                    <td className="p-3 text-center text-zinc-500 text-[10px]">
+                                                        {r.monthCount} mois
+                                                    </td>
+                                                )}
+                                            </>
                                         )}
                                         <td className="p-3 text-center text-zinc-400">{totalVal}</td>
                                         {activityType !== 'emails' && <td className="p-3 text-center text-zinc-400">{answeredVal}</td>}
@@ -764,7 +850,7 @@ export function CallsStatsPanel({
                                                 </span>
                                             </div>
                                         </td>}
-                                        {!managerId && (
+                                        {!managerId && !selectedManagerId && (
                                             <td className="p-3 text-right">
                                                 <button
                                                     onClick={() => setHistoryModal({ id: r.managerId, name: r.managerName })}
