@@ -26,7 +26,8 @@ import {
     FolderSync,
     X,
     Eye,
-    RefreshCw
+    RefreshCw,
+    Download
 } from 'lucide-react'
 import { saveCommunicationStatsAction } from '@/actions/communication-stats'
 import { toast } from 'sonner'
@@ -1054,7 +1055,20 @@ export function CommunicationAnalyzer({
             const res = await saveCommunicationStatsAction(selectedClientId, summaryPayload, overwriteOverlap)
             if (res.success) {
                 toast.success("Statistiques de l'audit de communication enregistrées dans le profil du syndicat !")
-                setHasSaved(true)
+                if (fileQueue.length > 1) {
+                    const remaining = fileQueue.slice(1)
+                    setFileQueue(remaining)
+                    setCsvFile(null)
+                    setRawRows([])
+                    setHasSaved(false)
+                    setIsSaving(false)
+                } else if (fileQueue.length === 1) {
+                    setFileQueue([])
+                    handleResetAll()
+                    toast.success("Tous les fichiers de la file d'attente ont été analysés et enregistrés !")
+                } else {
+                    setHasSaved(true)
+                }
             }
         } catch (err: any) {
             toast.error(err.message || "Erreur lors de la sauvegarde.")
@@ -1232,6 +1246,13 @@ export function CommunicationAnalyzer({
                             )}
                         </div>
                     )}
+                    {selectedClientId && selectedClient && (
+                        <div className="mt-1.5 flex items-center gap-2">
+                            <Badge variant="outline" className="bg-indigo-950/40 text-indigo-400 border-indigo-900/50 text-[9px] font-mono font-bold uppercase py-0.5 px-2">
+                                Code : {selectedClient.full_name}
+                            </Badge>
+                        </div>
+                    )}
                     {selectedClientId && (
                         <div className="mt-2 text-[10px] space-y-1">
                             {clientStats.length > 0 ? (
@@ -1376,9 +1397,26 @@ export function CommunicationAnalyzer({
                 <div className="bg-zinc-950/60 border border-zinc-850 p-4 rounded-xl space-y-2 text-xs">
                     <div className="flex justify-between items-center">
                         <span className="text-zinc-400">Fichier chargé : <strong className="text-zinc-200 font-mono">{csvFile.name}</strong></span>
-                        <Badge variant="outline" className="bg-indigo-950/30 text-indigo-400 border-indigo-900/50">
-                            {rawRows.length} lignes valides
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                    const link = document.createElement("a")
+                                    link.href = URL.createObjectURL(csvFile)
+                                    link.download = csvFile.name
+                                    link.click()
+                                }}
+                                className="bg-zinc-900 border-zinc-800 hover:bg-zinc-850 text-zinc-400 hover:text-zinc-200 text-[10px] h-6 px-2 rounded-md"
+                            >
+                                <Download className="h-3 w-3 mr-1" />
+                                Télécharger CSV
+                            </Button>
+                            <Badge variant="outline" className="bg-indigo-950/30 text-indigo-400 border-indigo-900/50">
+                                {rawRows.length} lignes valides
+                            </Badge>
+                        </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4 pt-2 border-t border-zinc-900/40">
                         <div className="bg-[#121318] p-2.5 rounded-lg border border-zinc-800/40 text-center">
@@ -1488,11 +1526,11 @@ export function CommunicationAnalyzer({
                                 </Card>
                                 <Card className="bg-gradient-to-tr from-[#16171e] to-emerald-950/20 border-zinc-800/80 shadow-md">
                                     <CardContent className="p-6">
-                                        <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-black block">Indice de Charge Réel du Forfait (PM Inclusions Load)</span>
+                                        <span className="text-[10px] text-zinc-550 uppercase tracking-wider font-black block">Indice de Charge Réel du Forfait (PM Inclusions Load)</span>
                                         <div className="text-3xl font-black text-emerald-400 mt-1 block">
-                                            {(pipelineData.contractInclusionsVolume / Math.max(1, unitCount)).toFixed(2)}
+                                            {(pipelineData.contractInclusionsVolume / (Math.max(1, unitCount) * (pipelineData.timelineList.length || 1))).toFixed(2)}
                                         </div>
-                                        <span className="text-[10px] text-zinc-450 mt-1.5 block">Moyenne d'interactions incluses par porte / année cible</span>
+                                        <span className="text-[10px] text-zinc-450 mt-1.5 block">Moyenne d'interactions incluses par porte / mois</span>
                                     </CardContent>
                                 </Card>
                                 <Card className="bg-gradient-to-tr from-[#16171e] to-indigo-950/20 border-zinc-800/80 shadow-md">
@@ -1593,15 +1631,16 @@ export function CommunicationAnalyzer({
 
                             {/* Departments grid load rates */}
                             <div className="space-y-2">
-                                <h4 className="text-[10px] font-bold text-zinc-550 uppercase tracking-wider">Répartition des charges opérationnelles annuelles par porte :</h4>
+                                <h4 className="text-[10px] font-bold text-zinc-550 uppercase tracking-wider">Répartition des charges opérationnelles moyennes par porte / mois :</h4>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                     {DEPT_LIST.map(d => {
                                         const count = pipelineData.deptCounts[d] || 0
-                                        const loadRate = (count / Math.max(1, unitCount)).toFixed(2)
+                                        const monthsCount = pipelineData.timelineList.length || 1
+                                        const loadRate = (count / (Math.max(1, unitCount) * monthsCount)).toFixed(2)
                                         
                                         let borderCss = DEPT_COLORS[d] || "border-l-zinc-700 bg-zinc-900/10"
                                         if (d === "Gestion") {
-                                            const pmLoadScore = count / Math.max(1, unitCount)
+                                            const pmLoadScore = count / (Math.max(1, unitCount) * monthsCount)
                                             if (pmLoadScore > 4.5) {
                                                 borderCss = "border-l-rose-500 bg-sky-950/10"
                                             } else if (pmLoadScore > 2.5) {
