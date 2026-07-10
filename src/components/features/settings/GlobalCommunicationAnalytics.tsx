@@ -312,6 +312,7 @@ export function GlobalCommunicationAnalytics({
             
             let outboundEmails = 0
             let inboundEmails = 0
+            let lettersSent = 0
             let chats = 0
             let phoneCalls = 0
             let others = 0
@@ -324,6 +325,7 @@ export function GlobalCommunicationAnalytics({
                 if (t.outboundEmails !== undefined || t.inboundEmails !== undefined || t.chats !== undefined || t.phoneCalls !== undefined) {
                     outboundEmails += Number(t.outboundEmails || 0)
                     inboundEmails += Number(t.inboundEmails || 0)
+                    lettersSent += Number(t.lettersSent || 0)
                     chats += Number(t.chats || 0)
                     phoneCalls += Number(t.phoneCalls || 0)
                     others += Number(t.others || 0)
@@ -337,6 +339,7 @@ export function GlobalCommunicationAnalytics({
                 if (recap) {
                     outboundEmails = Number(recap.outboundEmails || 0)
                     inboundEmails = Number(recap.inboundEmails || 0)
+                    lettersSent = Number(recap.lettersSent || 0)
                     chats = Number(recap.chats || 0)
                     phoneCalls = Number(recap.phoneCalls || 0)
                     others = Number(recap.others || 0)
@@ -394,6 +397,7 @@ export function GlobalCommunicationAnalytics({
                 runDate: run.analysis_date,
                 outboundEmails,
                 inboundEmails,
+                lettersSent,
                 chats,
                 phoneCalls,
                 others,
@@ -425,6 +429,7 @@ export function GlobalCommunicationAnalytics({
                 topOutlier: null,
                 outboundEmails: 0,
                 inboundEmails: 0,
+                lettersSent: 0,
                 chats: 0,
                 phoneCalls: 0,
                 others: 0,
@@ -445,6 +450,7 @@ export function GlobalCommunicationAnalytics({
 
         let outboundEmails = 0
         let inboundEmails = 0
+        let lettersSent = 0
         let chats = 0
         let phoneCalls = 0
         let others = 0
@@ -453,6 +459,7 @@ export function GlobalCommunicationAnalytics({
         processedClients.forEach(c => {
             outboundEmails += c.outboundEmails || 0
             inboundEmails += c.inboundEmails || 0
+            lettersSent += c.lettersSent || 0
             chats += c.chats || 0
             phoneCalls += c.phoneCalls || 0
             others += c.others || 0
@@ -478,6 +485,7 @@ export function GlobalCommunicationAnalytics({
             topOutlier,
             outboundEmails,
             inboundEmails,
+            lettersSent,
             chats,
             phoneCalls,
             others,
@@ -1062,10 +1070,14 @@ export function GlobalCommunicationAnalytics({
                                                 <span className="font-mono text-zinc-350 font-bold">{kpis.inboundEmails}</span>
                                             </div>
                                             <div className="flex items-center justify-between">
+                                                <span className="text-zinc-550 font-bold">Lettres :</span>
+                                                <span className="font-mono text-zinc-350 font-bold">{kpis.lettersSent}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
                                                 <span className="text-zinc-550 font-bold">Clavardage :</span>
                                                 <span className="font-mono text-zinc-350 font-bold">{kpis.chats}</span>
                                             </div>
-                                            <div className="flex items-center justify-between">
+                                            <div className="flex items-center justify-between col-span-2">
                                                 <span className="text-zinc-550 font-bold">Appels :</span>
                                                 <span className="font-mono text-zinc-350 font-bold">{kpis.phoneCalls}</span>
                                             </div>
@@ -1525,6 +1537,7 @@ export function GlobalCommunicationAnalytics({
                                                                              <span className="text-zinc-550 font-bold uppercase tracking-wider">Canaux :</span>
                                                                              <span>Courriels Expédiés : <strong className="text-zinc-200 font-mono">{c.outboundEmails}</strong></span>
                                                                              <span>Courriels Reçus : <strong className="text-zinc-200 font-mono">{c.inboundEmails}</strong></span>
+                                                                             <span>Lettres Expédiées : <strong className="text-zinc-200 font-mono">{c.lettersSent}</strong></span>
                                                                              <span>Clavardages : <strong className="text-zinc-200 font-mono">{c.chats}</strong></span>
                                                                              <span>Appels : <strong className="text-zinc-200 font-mono">{c.phoneCalls}</strong></span>
                                                                              {c.others > 0 && <span>Autres : <strong className="text-zinc-200 font-mono">{c.others}</strong></span>}
