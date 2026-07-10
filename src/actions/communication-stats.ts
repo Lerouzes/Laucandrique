@@ -115,11 +115,37 @@ export async function saveCommunicationStatsAction(
         total_communications: number
         analysis_date?: string | null
         analysis_summary: any
-    }
+    },
+    overwriteOverlap: boolean = false
 ): Promise<any> {
     const supabase = await createClient()
 
     if (!clientId) throw new Error("ID du client requis")
+
+    // Delete overlapping records if requested
+    if (overwriteOverlap && stats.period_start && stats.period_end) {
+        const { data: overlappingRecords, error: queryError } = await (supabase
+            .from('client_communication_stats' as any)
+            .select('id')
+            .eq('client_id', clientId)
+            .lte('period_start', stats.period_end)
+            .gte('period_end', stats.period_start) as any)
+
+        if (queryError) {
+            console.error("Error querying overlapping stats:", queryError)
+        } else if (overlappingRecords && overlappingRecords.length > 0) {
+            const idsToDelete = overlappingRecords.map((r: any) => r.id)
+            const { error: deleteError } = await (supabase
+                .from('client_communication_stats' as any)
+                .delete()
+                .in('id', idsToDelete) as any)
+
+            if (deleteError) {
+                console.error("Error deleting overlapping stats:", deleteError)
+                throw new Error("Impossible de supprimer les analyses existantes chevauchantes : " + deleteError.message)
+            }
+        }
+    }
 
     const insertPayload: any = {
         client_id: clientId,

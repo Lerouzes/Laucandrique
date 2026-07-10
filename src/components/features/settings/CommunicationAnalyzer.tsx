@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 import { saveCommunicationStatsAction } from '@/actions/communication-stats'
 import { toast } from 'sonner'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
     AreaChart,
     Area,
@@ -283,6 +284,7 @@ export function CommunicationAnalyzer({
     }, [clients, sdcSearch, selectedClient])
 
     const [unitCount, setUnitCount] = useState<number>(90)
+    const [overwriteOverlap, setOverwriteOverlap] = useState<boolean>(true)
     
     // CSV uploader states
     const [csvFile, setCsvFile] = useState<File | null>(null)
@@ -556,10 +558,12 @@ export function CommunicationAnalyzer({
                     const rowDateObj = parseDateString(dateStr)
                     if (rowDateObj) {
                         const rowDateStr = rowDateObj.toISOString().substring(0, 10)
-                        const isOverlap = existingRanges.some(r => rowDateStr >= r.startStr && rowDateStr <= r.endStr)
-                        if (isOverlap) {
-                            skippedOverlapCount++
-                            continue
+                        if (!overwriteOverlap) {
+                            const isOverlap = existingRanges.some(r => rowDateStr >= r.startStr && rowDateStr <= r.endStr)
+                            if (isOverlap) {
+                                skippedOverlapCount++
+                                continue
+                            }
                         }
                     }
 
@@ -1047,7 +1051,7 @@ export function CommunicationAnalyzer({
                 }
             }
 
-            const res = await saveCommunicationStatsAction(selectedClientId, summaryPayload)
+            const res = await saveCommunicationStatsAction(selectedClientId, summaryPayload, overwriteOverlap)
             if (res.success) {
                 toast.success("Statistiques de l'audit de communication enregistrées dans le profil du syndicat !")
                 setHasSaved(true)
@@ -1261,6 +1265,26 @@ export function CommunicationAnalyzer({
                         min="1"
                         className="bg-[#121318] border-zinc-800 h-9 text-zinc-150 text-xs"
                     />
+                </div>
+
+                <div className="flex items-center space-x-2 pt-2">
+                    <Checkbox 
+                        id="overwrite-overlap-checkbox"
+                        checked={overwriteOverlap}
+                        onCheckedChange={(checked) => {
+                            const val = !!checked
+                            setOverwriteOverlap(val)
+                            if (csvFile) {
+                                parseFile(csvFile)
+                            }
+                        }}
+                    />
+                    <label 
+                        htmlFor="overwrite-overlap-checkbox" 
+                        className="text-[10px] font-medium text-zinc-350 cursor-pointer select-none"
+                    >
+                        Remplacer l'analyse existante en cas de chevauchement
+                    </label>
                 </div>
 
                 <div className="space-y-1">
