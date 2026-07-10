@@ -166,7 +166,7 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Édouard Le Rouzes": "Gestion"
 }
 
-const classifyCommType = (typeStr: string): 'outboundEmail' | 'inboundEmail' | 'chat' | 'phoneCall' | 'other' => {
+const classifyCommType = (typeStr: string): 'outboundEmail' | 'inboundEmail' | 'chat' | 'phoneCall' | 'letterSent' | 'other' => {
     let t = (typeStr || "").toLowerCase().trim()
     
     // Handle potential mojibake/UTF-8 double encoding issues
@@ -182,6 +182,7 @@ const classifyCommType = (typeStr: string): 'outboundEmail' | 'inboundEmail' | '
     // Normalize accents
     t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     
+    if (t.includes("lettre")) return 'letterSent'
     if (t.includes("expedi") || t.includes("sent") || t.includes("envoi")) return 'outboundEmail'
     if (t.includes("recu") || t.includes("received")) return 'inboundEmail'
     if (t.includes("clavardage") || t.includes("chat")) return 'chat'
@@ -513,6 +514,7 @@ export function ClientCommunicationTrends({
             inboundEmails: number;
             chats: number;
             phoneCalls: number;
+            lettersSent: number;
             others: number;
         }> = {}
 
@@ -546,6 +548,7 @@ export function ClientCommunicationTrends({
                         inboundEmails: 0,
                         chats: 0,
                         phoneCalls: 0,
+                        lettersSent: 0,
                         others: 0
                     }
                 }
@@ -560,6 +563,7 @@ export function ClientCommunicationTrends({
                 else if (cls === 'inboundEmail') timelineChronologyMap[timelineKey].inboundEmails++
                 else if (cls === 'chat') timelineChronologyMap[timelineKey].chats++
                 else if (cls === 'phoneCall') timelineChronologyMap[timelineKey].phoneCalls++
+                else if (cls === 'letterSent') timelineChronologyMap[timelineKey].lettersSent++
                 else timelineChronologyMap[timelineKey].others++
             }
 
@@ -593,6 +597,7 @@ export function ClientCommunicationTrends({
             else if (cls === 'inboundEmail') inboundEmailsCount++
             else if (cls === 'chat') chatsCount++
             else if (cls === 'phoneCall') phoneCallsCount++
+            else if (cls === 'letterSent') lettersSentCount++
             else othersCount++
         })
 
@@ -609,6 +614,7 @@ export function ClientCommunicationTrends({
                     inboundEmails: data.inboundEmails,
                     chats: data.chats,
                     phoneCalls: data.phoneCalls,
+                    lettersSent: data.lettersSent,
                     others: data.others
                 }
             })
@@ -634,6 +640,7 @@ export function ClientCommunicationTrends({
             inboundEmails: inboundEmailsCount,
             chats: chatsCount,
             phoneCalls: phoneCallsCount,
+            lettersSent: lettersSentCount,
             others: othersCount
         }
     }, [rawRows, deptMap, doors])
@@ -674,6 +681,7 @@ export function ClientCommunicationTrends({
                         inboundEmails: pipelineData.inboundEmails,
                         chats: pipelineData.chats,
                         phoneCalls: pipelineData.phoneCalls,
+                        lettersSent: pipelineData.lettersSent,
                         others: pipelineData.others
                     }
                 }
@@ -1000,6 +1008,7 @@ export function ClientCommunicationTrends({
         let inboundEmails = 0
         let chats = 0
         let phoneCalls = 0
+        let lettersSent = 0
         let others = 0
         let hasGranularTypes = false
 
@@ -1012,6 +1021,7 @@ export function ClientCommunicationTrends({
                 inboundEmails += Number(t.inboundEmails || 0)
                 chats += Number(t.chats || 0)
                 phoneCalls += Number(t.phoneCalls || 0)
+                lettersSent += Number(t.lettersSent || 0)
                 others += Number(t.others || 0)
                 hasGranularTypes = true
             }
@@ -1025,6 +1035,7 @@ export function ClientCommunicationTrends({
                 inboundEmails = Number(recap.inboundEmails || 0)
                 chats = Number(recap.chats || 0)
                 phoneCalls = Number(recap.phoneCalls || 0)
+                lettersSent = Number(recap.lettersSent || 0)
                 others = Number(recap.others || 0)
                 hasGranularTypes = true
             } else {
@@ -1057,6 +1068,7 @@ export function ClientCommunicationTrends({
             inboundEmails,
             chats,
             phoneCalls,
+            lettersSent,
             others,
             hasGranularTypes
         }
@@ -1404,6 +1416,10 @@ export function ClientCommunicationTrends({
                                                         <span className="text-zinc-450 font-medium">Courriels Entrants (In) :</span>
                                                         <span className="font-bold font-mono text-zinc-200">{pipelineData.inboundEmails}</span>
                                                     </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-zinc-450 font-medium">Lettres Expédiées :</span>
+                                                        <span className="font-bold font-mono text-zinc-200">{pipelineData.lettersSent}</span>
+                                                    </div>
                                                     <div className="flex justify-between items-center pt-1 border-t border-zinc-900/40">
                                                         <span className="text-zinc-450 font-medium">Clavardages :</span>
                                                         <span className="font-bold font-mono text-zinc-200">{pipelineData.chats}</span>
@@ -1599,6 +1615,10 @@ export function ClientCommunicationTrends({
                                                 <div className="flex items-center justify-between">
                                                     <span>Reçus (M) :</span>
                                                     <span className="font-mono text-zinc-300">{filteredStats.inboundEmails}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between col-span-2">
+                                                    <span>Lettres Expédiées :</span>
+                                                    <span className="font-mono text-zinc-300">{filteredStats.lettersSent}</span>
                                                 </div>
                                                 <div className="flex items-center justify-between">
                                                     <span>Clavardage :</span>

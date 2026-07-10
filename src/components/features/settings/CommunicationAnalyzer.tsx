@@ -210,7 +210,7 @@ const INITIAL_DEPT_MAP: Record<string, string> = {
     "Édouard Le Rouzes": "Gestion"
 }
 
-const classifyCommType = (typeStr: string): 'outboundEmail' | 'inboundEmail' | 'chat' | 'phoneCall' | 'other' => {
+const classifyCommType = (typeStr: string): 'outboundEmail' | 'inboundEmail' | 'chat' | 'phoneCall' | 'letterSent' | 'other' => {
     let t = (typeStr || "").toLowerCase().trim()
     
     // Handle potential mojibake/UTF-8 double encoding issues
@@ -226,6 +226,7 @@ const classifyCommType = (typeStr: string): 'outboundEmail' | 'inboundEmail' | '
     // Normalize accents
     t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     
+    if (t.includes("lettre")) return 'letterSent'
     if (t.includes("expedi") || t.includes("sent") || t.includes("envoi")) return 'outboundEmail'
     if (t.includes("recu") || t.includes("received")) return 'inboundEmail'
     if (t.includes("clavardage") || t.includes("chat")) return 'chat'
@@ -681,6 +682,7 @@ export function CommunicationAnalyzer({
         let inboundEmailsCount = 0
         let chatsCount = 0
         let phoneCallsCount = 0
+        let lettersSentCount = 0
         let othersCount = 0
         
         const deptCounts: Record<string, number> = {}
@@ -694,6 +696,7 @@ export function CommunicationAnalyzer({
             inboundEmails: number;
             chats: number;
             phoneCalls: number;
+            lettersSent: number;
             others: number;
         }> = {}
         const employeeCounts: Record<string, number> = {}
@@ -717,6 +720,7 @@ export function CommunicationAnalyzer({
         let managerInboundEmails = 0
         let managerChats = 0
         let managerPhoneCalls = 0
+        let managerLettersSent = 0
         let managerOthers = 0
 
         const cleanStringForMatch = (str: string) => {
@@ -824,6 +828,7 @@ export function CommunicationAnalyzer({
                         inboundEmails: 0,
                         chats: 0,
                         phoneCalls: 0,
+                        lettersSent: 0,
                         others: 0
                     }
                 }
@@ -838,6 +843,7 @@ export function CommunicationAnalyzer({
                 else if (cls === 'inboundEmail') timelineChronologyMap[timelineKey].inboundEmails++
                 else if (cls === 'chat') timelineChronologyMap[timelineKey].chats++
                 else if (cls === 'phoneCall') timelineChronologyMap[timelineKey].phoneCalls++
+                else if (cls === 'letterSent') timelineChronologyMap[timelineKey].lettersSent++
                 else timelineChronologyMap[timelineKey].others++
             }
 
@@ -873,6 +879,7 @@ export function CommunicationAnalyzer({
                 else if (cls === 'inboundEmail') managerInboundEmails++
                 else if (cls === 'chat') managerChats++
                 else if (cls === 'phoneCall') managerPhoneCalls++
+                else if (cls === 'letterSent') managerLettersSent++
                 else managerOthers++
             }
 
@@ -893,6 +900,7 @@ export function CommunicationAnalyzer({
             else if (cls === 'inboundEmail') inboundEmailsCount++
             else if (cls === 'chat') chatsCount++
             else if (cls === 'phoneCall') phoneCallsCount++
+            else if (cls === 'letterSent') lettersSentCount++
             else othersCount++
 
             if (cls === 'inboundEmail' || cls === 'chat') {
@@ -928,6 +936,7 @@ export function CommunicationAnalyzer({
                     inboundEmails: data.inboundEmails,
                     chats: data.chats,
                     phoneCalls: data.phoneCalls,
+                    lettersSent: data.lettersSent,
                     others: data.others
                 }
             })
@@ -965,6 +974,7 @@ export function CommunicationAnalyzer({
             inboundEmails: inboundEmailsCount,
             chats: chatsCount,
             phoneCalls: phoneCallsCount,
+            lettersSent: lettersSentCount,
             others: othersCount,
             // Manager metrics
             managerName,
@@ -973,6 +983,7 @@ export function CommunicationAnalyzer({
             managerInboundEmails,
             managerChats,
             managerPhoneCalls,
+            managerLettersSent,
             managerOthers,
             isUserAManager
         }
@@ -1004,6 +1015,7 @@ export function CommunicationAnalyzer({
             let inboundEmailsCount = 0
             let chatsCount = 0
             let phoneCallsCount = 0
+            let lettersSentCount = 0
             let othersCount = 0
 
             rawRows.forEach(r => {
@@ -1019,6 +1031,8 @@ export function CommunicationAnalyzer({
                 } else if (cls === 'phoneCall') {
                     phoneCallsCount++
                     total_phone_calls++
+                } else if (cls === 'letterSent') {
+                    lettersSentCount++
                 } else {
                     othersCount++
                 }
@@ -1047,6 +1061,7 @@ export function CommunicationAnalyzer({
                         inboundEmails: inboundEmailsCount,
                         chats: chatsCount,
                         phoneCalls: phoneCallsCount,
+                        lettersSent: lettersSentCount,
                         others: othersCount
                     }
                 }
@@ -1418,17 +1433,35 @@ export function CommunicationAnalyzer({
                             </Badge>
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-zinc-900/40">
-                        <div className="bg-[#121318] p-2.5 rounded-lg border border-zinc-800/40 text-center">
-                            <span className="block text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Courriels Envoyés (Out)</span>
-                            <span className="text-lg font-bold font-mono text-emerald-450 text-emerald-400 mt-1 block">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2 border-t border-zinc-900/40">
+                        <div className="bg-[#121318] p-2 rounded-lg border border-zinc-800/40 text-center">
+                            <span className="block text-[9px] text-zinc-500 uppercase tracking-wider font-bold">Courriels Envoyés</span>
+                            <span className="text-base font-bold font-mono text-emerald-450 text-emerald-400 mt-0.5 block">
                                 {pipelineData.outboundEmails}
                             </span>
                         </div>
-                        <div className="bg-[#121318] p-2.5 rounded-lg border border-zinc-800/40 text-center">
-                            <span className="block text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Courriels Reçus (In)</span>
-                            <span className="text-lg font-bold font-mono text-sky-400 mt-1 block">
+                        <div className="bg-[#121318] p-2 rounded-lg border border-zinc-800/40 text-center">
+                            <span className="block text-[9px] text-zinc-500 uppercase tracking-wider font-bold">Courriels Reçus</span>
+                            <span className="text-base font-bold font-mono text-sky-400 mt-0.5 block">
                                 {pipelineData.inboundEmails}
+                            </span>
+                        </div>
+                        <div className="bg-[#121318] p-2 rounded-lg border border-zinc-800/40 text-center">
+                            <span className="block text-[9px] text-zinc-500 uppercase tracking-wider font-bold">Lettres Expédiées</span>
+                            <span className="text-base font-bold font-mono text-amber-500 mt-0.5 block">
+                                {pipelineData.lettersSent}
+                            </span>
+                        </div>
+                        <div className="bg-[#121318] p-2 rounded-lg border border-zinc-800/40 text-center">
+                            <span className="block text-[9px] text-zinc-500 uppercase tracking-wider font-bold">Clavardages</span>
+                            <span className="text-base font-bold font-mono text-indigo-400 mt-0.5 block">
+                                {pipelineData.chats}
+                            </span>
+                        </div>
+                        <div className="bg-[#121318] p-2 rounded-lg border border-zinc-800/40 text-center">
+                            <span className="block text-[9px] text-zinc-500 uppercase tracking-wider font-bold">Appels</span>
+                            <span className="text-base font-bold font-mono text-rose-400 mt-0.5 block">
+                                {pipelineData.phoneCalls}
                             </span>
                         </div>
                     </div>
