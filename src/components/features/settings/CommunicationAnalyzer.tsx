@@ -353,8 +353,6 @@ export function CommunicationAnalyzer({
         if (activeQueue.length === 0) return
         
         const nextFile = activeQueue[0]
-        const remaining = activeQueue.slice(1)
-        setFileQueue(remaining)
         
         setSelectedClientId('')
         setSdcSearch('')
@@ -600,6 +598,24 @@ export function CommunicationAnalyzer({
                 setExcludedOtonom(otonoms)
                 setExcludedAssign(assigns)
                 setDiscoveredUsers(Array.from(localDiscoveredUsers).sort())
+                
+                // Auto-select client by file name prefix (e.g. "R106")
+                const prefixMatch = file.name.match(/^([A-Z]\d+)/i)
+                if (prefixMatch) {
+                    const code = prefixMatch[1].toUpperCase()
+                    const matchedClient = clients.find(c => {
+                        const compName = (c.company_name || "").toUpperCase()
+                        const fullName = (c.full_name || "").toUpperCase()
+                        return compName.startsWith(code) || fullName.startsWith(code) || compName.includes(code) || fullName.includes(code)
+                    })
+                    if (matchedClient) {
+                        setSelectedClientId(matchedClient.id)
+                        setSdcSearch(matchedClient.company_name || matchedClient.full_name)
+                        if (matchedClient.doors && matchedClient.doors.length > 0) {
+                            setUnitCount(matchedClient.doors.length)
+                        }
+                    }
+                }
                 
                 if (skippedOverlapCount > 0) {
                     toast.info(`${skippedOverlapCount} lignes ignorées car elles chevauchent des dates déjà importées pour ce syndicat.`)
@@ -1112,10 +1128,22 @@ export function CommunicationAnalyzer({
                         <FileSpreadsheet className="h-5 w-5 text-indigo-400 shrink-0" />
                         <div>
                             <span className="font-bold text-zinc-100">File d'attente active : </span>
-                            <span className="font-semibold">{fileQueue.length} fichier(s) en attente</span>
-                            <span className="text-[10px] text-zinc-400 block mt-0.5">
-                                Prochain fichier : <span className="font-semibold text-indigo-200">{fileQueue[0].name}</span>
+                            <span className="font-semibold">
+                                {csvFile 
+                                    ? `Fichier en cours : ${csvFile.name} (${fileQueue.length - 1} restants)` 
+                                    : `${fileQueue.length} fichier(s) en attente`
+                                }
                             </span>
+                            {csvFile && fileQueue.length > 1 && (
+                                <span className="text-[10px] text-zinc-400 block mt-0.5">
+                                    Suivant : <span className="font-semibold text-indigo-200">{fileQueue[1].name}</span>
+                                </span>
+                            )}
+                            {!csvFile && (
+                                <span className="text-[10px] text-zinc-400 block mt-0.5">
+                                    Prochain fichier : <span className="font-semibold text-indigo-200">{fileQueue[0].name}</span>
+                                </span>
+                            )}
                         </div>
                     </div>
                     <div className="flex gap-2 w-full sm:w-auto">
@@ -1266,17 +1294,23 @@ export function CommunicationAnalyzer({
                             <Button
                                 type="button"
                                 onClick={() => {
-                                    if (fileQueue.length > 0) {
-                                        processNextFile()
+                                    if (fileQueue.length > 1) {
+                                        const remaining = fileQueue.slice(1)
+                                        setFileQueue(remaining)
+                                        setCsvFile(null)
+                                        setRawRows([])
+                                        setHasSaved(false)
+                                        setIsSaving(false)
                                     } else {
+                                        setFileQueue([])
                                         handleResetAll()
                                     }
                                 }}
                                 className="w-full font-bold h-9 rounded-lg flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md text-xs animate-in fade-in slide-in-from-bottom-2 duration-200"
                             >
                                 <RefreshCw className="h-4 w-4" />
-                                {fileQueue.length > 0 
-                                    ? `Traiter le fichier suivant (${fileQueue.length} en attente)` 
+                                {fileQueue.length > 1 
+                                    ? `Traiter le fichier suivant (${fileQueue.length - 1} en attente)` 
                                     : "Faire un autre syndicat"
                                 }
                             </Button>
