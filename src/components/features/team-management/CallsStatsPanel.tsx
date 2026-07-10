@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useTransition, useCallback, useMemo } from 'react'
-import { getCallsHistoryAction, getWorkloadHistoryAction } from '@/actions/team-management'
+import { getCallsHistoryAction, getWorkloadHistoryAction, getAuditedCommunicationsHistoryAction } from '@/actions/team-management'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -106,13 +106,15 @@ function ManagerHistoryModal({
     managerName,
     activityType,
     open,
-    onClose
+    onClose,
+    dataSource
 }: {
     managerId: string
     managerName: string
-    activityType: 'calls' | 'tasks' | 'emails'
+    activityType: 'calls' | 'tasks' | 'emails' | 'letters' | 'chats' | 'all'
     open: boolean
     onClose: () => void
+    dataSource: 'manual' | 'audit'
 }) {
     const [rows, setRows] = useState<CallRow[]>([])
     const [loading, setLoading] = useState(false)
@@ -125,21 +127,63 @@ function ManagerHistoryModal({
     useEffect(() => {
         if (!open) return
         setLoading(true)
-        const fetchAction = activityType === 'calls'
-            ? getCallsHistoryAction({ managerId, monthsBack: 24 })
-            : getWorkloadHistoryAction({ managerId, monthsBack: 24 })
+        if (dataSource === 'audit') {
+            getAuditedCommunicationsHistoryAction({ managerId, monthsBack: 24 })
+                .then(data => {
+                    const mapped = data.map(r => {
+                        let totalVal = 0
+                        if (activityType === 'emails') {
+                            totalVal = r.outboundEmails + r.inboundEmails
+                        } else if (activityType === 'calls') {
+                            totalVal = r.phoneCalls
+                        } else if (activityType === 'letters') {
+                            totalVal = r.lettersSent
+                        } else if (activityType === 'chats') {
+                            totalVal = r.chats
+                        } else if (activityType === 'all') {
+                            totalVal = r.outboundEmails + r.inboundEmails + r.lettersSent + r.chats + r.phoneCalls + r.others
+                        }
+                        return {
+                            managerId: r.managerId,
+                            managerName: r.managerName,
+                            yearMonth: r.yearMonth,
+                            ...(activityType === 'calls' ? {
+                                totalCalls: totalVal,
+                                answeredCalls: totalVal,
+                            } : {
+                                communicationsReceived: totalVal,
+                            }),
+                            pct: null,
+                            outboundEmails: r.outboundEmails,
+                            inboundEmails: r.inboundEmails,
+                            lettersSent: r.lettersSent,
+                            chats: r.chats,
+                            phoneCalls: r.phoneCalls,
+                            others: r.others
+                        }
+                    })
+                    setRows(mapped as any[])
+                })
+                .finally(() => setLoading(false))
+        } else {
+            const fetchAction = activityType === 'calls'
+                ? getCallsHistoryAction({ managerId, monthsBack: 24 })
+                : getWorkloadHistoryAction({ managerId, monthsBack: 24 })
 
-        fetchAction
-            .then(data => setRows(data as CallRow[]))
-            .finally(() => setLoading(false))
-    }, [open, managerId, activityType])
+            fetchAction
+                .then(data => setRows(data as CallRow[]))
+                .finally(() => setLoading(false))
+        }
+    }, [open, managerId, activityType, dataSource])
+
+    const isVolumeOnly = activityType === 'emails' || activityType === 'letters' || activityType === 'chats' || activityType === 'all'
 
     // Build MoM deltas (rows are sorted desc)
     const withMoM = rows.map((r, i) => {
         const prev = rows[i + 1]
         let delta: number | null = null
         if (prev) {
-            if (activityType === 'emails') {
+            if (isVolumeOnly || dataSource === 'audit') {
                 if (r.communicationsReceived !== undefined && prev.communicationsReceived !== undefined) {
                     delta = r.communicationsReceived - prev.communicationsReceived
                 }
@@ -206,8 +250,8 @@ function ManagerHistoryModal({
                                                     fontSize={9}
                                                     tickLine={false}
                                                     axisLine={false}
-                                                    domain={activityType === 'emails' ? ['auto', 'auto'] : [0, 100]}
-                                                    tickFormatter={(v) => activityType === 'emails' ? String(v) : `${v}%`}
+                                                    domain={(isVolumeOnly || dataSource === 'audit') ? ['auto', 'auto'] : [0, 100]}
+                                                    tickFormatter={(v) => (isVolumeOnly || dataSource === 'audit') ? String(v) : `${v}%`}
                                                 />
                                                 <Tooltip
                                                     contentStyle={{
@@ -217,11 +261,11 @@ function ManagerHistoryModal({
                                                         fontSize: 10,
                                                         color: '#fff'
                                                     }}
-                                                    formatter={(v: any) => activityType === 'emails' ? [v, "Courriels Reçus"] : [`${v}%`, activityType === 'calls' ? "Taux de Réponse" : "Taux de Complétion"]}
+                                                    formatter={(v: any) => (isVolumeOnly || dataSource === 'audit') ? [v, "Volume Épuré"] : [`${v}%`, activityType === 'calls' ? "Taux de Réponse" : "Taux de Complétion"]}
                                                 />
                                                 <Line
                                                     type="monotone"
-                                                    dataKey={activityType === 'emails' ? 'communicationsReceived' : 'pct'}
+                                                    dataKey={(isVolumeOnly || dataSource === 'audit') ? 'communicationsReceived' : 'pct'}
                                                     stroke="#a855f7"
                                                     strokeWidth={2}
                                                     dot={{ r: 3, fill: '#a855f7' }}
@@ -241,42 +285,44 @@ function ManagerHistoryModal({
                                     <thead>
                                         <tr className="border-b border-zinc-800 text-zinc-400 uppercase text-[10px] font-bold tracking-wider">
                                             <th className="pb-2 text-left">Mois</th>
-                                            <th className="pb-2 text-center">{activityType === 'calls' ? "Total Appels" : activityType === 'tasks' ? "Total Tâches" : "Courriels Reçus"}</th>
-                                            {activityType !== 'emails' && <th className="pb-2 text-center">{activityType === 'calls' ? "Répondus" : "Complétées"}</th>}
-                                            {activityType !== 'emails' && <th className="pb-2 text-center">Taux</th>}
+                                            <th className="pb-2 text-center">
+                                                {dataSource === 'audit' ? "Volume Épuré" : (activityType === 'calls' ? "Total Appels" : activityType === 'tasks' ? "Total Tâches" : "Courriels Reçus")}
+                                            </th>
+                                            {!isVolumeOnly && <th className="pb-2 text-center">{activityType === 'calls' ? "Répondus" : "Complétées"}</th>}
+                                            {!isVolumeOnly && <th className="pb-2 text-center">Taux</th>}
                                             <th className="pb-2 text-center">MoM</th>
-                                            {activityType !== 'emails' && <th className="pb-2 text-right pr-2">Barre</th>}
+                                            {!isVolumeOnly && <th className="pb-2 text-right pr-2">Barre</th>}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-zinc-900">
                                         {withMoM.map((r) => {
-                                            const total = activityType === 'calls' ? r.totalCalls : activityType === 'tasks' ? ((r.openTasks ?? 0) + (r.closedTasks ?? 0)) : r.communicationsReceived
+                                            const total = (activityType === 'calls') ? r.totalCalls : (activityType === 'tasks' ? ((r.openTasks ?? 0) + (r.closedTasks ?? 0)) : r.communicationsReceived)
                                             const answered = activityType === 'calls' ? r.answeredCalls : r.closedTasks
 
                                             return (
                                                 <tr key={r.yearMonth} className="hover:bg-zinc-900/30 transition-colors">
                                                     <td className="py-2.5 font-mono text-zinc-300">{formatYearMonth(r.yearMonth)}</td>
                                                     <td className="py-2.5 text-center text-zinc-400">{total}</td>
-                                                    {activityType !== 'emails' && <td className="py-2.5 text-center text-zinc-400">{answered}</td>}
-                                                    {activityType !== 'emails' && <td className={`py-2.5 text-center font-bold ${pctColor(r.pct)}`}>
+                                                    {!isVolumeOnly && <td className="py-2.5 text-center text-zinc-400">{answered}</td>}
+                                                    {!isVolumeOnly && <td className={`py-2.5 text-center font-bold ${pctColor(r.pct)}`}>
                                                         {r.pct !== null ? `${r.pct}%` : 'N/A'}
                                                     </td>}
                                                     <td className="py-2.5 text-center">
                                                         {r.delta === null ? (
                                                             <span className="text-zinc-600">—</span>
                                                         ) : r.delta > 0 ? (
-                                                            <span className={`${activityType === 'emails' ? 'text-rose-400' : 'text-emerald-400'} flex items-center justify-center gap-0.5 font-bold`}>
-                                                                <TrendingUp className="h-3 w-3" />+{r.delta}{activityType === 'emails' ? '' : '%'}
+                                                            <span className={`${isVolumeOnly ? 'text-rose-400' : 'text-emerald-400'} flex items-center justify-center gap-0.5 font-bold`}>
+                                                                <TrendingUp className="h-3 w-3" />+{r.delta}{isVolumeOnly ? '' : '%'}
                                                             </span>
                                                         ) : r.delta < 0 ? (
-                                                            <span className={`${activityType === 'emails' ? 'text-emerald-400' : 'text-rose-400'} flex items-center justify-center gap-0.5 font-bold`}>
-                                                                <TrendingDown className="h-3 w-3" />{r.delta}{activityType === 'emails' ? '' : '%'}
+                                                            <span className={`${isVolumeOnly ? 'text-emerald-400' : 'text-rose-400'} flex items-center justify-center gap-0.5 font-bold`}>
+                                                                <TrendingDown className="h-3 w-3" />{r.delta}{isVolumeOnly ? '' : '%'}
                                                             </span>
                                                         ) : (
                                                             <span className="text-zinc-500 flex items-center justify-center"><Minus className="h-3 w-3" /></span>
                                                         )}
                                                     </td>
-                                                    {activityType !== 'emails' && <td className="py-2.5 pr-2">
+                                                    {!isVolumeOnly && <td className="py-2.5 pr-2">
                                                         <div className="h-1.5 w-20 bg-zinc-800 rounded-full overflow-hidden ml-auto">
                                                             <div
                                                                 className={`h-full rounded-full transition-all ${pctBarColor(r.pct)}`}
@@ -361,8 +407,22 @@ export function CallsStatsPanel({
     }, [managersProp, localManagers])
 
     // Activity & View Modes
-    const [activityType, setActivityType] = useState<'calls' | 'tasks' | 'emails'>('calls')
+    const [activityType, setActivityType] = useState<'calls' | 'tasks' | 'emails' | 'letters' | 'chats' | 'all'>('calls')
     const [viewMode, setViewMode] = useState<'table' | 'chart'>('table')
+    const [dataSource, setDataSource] = useState<'manual' | 'audit'>('manual')
+
+    // Reset activityType if switching data sources
+    useEffect(() => {
+        if (dataSource === 'audit') {
+            if (activityType === 'tasks') {
+                setActivityType('emails')
+            }
+        } else {
+            if (activityType === 'letters' || activityType === 'chats' || activityType === 'all') {
+                setActivityType('emails')
+            }
+        }
+    }, [dataSource])
 
     // Custom date range mode
     const [useRange, setUseRange] = useState(false)
@@ -424,13 +484,51 @@ export function CallsStatsPanel({
                 ? { managerId: activeManagerId, teamId, fromMonth, toMonth }
                 : { managerId: activeManagerId, teamId, fromMonth: currentMonth, toMonth: currentMonth }
 
-            const data = activityType === 'calls'
-                ? await getCallsHistoryAction(opts)
-                : await getWorkloadHistoryAction(opts)
+            if (dataSource === 'audit') {
+                const data = await getAuditedCommunicationsHistoryAction(opts)
+                const mapped = data.map(r => {
+                    let totalVal = 0
+                    if (activityType === 'emails') {
+                        totalVal = r.outboundEmails + r.inboundEmails
+                    } else if (activityType === 'calls') {
+                        totalVal = r.phoneCalls
+                    } else if (activityType === 'letters') {
+                        totalVal = r.lettersSent
+                    } else if (activityType === 'chats') {
+                        totalVal = r.chats
+                    } else if (activityType === 'all') {
+                        totalVal = r.outboundEmails + r.inboundEmails + r.lettersSent + r.chats + r.phoneCalls + r.others
+                    }
 
-            setRows(data as CallRow[])
+                    return {
+                        managerId: r.managerId,
+                        managerName: r.managerName,
+                        yearMonth: r.yearMonth,
+                        ...(activityType === 'calls' ? {
+                            totalCalls: totalVal,
+                            answeredCalls: totalVal,
+                        } : {
+                            communicationsReceived: totalVal,
+                        }),
+                        pct: null,
+                        outboundEmails: r.outboundEmails,
+                        inboundEmails: r.inboundEmails,
+                        lettersSent: r.lettersSent,
+                        chats: r.chats,
+                        phoneCalls: r.phoneCalls,
+                        others: r.others
+                    }
+                })
+                setRows(mapped as any[])
+            } else {
+                const data = activityType === 'calls'
+                    ? await getCallsHistoryAction(opts)
+                    : await getWorkloadHistoryAction(opts)
+
+                setRows(data as CallRow[])
+            }
         })
-    }, [selectedManagerId, managerId, teamId, useRange, currentMonth, fromMonth, toMonth, activityType])
+    }, [selectedManagerId, managerId, teamId, useRange, currentMonth, fromMonth, toMonth, activityType, dataSource])
 
     useEffect(() => { load() }, [load])
 
@@ -454,13 +552,15 @@ export function CallsStatsPanel({
                 } else if (activityType === 'tasks') {
                     map[r.managerId].totalVal1 += ((r.openTasks ?? 0) + (r.closedTasks ?? 0))
                     map[r.managerId].totalVal2 += (r.closedTasks ?? 0)
-                } else if (activityType === 'emails') {
+                } else {
+                    // emails, letters, chats, all
                     map[r.managerId].totalVal1 += (r.communicationsReceived ?? 0)
                 }
                 map[r.managerId].count++
             })
             return Object.values(map).map(m => {
-                const pct = activityType !== 'emails' ? (m.totalVal1 > 0 ? Math.round((m.totalVal2 / m.totalVal1) * 100) : null) : null
+                const isVolumeOnly = activityType === 'emails' || activityType === 'letters' || activityType === 'chats' || activityType === 'all'
+                const pct = (!isVolumeOnly && activityType !== 'tasks') ? (m.totalVal1 > 0 ? Math.round((m.totalVal2 / m.totalVal1) * 100) : null) : null
                 return {
                     managerId: m.managerId,
                     managerName: m.managerName,
@@ -477,9 +577,9 @@ export function CallsStatsPanel({
                     pct,
                     monthCount: m.count
                 }
-            }).sort((a: any, b: any) => activityType === 'emails' ? (b.communicationsReceived ?? 0) - (a.communicationsReceived ?? 0) : ((b.pct ?? -1) - (a.pct ?? -1)))
+            }).sort((a: any, b: any) => (activityType === 'emails' || activityType === 'letters' || activityType === 'chats' || activityType === 'all') ? (b.communicationsReceived ?? 0) - (a.communicationsReceived ?? 0) : ((b.pct ?? -1) - (a.pct ?? -1)))
         })()
-        : [...rows].sort((a: any, b: any) => activityType === 'emails' ? (b.communicationsReceived ?? 0) - (a.communicationsReceived ?? 0) : ((b.pct ?? -1) - (a.pct ?? -1)))
+        : [...rows].sort((a: any, b: any) => (activityType === 'emails' || activityType === 'letters' || activityType === 'chats' || activityType === 'all') ? (b.communicationsReceived ?? 0) - (a.communicationsReceived ?? 0) : ((b.pct ?? -1) - (a.pct ?? -1)))
 
     const tableRows = useMemo(() => {
         if (selectedManagerId) {
@@ -498,16 +598,17 @@ export function CallsStatsPanel({
     // Global stats summary values
     let totalAll = 0
     let answeredAll = 0
+    const isVolumeOnly = activityType === 'emails' || activityType === 'letters' || activityType === 'chats' || activityType === 'all'
     if (activityType === 'calls') {
         totalAll = displayRows.reduce((s, r) => s + (r.totalCalls ?? 0), 0)
         answeredAll = displayRows.reduce((s, r) => s + (r.answeredCalls ?? 0), 0)
     } else if (activityType === 'tasks') {
         totalAll = displayRows.reduce((s, r) => s + ((r.openTasks ?? 0) + (r.closedTasks ?? 0)), 0)
         answeredAll = displayRows.reduce((s, r) => s + (r.closedTasks ?? 0), 0)
-    } else if (activityType === 'emails') {
+    } else {
         totalAll = displayRows.reduce((s, r) => s + (r.communicationsReceived ?? 0), 0)
     }
-    const globalPct = activityType !== 'emails' ? (totalAll > 0 ? Math.round((answeredAll / totalAll) * 100) : null) : null
+    const globalPct = !isVolumeOnly ? (totalAll > 0 ? Math.round((answeredAll / totalAll) * 100) : null) : null
 
     return (
         <div className="space-y-4">
@@ -522,14 +623,16 @@ export function CallsStatsPanel({
                         <Mail className="h-4 w-4 text-purple-400" />
                     )}
                     <h3 className="text-sm font-bold text-white">
-                        {title ?? (activityType === 'calls' ? "Statistiques d'Appels" : activityType === 'tasks' ? "Taux de Complétion des Tâches" : "Statistiques des Courriels")}
+                        {title ?? (dataSource === 'audit' 
+                            ? (activityType === 'calls' ? "Audits d'Appels Épurés" : activityType === 'letters' ? "Audits de Lettres Expédiées" : activityType === 'chats' ? "Audits de Clavardages (Chats)" : activityType === 'all' ? "Audits de Volume Global Épuré" : "Audits de Courriels Épurés")
+                            : (activityType === 'calls' ? "Statistiques d'Appels" : activityType === 'tasks' ? "Taux de Complétion des Tâches" : "Statistiques des Courriels"))}
                     </h3>
-                    {activityType !== 'emails' && globalPct !== null && (
+                    {!isVolumeOnly && globalPct !== null && (
                         <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full border ${pctBgColor(globalPct)} ${pctColor(globalPct)}`}>
                             {globalPct}% global
                         </span>
                     )}
-                    {activityType === 'emails' && (
+                    {isVolumeOnly && (
                         <span className="text-xs font-extrabold px-2 py-0.5 rounded-full border bg-zinc-900 border-zinc-800 text-purple-400">
                             {totalAll} global
                         </span>
@@ -734,8 +837,8 @@ export function CallsStatsPanel({
                                 fontSize={10}
                                 tickLine={false}
                                 axisLine={false}
-                                domain={activityType === 'emails' ? ['auto', 'auto'] : [0, 100]}
-                                tickFormatter={(v) => activityType === 'emails' ? String(v) : `${v}%`}
+                                domain={(isVolumeOnly || dataSource === 'audit') ? ['auto', 'auto'] : [0, 100]}
+                                tickFormatter={(v) => (isVolumeOnly || dataSource === 'audit') ? String(v) : `${v}%`}
                             />
                             <Tooltip
                                 cursor={{ fill: 'rgba(39, 39, 42, 0.2)' }}
@@ -753,30 +856,54 @@ export function CallsStatsPanel({
                                             <p className="font-bold text-white">
                                                 {selectedManagerId ? formatYearMonth(data.yearMonth) : data.managerName}
                                             </p>
-                                            {activityType !== 'emails' && <p className="text-purple-400">
-                                                {activityType === 'calls' ? "Taux de Réponse" : "Taux de Complétion"} : <span className="font-extrabold">{rate}</span>
-                                            </p>}
-                                            {activityType === 'calls' ? (
-                                                <p className="text-zinc-400">
-                                                    Appels : <span className="text-zinc-200">{data.answeredCalls} répondus / {data.totalCalls} total</span>
-                                                </p>
-                                            ) : activityType === 'tasks' ? (
-                                                <p className="text-zinc-400">
-                                                    Tâches : <span className="text-zinc-200">{data.closedTasks} fermées / {((data.openTasks ?? 0) + (data.closedTasks ?? 0))} total</span>
-                                                </p>
+                                            {dataSource === 'audit' ? (
+                                                <div className="space-y-1 text-zinc-400">
+                                                    <p className="text-purple-400 font-extrabold">
+                                                        Volume épuré : <span className="font-black text-white">{data.communicationsReceived}</span>
+                                                    </p>
+                                                    {activityType === 'all' && (
+                                                        <div className="text-[10px] pl-2 border-l border-zinc-850 space-y-0.5">
+                                                            <p>Courriels : {(data.outboundEmails ?? 0) + (data.inboundEmails ?? 0)} ({(data.inboundEmails ?? 0)} In / {(data.outboundEmails ?? 0)} Out)</p>
+                                                            <p>Appels : {data.phoneCalls}</p>
+                                                            <p>Lettres : {data.lettersSent}</p>
+                                                            <p>Clavardages : {data.chats}</p>
+                                                        </div>
+                                                    )}
+                                                    {activityType === 'emails' && (
+                                                        <div className="text-[10px] pl-2 border-l border-zinc-850 space-y-0.5">
+                                                            <p>Envoyés (Out) : {data.outboundEmails}</p>
+                                                            <p>Reçus (In) : {data.inboundEmails}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             ) : (
-                                                <p className="text-zinc-400">
-                                                    Courriels : <span className="text-zinc-200">{data.communicationsReceived} reçus</span>
-                                                </p>
+                                                <>
+                                                    {!isVolumeOnly && <p className="text-purple-400">
+                                                        {activityType === 'calls' ? "Taux de Réponse" : "Taux de Complétion"} : <span className="font-extrabold">{rate}</span>
+                                                    </p>}
+                                                    {activityType === 'calls' ? (
+                                                        <p className="text-zinc-400">
+                                                            Appels : <span className="text-zinc-200">{data.answeredCalls} répondus / {data.totalCalls} total</span>
+                                                        </p>
+                                                    ) : activityType === 'tasks' ? (
+                                                        <p className="text-zinc-400">
+                                                            Tâches : <span className="text-zinc-200">{data.closedTasks} fermées / {((data.openTasks ?? 0) + (data.closedTasks ?? 0))} total</span>
+                                                        </p>
+                                                    ) : (
+                                                        <p className="text-zinc-400">
+                                                            Courriels : <span className="text-zinc-200">{data.communicationsReceived} reçus</span>
+                                                        </p>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     )
                                 }}
                             />
-                            <Bar dataKey={activityType === 'emails' ? 'communicationsReceived' : 'pct'} radius={[4, 4, 0, 0]} maxBarSize={40}>
+                            <Bar dataKey={(isVolumeOnly || dataSource === 'audit') ? 'communicationsReceived' : 'pct'} radius={[4, 4, 0, 0]} maxBarSize={40}>
                                 {chartRows.map((entry, index) => {
                                     const rate = entry.pct ?? 0
-                                    const color = activityType === 'emails' ? '#a855f7' : (rate >= 80 ? '#10b981' : rate > 55 ? '#f59e0b' : '#ef4444')
+                                    const color = (isVolumeOnly || dataSource === 'audit') ? '#a855f7' : (rate >= 80 ? '#10b981' : rate > 55 ? '#f59e0b' : '#ef4444')
                                     return <Cell key={`cell-${index}`} fill={color} />
                                 })}
                             </Bar>
@@ -798,14 +925,36 @@ export function CallsStatsPanel({
                                         {useRange && <th className="p-3 text-center">Mois</th>}
                                     </>
                                 )}
-                                <th className="p-3 text-center">
-                                    {activityType === 'calls' ? "Total Appels" : activityType === 'tasks' ? "Total Tâches" : "Courriels Reçus"}
-                                </th>
-                                {activityType !== 'emails' && <th className="p-3 text-center">
-                                    {activityType === 'calls' ? "Répondus" : "Complétées"}
-                                </th>}
-                                {activityType !== 'emails' && <th className="p-3 text-center">Taux</th>}
-                                {activityType !== 'emails' && <th className="p-3">Progression</th>}
+                                {dataSource === 'audit' ? (
+                                    <>
+                                        <th className="p-3 text-center">Volume Total</th>
+                                        {activityType === 'emails' && (
+                                            <>
+                                                <th className="p-3 text-center">Sortants (Out)</th>
+                                                <th className="p-3 text-center">Entrants (In)</th>
+                                            </>
+                                        )}
+                                        {activityType === 'all' && (
+                                            <>
+                                                <th className="p-3 text-center">Courriels</th>
+                                                <th className="p-3 text-center">Appels</th>
+                                                <th className="p-3 text-center">Lettres</th>
+                                                <th className="p-3 text-center">Clavardages</th>
+                                            </>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        <th className="p-3 text-center">
+                                            {activityType === 'calls' ? "Total Appels" : activityType === 'tasks' ? "Total Tâches" : "Courriels Reçus"}
+                                        </th>
+                                        {activityType !== 'emails' && <th className="p-3 text-center">
+                                            {activityType === 'calls' ? "Répondus" : "Complétées"}
+                                        </th>}
+                                        {activityType !== 'emails' && <th className="p-3 text-center">Taux</th>}
+                                        {activityType !== 'emails' && <th className="p-3">Progression</th>}
+                                    </>
+                                )}
                                 {!managerId && !selectedManagerId && <th className="p-3 text-right">Historique</th>}
                             </tr>
                         </thead>
@@ -830,26 +979,48 @@ export function CallsStatsPanel({
                                                 )}
                                             </>
                                         )}
-                                        <td className="p-3 text-center text-zinc-400">{totalVal}</td>
-                                        {activityType !== 'emails' && <td className="p-3 text-center text-zinc-400">{answeredVal}</td>}
-                                        {activityType !== 'emails' && <td className="p-3 text-center">
-                                            <span className={`font-extrabold text-sm ${pctColor(r.pct)}`}>
-                                                {r.pct !== null ? `${r.pct}%` : 'N/A'}
-                                            </span>
-                                        </td>}
-                                        {activityType !== 'emails' && <td className="p-3">
-                                            <div className={`flex items-center gap-2 px-2 py-1 rounded-lg border ${pctBgColor(r.pct)}`} style={{ minWidth: 140 }}>
-                                                <div className="h-1.5 flex-1 bg-zinc-900 rounded-full overflow-hidden">
-                                                    <div
-                                                        className={`h-full rounded-full transition-all duration-700 ${pctBarColor(r.pct)}`}
-                                                        style={{ width: `${r.pct ?? 0}%` }}
-                                                    />
-                                                </div>
-                                                <span className={`text-[10px] font-bold shrink-0 ${pctColor(r.pct)}`}>
-                                                    {r.pct !== null ? `${r.pct}%` : '—'}
-                                                </span>
-                                            </div>
-                                        </td>}
+                                        {dataSource === 'audit' ? (
+                                            <>
+                                                <td className="p-3 text-center font-bold text-zinc-200">{totalVal}</td>
+                                                {activityType === 'emails' && (
+                                                    <>
+                                                        <td className="p-3 text-center text-zinc-400">{r.outboundEmails}</td>
+                                                        <td className="p-3 text-center text-zinc-400">{r.inboundEmails}</td>
+                                                    </>
+                                                )}
+                                                {activityType === 'all' && (
+                                                    <>
+                                                        <td className="p-3 text-center text-zinc-400">{(r.outboundEmails ?? 0) + (r.inboundEmails ?? 0)}</td>
+                                                        <td className="p-3 text-center text-zinc-400">{r.phoneCalls}</td>
+                                                        <td className="p-3 text-center text-zinc-400">{r.lettersSent}</td>
+                                                        <td className="p-3 text-center text-zinc-400">{r.chats}</td>
+                                                    </>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <td className="p-3 text-center text-zinc-400">{totalVal}</td>
+                                                {!isVolumeOnly && <td className="p-3 text-center text-zinc-400">{answeredVal}</td>}
+                                                {!isVolumeOnly && <td className="p-3 text-center">
+                                                    <span className={`font-extrabold text-sm ${pctColor(r.pct)}`}>
+                                                        {r.pct !== null ? `${r.pct}%` : 'N/A'}
+                                                    </span>
+                                                </td>}
+                                                {!isVolumeOnly && <td className="p-3">
+                                                    <div className={`flex items-center gap-2 px-2 py-1 rounded-lg border ${pctBgColor(r.pct)}`} style={{ minWidth: 140 }}>
+                                                        <div className="h-1.5 flex-1 bg-zinc-900 rounded-full overflow-hidden">
+                                                            <div
+                                                                className={`h-full rounded-full transition-all duration-700 ${pctBarColor(r.pct)}`}
+                                                                style={{ width: `${r.pct ?? 0}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className={`text-[10px] font-bold shrink-0 ${pctColor(r.pct)}`}>
+                                                            {r.pct !== null ? `${r.pct}%` : '—'}
+                                                        </span>
+                                                    </div>
+                                                </td>}
+                                            </>
+                                        )}
                                         {!managerId && !selectedManagerId && (
                                             <td className="p-3 text-right">
                                                 <button
@@ -877,6 +1048,7 @@ export function CallsStatsPanel({
                     activityType={activityType}
                     open={!!historyModal}
                     onClose={() => setHistoryModal(null)}
+                    dataSource={dataSource}
                 />
             )}
         </div>

@@ -3906,6 +3906,127 @@ export async function confirmAssemblyCompletedAction(id: string, data: {
     revalidatePath('/team-management/one-on-ones')
 }
 
+export async function getAuditedCommunicationsHistoryAction(opts: {
+    managerId?: string
+    teamId?: string
+    monthsBack?: number
+    fromMonth?: string
+    toMonth?: string
+}) {
+    const supabase = await createClient()
+
+    let managerQuery = supabase
+        .from('managers')
+        .select('id, first_name, last_name, team_id')
+
+    if (opts.managerId) {
+        managerQuery = managerQuery.eq('id', opts.managerId)
+    }
+    if (opts.teamId && opts.teamId !== 'all') {
+        managerQuery = managerQuery.eq('team_id', opts.teamId)
+    }
+
+    const { data: managers, error: mgrErr } = await managerQuery
+    if (mgrErr || !managers || managers.length === 0) return []
+
+    const managerMap = new Map(managers.map(m => [m.id, `${m.first_name} ${m.last_name}`]))
+    const managerIds = managers.map(m => m.id)
+
+    // Fetch clients assigned to these managers
+    const { data: clients, error: clientErr } = await supabase
+        .from('clients')
+        .select('id, manager_id')
+        .in('manager_id', managerIds)
+
+    if (clientErr || !clients || clients.length === 0) return []
+
+    const clientToManagerMap = new Map(clients.map(c => [c.id, c.manager_id]))
+    const clientIds = clients.map(c => c.id)
+
+    // Fetch stats
+    const { data: stats, error: statsErr } = await (supabase
+        .from('client_communication_stats' as any)
+        .select('id, client_id, analysis_date, analysis_summary')
+        .in('client_id', clientIds)
+        .order('analysis_date', { ascending: false }) as any)
+
+    if (statsErr || !stats) {
+        console.error('Error in getAuditedCommunicationsHistoryAction:', statsErr)
+        return []
+    }
+
+    // Keep only the latest stats run per client
+    const latestStatsMap = new Map()
+    for (const s of stats) {
+        if (!latestStatsMap.has(s.client_id)) {
+            latestStatsMap.set(s.client_id, s)
+        }
+    }
+
+    const aggMap = new Map<string, {
+        managerId: string
+        managerName: string
+        yearMonth: string
+        outboundEmails: number
+        inboundEmails: number
+        lettersSent: number
+        chats: number
+        phoneCalls: number
+        others: number
+    }>()
+
+    // Determine fallback time limit if fromMonth is not set
+    let activeFrom = opts.fromMonth
+    if (!activeFrom && !opts.toMonth) {
+        const n = opts.monthsBack ?? 12
+        const d = new Date()
+        d.setMonth(d.getMonth() - n)
+        activeFrom = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    }
+
+    for (const stat of latestStatsMap.values()) {
+        const mId = clientToManagerMap.get(stat.client_id)
+        if (!mId) continue
+        const mName = managerMap.get(mId) || 'Inconnu'
+
+        const summary = stat.analysis_summary || {}
+        const timeline = summary.timelineList || []
+
+        for (const t of timeline) {
+            const period = t.period
+            if (!period) continue
+
+            if (activeFrom && period < activeFrom) continue
+            if (opts.toMonth && period > opts.toMonth) continue
+
+            const key = `${mId}_${period}`
+            if (!aggMap.has(key)) {
+                aggMap.set(key, {
+                    managerId: mId,
+                    managerName: mName,
+                    yearMonth: period,
+                    outboundEmails: 0,
+                    inboundEmails: 0,
+                    lettersSent: 0,
+                    chats: 0,
+                    phoneCalls: 0,
+                    others: 0
+                })
+            }
+
+            const item = aggMap.get(key)!
+            item.outboundEmails += Number(t.outboundEmails || 0)
+            item.inboundEmails += Number(t.inboundEmails || 0)
+            item.lettersSent += Number(t.lettersSent || 0)
+            item.chats += Number(t.chats || 0)
+            item.phoneCalls += Number(t.phoneCalls || 0)
+            item.others += Number(t.others || 0)
+        }
+    }
+
+    return Array.from(aggMap.values()).sort((a, b) => b.yearMonth.localeCompare(a.yearMonth))
+}
+
 
 
 
