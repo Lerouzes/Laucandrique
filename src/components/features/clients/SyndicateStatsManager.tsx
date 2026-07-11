@@ -17,7 +17,8 @@ import {
     Loader2,
     Calendar,
     ArrowUpRight,
-    LandPlot
+    LandPlot,
+    AlertCircle
 } from 'lucide-react'
 
 type SyndicateStatsManagerProps = {
@@ -59,63 +60,46 @@ export function SyndicateStatsManager({ clientId, initialStats }: SyndicateStats
         }))
     )
 
-    // Form states for new entry additions
-    const [newYear, setNewYear] = useState<string>('')
-    const [newValuation, setNewValuation] = useState<string>('')
-    const [newRegularCondoFees, setNewRegularCondoFees] = useState<string>('')
-    const [newPreventionFundFees, setNewPreventionFundFees] = useState<string>('')
-    const [newInsuranceFundFees, setNewInsuranceFundFees] = useState<string>('')
-
-    const [newAssTitle, setNewAssTitle] = useState<string>('')
-    const [newAssYear, setNewAssYear] = useState<string>('')
-    const [newAssAmount, setNewAssAmount] = useState<string>('')
-    const [newAssFund, setNewAssFund] = useState<'regular' | 'prevention' | 'insurance'>('prevention')
-
-    const [showAddYear, setShowAddYear] = useState(false)
-    const [showAddAss, setShowAddAss] = useState(false)
+    // Form inputs maps for special assessments per year card
+    const [newYearInput, setNewYearInput] = useState('')
+    const [newAssTitleMap, setNewAssTitleMap] = useState<Record<number, string>>({})
+    const [newAssAmountMap, setNewAssAmountMap] = useState<Record<number, string>>({})
+    const [newAssFundMap, setNewAssFundMap] = useState<Record<number, 'regular' | 'prevention' | 'insurance'>>({})
 
     // Add Year handler
-    const handleAddYear = () => {
-        const yr = parseInt(newYear, 10)
+    const handleAddNewYear = () => {
+        const yr = parseInt(newYearInput, 10)
         if (isNaN(yr) || yr < 1900 || yr > 2100) {
             toast.error("Veuillez entrer une année valide (ex: 2026).")
             return
         }
         if (yearlyStats.some(y => y.year === yr)) {
-            toast.error("Des statistiques existent déjà pour cette année.")
+            toast.error("Cette année existe déjà.")
             return
         }
 
         const newEntry: YearlyStatInput = {
             year: yr,
-            building_valuation: Number(newValuation) || 0,
-            regular_condo_fees: Number(newRegularCondoFees) || 0,
-            prevention_fund_fees: Number(newPreventionFundFees) || 0,
-            insurance_fund_fees: Number(newInsuranceFundFees) || 0
+            building_valuation: 0,
+            regular_condo_fees: 0,
+            prevention_fund_fees: 0,
+            insurance_fund_fees: 0
         }
 
         setYearlyStats(prev => [...prev, newEntry].sort((a, b) => b.year - a.year))
-        
-        // Reset inputs
-        setNewYear('')
-        setNewValuation('')
-        setNewRegularCondoFees('')
-        setNewPreventionFundFees('')
-        setNewInsuranceFundFees('')
-        setShowAddYear(false)
-        toast.success(`Année ${yr} ajoutée à la liste locale.`)
+        setNewYearInput('')
+        toast.success(`Année ${yr} initialisée. Saisissez ses détails ci-dessous.`)
     }
 
-    // Add Special Assessment handler
-    const handleAddAssessment = () => {
-        const yr = parseInt(newAssYear, 10)
-        const amt = Number(newAssAmount)
-        if (!newAssTitle.trim()) {
+    // Add Special Assessment handler for a specific year
+    const handleAddAssessmentForYear = (year: number) => {
+        const title = newAssTitleMap[year] || ''
+        const amountStr = newAssAmountMap[year] || ''
+        const fund = newAssFundMap[year] || 'prevention'
+        const amt = Number(amountStr)
+
+        if (!title.trim()) {
             toast.error("Veuillez entrer un titre descriptif.")
-            return
-        }
-        if (isNaN(yr) || yr < 1900 || yr > 2100) {
-            toast.error("Veuillez entrer une année valide.")
             return
         }
         if (isNaN(amt) || amt <= 0) {
@@ -124,32 +108,41 @@ export function SyndicateStatsManager({ clientId, initialStats }: SyndicateStats
         }
 
         const newEntry: SpecialAssessmentInput = {
-            year: yr,
+            year,
             amount: amt,
-            fund_type: newAssFund,
-            title: newAssTitle.trim()
+            fund_type: fund,
+            title: title.trim()
         }
 
-        setSpecialAssessments(prev => [newEntry, ...prev].sort((a, b) => b.year - a.year))
+        setSpecialAssessments(prev => [newEntry, ...prev])
 
-        // Reset inputs
-        setNewAssTitle('')
-        setNewAssYear('')
-        setNewAssAmount('')
-        setNewAssFund('prevention')
-        setShowAddAss(false)
-        toast.success(`Cotisation spéciale "${newEntry.title}" ajoutée localement.`)
+        // Reset inputs for this year
+        setNewAssTitleMap(prev => ({ ...prev, [year]: '' }))
+        setNewAssAmountMap(prev => ({ ...prev, [year]: '' }))
+        setNewAssFundMap(prev => ({ ...prev, [year]: 'prevention' }))
+        toast.success(`Cotisation spéciale "${newEntry.title}" ajoutée pour l'année ${year}.`)
     }
 
     // Remove handlers
     const handleRemoveYear = (year: number) => {
         setYearlyStats(prev => prev.filter(y => y.year !== year))
-        toast.success(`Statistiques de l'année ${year} retirées.`)
+        setSpecialAssessments(prev => prev.filter(s => s.year !== year))
+        toast.success(`Données de l'année ${year} retirées.`)
     }
 
-    const handleRemoveAssessment = (index: number) => {
-        setSpecialAssessments(prev => prev.filter((_, i) => i !== index))
+    const handleRemoveAssessment = (indexToRemove: number) => {
+        setSpecialAssessments(prev => prev.filter((_, idx) => idx !== indexToRemove))
         toast.success("Cotisation spéciale retirée.")
+    }
+
+    // Update yearly inputs directly
+    const handleUpdateYearlyField = (year: number, field: keyof YearlyStatInput, value: number) => {
+        setYearlyStats(prev => prev.map(y => {
+            if (y.year === year) {
+                return { ...y, [field]: value }
+            }
+            return y
+        }))
     }
 
     // Save handler
@@ -227,7 +220,7 @@ export function SyndicateStatsManager({ clientId, initialStats }: SyndicateStats
                                 Fiche Technique & Paramètres Physiques
                             </CardTitle>
                             <CardDescription className="text-xs text-zinc-400">
-                                Saisissez la superficie totale et les budgets annuels réguliers et exceptionnels de la copropriété.
+                                Saisissez la superficie totale et les budgets de la copropriété.
                             </CardDescription>
                         </div>
                         <Button
@@ -263,279 +256,211 @@ export function SyndicateStatsManager({ clientId, initialStats }: SyndicateStats
                 </CardContent>
             </Card>
 
-            {/* Yearly Budgets Section */}
-            <Card className="bg-zinc-900 border-zinc-800 text-zinc-100">
-                <CardHeader className="pb-3 border-b border-zinc-850 flex flex-row items-center justify-between">
-                    <div>
-                        <CardTitle className="text-base font-bold text-white">Budgets & Évaluations Annuels</CardTitle>
-                        <CardDescription className="text-xs text-zinc-400">
-                            Historique des évaluations foncières et des cotisations régulières aux trois fonds.
-                        </CardDescription>
-                    </div>
+            {/* Quick Add Year */}
+            <div className="flex items-center gap-3 p-3 bg-zinc-950/40 border border-zinc-900 rounded-xl">
+                <div className="flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4 text-cyan-400" />
+                    <Label className="text-xs font-bold text-zinc-300">Initialiser une Année :</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Input
+                        type="number"
+                        placeholder="Ex: 2026"
+                        value={newYearInput}
+                        onChange={e => setNewYearInput(e.target.value)}
+                        className="bg-zinc-950 border-zinc-800 h-8 text-xs text-white w-28"
+                    />
                     <Button
-                        onClick={() => setShowAddYear(v => !v)}
-                        variant="outline"
-                        size="sm"
-                        className="border-zinc-800 text-zinc-300 bg-zinc-950/20 hover:bg-zinc-950/60 text-xxs font-extrabold h-8 rounded-lg"
+                        onClick={handleAddNewYear}
+                        className="bg-cyan-600 hover:bg-cyan-700 text-white font-extrabold h-8 px-3 rounded-lg text-xs"
                     >
                         <Plus className="h-3.5 w-3.5 mr-1" />
-                        {showAddYear ? "Annuler" : "Ajouter une année"}
+                        Créer
                     </Button>
-                </CardHeader>
+                </div>
+            </div>
 
-                <CardContent className="p-0">
-                    {/* Add Year Form Panel */}
-                    {showAddYear && (
-                        <div className="p-4 bg-zinc-950/40 border-b border-zinc-850 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end animate-slide-in">
-                            <div className="space-y-1">
-                                <Label className="text-[9px] text-zinc-400 font-bold uppercase">Année</Label>
-                                <Input
-                                    type="number"
-                                    placeholder="2026"
-                                    value={newYear}
-                                    onChange={e => setNewYear(e.target.value)}
-                                    className="bg-zinc-950 border-zinc-800 h-8 text-xs text-white"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-[9px] text-zinc-400 font-bold uppercase">Évaluation Bâtiment ($)</Label>
-                                <Input
-                                    type="number"
-                                    placeholder="15000000"
-                                    value={newValuation}
-                                    onChange={e => setNewValuation(e.target.value)}
-                                    className="bg-zinc-950 border-zinc-800 h-8 text-xs text-white"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-[9px] text-zinc-400 font-bold uppercase">Frais Réguliers ($)</Label>
-                                <Input
-                                    type="number"
-                                    placeholder="120000"
-                                    value={newRegularCondoFees}
-                                    onChange={e => setNewRegularCondoFees(e.target.value)}
-                                    className="bg-zinc-950 border-zinc-800 h-8 text-xs text-white"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-[9px] text-zinc-400 font-bold uppercase">Prévoyance ($)</Label>
-                                <Input
-                                    type="number"
-                                    placeholder="35000"
-                                    value={newPreventionFundFees}
-                                    onChange={e => setNewPreventionFundFees(e.target.value)}
-                                    className="bg-zinc-950 border-zinc-800 h-8 text-xs text-white"
-                                />
-                            </div>
-                            <div className="space-y-1 flex items-center gap-2">
-                                <div className="flex-1 space-y-1">
-                                    <Label className="text-[9px] text-zinc-400 font-bold uppercase">Assurance ($)</Label>
-                                    <Input
-                                        type="number"
-                                        placeholder="15000"
-                                        value={newInsuranceFundFees}
-                                        onChange={e => setNewInsuranceFundFees(e.target.value)}
-                                        className="bg-zinc-950 border-zinc-800 h-8 text-xs text-white"
-                                    />
-                                </div>
-                                <Button
-                                    onClick={handleAddYear}
-                                    className="bg-cyan-650 bg-cyan-600 hover:bg-cyan-705 hover:bg-cyan-700 text-white font-extrabold h-8 px-3 rounded-lg text-xs shrink-0 self-end"
-                                >
-                                    Valider
-                                </Button>
-                            </div>
-                        </div>
-                    )}
+            {/* List of Years as Cards */}
+            {yearlyStats.length === 0 ? (
+                <div className="p-8 text-center text-xs text-zinc-500 italic border border-zinc-800 rounded-xl bg-zinc-950/20">
+                    Aucune donnée annuelle saisie. Utilisez le module d'initialisation ci-dessus.
+                </div>
+            ) : (
+                <div className="space-y-6">
+                    {yearlyStats.map((y) => {
+                        const valYoY = getYoYComparison(y.year, 'building_valuation')
+                        const regYoY = getYoYComparison(y.year, 'regular_condo_fees')
+                        const prevYoY = getYoYComparison(y.year, 'prevention_fund_fees')
+                        const insYoY = getYoYComparison(y.year, 'insurance_fund_fees')
 
-                    {yearlyStats.length === 0 ? (
-                        <div className="p-8 text-center text-xs text-zinc-500 italic">
-                            Aucune statistique annuelle saisie pour le moment.
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs border-collapse">
-                                <thead>
-                                    <tr className="border-b border-zinc-850 bg-zinc-950/20 text-zinc-400 uppercase text-[9px] font-bold tracking-wider">
-                                        <th className="p-3">Année</th>
-                                        <th className="p-3">Évaluation Bâtiment</th>
-                                        <th className="p-3">Frais réguliers</th>
-                                        <th className="p-3">Fonds prévoyance</th>
-                                        <th className="p-3">Fonds assurance</th>
-                                        <th className="p-3 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-zinc-900">
-                                    {yearlyStats.map((y) => {
-                                        const valYoY = getYoYComparison(y.year, 'building_valuation')
-                                        const regYoY = getYoYComparison(y.year, 'regular_condo_fees')
-                                        const prevYoY = getYoYComparison(y.year, 'prevention_fund_fees')
-                                        const insYoY = getYoYComparison(y.year, 'insurance_fund_fees')
+                        // Find matching assessments for this year
+                        const yearAssessments = specialAssessments.filter(s => s.year === y.year)
 
-                                        return (
-                                            <tr key={y.year} className="hover:bg-zinc-900/20 transition-colors">
-                                                <td className="p-3 font-extrabold text-zinc-100 flex items-center gap-1.5">
-                                                    <Calendar className="h-3.5 w-3.5 text-zinc-500" />
-                                                    {y.year}
-                                                </td>
-                                                <td className="p-3">
-                                                    <div className="font-semibold text-zinc-200">{formatCurrency(y.building_valuation)}</div>
-                                                    {formatYoY(valYoY)}
-                                                </td>
-                                                <td className="p-3">
-                                                    <div className="font-semibold text-zinc-200">{formatCurrency(y.regular_condo_fees)}</div>
-                                                    {formatYoY(regYoY)}
-                                                </td>
-                                                <td className="p-3">
-                                                    <div className="font-semibold text-zinc-200">{formatCurrency(y.prevention_fund_fees)}</div>
-                                                    {formatYoY(prevYoY)}
-                                                </td>
-                                                <td className="p-3">
-                                                    <div className="font-semibold text-zinc-200">{formatCurrency(y.insurance_fund_fees)}</div>
-                                                    {formatYoY(insYoY)}
-                                                </td>
-                                                <td className="p-3 text-right">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleRemoveYear(y.year)}
-                                                        className="text-rose-400 hover:text-rose-300 hover:bg-rose-950/20 h-7 w-7 p-0 rounded-lg"
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                        return (
+                            <Card key={y.year} className="bg-zinc-900 border-zinc-800 text-zinc-100 shadow-xl overflow-hidden">
+                                {/* Card Header */}
+                                <CardHeader className="bg-zinc-950/40 p-4 border-b border-zinc-850 flex flex-row items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Calendar className="h-4.5 w-4.5 text-cyan-400" />
+                                        <span className="font-extrabold text-white text-sm">Année {y.year}</span>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRemoveYear(y.year)}
+                                        className="text-rose-450 hover:text-rose-400 hover:bg-rose-950/20 h-8 px-2 rounded-lg text-xxs font-extrabold gap-1"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                        Supprimer l'Année
+                                    </Button>
+                                </CardHeader>
 
-            {/* Special Assessments Section */}
-            <Card className="bg-zinc-900 border-zinc-800 text-zinc-100">
-                <CardHeader className="pb-3 border-b border-zinc-850 flex flex-row items-center justify-between">
-                    <div>
-                        <CardTitle className="text-base font-bold text-white">Cotisations Spéciales</CardTitle>
-                        <CardDescription className="text-xs text-zinc-400">
-                            Cotisations exceptionnelles votées pour couvrir des travaux ou des déficits dans l'un des fonds.
-                        </CardDescription>
-                    </div>
-                    <Button
-                        onClick={() => setShowAddAss(v => !v)}
-                        variant="outline"
-                        size="sm"
-                        className="border-zinc-800 text-zinc-300 bg-zinc-950/20 hover:bg-zinc-950/60 text-xxs font-extrabold h-8 rounded-lg"
-                    >
-                        <Plus className="h-3.5 w-3.5 mr-1" />
-                        {showAddAss ? "Annuler" : "Ajouter cotisation"}
-                    </Button>
-                </CardHeader>
+                                {/* Card Content */}
+                                <CardContent className="p-5 space-y-5">
+                                    {/* Regular Budgets Fields Grid */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div className="space-y-1.5">
+                                            <Label className="text-[10px] text-zinc-400 font-bold uppercase">Évaluation Bâtiment ($)</Label>
+                                            <Input
+                                                type="number"
+                                                value={y.building_valuation || ''}
+                                                onChange={e => handleUpdateYearlyField(y.year, 'building_valuation', Number(e.target.value))}
+                                                className="bg-zinc-950 border-zinc-850 h-9 text-xs text-white"
+                                            />
+                                            <div className="h-4">{formatYoY(valYoY)}</div>
+                                        </div>
 
-                <CardContent className="p-0">
-                    {/* Add Assessment Form Panel */}
-                    {showAddAss && (
-                        <div className="p-4 bg-zinc-950/40 border-b border-zinc-850 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end animate-slide-in">
-                            <div className="space-y-1">
-                                <Label className="text-[9px] text-zinc-400 font-bold uppercase">Titre / Projet</Label>
-                                <Input
-                                    type="text"
-                                    placeholder="Ex: Remplacement toiture"
-                                    value={newAssTitle}
-                                    onChange={e => setNewAssTitle(e.target.value)}
-                                    className="bg-zinc-950 border-zinc-800 h-8 text-xs text-white"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-[9px] text-zinc-400 font-bold uppercase">Année</Label>
-                                <Input
-                                    type="number"
-                                    placeholder="2026"
-                                    value={newAssYear}
-                                    onChange={e => setNewAssYear(e.target.value)}
-                                    className="bg-zinc-950 border-zinc-800 h-8 text-xs text-white"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-[9px] text-zinc-400 font-bold uppercase">Montant ($)</Label>
-                                <Input
-                                    type="number"
-                                    placeholder="15000"
-                                    value={newAssAmount}
-                                    onChange={e => setNewAssAmount(e.target.value)}
-                                    className="bg-zinc-950 border-zinc-800 h-8 text-xs text-white"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-[9px] text-zinc-400 font-bold uppercase">Fonds Ciblé</Label>
-                                <select
-                                    value={newAssFund}
-                                    onChange={e => setNewAssFund(e.target.value as any)}
-                                    className="bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1 text-xs text-zinc-350 outline-none focus:border-cyan-650 h-8 cursor-pointer w-full"
-                                >
-                                    <option value="regular">Frais réguliers (Administration)</option>
-                                    <option value="prevention">Fonds de prévoyance</option>
-                                    <option value="insurance">Fonds d'assurance</option>
-                                </select>
-                            </div>
-                            <div className="space-y-1">
-                                <Button
-                                    onClick={handleAddAssessment}
-                                    className="bg-cyan-600 hover:bg-cyan-700 text-white font-extrabold h-8 px-4 rounded-lg text-xs w-full"
-                                >
-                                    Ajouter
-                                </Button>
-                            </div>
-                        </div>
-                    )}
+                                        <div className="space-y-1.5">
+                                            <Label className="text-[10px] text-zinc-400 font-bold uppercase">Frais Réguliers ($)</Label>
+                                            <Input
+                                                type="number"
+                                                value={y.regular_condo_fees || ''}
+                                                onChange={e => handleUpdateYearlyField(y.year, 'regular_condo_fees', Number(e.target.value))}
+                                                className="bg-zinc-950 border-zinc-850 h-9 text-xs text-white"
+                                            />
+                                            <div className="h-4">{formatYoY(regYoY)}</div>
+                                        </div>
 
-                    {specialAssessments.length === 0 ? (
-                        <div className="p-8 text-center text-xs text-zinc-500 italic">
-                            Aucune cotisation spéciale enregistrée.
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs border-collapse">
-                                <thead>
-                                    <tr className="border-b border-zinc-850 bg-zinc-950/20 text-zinc-400 uppercase text-[9px] font-bold tracking-wider">
-                                        <th className="p-3">Titre</th>
-                                        <th className="p-3">Année</th>
-                                        <th className="p-3">Fonds Ciblé</th>
-                                        <th className="p-3">Montant Exceptionnel</th>
-                                        <th className="p-3 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-zinc-900">
-                                    {specialAssessments.map((s, idx) => (
-                                        <tr key={idx} className="hover:bg-zinc-900/20 transition-colors">
-                                            <td className="p-3 font-semibold text-zinc-150">{s.title}</td>
-                                            <td className="p-3 font-mono text-zinc-400">{s.year}</td>
-                                            <td className="p-3">
-                                                <span className={`inline-flex items-center text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${getFundBadgeStyle(s.fund_type)}`}>
-                                                    {getFundName(s.fund_type)}
-                                                </span>
-                                            </td>
-                                            <td className="p-3 font-extrabold text-cyan-400">{formatCurrency(s.amount)}</td>
-                                            <td className="p-3 text-right">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleRemoveAssessment(idx)}
-                                                    className="text-rose-400 hover:text-rose-300 hover:bg-rose-950/20 h-7 w-7 p-0 rounded-lg"
+                                        <div className="space-y-1.5">
+                                            <Label className="text-[10px] text-zinc-400 font-bold uppercase">Fonds Prévoyance ($)</Label>
+                                            <Input
+                                                type="number"
+                                                value={y.prevention_fund_fees || ''}
+                                                onChange={e => handleUpdateYearlyField(y.year, 'prevention_fund_fees', Number(e.target.value))}
+                                                className="bg-zinc-950 border-zinc-850 h-9 text-xs text-white"
+                                            />
+                                            <div className="h-4">{formatYoY(prevYoY)}</div>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <Label className="text-[10px] text-zinc-400 font-bold uppercase">Fonds Assurance ($)</Label>
+                                            <Input
+                                                type="number"
+                                                value={y.insurance_fund_fees || ''}
+                                                onChange={e => handleUpdateYearlyField(y.year, 'insurance_fund_fees', Number(e.target.value))}
+                                                className="bg-zinc-950 border-zinc-850 h-9 text-xs text-white"
+                                            />
+                                            <div className="h-4">{formatYoY(insYoY)}</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Nested Special Assessments Manager */}
+                                    <div className="pt-4 border-t border-zinc-850 space-y-3">
+                                        <div className="flex items-center gap-1.5">
+                                            <AlertCircle className="h-4 w-4 text-amber-500" />
+                                            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Cotisations Spéciales ({y.year})</h4>
+                                        </div>
+
+                                        {/* List of Assessments */}
+                                        {yearAssessments.length > 0 && (
+                                            <div className="overflow-x-auto border border-zinc-850 rounded-xl bg-zinc-950/20">
+                                                <table className="w-full text-left text-xs border-collapse">
+                                                    <thead>
+                                                        <tr className="border-b border-zinc-850 text-zinc-500 uppercase text-[9px] font-bold tracking-wider">
+                                                            <th className="p-2.5">Projet / Titre</th>
+                                                            <th className="p-2.5">Fonds Ciblé</th>
+                                                            <th className="p-2.5 text-center">Montant Exceptionnel</th>
+                                                            <th className="p-2.5 text-right pr-4">Retirer</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-zinc-900">
+                                                        {specialAssessments.map((s, idx) => {
+                                                            if (s.year !== y.year) return null
+                                                            return (
+                                                                <tr key={idx} className="hover:bg-zinc-900/20 transition-colors">
+                                                                    <td className="p-2.5 font-semibold text-zinc-200">{s.title}</td>
+                                                                    <td className="p-2.5">
+                                                                        <span className={`inline-flex items-center text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${getFundBadgeStyle(s.fund_type)}`}>
+                                                                            {getFundName(s.fund_type)}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="p-2.5 text-center font-extrabold text-cyan-400">{formatCurrency(s.amount)}</td>
+                                                                    <td className="p-2.5 text-right pr-4">
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            onClick={() => handleRemoveAssessment(idx)}
+                                                                            className="text-rose-450 hover:text-rose-400 hover:bg-rose-950/25 h-7 w-7 p-0 rounded-lg"
+                                                                        >
+                                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                                        </Button>
+                                                                    </td>
+                                                                </tr>
+                                                            )
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+
+                                        {/* Inline Add Assessment Row */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 gap-3 p-3 bg-zinc-950/40 border border-zinc-850 rounded-xl items-end">
+                                            <div className="space-y-1">
+                                                <Label className="text-[9px] text-zinc-400 font-bold uppercase">Projet</Label>
+                                                <Input
+                                                    type="text"
+                                                    placeholder="Ex: Remplacement Toiture"
+                                                    value={newAssTitleMap[y.year] || ''}
+                                                    onChange={e => setNewAssTitleMap(prev => ({ ...prev, [y.year]: e.target.value }))}
+                                                    className="bg-zinc-950 border-zinc-800 h-8 text-xs text-white"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-[9px] text-zinc-400 font-bold uppercase">Montant ($)</Label>
+                                                <Input
+                                                    type="number"
+                                                    placeholder="10000"
+                                                    value={newAssAmountMap[y.year] || ''}
+                                                    onChange={e => setNewAssAmountMap(prev => ({ ...prev, [y.year]: e.target.value }))}
+                                                    className="bg-zinc-950 border-zinc-800 h-8 text-xs text-white"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-[9px] text-zinc-400 font-bold uppercase">Fonds Ciblé</Label>
+                                                <select
+                                                    value={newAssFundMap[y.year] || 'prevention'}
+                                                    onChange={e => setNewAssFundMap(prev => ({ ...prev, [y.year]: e.target.value as any }))}
+                                                    className="bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1 text-xs text-zinc-350 outline-none focus:border-cyan-650 h-8 cursor-pointer w-full"
                                                 >
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </Button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                                                    <option value="regular">Frais réguliers (Administration)</option>
+                                                    <option value="prevention">Fonds de prévoyance</option>
+                                                    <option value="insurance">Fonds d'assurance</option>
+                                                </select>
+                                            </div>
+                                            <Button
+                                                onClick={() => handleAddAssessmentForYear(y.year)}
+                                                className="bg-cyan-600 hover:bg-cyan-700 text-white font-extrabold h-8 px-4 rounded-lg text-xs w-full self-end"
+                                            >
+                                                Ajouter Cotisation
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )
+                    })}
+                </div>
+            )}
         </div>
     )
 }
