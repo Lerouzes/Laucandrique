@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
+import { SearchableManagerSelect } from './SearchableManagerSelect'
 import { 
     savePerformanceLogAction, 
     getLatestTeamPerformanceLogsAction,
@@ -41,6 +42,7 @@ export function WeeklyAssessmentGrid({ managers = [], teams = [] }: WeeklyAssess
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().substring(0, 10))
     const [isOpen, setIsOpen] = useState(false)
     const [selectedTeamId, setSelectedTeamId] = useState<string>('all')
+    const [selectedManagerId, setSelectedManagerId] = useState<string>('')
     const [latestLogs, setLatestLogs] = useState<Record<string, { value: number; logged_at: string; id: string }>>({})
     const [inputValues, setInputValues] = useState<Record<string, string>>({})
     const [saving, setSaving] = useState<Record<string, boolean>>({})
@@ -232,7 +234,10 @@ export function WeeklyAssessmentGrid({ managers = [], teams = [] }: WeeklyAssess
                                 <Label className="text-[10px] text-zinc-400 font-bold uppercase shrink-0">Équipe :</Label>
                                 <select 
                                     value={selectedTeamId}
-                                    onChange={(e) => setSelectedTeamId(e.target.value)}
+                                    onChange={(e) => {
+                                        setSelectedTeamId(e.target.value)
+                                        setSelectedManagerId('')
+                                    }}
                                     className="bg-transparent border-none outline-none text-xxs text-white cursor-pointer focus:ring-0"
                                 >
                                     <option value="all" className="bg-[#121318] text-white">Toutes les équipes</option>
@@ -266,54 +271,63 @@ export function WeeklyAssessmentGrid({ managers = [], teams = [] }: WeeklyAssess
                 </div>
             </CardHeader>
             {isOpen && (
-                <CardContent className="p-0">
+                <CardContent className="p-6 space-y-6">
+                    {/* Select searchable manager card */}
+                    <div className="max-w-md space-y-2">
+                        <Label className="text-zinc-400 text-xs font-bold uppercase">Sélectionner un gestionnaire pour la saisie</Label>
+                        <SearchableManagerSelect
+                            managers={filteredManagers.map(m => ({
+                                id: m.id,
+                                first_name: m.first_name,
+                                last_name: m.last_name,
+                                team_name: m.manager_teams?.name || undefined
+                            }))}
+                            name="selected_manager"
+                            placeholder="Rechercher un gestionnaire..."
+                            defaultValue={selectedManagerId}
+                            onChange={setSelectedManagerId}
+                        />
+                    </div>
+
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-12 gap-2 text-zinc-400 text-xs">
                             <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
                             Chargement des indicateurs...
                         </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xxs text-zinc-300">
-                                <thead className="bg-zinc-950/40 text-zinc-400 font-bold uppercase border-b border-zinc-850">
-                                    <tr>
-                                        <th className="p-3 w-[150px]">Gestionnaire</th>
-                                        <th className="p-3">Courriels &gt; 48 heures</th>
-                                        <th className="p-3">Tâches en Retard</th>
-                                        <th className="p-3">Factures sans notes &gt; 7 jours</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-zinc-850/60 bg-zinc-900/10">
-                                    {filteredManagers.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={4} className="p-8 text-center text-zinc-500 italic">
-                                                Aucun gestionnaire trouvé pour cette équipe.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        filteredManagers.map(manager => {
-                                            const teamName = manager.manager_teams?.name || 'Classique'
-                                            return (
-                                                <tr key={manager.id} className="hover:bg-zinc-850/10 transition-colors">
-                                                    <td className="p-3 font-semibold text-zinc-150 align-top">
-                                                        <div className="text-xs font-bold text-white">{manager.first_name} {manager.last_name}</div>
-                                                        <div className="text-[8px] text-zinc-550 text-zinc-500 font-mono mt-0.5">Forfait : {teamName}</div>
-                                                    </td>
-                                                    <td className="p-2">
-                                                        {renderCell(manager, 'emails_over_48h', <Mail className="h-3 w-3 text-blue-400" />)}
-                                                    </td>
-                                                    <td className="p-2">
-                                                        {renderCell(manager, 'late_tasks', <CheckSquare className="h-3 w-3 text-purple-400" />)}
-                                                    </td>
-                                                    <td className="p-2">
-                                                        {renderCell(manager, 'bills_no_notes_over_7d', <FileText className="h-3 w-3 text-amber-400" />)}
-                                                    </td>
-                                                </tr>
-                                            )
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
+                    ) : selectedManagerId ? (() => {
+                        const activeManager = managers.find(m => m.id === selectedManagerId)
+                        if (!activeManager) return null
+                        const teamName = activeManager.manager_teams?.name || 'Classique'
+                        return (
+                            <div className="space-y-4 border border-zinc-850 p-5 rounded-2xl bg-zinc-950/20 animate-fade-in">
+                                <div className="border-b border-zinc-850 pb-3">
+                                    <h4 className="text-sm font-extrabold text-white">
+                                        {activeManager.first_name} {activeManager.last_name}
+                                    </h4>
+                                    <p className="text-[10px] text-zinc-500 font-mono mt-0.5">
+                                        Forfait : {teamName}
+                                    </p>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Courriels &gt; 48h</Label>
+                                        {renderCell(activeManager, 'emails_over_48h', <Mail className="h-3.5 w-3.5 text-blue-400" />)}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Tâches en Retard</Label>
+                                        {renderCell(activeManager, 'late_tasks', <CheckSquare className="h-3.5 w-3.5 text-purple-400" />)}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Factures sans notes &gt; 7j</Label>
+                                        {renderCell(activeManager, 'bills_no_notes_over_7d', <FileText className="h-3.5 w-3.5 text-amber-400" />)}
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    })() : (
+                        <div className="text-center py-8 text-xs text-zinc-500 italic border border-dashed border-zinc-800 rounded-2xl bg-[#121318]/50">
+                            Veuillez sélectionner un gestionnaire ci-dessus pour saisir ou consulter ses données.
                         </div>
                     )}
                 </CardContent>

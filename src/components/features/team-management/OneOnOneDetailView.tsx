@@ -11,6 +11,7 @@ import {
     getAssemblyTrackingForManagerAction,
     updateAssemblyTrackingAction,
     confirmAssemblyCompletedAction,
+    deleteAssemblyTrackingAction,
     getCategoryComplaintHistoryAction,
     getSyndicateAuditDetailsAction,
     getAssemblyEvaluationDetailsAction,
@@ -194,6 +195,8 @@ export function OneOnOneDetailView({
     const [assemblyNotesTexts, setAssemblyNotesTexts] = useState<Record<string, string>>({})
     const [confirmingAssemblyId, setConfirmingAssemblyId] = useState<string | null>(null)
     const [actualAssemblyDate, setActualAssemblyDate] = useState('')
+    const [editingNoteIndex, setEditingNoteIndex] = useState<Record<string, number | null>>({})
+    const [editingNoteText, setEditingNoteText] = useState<string>('')
 
     // Priorities
     const [prioritiesList, setPrioritiesList] = useState<any[]>(oneOnOne.priorities || [])
@@ -555,6 +558,67 @@ export function OneOnOneDetailView({
             toast.success("Note ajoutée à l'assemblée.")
         } catch (err) {
             toast.error("Erreur lors de l'ajout de la note: " + (err as Error).message)
+        }
+    }
+
+    const handleEditAssemblyNoteStart = (assemblyId: string, index: number, currentText: string) => {
+        setEditingNoteIndex(prev => ({ ...prev, [assemblyId]: index }))
+        setEditingNoteText(currentText)
+    }
+
+    const handleCancelAssemblyNoteEdit = (assemblyId: string) => {
+        setEditingNoteIndex(prev => ({ ...prev, [assemblyId]: null }))
+        setEditingNoteText('')
+    }
+
+    const handleSaveAssemblyNote = async (assembly: any, index: number) => {
+        if (!editingNoteText.trim()) return
+
+        const updatedNotes = (assembly.notes || []).map((n: any, idx: number) => {
+            if (idx === index) {
+                return { ...n, note: editingNoteText.trim(), timestamp: new Date().toISOString() }
+            }
+            return n
+        })
+
+        try {
+            await updateAssemblyTrackingAction(assembly.id, {
+                notes: updatedNotes
+            })
+            setAssemblyTrackings(prev => prev.map(a => a.id === assembly.id ? { ...a, notes: updatedNotes } : a))
+            setEditingNoteIndex(prev => ({ ...prev, [assembly.id]: null }))
+            setEditingNoteText('')
+            toast.success("Note de l'assemblée mise à jour.")
+        } catch (err) {
+            toast.error("Erreur lors de la mise à jour de la note: " + (err as Error).message)
+        }
+    }
+
+    const handleDeleteAssemblyNote = async (assembly: any, index: number) => {
+        if (!confirm("Voulez-vous supprimer cette note ?")) return
+
+        const updatedNotes = (assembly.notes || []).filter((_: any, idx: number) => idx !== index)
+
+        try {
+            await updateAssemblyTrackingAction(assembly.id, {
+                notes: updatedNotes
+            })
+            setAssemblyTrackings(prev => prev.map(a => a.id === assembly.id ? { ...a, notes: updatedNotes } : a))
+            toast.success("Note de l'assemblée supprimée.")
+        } catch (err) {
+            toast.error("Erreur lors de la suppression de la note: " + (err as Error).message)
+        }
+    }
+
+    const handleDeleteAssemblyTracking = async (assemblyId: string) => {
+        if (!confirm("Voulez-vous supprimer définitivement ce suivi d'assemblée ? Cette action est irréversible et supprimera le suivi pour cette année fiscale.")) return
+
+        try {
+            await deleteAssemblyTrackingAction(assemblyId)
+            setAssemblyTrackings(prev => prev.filter(a => a.id !== assemblyId))
+            toast.success("Suivi d'assemblée supprimé.")
+        } catch (err) {
+            toast.error("Erreur lors de la suppression du suivi: " + (err as Error).message)
         }
     }
 
@@ -1489,10 +1553,21 @@ export function OneOnOneDetailView({
                                                     Période cible : <span className="text-zinc-400">{new Date(assembly.target_date).toLocaleDateString('fr-CA')}</span>
                                                 </p>
                                             </div>
-                                            <Badge variant="outline" className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1 ${ind.color}`}>
-                                                <span className={`h-1.5 w-1.5 rounded-full ${ind.dot}`} />
-                                                {ind.label}
-                                            </Badge>
+                                            <div className="flex items-center gap-1.5">
+                                                <Badge variant="outline" className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1 ${ind.color}`}>
+                                                    <span className={`h-1.5 w-1.5 rounded-full ${ind.dot}`} />
+                                                    {ind.label}
+                                                </Badge>
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    onClick={() => handleDeleteAssemblyTracking(assembly.id)}
+                                                    className="h-6 w-6 text-zinc-550 hover:text-rose-400 hover:bg-rose-950/20 rounded"
+                                                    title="Supprimer définitivement ce suivi d'assemblée"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-3.5 text-xs border-t border-zinc-900 pt-3">
@@ -1551,28 +1626,78 @@ export function OneOnOneDetailView({
                                         {assembly.notes && assembly.notes.length > 0 && (
                                             <div className="pt-2 border-t border-zinc-900/40 space-y-1.5">
                                                 <span className="text-[9px] font-bold text-zinc-500 uppercase block">Notes de suivi :</span>
-                                                <div className="space-y-1.5 max-h-24 overflow-y-auto pr-1">
-                                                    {assembly.notes.map((n: any, nIdx: number) => (
-                                                        <div key={nIdx} className="text-[10px] text-zinc-400 pl-1.5 border-l border-purple-500/40">
-                                                            <strong className="text-zinc-350">{n.author}</strong> · <span className="text-[9px] text-zinc-650">{new Date(n.timestamp).toLocaleDateString('fr-CA')}</span>
-                                                            <p className="text-zinc-350">{n.note}</p>
-                                                        </div>
-                                                    ))}
+                                                <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                                                    {assembly.notes.map((n: any, nIdx: number) => {
+                                                        const isEditingThisNote = editingNoteIndex[assembly.id] === nIdx
+                                                        return (
+                                                            <div key={nIdx} className="text-xs text-zinc-400 pl-2 border-l border-purple-500/40 py-1 space-y-1">
+                                                                <div className="flex justify-between items-center text-[10px] text-zinc-500">
+                                                                    <span>
+                                                                        <strong className="text-zinc-350">{n.author}</strong> · <span>{new Date(n.timestamp).toLocaleDateString('fr-CA')}</span>
+                                                                    </span>
+                                                                    {assembly.status !== 'completed' && (
+                                                                        <div className="flex items-center gap-1">
+                                                                            <button
+                                                                                onClick={() => handleEditAssemblyNoteStart(assembly.id, nIdx, n.note)}
+                                                                                className="text-zinc-550 hover:text-purple-400 p-0.5 rounded transition-all"
+                                                                                title="Modifier la note"
+                                                                            >
+                                                                                <Edit2 className="h-2.5 w-2.5" />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleDeleteAssemblyNote(assembly, nIdx)}
+                                                                                className="text-zinc-555 text-zinc-550 hover:text-rose-450 p-0.5 rounded transition-all"
+                                                                                title="Supprimer la note"
+                                                                            >
+                                                                                <Trash2 className="h-2.5 w-2.5" />
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                {isEditingThisNote ? (
+                                                                    <div className="flex items-center gap-1.5 mt-1">
+                                                                        <Input
+                                                                            value={editingNoteText}
+                                                                            onChange={(e) => setEditingNoteText(e.target.value)}
+                                                                            className="h-7 text-xs bg-zinc-950 border-zinc-800 text-white rounded px-2 w-full"
+                                                                        />
+                                                                        <Button
+                                                                            size="icon"
+                                                                            onClick={() => handleSaveAssemblyNote(assembly, nIdx)}
+                                                                            className="h-7 w-7 bg-emerald-650 hover:bg-emerald-750 text-white rounded-lg shrink-0"
+                                                                        >
+                                                                            <Check className="h-3 w-3" />
+                                                                        </Button>
+                                                                        <Button
+                                                                            size="icon"
+                                                                            variant="ghost"
+                                                                            onClick={() => handleCancelAssemblyNoteEdit(assembly.id)}
+                                                                            className="h-7 w-7 text-zinc-400 hover:text-white rounded-lg shrink-0"
+                                                                        >
+                                                                            <X className="h-3.5 w-3.5" />
+                                                                        </Button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <p className="text-zinc-200 break-words leading-normal">{n.note}</p>
+                                                                )}
+                                                            </div>
+                                                        )
+                                                    })}
                                                 </div>
                                             </div>
                                         )}
 
                                         {/* Add assembly note field */}
-                                        {isEditing && assembly.status !== 'completed' && (
+                                        {assembly.status !== 'completed' && (
                                             <div className="flex gap-2 pt-1.5">
                                                 <Input 
                                                     value={assemblyNotesTexts[assembly.id] || ''}
                                                     onChange={(e) => setAssemblyNotesTexts(prev => ({ ...prev, [assembly.id]: e.target.value }))}
                                                     placeholder="Saisir note de suivi..."
-                                                    className="bg-zinc-950 border-zinc-800 text-[10px] h-7 rounded"
+                                                    className="bg-zinc-950 border-zinc-800 text-xs h-8 rounded"
                                                     onKeyDown={(e) => e.key === 'Enter' && handleAddAssemblyNote(assembly)}
                                                 />
-                                                <Button onClick={() => handleAddAssemblyNote(assembly)} className="h-7 px-2.5 text-[10px] bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded">
+                                                <Button onClick={() => handleAddAssemblyNote(assembly)} className="h-8 px-3 text-xs bg-zinc-900 hover:bg-zinc-805 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded font-bold">
                                                     Note
                                                 </Button>
                                             </div>

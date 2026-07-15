@@ -3836,6 +3836,18 @@ export async function updateAssemblyTrackingAction(id: string, data: {
     revalidatePath('/team-management/one-on-ones')
 }
 
+export async function deleteAssemblyTrackingAction(id: string) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('client_assembly_tracking')
+        .delete()
+        .eq('id', id)
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/team-management/one-on-ones')
+}
+
 export async function confirmAssemblyCompletedAction(id: string, data: {
     actual_assembly_date: string
     confirmed_by: string
