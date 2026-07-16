@@ -236,8 +236,7 @@ export default function CommandCenterPage() {
 
     // New Request Form states
     const [isCreatingNewRequest, setIsCreatingNewRequest] = useState<boolean>(false)
-    const [newRequestSyndicate, setNewRequestSyndicate] = useState<string>('R106')
-    const [newRequestSubject, setNewRequestSubject] = useState<string>('')
+    const [newRequestSyndicate, setNewRequestSyndicate] = useState<string>('GENERAL')
     const [newRequestInstruction, setNewRequestInstruction] = useState<string>('')
     const [isGenerating, setIsGenerating] = useState<boolean>(false)
 
@@ -308,8 +307,8 @@ export default function CommandCenterPage() {
     // Create New Request Flow (Simulated AI generation)
     const handleCreateNewRequestSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        if (!newRequestSubject.trim() || !newRequestInstruction.trim()) {
-            toast.error("Veuillez remplir le sujet et l'instruction.")
+        if (!newRequestInstruction.trim()) {
+            toast.error("Veuillez entrer une instruction.")
             return
         }
 
@@ -318,22 +317,30 @@ export default function CommandCenterPage() {
 
         setTimeout(() => {
             // Find syndicate name
+            const isGeneral = newRequestSyndicate === 'GENERAL'
             const matchingSyndicate = INITIAL_MOCK_ITEMS.find(i => i.syndicateId === newRequestSyndicate)
-            const syndicateName = matchingSyndicate ? matchingSyndicate.syndicateName : 'Copropriété Gustav'
+            const syndicateId = isGeneral ? 'GEN' : newRequestSyndicate
+            const syndicateName = isGeneral ? 'Information Générale' : (matchingSyndicate ? matchingSyndicate.syndicateName : 'Copropriété Gustav')
 
-            const generatedEmail = `Bonjour aux copropriétaires du syndicat ${newRequestSyndicate} (${syndicateName}),\n\nNous faisons suite à votre demande concernant : "${newRequestSubject}".\n\nNotre équipe a analysé les instructions réglementaires applicables. Nous vous confirmons que nous prenons en charge cette demande.\n\n[Détails de l'action copilote : ${newRequestInstruction}]\n\nN'hésitez pas à nous faire part de vos commentaires.\n\nCordialement,\nVotre gestionnaire Gustav`
+            const truncatedTitle = newRequestInstruction.length > 50 
+                ? newRequestInstruction.substring(0, 50).trim() + '...' 
+                : newRequestInstruction.trim()
+
+            const generatedEmail = isGeneral
+                ? `Bonjour,\n\nVous trouverez ci-dessous les informations demandées :\n\n[Détails de l'analyse Gustav suite à votre requête générale : "${newRequestInstruction}"]\n\nN'hésitez pas si vous avez d'autres questions.\n\nCordialement,\nVotre copilote Gustav`
+                : `Bonjour aux copropriétaires du syndicat ${syndicateId} (${syndicateName}),\n\nNous faisons suite à votre demande.\n\nNotre équipe a analysé les instructions réglementaires applicables. Nous vous confirmons que nous prenons en charge cette demande.\n\n[Détails de l'action copilote : ${newRequestInstruction}]\n\nN'hésitez pas à nous faire part de vos commentaires.\n\nCordialement,\nVotre gestionnaire Gustav`
             
             const newRequestItem: CommandCenterItem = {
                 id: `item-${Date.now()}`,
-                syndicateId: newRequestSyndicate,
+                syndicateId: syndicateId,
                 syndicateName: syndicateName,
-                title: newRequestSubject,
+                title: truncatedTitle,
                 latencyText: 'Alerte générée à l\'instant',
                 type: 'email',
-                originalSubject: `Requête IA : ${newRequestSubject}`,
+                originalSubject: isGeneral ? 'Requête Copilote Générale' : `Requête IA : ${syndicateName}`,
                 originalContent: newRequestInstruction,
-                extractedRuleTitle: 'Règlement SDC standard & Règles Générales',
-                extractedRuleText: 'Selon le règlement cadre du syndicat, toute demande de communication générale aux copropriétaires doit être validée par le gestionnaire ou un administrateur désigné.',
+                extractedRuleTitle: isGeneral ? 'Base de Connaissances Générale' : 'Règlement SDC standard & Règles Générales',
+                extractedRuleText: isGeneral ? 'Informations générales sur la gestion immobilière et les meilleures pratiques administratives.' : 'Selon le règlement cadre du syndicat, toute demande de communication générale aux copropriétaires doit être validée par le gestionnaire ou un administrateur désigné.',
                 draftResponse: generatedEmail,
                 fromName: 'Requête Manuelle Gestionnaire',
                 fromEmail: 'copilote@laucandrique.com',
@@ -347,7 +354,6 @@ export default function CommandCenterPage() {
             setDraftText(newRequestItem.draftResponse)
 
             // Reset form states
-            setNewRequestSubject('')
             setNewRequestInstruction('')
             setIsCreatingNewRequest(false)
             setIsGenerating(false)
@@ -528,6 +534,7 @@ export default function CommandCenterPage() {
                                     onChange={(e) => setNewRequestSyndicate(e.target.value)}
                                     className="w-full bg-[#0c1326] border border-white/10 rounded-xl px-4 py-3 text-xs text-zinc-100 outline-none focus:border-cyan-600 focus:ring-1 focus:ring-cyan-600/30 cursor-pointer"
                                 >
+                                    <option value="GENERAL">Général (Aucun syndicat spécifique / Informations Générales)</option>
                                     <option value="R106">Les Condos de la Colline (R106)</option>
                                     <option value="S205">Les Condos du Parc (S205)</option>
                                     <option value="B302">Résidences du Vieux-Port (B302)</option>
@@ -535,20 +542,6 @@ export default function CommandCenterPage() {
                                     <option value="R408">Terrasses de la Rivière (R408)</option>
                                     <option value="A502">Château Saint-Laurent (A502)</option>
                                 </select>
-                            </div>
-
-                            {/* Subject */}
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase text-white/50 tracking-wider">
-                                    Objet / Sujet de la demande
-                                </label>
-                                <input
-                                    type="text"
-                                    value={newRequestSubject}
-                                    onChange={(e) => setNewRequestSubject(e.target.value)}
-                                    placeholder="Ex: Avis de convocation ou Rappel paiement charges communes"
-                                    className="w-full bg-[#0c1326] border border-white/10 rounded-xl px-4 py-3 text-xs text-zinc-150 placeholder:text-white/20 outline-none focus:border-cyan-600 focus:ring-1 focus:ring-cyan-600/30"
-                                />
                             </div>
 
                             {/* Instruction prompt */}
