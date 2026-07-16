@@ -12,7 +12,6 @@ import {
     Send, 
     Check, 
     Clock, 
-    RefreshCw, 
     ShieldAlert, 
     ArrowLeft, 
     Mic, 
@@ -20,7 +19,13 @@ import {
     Calendar,
     User,
     Paperclip,
-    Shield
+    Shield,
+    Plus,
+    X,
+    CheckSquare,
+    Square,
+    Sparkles,
+    RefreshCw
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -28,6 +33,12 @@ import { toast } from 'sonner'
 
 // Types for Command Center items
 type ItemType = 'task' | 'email' | 'alert'
+
+interface TaskTodo {
+    id: string
+    text: string
+    completed: boolean
+}
 
 interface CommandCenterItem {
     id: string
@@ -55,6 +66,12 @@ interface CommandCenterItem {
     peopleImplicated?: string
     actionsTaken?: string
     files?: string[]
+    category?: string
+    status?: string
+    tags?: string[]
+    todos?: TaskTodo[]
+    contractors?: string
+    followUpDate?: string
 
     // Alert-specific fields
     alertSource?: string
@@ -62,8 +79,8 @@ interface CommandCenterItem {
     triggeredAt?: string
 }
 
-// Hardcoded Mock Data with rich task metadata and email headers
-const MOCK_ITEMS: CommandCenterItem[] = [
+// Hardcoded Mock Data (Phases 1 & 2 Refinements)
+const INITIAL_MOCK_ITEMS: CommandCenterItem[] = [
     {
         id: 'item-1',
         syndicateId: 'R106',
@@ -82,7 +99,18 @@ const MOCK_ITEMS: CommandCenterItem[] = [
         priority: 'Urgent',
         peopleImplicated: 'Julie Roy (Unité 402), Marc Boyer (CA)',
         actionsTaken: 'Bâche temporaire de protection posée ce matin par le concierge. Appel de service logé auprès de Couvreurs Express.',
-        files: ['rapport_toiture_2025.pdf', 'photo_infiltration_402.jpg']
+        files: ['rapport_toiture_2025.pdf', 'photo_infiltration_402.jpg'],
+        category: 'Toiture & Enveloppe',
+        status: 'En cours',
+        tags: ['Infiltration', 'Garantie', 'Structure'],
+        todos: [
+            { id: 't1-1', text: 'Vérification visuelle par le concierge', completed: true },
+            { id: 't1-2', text: 'Appel d\'urgence Couvreurs Express', completed: true },
+            { id: 't1-3', text: 'Inspection et réparation temporaire de l\'entretoit', completed: false },
+            { id: 't1-4', text: 'Soumettre soumission définitive au CA pour approbation', completed: false }
+        ],
+        contractors: 'Couvreurs Express Inc.',
+        followUpDate: '17 Juillet 2026'
     },
     {
         id: 'item-2',
@@ -137,7 +165,17 @@ const MOCK_ITEMS: CommandCenterItem[] = [
         priority: 'Moyenne',
         peopleImplicated: 'Technicien Plomberie Pro, Conseil d’Administration',
         actionsTaken: 'Validation des tarifs du fournisseur. Soumission reçue à 850$.',
-        files: ['devis_pompe_plomberie.pdf']
+        files: ['devis_pompe_plomberie.pdf'],
+        category: 'Plomberie & Équipements',
+        status: 'Planifié',
+        tags: ['Garage', 'Sécurité', 'Maintenance'],
+        todos: [
+            { id: 't4-1', text: 'Obtention soumission Plomberie Pro', completed: true },
+            { id: 't4-2', text: 'Vérification de la limite budgétaire Art. 14.2', completed: true },
+            { id: 't4-3', text: 'Confirmation du rendez-vous d\'installation', completed: false }
+        ],
+        contractors: 'Plomberie Pro Inc.',
+        followUpDate: '19 Juillet 2026'
     },
     {
         id: 'item-5',
@@ -175,34 +213,67 @@ const MOCK_ITEMS: CommandCenterItem[] = [
         priority: 'Planifiée',
         peopleImplicated: 'Tous les résidents, Net-Conduits Inc.',
         actionsTaken: 'Horaires types définis. Négociations tarifaires complétées.',
-        files: ['contrat_nettoyage_secheuses_2026.pdf']
+        files: ['contrat_nettoyage_secheuses_2026.pdf'],
+        category: 'Prévention & Sécurité',
+        status: 'En attente de planification',
+        tags: ['Annuel', 'Sécurité', 'Conduits'],
+        todos: [
+            { id: 't6-1', text: 'Obtenir devis annuel Net-Conduits', completed: true },
+            { id: 't6-2', text: 'Valider le calendrier avec le CA', completed: false },
+            { id: 't6-3', text: 'Distribuer la circulaire de planification', completed: false }
+        ],
+        contractors: 'Net-Conduits Inc.',
+        followUpDate: '25 Juillet 2026'
     }
 ]
 
 export default function CommandCenterPage() {
-    const [selectedItemId, setSelectedItemId] = useState<string>(MOCK_ITEMS[0].id)
+    const [mockItems, setMockItems] = useState<CommandCenterItem[]>(INITIAL_MOCK_ITEMS)
+    const [selectedItemId, setSelectedItemId] = useState<string>(INITIAL_MOCK_ITEMS[0].id)
     const [filterType, setFilterType] = useState<string>('all')
     const [isMobileWorkspaceOpen, setIsMobileWorkspaceOpen] = useState<boolean>(false)
     const [chatInput, setChatInput] = useState<string>('')
 
+    // New Request Form states
+    const [isCreatingNewRequest, setIsCreatingNewRequest] = useState<boolean>(false)
+    const [newRequestSyndicate, setNewRequestSyndicate] = useState<string>('R106')
+    const [newRequestSubject, setNewRequestSubject] = useState<string>('')
+    const [newRequestInstruction, setNewRequestInstruction] = useState<string>('')
+    const [isGenerating, setIsGenerating] = useState<boolean>(false)
+
     // Retrieve active selected item
-    const selectedItem = MOCK_ITEMS.find(item => item.id === selectedItemId) || MOCK_ITEMS[0]
+    const selectedItem = mockItems.find(item => item.id === selectedItemId) || mockItems[0]
 
     // Track active item text draft locally so it remains editable
     const [draftText, setDraftText] = useState<string>(selectedItem.draftResponse)
 
     // Reset editable text state when item changes
     const selectItemAndResetDraft = (itemId: string) => {
+        setIsCreatingNewRequest(false)
         setSelectedItemId(itemId)
-        const newItem = MOCK_ITEMS.find(item => item.id === itemId)
+        const newItem = mockItems.find(item => item.id === itemId)
         if (newItem) {
             setDraftText(newItem.draftResponse)
         }
         setIsMobileWorkspaceOpen(true) // Open workspace view on mobile
     }
 
+    // Toggle todo items locally
+    const handleToggleTodo = (itemId: string, todoId: string) => {
+        setMockItems(prev => prev.map(item => {
+            if (item.id !== itemId) return item
+            return {
+                ...item,
+                todos: item.todos?.map(todo => {
+                    if (todo.id !== todoId) return todo
+                    return { ...todo, completed: !todo.completed }
+                })
+            }
+        }))
+    }
+
     // Filter elements
-    const filteredItems = MOCK_ITEMS.filter(item => {
+    const filteredItems = mockItems.filter(item => {
         if (filterType === 'all') return true
         return item.type === filterType
     })
@@ -234,6 +305,58 @@ export default function CommandCenterPage() {
         }, 1500)
     }
 
+    // Create New Request Flow (Simulated AI generation)
+    const handleCreateNewRequestSubmit = (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newRequestSubject.trim() || !newRequestInstruction.trim()) {
+            toast.error("Veuillez remplir le sujet et l'instruction.")
+            return
+        }
+
+        setIsGenerating(true)
+        toast.loading("Gustav interroge le RAG et rédige la réponse...", { id: 'generating-new' })
+
+        setTimeout(() => {
+            // Find syndicate name
+            const matchingSyndicate = INITIAL_MOCK_ITEMS.find(i => i.syndicateId === newRequestSyndicate)
+            const syndicateName = matchingSyndicate ? matchingSyndicate.syndicateName : 'Copropriété Gustav'
+
+            const generatedEmail = `Bonjour aux copropriétaires du syndicat ${newRequestSyndicate} (${syndicateName}),\n\nNous faisons suite à votre demande concernant : "${newRequestSubject}".\n\nNotre équipe a analysé les instructions réglementaires applicables. Nous vous confirmons que nous prenons en charge cette demande.\n\n[Détails de l'action copilote : ${newRequestInstruction}]\n\nN'hésitez pas à nous faire part de vos commentaires.\n\nCordialement,\nVotre gestionnaire Gustav`
+            
+            const newRequestItem: CommandCenterItem = {
+                id: `item-${Date.now()}`,
+                syndicateId: newRequestSyndicate,
+                syndicateName: syndicateName,
+                title: newRequestSubject,
+                latencyText: 'Alerte générée à l\'instant',
+                type: 'email',
+                originalSubject: `Requête IA : ${newRequestSubject}`,
+                originalContent: newRequestInstruction,
+                extractedRuleTitle: 'Règlement SDC standard & Règles Générales',
+                extractedRuleText: 'Selon le règlement cadre du syndicat, toute demande de communication générale aux copropriétaires doit être validée par le gestionnaire ou un administrateur désigné.',
+                draftResponse: generatedEmail,
+                fromName: 'Requête Manuelle Gestionnaire',
+                fromEmail: 'copilote@laucandrique.com',
+                toEmail: 'conseil@laucandrique.com',
+                receivedAt: 'À l\'instant'
+            }
+
+            // Prepend new item to the queue list, select it, and show draft
+            setMockItems(prev => [newRequestItem, ...prev])
+            setSelectedItemId(newRequestItem.id)
+            setDraftText(newRequestItem.draftResponse)
+
+            // Reset form states
+            setNewRequestSubject('')
+            setNewRequestInstruction('')
+            setIsCreatingNewRequest(false)
+            setIsGenerating(false)
+            setIsMobileWorkspaceOpen(true) // Open workspace view on mobile
+
+            toast.success("Nouveau brouillon rédigé par Gustav !", { id: 'generating-new' })
+        }, 2000)
+    }
+
     const getIcon = (type: ItemType, className: string) => {
         switch(type) {
             case 'task':
@@ -246,7 +369,7 @@ export default function CommandCenterPage() {
     }
 
     return (
-        <div className="flex h-full w-full overflow-hidden text-zinc-200 font-sans">
+        <div className="flex h-full w-full overflow-hidden text-zinc-200 font-sans bg-[#050b18]">
             
             {/* Left Pane: Stream list of tasks */}
             <div className={`w-full md:w-[38%] xl:w-[32%] min-w-[340px] max-w-[460px] border-r border-white/10 bg-[#0c1c38]/70 backdrop-blur-md flex flex-col h-full shrink-0 transition-transform duration-300 md:translate-x-0 ${
@@ -261,19 +384,29 @@ export default function CommandCenterPage() {
                             Flux d'attention
                         </h2>
                         <p className="text-xs text-white/50 mt-0.5">
-                            {filteredItems.length} élément{filteredItems.length !== 1 && 's'} en attente de traitement
+                            {filteredItems.length} élément{filteredItems.length !== 1 && 's'} en attente
                         </p>
                     </div>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                            toast.success("Flux d'attention synchronisé et à jour.")
-                        }}
-                        className="text-white/60 hover:text-white hover:bg-white/10 rounded-lg cursor-pointer"
-                    >
-                        <RefreshCw className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                                toast.success("Flux d'attention synchronisé.")
+                            }}
+                            className="text-white/60 hover:text-white hover:bg-white/10 rounded-lg cursor-pointer h-8 w-8"
+                        >
+                            <RefreshCw className="h-4 w-4" />
+                        </Button>
+                        
+                        <Button
+                            onClick={() => setIsCreatingNewRequest(true)}
+                            className="flex items-center justify-center h-8 px-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs gap-1 shadow-md shadow-cyan-950/20 cursor-pointer"
+                        >
+                            <Plus className="h-3.5 w-3.5" />
+                            Requête
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Filter pills */}
@@ -303,11 +436,11 @@ export default function CommandCenterPage() {
                     {filteredItems.length === 0 ? (
                         <div className="text-center py-12 text-white/30 text-sm flex flex-col items-center justify-center gap-2">
                             <Check className="h-8 w-8 text-emerald-500/55" />
-                            Aucun élément en attente pour cette catégorie.
+                            Aucun élément en attente.
                         </div>
                     ) : (
                         filteredItems.map(item => {
-                            const isSelected = item.id === selectedItemId
+                            const isSelected = item.id === selectedItemId && !isCreatingNewRequest
                             return (
                                 <button
                                     key={item.id}
@@ -353,265 +486,421 @@ export default function CommandCenterPage() {
                 isMobileWorkspaceOpen ? 'flex' : 'hidden md:flex'
             }`}>
                 
-                {/* Workspace Header */}
-                <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#0a152d]/90">
-                    <div className="flex items-center gap-3">
-                        {/* Mobile Back Button */}
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setIsMobileWorkspaceOpen(false)}
-                            className="md:hidden text-white/70 hover:text-white hover:bg-white/10"
-                        >
-                            <ArrowLeft className="h-5 w-5" />
-                        </Button>
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-black uppercase text-cyan-400 bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-800/80 font-mono">
-                                    {selectedItem.syndicateId}
-                                </span>
-                                <h1 className="text-sm font-black text-white truncate">
-                                    {selectedItem.syndicateName}
-                                </h1>
+                {/* NEW REQUEST FORM STATE */}
+                {isCreatingNewRequest ? (
+                    <div className="flex-1 flex flex-col h-full overflow-hidden">
+                        {/* Form Header */}
+                        <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#0a152d]">
+                            <div className="flex items-center gap-3">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => {
+                                        setIsCreatingNewRequest(false)
+                                        setIsMobileWorkspaceOpen(false)
+                                    }}
+                                    className="text-white/70 hover:text-white hover:bg-white/10"
+                                >
+                                    <X className="h-5 w-5" />
+                                </Button>
+                                <div>
+                                    <h1 className="text-sm font-black text-white flex items-center gap-2">
+                                        <Sparkles className="h-4.5 w-4.5 text-cyan-400 animate-pulse" />
+                                        Nouvelle Requête Copilote Gustav
+                                    </h1>
+                                    <p className="text-[10px] text-white/40 mt-0.5">
+                                        Rédigez une consigne de courriel ou un avis pour une copropriété spécifique.
+                                    </p>
+                                </div>
                             </div>
-                            <p className="text-[11px] text-white/50 mt-1 truncate max-w-[280px] sm:max-w-md">
-                                {selectedItem.originalSubject}
-                            </p>
                         </div>
-                    </div>
 
-                    <div className="flex gap-2">
-                        <Button 
-                            onClick={handleSnooze}
-                            className="bg-white/5 border border-white/10 text-white hover:bg-white/10 rounded-xl px-4 py-2 text-xs font-semibold transition-all h-9 cursor-pointer"
-                        >
-                            Reporter
-                        </Button>
-                        <Button 
-                            onClick={handleApprove}
-                            className="bg-emerald-600 hover:bg-emerald-500 border border-emerald-500/20 text-white rounded-xl px-4 py-2 text-xs font-black shadow-md shadow-emerald-950/20 hover:scale-[1.01] active:scale-[0.99] transition-all h-9 cursor-pointer"
-                        >
-                            <Check className="mr-1.5 h-4 w-4" />
-                            Approuver & Envoyer
-                        </Button>
-                    </div>
-                </div>
+                        {/* Form Body Scroll area */}
+                        <form onSubmit={handleCreateNewRequestSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-transparent to-[#050b1b]/50">
+                            
+                            {/* Syndicate Selection */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-white/50 tracking-wider">
+                                    Sélectionner la Copropriété (Syndicat)
+                                </label>
+                                <select
+                                    value={newRequestSyndicate}
+                                    onChange={(e) => setNewRequestSyndicate(e.target.value)}
+                                    className="w-full bg-[#0c1326] border border-white/10 rounded-xl px-4 py-3 text-xs text-zinc-100 outline-none focus:border-cyan-600 focus:ring-1 focus:ring-cyan-600/30 cursor-pointer"
+                                >
+                                    <option value="R106">Les Condos de la Colline (R106)</option>
+                                    <option value="S205">Les Condos du Parc (S205)</option>
+                                    <option value="B302">Résidences du Vieux-Port (B302)</option>
+                                    <option value="T104">Terrasses du Centre-Ville (T104)</option>
+                                    <option value="R408">Terrasses de la Rivière (R408)</option>
+                                    <option value="A502">Château Saint-Laurent (A502)</option>
+                                </select>
+                            </div>
 
-                {/* Workspace content - Fixed layout with inner scroll sections */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-transparent to-[#050b1b]/50">
-                    
-                    {/* Render dynamically tailored context blocks based on item types */}
-                    
-                    {/* EMAIL DETAILS CARD */}
-                    {selectedItem.type === 'email' && (
-                        <div className="rounded-2xl bg-[#091227]/90 border border-white/10 p-5 space-y-4 shadow-xl">
-                            <div className="flex items-start justify-between border-b border-white/5 pb-3">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-9 w-9 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center font-bold text-sm">
-                                        {selectedItem.fromName?.split(' ').map(n => n[0]).join('')}
+                            {/* Subject */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-white/50 tracking-wider">
+                                    Objet / Sujet de la demande
+                                </label>
+                                <input
+                                    type="text"
+                                    value={newRequestSubject}
+                                    onChange={(e) => setNewRequestSubject(e.target.value)}
+                                    placeholder="Ex: Avis de convocation ou Rappel paiement charges communes"
+                                    className="w-full bg-[#0c1326] border border-white/10 rounded-xl px-4 py-3 text-xs text-zinc-150 placeholder:text-white/20 outline-none focus:border-cyan-600 focus:ring-1 focus:ring-cyan-600/30"
+                                />
+                            </div>
+
+                            {/* Instruction prompt */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-white/50 tracking-wider">
+                                    Instructions pour l'IA (Description du courriel à rédiger)
+                                </label>
+                                <textarea
+                                    value={newRequestInstruction}
+                                    onChange={(e) => setNewRequestInstruction(e.target.value)}
+                                    placeholder="Décrivez précisément ce que vous souhaitez rédiger (Ex: 'Écris un courriel courtois mais ferme pour rappeler à l'unité 302 que son chèque mensuel a été rejeté le 1er juillet. Demande de régulariser par virement Interac sous 48h.')"
+                                    className="w-full min-h-[160px] bg-[#0c1326] border border-white/10 focus:border-cyan-600 focus:ring-1 focus:ring-cyan-600/30 rounded-xl p-4 text-xs font-sans text-zinc-200 placeholder:text-white/20 outline-none leading-relaxed resize-y"
+                                />
+                            </div>
+
+                            {/* Action Button */}
+                            <Button
+                                type="submit"
+                                disabled={isGenerating}
+                                className="w-full bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 border border-cyan-500/25 text-white h-11 rounded-xl text-xs font-black shadow-lg shadow-cyan-950/40 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                            >
+                                {isGenerating ? (
+                                    <>
+                                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                        Génération de la réponse...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Bot className="mr-2 h-4.5 w-4.5" />
+                                        Rédiger avec le Copilote Gustav
+                                    </>
+                                )}
+                            </Button>
+                        </form>
+                    </div>
+                ) : (
+                    /* CONTEXT VIEW & DRAFT EDITOR STATE */
+                    <div className="flex-1 flex flex-col h-full overflow-hidden">
+                        {/* Workspace Header */}
+                        <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#0a152d]/90">
+                            <div className="flex items-center gap-3">
+                                {/* Mobile Back Button */}
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setIsMobileWorkspaceOpen(false)}
+                                    className="md:hidden text-white/70 hover:text-white hover:bg-white/10"
+                                >
+                                    <ArrowLeft className="h-5 w-5" />
+                                </Button>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-black uppercase text-cyan-400 bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-800/80 font-mono">
+                                            {selectedItem.syndicateId}
+                                        </span>
+                                        <h1 className="text-sm font-black text-white truncate">
+                                            {selectedItem.syndicateName}
+                                        </h1>
                                     </div>
-                                    <div className="min-w-0">
-                                        <h4 className="text-xs font-bold text-zinc-150">{selectedItem.fromName}</h4>
-                                        <p className="text-[10px] text-white/40 truncate mt-0.5">
-                                            De : {selectedItem.fromEmail} &rarr; Pour : {selectedItem.toEmail}
+                                    <p className="text-[11px] text-white/50 mt-1 truncate max-w-[280px] sm:max-w-md">
+                                        {selectedItem.originalSubject}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <Button 
+                                    onClick={handleSnooze}
+                                    className="bg-white/5 border border-white/10 text-white hover:bg-white/10 rounded-xl px-4 py-2 text-xs font-semibold transition-all h-9 cursor-pointer"
+                                >
+                                    Reporter
+                                </Button>
+                                <Button 
+                                    onClick={handleApprove}
+                                    className="bg-emerald-600 hover:bg-emerald-500 border border-emerald-500/20 text-white rounded-xl px-4 py-2 text-xs font-black shadow-md shadow-emerald-950/20 hover:scale-[1.01] active:scale-[0.99] transition-all h-9 cursor-pointer"
+                                >
+                                    <Check className="mr-1.5 h-4 w-4" />
+                                    Approuver & Envoyer
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Workspace scroll content */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-transparent to-[#050b1b]/50">
+                            
+                            {/* EMAIL DETAILS CARD */}
+                            {selectedItem.type === 'email' && (
+                                <div className="rounded-2xl bg-[#091227]/90 border border-white/10 p-5 space-y-4 shadow-xl">
+                                    <div className="flex items-start justify-between border-b border-white/5 pb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-9 w-9 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center font-bold text-sm">
+                                                {selectedItem.fromName?.split(' ').map(n => n[0]).join('')}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h4 className="text-xs font-bold text-zinc-150">{selectedItem.fromName}</h4>
+                                                <p className="text-[10px] text-white/40 truncate mt-0.5">
+                                                    De : {selectedItem.fromEmail} &rarr; Pour : {selectedItem.toEmail}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <span className="text-[10px] text-white/40 flex items-center gap-1 shrink-0 bg-white/5 px-2.5 py-1 rounded-md border border-white/5">
+                                            <Clock className="h-3 w-3" />
+                                            {selectedItem.receivedAt}
+                                        </span>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <h5 className="text-[11px] font-bold text-white/40">
+                                            Sujet : <span className="text-zinc-200">{selectedItem.originalSubject}</span>
+                                        </h5>
+                                        <p className="text-xs text-white/80 leading-relaxed font-sans italic bg-[#040917]/40 p-4 rounded-xl border border-white/5 whitespace-pre-line select-text">
+                                            "{selectedItem.originalContent}"
                                         </p>
                                     </div>
                                 </div>
-                                <span className="text-[10px] text-white/40 flex items-center gap-1 shrink-0 bg-white/5 px-2.5 py-1 rounded-md border border-white/5">
-                                    <Clock className="h-3 w-3" />
-                                    {selectedItem.receivedAt}
-                                </span>
-                            </div>
-                            <div className="space-y-2">
-                                <h5 className="text-[11px] font-bold text-white/40">
-                                    Sujet : <span className="text-zinc-200">{selectedItem.originalSubject}</span>
-                                </h5>
-                                <p className="text-xs text-white/80 leading-relaxed font-sans italic bg-[#040917]/40 p-4 rounded-xl border border-white/5 whitespace-pre-line select-text">
-                                    "{selectedItem.originalContent}"
-                                </p>
-                            </div>
-                        </div>
-                    )}
+                            )}
 
-                    {/* TASK DETAILS CARD */}
-                    {selectedItem.type === 'task' && (
-                        <div className="rounded-2xl bg-[#091227]/90 border border-white/10 p-5 space-y-4 shadow-xl">
-                            <div className="flex items-center gap-2 border-b border-white/5 pb-3">
-                                <FileText className="h-5 w-5 text-rose-500" />
-                                <h4 className="text-xs font-black text-white uppercase tracking-wider">Fiche de Tâche Opérationnelle</h4>
-                            </div>
-                            
-                            {/* Grid Metadata */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                                <div className="flex items-center gap-3 bg-[#040917]/30 p-3 rounded-xl border border-white/5">
-                                    <Calendar className="h-4 w-4 text-rose-400" />
-                                    <div>
-                                        <span className="text-[10px] text-white/40 block">Échéance</span>
-                                        <span className="font-bold text-zinc-200">{selectedItem.dueDate}</span>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3 bg-[#040917]/30 p-3 rounded-xl border border-white/5">
-                                    <User className="h-4 w-4 text-cyan-400" />
-                                    <div>
-                                        <span className="text-[10px] text-white/40 block">Assigné à</span>
-                                        <span className="font-bold text-zinc-200">{selectedItem.assignee}</span>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3 bg-[#040917]/30 p-3 rounded-xl border border-white/5">
-                                    <Shield className="h-4 w-4 text-amber-500" />
-                                    <div>
-                                        <span className="text-[10px] text-white/40 block">Priorité</span>
-                                        <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${
-                                            selectedItem.priority === 'Urgent' 
-                                                ? 'bg-rose-950/40 text-rose-455 text-rose-500 border border-rose-900/60'
-                                                : 'bg-indigo-950/40 text-indigo-400 border border-indigo-900/60'
-                                        }`}>
-                                            {selectedItem.priority}
+                            {/* TASK DETAILS CARD (With Categories, Tags, Todos, Contractors, and Follow-Up Dates) */}
+                            {selectedItem.type === 'task' && (
+                                <div className="rounded-2xl bg-[#091227]/90 border border-white/10 p-5 space-y-4 shadow-xl">
+                                    
+                                    {/* Task Header */}
+                                    <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                                        <div className="flex items-center gap-2">
+                                            <FileText className="h-5 w-5 text-rose-500" />
+                                            <div>
+                                                <h4 className="text-xs font-black text-white uppercase tracking-wider">Fiche Opérationnelle</h4>
+                                                <span className="text-[10px] text-rose-400 font-bold bg-rose-950/20 border border-rose-900/40 px-2 py-0.5 rounded">
+                                                    {selectedItem.category}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Status badge */}
+                                        <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-cyan-950/50 text-cyan-300 border border-cyan-800/80">
+                                            {selectedItem.status}
                                         </span>
                                     </div>
-                                </div>
-                                <div className="flex items-center gap-3 bg-[#040917]/30 p-3 rounded-xl border border-white/5">
-                                    <Layers className="h-4 w-4 text-purple-400" />
-                                    <div>
-                                        <span className="text-[10px] text-white/40 block">Implication</span>
-                                        <span className="font-bold text-zinc-200 truncate block max-w-[200px]" title={selectedItem.peopleImplicated}>
-                                            {selectedItem.peopleImplicated}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
 
-                            {/* Actions taken */}
-                            <div className="space-y-1.5 pt-2">
-                                <h5 className="text-[10px] font-black uppercase text-white/45 tracking-wide">Actions déjà entreprises</h5>
-                                <p className="text-xs text-white/80 leading-relaxed bg-[#040917]/40 p-3.5 rounded-xl border border-white/5">
-                                    {selectedItem.actionsTaken}
-                                </p>
-                            </div>
-
-                            {/* Attached files capsules */}
-                            {selectedItem.files && selectedItem.files.length > 0 && (
-                                <div className="space-y-2 pt-2">
-                                    <h5 className="text-[10px] font-black uppercase text-white/45 tracking-wide flex items-center gap-1">
-                                        <Paperclip className="h-3.5 w-3.5" />
-                                        Fichiers et rapports rattachés ({selectedItem.files.length})
-                                    </h5>
-                                    <div className="flex flex-wrap gap-2">
-                                        {selectedItem.files.map(file => (
-                                            <button 
-                                                key={file}
-                                                onClick={() => toast.info(`Téléchargement simulé de : ${file}`)}
-                                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-mono text-cyan-400 transition-all cursor-pointer"
-                                            >
-                                                <FileText className="h-3.5 w-3.5 text-zinc-400" />
-                                                {file}
-                                            </button>
-                                        ))}
+                                    {/* Tags */}
+                                    {selectedItem.tags && selectedItem.tags.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 pb-1">
+                                            {selectedItem.tags.map(tag => (
+                                                <span key={tag} className="text-[9px] font-bold text-white/40 bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                                                    #{tag}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                    
+                                    {/* Grid Metadata */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                                        <div className="flex items-center gap-3 bg-[#040917]/30 p-3 rounded-xl border border-white/5">
+                                            <Calendar className="h-4 w-4 text-rose-400 shrink-0" />
+                                            <div>
+                                                <span className="text-[10px] text-white/40 block">Échéance de la tâche</span>
+                                                <span className="font-bold text-zinc-200">{selectedItem.dueDate}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 bg-[#040917]/30 p-3 rounded-xl border border-white/5">
+                                            <User className="h-4 w-4 text-cyan-400 shrink-0" />
+                                            <div>
+                                                <span className="text-[10px] text-white/40 block">Responsable assigné</span>
+                                                <span className="font-bold text-zinc-200">{selectedItem.assignee}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 bg-[#040917]/30 p-3 rounded-xl border border-white/5">
+                                            <Calendar className="h-4 w-4 text-amber-400 shrink-0" />
+                                            <div>
+                                                <span className="text-[10px] text-white/40 block">Prochain Suivi</span>
+                                                <span className="font-bold text-zinc-250 text-amber-400">{selectedItem.followUpDate}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 bg-[#040917]/30 p-3 rounded-xl border border-white/5">
+                                            <User className="h-4 w-4 text-purple-400 shrink-0" />
+                                            <div>
+                                                <span className="text-[10px] text-white/40 block">Implication</span>
+                                                <span className="font-bold text-zinc-200 truncate block max-w-[200px]" title={selectedItem.peopleImplicated}>
+                                                    {selectedItem.peopleImplicated}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
+
+                                    {/* Contractor involved */}
+                                    <div className="space-y-1 bg-cyan-950/15 border border-cyan-900/30 p-3 rounded-xl">
+                                        <span className="text-[9px] font-black uppercase text-cyan-400 tracking-wider">Entrepreneur / Fournisseur</span>
+                                        <p className="text-xs font-bold text-zinc-150 flex items-center gap-1.5">
+                                            <Bot className="h-3.5 w-3.5 text-cyan-400" />
+                                            {selectedItem.contractors}
+                                        </p>
+                                    </div>
+
+                                    {/* Interactive Checklist (Todos) */}
+                                    {selectedItem.todos && selectedItem.todos.length > 0 && (
+                                        <div className="space-y-2 pt-2 border-t border-white/5">
+                                            <h5 className="text-[10px] font-black uppercase text-white/45 tracking-wide">
+                                                Plan d'action & Liste des tâches à faire
+                                            </h5>
+                                            <div className="space-y-2 bg-[#040917]/40 p-3 rounded-xl border border-white/5">
+                                                {selectedItem.todos.map(todo => (
+                                                    <button
+                                                        key={todo.id}
+                                                        onClick={() => handleToggleTodo(selectedItem.id, todo.id)}
+                                                        className="w-full flex items-start gap-2.5 text-left text-xs transition-colors hover:text-white text-zinc-300 py-1.5 cursor-pointer"
+                                                    >
+                                                        {todo.completed ? (
+                                                            <CheckSquare className="h-4 w-4 text-emerald-500 shrink-0" />
+                                                        ) : (
+                                                            <Square className="h-4 w-4 text-white/30 shrink-0" />
+                                                        )}
+                                                        <span className={todo.completed ? 'line-through text-white/40' : ''}>
+                                                            {todo.text}
+                                                        </span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Actions Taken */}
+                                    <div className="space-y-1.5 pt-2">
+                                        <h5 className="text-[10px] font-black uppercase text-white/45 tracking-wide">Actions entreprises</h5>
+                                        <p className="text-xs text-white/80 leading-relaxed bg-[#040917]/40 p-3.5 rounded-xl border border-white/5">
+                                            {selectedItem.actionsTaken}
+                                        </p>
+                                    </div>
+
+                                    {/* Attached files capsules */}
+                                    {selectedItem.files && selectedItem.files.length > 0 && (
+                                        <div className="space-y-2 pt-2">
+                                            <h5 className="text-[10px] font-black uppercase text-white/45 tracking-wide flex items-center gap-1">
+                                                <Paperclip className="h-3.5 w-3.5" />
+                                                Documents et rapports rattachés ({selectedItem.files.length})
+                                            </h5>
+                                            <div className="flex flex-wrap gap-2">
+                                                {selectedItem.files.map(file => (
+                                                    <button 
+                                                        key={file}
+                                                        onClick={() => toast.info(`Téléchargement simulé de : ${file}`)}
+                                                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-mono text-cyan-400 transition-all cursor-pointer"
+                                                    >
+                                                        <FileText className="h-3.5 w-3.5 text-zinc-400" />
+                                                        {file}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
-                        </div>
-                    )}
 
-                    {/* ALERT DETAILS CARD */}
-                    {selectedItem.type === 'alert' && (
-                        <div className="rounded-2xl bg-[#091227]/90 border border-white/10 p-5 space-y-4 shadow-xl">
-                            <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                                <div className="flex items-center gap-2">
-                                    <AlertTriangle className="h-5 w-5 text-amber-500 animate-pulse shrink-0" />
-                                    <h4 className="text-xs font-black text-white uppercase tracking-wider">Alerte Système Automatique</h4>
+                            {/* ALERT DETAILS CARD */}
+                            {selectedItem.type === 'alert' && (
+                                <div className="rounded-2xl bg-[#091227]/90 border border-white/10 p-5 space-y-4 shadow-xl">
+                                    <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                                        <div className="flex items-center gap-2">
+                                            <AlertTriangle className="h-5 w-5 text-amber-500 animate-pulse shrink-0" />
+                                            <h4 className="text-xs font-black text-white uppercase tracking-wider">Alerte Système Automatique</h4>
+                                        </div>
+                                        <span className="text-[10px] text-white/40 flex items-center gap-1 shrink-0 bg-white/5 px-2.5 py-1 rounded-md border border-white/5">
+                                            <Clock className="h-3 w-3" />
+                                            {selectedItem.triggeredAt}
+                                        </span>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                                        <div className="flex items-center gap-3 bg-[#040917]/30 p-3 rounded-xl border border-white/5">
+                                            <Layers className="h-4 w-4 text-amber-400" />
+                                            <div>
+                                                <span className="text-[10px] text-white/40 block">Source</span>
+                                                <span className="font-bold text-zinc-200">{selectedItem.alertSource}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 bg-[#040917]/30 p-3 rounded-xl border border-white/5">
+                                            <ShieldAlert className="h-4 w-4 text-rose-500" />
+                                            <div>
+                                                <span className="text-[10px] text-white/40 block">Gravité</span>
+                                                <span className="font-bold text-rose-455 text-rose-500">{selectedItem.severity}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <p className="text-xs text-white/80 leading-relaxed font-sans italic bg-[#040917]/40 p-4 rounded-xl border border-white/5 select-text">
+                                        "{selectedItem.originalContent}"
+                                    </p>
                                 </div>
-                                <span className="text-[10px] text-white/40 flex items-center gap-1 shrink-0 bg-white/5 px-2.5 py-1 rounded-md border border-white/5">
-                                    <Clock className="h-3 w-3" />
-                                    {selectedItem.triggeredAt}
-                                </span>
+                            )}
+
+                            {/* Copilot Reference Rule (Extracted Bylaw RAG) */}
+                            <div className="rounded-2xl border border-indigo-900/35 bg-indigo-950/15 p-4 space-y-3 shadow-lg">
+                                <div className="flex items-center gap-2 text-xs text-indigo-400 font-extrabold uppercase tracking-wide">
+                                    <Scale className="h-4 w-4 text-indigo-400" />
+                                    <span>Bylaw Copilote RAG - Extrait de Règlement</span>
+                                </div>
+                                <div className="text-xs leading-relaxed space-y-1">
+                                    <h4 className="font-bold text-zinc-200">
+                                        {selectedItem.extractedRuleTitle}
+                                    </h4>
+                                    <p className="text-white/70 bg-indigo-950/25 p-3 rounded-xl border border-indigo-900/30 leading-relaxed">
+                                        {selectedItem.extractedRuleText}
+                                    </p>
+                                </div>
                             </div>
-                            
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                                <div className="flex items-center gap-3 bg-[#040917]/30 p-3 rounded-xl border border-white/5">
-                                    <Layers className="h-4 w-4 text-amber-400" />
-                                    <div>
-                                        <span className="text-[10px] text-white/40 block">Source</span>
-                                        <span className="font-bold text-zinc-200">{selectedItem.alertSource}</span>
+
+                            {/* Copilot Draft Editor (Only 1 output text block, no tone toggles) */}
+                            <div className="flex flex-col rounded-2xl bg-zinc-950/40 border border-white/10 p-4 space-y-3 shadow-2xl">
+                                <div className="flex justify-between items-center border-b border-zinc-900 pb-3">
+                                    <div className="flex items-center gap-2 text-xs text-cyan-300 font-bold">
+                                        <Bot className="h-4 w-4 text-cyan-400" />
+                                        <span>Proposition de réponse copilote Gustav</span>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3 bg-[#040917]/30 p-3 rounded-xl border border-white/5">
-                                    <ShieldAlert className="h-4 w-4 text-rose-500 animate-bounce-slow" />
-                                    <div>
-                                        <span className="text-[10px] text-white/40 block">Gravité</span>
-                                        <span className="font-bold text-rose-455 text-rose-500">{selectedItem.severity}</span>
-                                    </div>
+
+                                {/* Editable draft textarea */}
+                                <textarea
+                                    value={draftText}
+                                    onChange={(e) => setDraftText(e.target.value)}
+                                    className="w-full min-h-[220px] bg-zinc-950 border border-white/5 focus:border-cyan-600 focus:ring-1 focus:ring-cyan-600/30 rounded-xl p-4 text-xs font-mono text-zinc-200 outline-none leading-relaxed resize-y transition-colors select-text"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Bottom Action chat bar input */}
+                        <div className="px-6 py-4 border-t border-white/10 shrink-0 bg-[#0a152d] flex items-center justify-between">
+                            <form onSubmit={handleChatSubmit} className="w-full flex items-center gap-3">
+                                <div className="relative flex-1">
+                                    <input
+                                        type="text"
+                                        value={chatInput}
+                                        onChange={(e) => setChatInput(e.target.value)}
+                                        placeholder="Demander une correction à l'IA... (ex: 'Mentionne que le technicien portera un casque')"
+                                        className="w-full bg-[#050b18] border border-white/10 rounded-xl py-3 pl-4 pr-10 text-xs text-white/90 placeholder:text-white/30 outline-none focus:border-cyan-600 focus:ring-1 focus:ring-cyan-600/25 transition-all"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => toast.info("Dictée vocale (simulation)")}
+                                        className="absolute right-3.5 top-3.5 text-white/40 hover:text-white/80 transition-colors cursor-pointer"
+                                    >
+                                        <Mic className="h-4 w-4" />
+                                    </button>
                                 </div>
-                            </div>
-
-                            <p className="text-xs text-white/80 leading-relaxed font-sans italic bg-[#040917]/40 p-4 rounded-xl border border-white/5 select-text">
-                                "{selectedItem.originalContent}"
-                            </p>
-                        </div>
-                    )}
-
-                    {/* Copilot Reference Rule (Extracted Bylaw RAG) */}
-                    <div className="rounded-2xl border border-indigo-900/35 bg-indigo-950/15 p-4 space-y-3 shadow-lg">
-                        <div className="flex items-center gap-2 text-xs text-indigo-400 font-extrabold uppercase tracking-wide">
-                            <Scale className="h-4 w-4 text-indigo-400" />
-                            <span>Bylaw Copilote RAG - Extrait de Règlement</span>
-                        </div>
-                        <div className="text-xs leading-relaxed space-y-1">
-                            <h4 className="font-bold text-zinc-200">
-                                {selectedItem.extractedRuleTitle}
-                            </h4>
-                            <p className="text-white/70 bg-indigo-950/25 p-3 rounded-xl border border-indigo-900/30 leading-relaxed">
-                                {selectedItem.extractedRuleText}
-                            </p>
+                                <Button
+                                    type="submit"
+                                    disabled={!chatInput.trim()}
+                                    className="bg-cyan-600 hover:bg-cyan-500 border border-cyan-500/25 text-white h-10 px-4 rounded-xl flex items-center justify-center shadow-lg transition-transform active:scale-95 disabled:opacity-40 disabled:scale-100 cursor-pointer"
+                                >
+                                    <Send className="h-4 w-4" />
+                                </Button>
+                            </form>
                         </div>
                     </div>
-
-                    {/* Copilot Draft Editor (Only 1 output text block, no tone toggles) */}
-                    <div className="flex flex-col rounded-2xl bg-zinc-950/40 border border-white/10 p-4 space-y-3 shadow-2xl">
-                        <div className="flex justify-between items-center border-b border-zinc-900 pb-3">
-                            <div className="flex items-center gap-2 text-xs text-cyan-300 font-bold">
-                                <Bot className="h-4 w-4 text-cyan-400" />
-                                <span>Proposition de réponse copilote Gustav</span>
-                            </div>
-                        </div>
-
-                        {/* Editable draft textarea */}
-                        <textarea
-                            value={draftText}
-                            onChange={(e) => setDraftText(e.target.value)}
-                            className="w-full min-h-[220px] bg-zinc-950 border border-white/5 focus:border-cyan-600 focus:ring-1 focus:ring-cyan-600/30 rounded-xl p-4 text-xs font-mono text-zinc-200 outline-none leading-relaxed resize-y transition-colors select-text"
-                        />
-                    </div>
-                </div>
-
-                {/* Bottom Action chat bar input */}
-                <div className="px-6 py-4 border-t border-white/10 shrink-0 bg-[#0a152d] flex items-center justify-between">
-                    <form onSubmit={handleChatSubmit} className="w-full flex items-center gap-3">
-                        <div className="relative flex-1">
-                            <input
-                                type="text"
-                                value={chatInput}
-                                onChange={(e) => setChatInput(e.target.value)}
-                                placeholder="Demander une correction à l'IA... (ex: 'Mentionne que le technicien portera un casque')"
-                                className="w-full bg-[#050b18] border border-white/10 rounded-xl py-3 pl-4 pr-10 text-xs text-white/90 placeholder:text-white/30 outline-none focus:border-cyan-600 focus:ring-1 focus:ring-cyan-600/25 transition-all"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => toast.info("Dictée vocale (simulation)")}
-                                className="absolute right-3.5 top-3.5 text-white/40 hover:text-white/80 transition-colors cursor-pointer"
-                            >
-                                <Mic className="h-4 w-4" />
-                            </button>
-                        </div>
-                        <Button
-                            type="submit"
-                            disabled={!chatInput.trim()}
-                            className="bg-cyan-600 hover:bg-cyan-500 border border-cyan-500/25 text-white h-10 px-4 rounded-xl flex items-center justify-center shadow-lg transition-transform active:scale-95 disabled:opacity-40 disabled:scale-100 cursor-pointer"
-                        >
-                            <Send className="h-4 w-4" />
-                        </Button>
-                    </form>
-                </div>
+                )}
             </div>
 
         </div>
