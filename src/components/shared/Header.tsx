@@ -6,14 +6,19 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { SidebarContent } from '@/components/shared/Sidebar'
+import { TeamManagementSidebar } from '@/components/shared/TeamManagementSidebar'
+import { MaintenanceHubSidebar } from '@/components/shared/MaintenanceHubSidebar'
+import { GlobalSettingsSidebar } from '@/components/shared/GlobalSettingsSidebar'
+import { CommandCenterSidebar } from '@/components/shared/CommandCenterSidebar'
 import { createClient } from '@/utils/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { Database } from '@/types/supabase'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
 
 export function Header({ user, profile }: { user: User, profile: Profile | null }) {
     const router = useRouter()
+    const pathname = usePathname()
     const supabase = createClient()
 
     async function handleSignOut() {
@@ -40,7 +45,17 @@ export function Header({ user, profile }: { user: User, profile: Profile | null 
                     </SheetTrigger>
                     <SheetContent side="left" className="w-64 p-0 bg-[#103f75] border-r border-white/20 text-white">
                         <div className="flex h-full flex-col">
-                            <SidebarContent profile={profile} />
+                            {pathname.startsWith('/manager') ? (
+                                <CommandCenterSidebar profile={profile} />
+                            ) : pathname.startsWith('/team-management') ? (
+                                <TeamManagementSidebar profile={profile} />
+                            ) : pathname.startsWith('/maintenance-hub') ? (
+                                <MaintenanceHubSidebar profile={profile} />
+                            ) : pathname.startsWith('/global-settings') ? (
+                                <GlobalSettingsSidebar profile={profile} />
+                            ) : (
+                                <SidebarContent profile={profile} />
+                            )}
                         </div>
                     </SheetContent>
                 </Sheet>

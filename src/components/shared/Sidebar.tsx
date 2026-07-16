@@ -70,6 +70,14 @@ export function SidebarContent({ profile }: { profile: Profile | null }) {
                                 Hub de Maintenance
                             </Link>
                             <Link 
+                                href="/manager/command-center"
+                                onClick={() => setIsSwitcherOpen(false)}
+                                className="flex items-center gap-2 p-3 text-xs text-white/70 hover:text-white hover:bg-white/15 transition-all"
+                            >
+                                <Layers className="h-3.5 w-3.5 text-cyan-400" />
+                                Centre de Commande
+                            </Link>
+                            <Link 
                                 href="/global-settings"
                                 onClick={() => setIsSwitcherOpen(false)}
                                 className="flex items-center gap-2 p-3 text-xs text-white/70 hover:text-white hover:bg-white/15 transition-all"

@@ -88,6 +88,14 @@ export function GlobalSettingsSidebar({ profile }: { profile: Profile | null }) 
                             <Wrench className="h-3.5 w-3.5 text-amber-500" />
                             Hub de Maintenance
                         </Link>
+                        <Link 
+                            href="/manager/command-center"
+                            onClick={() => setIsSwitcherOpen(false)}
+                            className="flex items-center gap-2 p-3 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-all"
+                        >
+                            <Layers className="h-3.5 w-3.5 text-cyan-400" />
+                            Centre de Commande
+                        </Link>
                         <div className="flex items-center gap-2 p-3 text-xs text-indigo-400 font-bold bg-indigo-950/15">
                             <ShieldCheck className="h-3.5 w-3.5 text-indigo-400" />
                             Configuration Globale (Actif)
@@ -103,7 +111,7 @@ export function GlobalSettingsSidebar({ profile }: { profile: Profile | null }) 
                     { name: 'Snapshots & Synchro', href: '/global-settings?tab=snapshots', key: 'snapshots', icon: FileSpreadsheet },
                     { name: 'Analyse Communications', href: '/global-settings?tab=communications', key: 'communications', icon: MessageSquare }
                 ].map((item) => {
-                    const isActive = activeTab === item.key
+                    const isActive = pathname === '/global-settings' && activeTab === item.key
                     return (
                         <Link
                             key={item.name}

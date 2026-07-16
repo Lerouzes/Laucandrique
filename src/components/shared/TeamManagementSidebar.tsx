@@ -108,6 +108,14 @@ export function TeamManagementSidebar({ profile }: { profile: Profile | null }) 
                                 <Wrench className="h-3.5 w-3.5 text-amber-500" />
                                 Hub de Maintenance
                             </Link>
+                            <Link 
+                                href="/manager/command-center"
+                                onClick={() => setIsSwitcherOpen(false)}
+                                className="flex items-center gap-2 p-3 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-all"
+                            >
+                                <Layers className="h-3.5 w-3.5 text-cyan-400" />
+                                Centre de Commande
+                            </Link>
                             {isMasterOrDirection && (
                                 <Link 
                                     href="/global-settings"
