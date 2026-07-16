@@ -418,7 +418,7 @@ export function ClientExcelImport({
                     setStep('result')
                     toast.success("Importation terminée avec succès!")
                 } else {
-                    toast.error("Échec de l'importation en base de données.")
+                    toast.error("Échec de l'importation en base de données.", { description: response.error })
                 }
             } catch (err: any) {
                 toast.error("Erreur lors de l'importation", { description: err.message })

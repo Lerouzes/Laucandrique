@@ -11,7 +11,8 @@ async function authorizeUser() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error("Utilisateur non authentifié.")
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (!profile || (profile.role !== 'Master' && profile.role !== 'Direction')) {
+    const roleLower = (profile?.role || '').toLowerCase()
+    if (roleLower !== 'master' && roleLower !== 'direction') {
         throw new Error("Sécurité : Rôle insuffisant pour effectuer cette action.")
     }
     return { user, profile }

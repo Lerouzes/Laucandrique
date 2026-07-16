@@ -321,57 +321,67 @@ export async function importResidentsAction(
     clientId: string,
     rows: Array<{ door_number: string; full_name: string; email?: string; phone?: string }>
 ) {
-    const supabase = await createClient()
+    try {
+        const supabase = await createClient()
 
-    // 1. Fetch all existing doors for this syndicate
-    const { data: doors, error: doorsErr } = await supabase
-        .from('doors')
-        .select('*')
-        .eq('client_id', clientId)
+        // 1. Fetch all existing doors for this syndicate
+        const { data: doors, error: doorsErr } = await supabase
+            .from('doors')
+            .select('*')
+            .eq('client_id', clientId)
 
-    if (doorsErr) throw new Error(doorsErr.message)
+        if (doorsErr) throw new Error(doorsErr.message)
 
-    const conflicts: string[] = []
-    const missingUnits: string[] = []
-    let importedCount = 0
+        const conflicts: string[] = []
+        const missingUnits: string[] = []
+        let importedCount = 0
 
-    for (const row of rows) {
-        const doorNum = String(row.door_number).trim()
-        const matchedDoor = (doors || []).find(d => String(d.door_number).trim().toLowerCase() === doorNum.toLowerCase())
+        for (const row of rows) {
+            const doorNum = String(row.door_number).trim()
+            const matchedDoor = (doors || []).find(d => String(d.door_number).trim().toLowerCase() === doorNum.toLowerCase())
 
-        if (!matchedDoor) {
-            missingUnits.push(doorNum)
-            continue
-        }
-
-        try {
-            // Upsert resident details for that door (unit)
-            // Uses door_id unique constraint
-            const { error: upsertErr } = await supabase
-                .from('maintenance_residents')
-                .upsert({
-                    door_id: matchedDoor.id,
-                    full_name: row.full_name,
-                    email: row.email || null,
-                    phone: row.phone || null,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'door_id' })
-
-            if (upsertErr) {
-                conflicts.push(`${doorNum}: ${upsertErr.message}`)
-            } else {
-                importedCount++
+            if (!matchedDoor) {
+                missingUnits.push(doorNum)
+                continue
             }
-        } catch (err) {
-            conflicts.push(`${doorNum}: ${(err as Error).message}`)
-        }
-    }
 
-    return {
-        success: true,
-        importedCount,
-        missingUnits,
-        conflicts
+            try {
+                // Upsert resident details for that door (unit)
+                // Uses door_id unique constraint
+                const { error: upsertErr } = await supabase
+                    .from('maintenance_residents')
+                    .upsert({
+                        door_id: matchedDoor.id,
+                        full_name: row.full_name,
+                        email: row.email || null,
+                        phone: row.phone || null,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'door_id' })
+
+                if (upsertErr) {
+                    conflicts.push(`${doorNum}: ${upsertErr.message}`)
+                } else {
+                    importedCount++
+                }
+            } catch (err) {
+                conflicts.push(`${doorNum}: ${(err as Error).message}`)
+            }
+        }
+
+        return {
+            success: true,
+            importedCount,
+            missingUnits,
+            conflicts
+        }
+    } catch (err: any) {
+        console.error("Exception in importResidentsAction:", err)
+        return {
+            success: false,
+            importedCount: 0,
+            missingUnits: [],
+            conflicts: ["Erreur fatale: " + (err?.message || String(err))]
+        }
     }
 }
 
@@ -1472,66 +1482,78 @@ export async function importCoOwnersAction(
     clientId: string,
     rows: Array<{ door_number: string; full_name: string; email?: string; phone?: string }>
 ) {
-    const supabase = await createClient()
-    
-    // Fetch all existing doors
-    const { data: doors, error: doorsErr } = await supabase
-        .from('doors')
-        .select('*')
-        .eq('client_id', clientId)
-    if (doorsErr) throw new Error(doorsErr.message)
-
-    const conflicts: string[] = []
-    let importedCount = 0
-
-    for (const row of rows) {
-        const doorNum = String(row.door_number).trim()
-        if (!doorNum) continue
-
-        let matchedDoor = (doors || []).find(d => String(d.door_number).trim().toLowerCase() === doorNum.toLowerCase())
+    try {
+        const supabase = await createClient()
         
-        try {
-            let doorId = matchedDoor?.id
-            if (!doorId) {
-                // Create new door
-                const { data: newDoor, error: doorErr } = await supabase
-                    .from('doors')
-                    .insert({ client_id: clientId, door_number: doorNum })
-                    .select()
-                    .single()
-                if (doorErr) {
-                    conflicts.push(`${doorNum}: ${doorErr.message}`)
-                    continue
+        // Fetch all existing doors
+        const { data: doors, error: doorsErr } = await supabase
+            .from('doors')
+            .select('*')
+            .eq('client_id', clientId)
+        if (doorsErr) throw new Error(doorsErr.message)
+
+        const conflicts: string[] = []
+        let importedCount = 0
+
+        for (const row of rows) {
+            const doorNum = String(row.door_number).trim()
+            if (!doorNum) continue
+
+            let matchedDoor = (doors || []).find(d => String(d.door_number).trim().toLowerCase() === doorNum.toLowerCase())
+            
+            try {
+                let doorId = matchedDoor?.id
+                if (!doorId) {
+                    // Create new door
+                    const { data: newDoor, error: doorErr } = await supabase
+                        .from('doors')
+                        .insert({ client_id: clientId, door_number: doorNum })
+                        .select()
+                        .single()
+                    if (doorErr) {
+                        conflicts.push(`${doorNum}: ${doorErr.message}`)
+                        continue
+                    }
+                    doorId = newDoor.id
                 }
-                doorId = newDoor.id
-            }
 
-            // Upsert resident details for that door
-            const { error: upsertErr } = await supabase
-                .from('maintenance_residents')
-                .upsert({
-                    door_id: doorId,
-                    full_name: row.full_name,
-                    email: row.email || null,
-                    phone: row.phone || null,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'door_id' })
+                // Upsert resident details for that door
+                const { error: upsertErr } = await supabase
+                    .from('maintenance_residents')
+                    .upsert({
+                        door_id: doorId,
+                        full_name: row.full_name,
+                        email: row.email || null,
+                        phone: row.phone || null,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'door_id' })
 
-            if (upsertErr) {
-                conflicts.push(`${doorNum}: ${upsertErr.message}`)
-            } else {
-                importedCount++
+                if (upsertErr) {
+                    conflicts.push(`${doorNum}: ${upsertErr.message}`)
+                } else {
+                    importedCount++
+                }
+            } catch (err) {
+                conflicts.push(`${doorNum}: ${(err as Error).message}`)
             }
-        } catch (err) {
-            conflicts.push(`${doorNum}: ${(err as Error).message}`)
         }
-    }
 
-    revalidatePath(`/clients/${clientId}`)
-    return {
-        success: true,
-        importedCount,
-        conflicts
+        try {
+            revalidatePath(`/clients/${clientId}`)
+        } catch (_) {}
+
+        return {
+            success: true,
+            importedCount,
+            conflicts
+        }
+    } catch (err: any) {
+        console.error("Exception in importCoOwnersAction:", err)
+        return {
+            success: false,
+            importedCount: 0,
+            conflicts: ["Erreur fatale: " + (err?.message || String(err))]
+        }
     }
 }
 

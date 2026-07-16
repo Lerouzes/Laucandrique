@@ -58,7 +58,8 @@ import {
     AlertTriangle,
     Eye,
     ChevronUp as ArrowUp,
-    ChevronDown as ArrowDown
+    ChevronDown as ArrowDown,
+    Edit
 } from 'lucide-react'
 import { SearchableClientSelect } from './SearchableClientSelect'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -1642,7 +1643,7 @@ export function OneOnOneDetailView({
                                                                                 className="text-zinc-550 hover:text-purple-400 p-0.5 rounded transition-all"
                                                                                 title="Modifier la note"
                                                                             >
-                                                                                <Edit2 className="h-2.5 w-2.5" />
+                                                                                <Edit className="h-2.5 w-2.5" />
                                                                             </button>
                                                                             <button
                                                                                 onClick={() => handleDeleteAssemblyNote(assembly, nIdx)}
