@@ -35,9 +35,9 @@ async function revalidatePath(path: string, type?: 'page' | 'layout') {
 // 1. DYNAMIC STATISTICS & KPI ENGINE
 // ==========================================
 
-export async function getManagerStats(managerId: string) {
+export async function getManagerStats(managerId: string, referenceDateStr?: string) {
     const supabase = await createClient()
-    const now = new Date()
+    const now = referenceDateStr ? new Date(referenceDateStr) : new Date()
     const startOfYear = new Date(now.getFullYear(), 0, 1).toISOString()
 
     // 1. Basic Manager and Team info
@@ -120,10 +120,12 @@ export async function getManagerStats(managerId: string) {
     const lastOneOnOneDate = last1v1?.[0]?.meeting_date || null
 
     // 7. Call stats (Latest Month)
+    const refYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const { data: latestCalls } = await supabase
         .from('manager_monthly_calls')
         .select('*')
         .eq('manager_id', managerId)
+        .lte('year_month', refYearMonth)
         .order('year_month', { ascending: false })
         .limit(1)
 
@@ -136,6 +138,7 @@ export async function getManagerStats(managerId: string) {
         .from('manager_monthly_workload')
         .select('*')
         .eq('manager_id', managerId)
+        .lte('year_month', refYearMonth)
         .order('year_month', { ascending: false })
         .limit(1)
 
@@ -2215,9 +2218,9 @@ export async function resolveComplaintAction(id: string) {
     if (comp?.manager_id) revalidatePath(`/team-management/managers/${comp.manager_id}`)
 }
 
-export async function getOneOnOneSnapshotAction(managerId: string) {
+export async function getOneOnOneSnapshotAction(managerId: string, meetingDate?: string) {
     const supabase = await createClient()
-    const stats = await getManagerStats(managerId)
+    const stats = await getManagerStats(managerId, meetingDate)
 
     // Get manager's active clients
     const { data: clients } = await supabase
@@ -2236,21 +2239,26 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         .eq('status', 'active')
         .order('company_name')
 
-    // Fetch monthly calls history (only months containing call data)
+    const referenceDate = meetingDate ? new Date(meetingDate) : new Date()
+    const refYearMonth = `${referenceDate.getFullYear()}-${String(referenceDate.getMonth() + 1).padStart(2, '0')}`
+
+    // Fetch monthly calls history (only months containing call data on or before the meeting date's month)
     const { data: callsHistory } = await supabase
         .from('manager_monthly_calls')
         .select('*')
         .eq('manager_id', managerId)
         .gt('total_calls', 0)
+        .lte('year_month', refYearMonth)
         .order('year_month', { ascending: false })
         .limit(6)
 
-    // Fetch monthly workload history (only months containing workload/task data)
+    // Fetch monthly workload history (only months containing workload/task data on or before the meeting date's month)
     const { data: workloadHistory } = await supabase
         .from('manager_monthly_workload')
         .select('*')
         .eq('manager_id', managerId)
         .or('communications_received.gt.0,open_tasks.gt.0,closed_tasks.gt.0')
+        .lte('year_month', refYearMonth)
         .order('year_month', { ascending: false })
         .limit(6)
 
@@ -2262,11 +2270,11 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         .order('logged_at', { ascending: false })
         .limit(30)
 
-    // Calculate current bills without notes older than 7 days
+    // Calculate current bills without notes older than 7 days relative to the meeting date
     let billsNoNotesCount = 0
     let billsNoNotesCountPrev = 0
     if (clientIds.length > 0) {
-        const sevenDaysAgo = new Date()
+        const sevenDaysAgo = new Date(referenceDate)
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
         const { data: currentOverdueBills } = await supabase
             .from('bills')
@@ -2275,7 +2283,7 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
             .lt('bill_date', sevenDaysAgo.toISOString().substring(0, 10))
         billsNoNotesCount = (currentOverdueBills || []).filter(b => !b.notes || b.notes.trim() === '').length
 
-        const thirtySevenDaysAgo = new Date()
+        const thirtySevenDaysAgo = new Date(referenceDate)
         thirtySevenDaysAgo.setDate(thirtySevenDaysAgo.getDate() - 37)
         const { data: prevOverdueBills } = await supabase
             .from('bills')
@@ -2444,6 +2452,19 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         .eq('manager_id', managerId)
         .order('created_at', { ascending: false })
 
+    // Fetch latest emails_over_48h from stats logs on or before the referenceDate
+    const { data: latestEmailStat } = await supabase
+        .from('manager_stats_logs')
+        .select('value')
+        .eq('manager_id', managerId)
+        .eq('metric_type', 'emails_over_48h')
+        .lte('logged_at', referenceDate.toISOString())
+        .order('logged_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+    const emailsOver48hValue = latestEmailStat?.value ?? 0
+
     return {
         // Current metrics (fall back to 0 if history is empty)
         calls_total: callsHistory?.[0]?.total_calls ?? 0,
@@ -2451,6 +2472,7 @@ export async function getOneOnOneSnapshotAction(managerId: string) {
         late_tasks: workloadHistory?.[0]?.open_tasks ?? 0,
         op_reports_closed: workloadHistory?.[0]?.closed_tasks ?? 0,
         emails_received: workloadHistory?.[0]?.communications_received ?? 0,
+        emails_over_48h: emailsOver48hValue,
         bills_no_notes: billsNoNotesCount,
         open_complaints_count: openComplaints?.length || 0,
 
@@ -3395,7 +3417,7 @@ export async function getSyndicateAuditDetailsAction(auditId: string) {
     const [auditRes, answersRes] = await Promise.all([
         supabase
             .from('syndicate_audits')
-            .select('*, clients(id, company_name, full_name, managers(first_name, last_name)), profiles:audited_by(full_name)')
+            .select('*, clients(id, company_name, full_name, notes, managers(first_name, last_name)), profiles:audited_by(full_name)')
             .eq('id', auditId)
             .single(),
         supabase

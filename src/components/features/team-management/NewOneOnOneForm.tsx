@@ -495,12 +495,13 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
         if (!id) return
         setLoadingSnapshot(true)
         try {
-            const snapshot = await getOneOnOneSnapshotAction(id)
+            const snapshot = await getOneOnOneSnapshotAction(id, meetingDate)
             // Set current values
             setCallsTotal(snapshot.calls_total)
             setCallsAnswered(snapshot.calls_answered)
             setLateTasks(snapshot.late_tasks)
             setBillsNoNotes(snapshot.bills_no_notes)
+            setEmailsOver48h(snapshot.emails_over_48h || 0)
             
             // Set comparison previous values
             setCallsTotalPrev(snapshot.calls_total_prev)
@@ -510,31 +511,31 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
             setEmailsReceivedPrev(snapshot.emails_received_prev)
             setBillsNoNotesPrev(snapshot.bills_no_notes_prev)
             setOpenComplaintsPrev(snapshot.open_complaints_count_prev)
-
+ 
             setCallsMonthCurrent(snapshot.calls_month_current)
             setCallsMonthPrev(snapshot.calls_month_prev)
             setWorkloadMonthCurrent(snapshot.workload_month_current)
             setWorkloadMonthPrev(snapshot.workload_month_prev)
-
+ 
             // Global Stats
             setQuoteApprovalRate(snapshot.quote_approval_rate)
             setDoorsCount(snapshot.doors_count)
             setSyndicatesCount(snapshot.syndicates_count)
-
+ 
             setCallsHistory(snapshot.callsHistory || [])
             setWorkloadHistory(snapshot.workloadHistory || [])
             setStatsLogs(snapshot.statsLogs || [])
-
+ 
             // Set pending commitments to carry forward
             setPreviousCommitments(snapshot.pendingCommitments || [])
-
+ 
             // Review items
             setSyndicateAudits(snapshot.syndicateAudits || [])
             setAssemblyEvaluations(snapshot.assemblyEvaluations || [])
             setManagerComplaints(snapshot.openComplaints || [])
             setOperationalRisks(snapshot.operationalRisks || [])
             setClientsList(snapshot.clientsList || [])
-
+ 
             // Reset review states
             setReviewedAuditsState({})
             setReviewedAssembliesState({})
@@ -546,13 +547,13 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
         } finally {
             setLoadingSnapshot(false)
         }
-    }, [])
-
-    // Fetch snapshot metrics when managerId changes
+    }, [meetingDate])
+ 
+    // Fetch snapshot metrics when managerId or meetingDate changes
     useEffect(() => {
         if (!managerId) return
         loadManagerData(managerId)
-    }, [managerId, loadManagerData])
+    }, [managerId, meetingDate, loadManagerData])
 
     // Dynamic Scoring Engine
     const callsPct = callsTotal > 0 ? (callsAnswered / callsTotal) * 100 : 0
@@ -2242,37 +2243,94 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
 
                         {/* Audit Details */}
                         {loadingAuditDetails ? (
-                            <p className="italic text-zinc-500 py-6 text-center text-xxs">Chargement des détails de l'audit...</p>
+                            <p className="italic text-zinc-500 py-12 text-center text-xs">Chargement des détails de l'audit...</p>
                         ) : (
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4 p-3 bg-zinc-950/40 border border-zinc-900 rounded-xl text-xxs">
-                                    <div>Date d'Audit: <strong className="text-zinc-300">{new Date(activeAudit.audit_date).toLocaleDateString('fr-CA')}</strong></div>
-                                    <div>Indice de Santé: <strong className="text-purple-400 font-bold">{activeAudit.health_score}%</strong></div>
-                                    <div className="col-span-2 mt-1">
-                                        Auditeur: <strong className="text-zinc-300">{activeAuditDetails?.audit?.profiles?.full_name || 'Évaluateur'}</strong>
-                                    </div>
-                                    {activeAuditDetails?.audit?.notes && (
-                                        <div className="col-span-2 border-t border-zinc-905 pt-2 mt-2">
-                                            <span className="text-zinc-500 block mb-0.5 font-bold uppercase tracking-wider text-[8px]">Observations Globales:</span>
-                                            <p className="text-zinc-300 text-[10px] leading-relaxed whitespace-pre-wrap font-medium">{activeAuditDetails.audit.notes}</p>
+                            <div className="space-y-5">
+                                {/* Top metadata cards grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {/* Core Metrics */}
+                                    <div className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
+                                        <span className="text-zinc-500 block uppercase font-bold tracking-wider text-[9px]">Informations Générales</span>
+                                        <div className="space-y-1.5 text-xs text-zinc-300">
+                                            <div>Date d'Audit: <strong className="text-white">{new Date(activeAudit.audit_date).toLocaleDateString('fr-CA')}</strong></div>
+                                            <div>Indice de Santé: <strong className="text-purple-400 font-bold text-sm">{activeAudit.health_score}%</strong></div>
+                                            <div>Auditeur: <strong className="text-white">{activeAuditDetails?.audit?.profiles?.full_name || 'Évaluateur'}</strong></div>
                                         </div>
-                                    )}
+                                    </div>
+
+                                    {/* Governance & Meetings */}
+                                    <div className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
+                                        <span className="text-zinc-500 block uppercase font-bold tracking-wider text-[9px]">Gouvernance & Réunions</span>
+                                        <div className="space-y-1.5 text-xs text-zinc-300">
+                                            <div>Exercice financier à jour: {activeAuditDetails?.audit?.current_year_active ? (
+                                                <span className="px-2 py-0.5 bg-green-950/40 border border-green-800/60 rounded text-green-400 font-bold text-[10px]">Oui</span>
+                                            ) : (
+                                                <span className="px-2 py-0.5 bg-rose-950/40 border border-rose-800/60 rounded text-rose-450 font-bold text-[10px]">Non</span>
+                                            )}</div>
+                                            <div>Nombre de CA (Requis/Fait): <strong className="text-white">{activeAuditDetails?.audit?.board_meetings_count ?? 0} / {activeAuditDetails?.audit?.board_meetings_fiscal_year ?? 0}</strong></div>
+                                        </div>
+                                    </div>
+
+                                    {/* Budgets de Cotisations (Fonds) */}
+                                    <div className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
+                                        <span className="text-zinc-500 block uppercase font-bold tracking-wider text-[9px]">Budgets de Cotisations (Fonds)</span>
+                                        <div className="space-y-1 text-xs text-zinc-300">
+                                            <div className="flex justify-between">
+                                                <span>Fonds d'Exploitation:</span>
+                                                <strong className="text-white">${Number(activeAuditDetails?.audit?.cotisation_fonds_exploitation || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</strong>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>Fonds de Prévoyance:</span>
+                                                <strong className="text-white">${Number(activeAuditDetails?.audit?.cotisation_fonds_prevoyance || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</strong>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>Fonds d'Assurance:</span>
+                                                <strong className="text-white">${Number(activeAuditDetails?.audit?.cotisation_fonds_assurance || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</strong>
+                                            </div>
+                                            <div className="flex justify-between border-t border-zinc-800 pt-1 mt-1 font-bold text-purple-400">
+                                                <span>Total des Cotisations:</span>
+                                                <span>${Number(activeAuditDetails?.audit?.cotisation_fonds_total || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
+
+                                {/* Information added in the Syndicate (Client notes) */}
+                                {activeAuditDetails?.audit?.clients?.notes && (
+                                    <div className="p-4 bg-[#6366f1]/5 border border-[#6366f1]/20 rounded-xl space-y-1.5">
+                                        <span className="text-[#818cf8] block uppercase font-bold tracking-wider text-[9px]">Informations / Notes du Syndicat</span>
+                                        <p className="text-zinc-200 text-xs leading-relaxed whitespace-pre-wrap font-medium">{activeAuditDetails.audit.clients.notes}</p>
+                                    </div>
+                                )}
+
+                                {/* Observations Globales from Audit */}
+                                {activeAuditDetails?.audit?.notes && (
+                                    <div className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-1.5">
+                                        <span className="text-zinc-500 block uppercase font-bold tracking-wider text-[9px]">Observations Globales de l'Audit</span>
+                                        <p className="text-zinc-200 text-xs leading-relaxed whitespace-pre-wrap font-medium">{activeAuditDetails.audit.notes}</p>
+                                    </div>
+                                )}
 
                                 {/* Answers Section */}
                                 {activeAuditDetails?.answers && activeAuditDetails.answers.length > 0 && (
-                                    <div className="space-y-2.5">
-                                        <span className="text-[9px] uppercase font-bold text-zinc-500 block border-b border-zinc-900 pb-1">Évaluation des Critères</span>
-                                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                    <div className="space-y-2">
+                                        <span className="text-[10px] uppercase font-black text-zinc-500 block border-b border-zinc-850 pb-1">Évaluation Détaillée des Critères</span>
+                                        <div className="space-y-2.5 max-h-[35vh] overflow-y-auto pr-1">
                                             {activeAuditDetails.answers.map((ans: any) => {
                                                 const label = AUDIT_LABELS[ans.question_key] || ans.question_key
                                                 return (
-                                                    <div key={ans.id} className="p-2 bg-zinc-950/20 border border-zinc-900 rounded-lg text-xxs flex justify-between items-start gap-3">
-                                                        <div className="flex-1">
-                                                            <span className="font-semibold text-zinc-300 block">{label}</span>
-                                                            {ans.note && <span className="text-zinc-500 italic text-[9px] block mt-0.5 font-medium">{ans.note}</span>}
+                                                    <div key={ans.id} className="p-3 bg-zinc-950/20 border border-zinc-850 rounded-xl text-xs flex justify-between items-start gap-4 hover:border-zinc-800 transition-colors">
+                                                        <div className="flex-1 space-y-1">
+                                                            <span className="font-semibold text-zinc-200 block text-xs">{label}</span>
+                                                            {ans.note && (
+                                                                <p className="text-zinc-400 italic text-[11px] leading-normal font-medium bg-zinc-950/25 p-2 rounded-lg border border-zinc-900/60 mt-1">
+                                                                    {ans.note}
+                                                                </p>
+                                                            )}
                                                         </div>
-                                                        <span className="text-purple-400 font-bold shrink-0">{ans.score}/5</span>
+                                                        <span className="px-2.5 py-1 bg-purple-950/40 border border-purple-900/40 rounded text-purple-400 font-bold shrink-0 text-xs">
+                                                            {ans.score}/5
+                                                        </span>
                                                     </div>
                                                 )
                                             })}
