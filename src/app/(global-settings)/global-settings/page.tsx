@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Search, RefreshCw, List, FileSpreadsheet, Users, MessageSquare, Home } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { createClient } from '@/utils/supabase/client'
 import { Checkbox } from '@/components/ui/checkbox'
 
@@ -124,51 +124,83 @@ export default function GlobalSettingsPage() {
         return list
     }, [clients, showOnlyActive, selectedTeamId])
 
+    // Compute aggregates for cards on Lister Maitresse
+    const stats = useMemo(() => {
+        const activeClients = clients.filter(c => c.status !== 'inactive')
+        const totalSyndicates = activeClients.length
+        const totalDoors = activeClients.reduce((sum, c) => sum + (c.doors?.length || 0), 0)
+        const totalMonthlyRevenues = activeClients.reduce((sum, c) => sum + Number(c.package_pricing || 0), 0)
+        const totalSqFt = activeClients.reduce((sum, c) => sum + Number(c.total_square_feet || 0), 0)
+        return {
+            totalSyndicates,
+            totalDoors,
+            totalMonthlyRevenues,
+            totalSqFt
+        }
+    }, [clients])
+
     return (
         <div className="space-y-6">
             <div>
                 <h2 className="text-2xl font-bold tracking-tight text-zinc-100">Configuration Globale & Snapshots</h2>
                 <p className="text-sm text-zinc-400">
-                    Source de vérité Gustav pour la liste maîtresse des syndicats (SDC) et les imports Microsoft List.
+                    Source de vérité Gustav pour la liste maîtresse des syndicats (SDC) et les rapports.
                 </p>
             </div>
 
             <Tabs defaultValue="clients" value={activeTab} onValueChange={handleTabChange} className="w-full space-y-6">
-                <TabsList className="bg-zinc-950 border border-zinc-850 p-1 flex justify-start gap-1 w-fit rounded-xl max-w-full overflow-x-auto scrollbar-none">
-                    <TabsTrigger value="clients" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
-                        <List className="h-4 w-4" />
-                        Liste Maîtresse SDC
-                    </TabsTrigger>
-                    <TabsTrigger value="real-estate" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
-                        <Home className="h-4 w-4 text-cyan-405 text-cyan-400" />
-                        Données Immobilières
-                    </TabsTrigger>
-                    <TabsTrigger value="snapshots" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
-                        <FileSpreadsheet className="h-4 w-4" />
-                        Snapshots & Synchro
-                    </TabsTrigger>
-                    <TabsTrigger value="communications" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
-                        <MessageSquare className="h-4 w-4" />
-                        Analyse Communications
-                    </TabsTrigger>
-                    <TabsTrigger value="comms-analytics" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
-                        <MessageSquare className="h-4 w-4 text-indigo-400" />
-                        Analytics Communications
-                    </TabsTrigger>
-                    <TabsTrigger value="extractor" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
-                        <FileSpreadsheet className="h-4 w-4 text-emerald-400" />
-                        Extracteur Laucandrique
-                    </TabsTrigger>
-                    {userRole === 'Master' && (
-                        <TabsTrigger value="accounts" className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-zinc-900 data-[state=active]:text-white">
-                            <Users className="h-4 w-4" />
-                            Gestion des Comptes
-                        </TabsTrigger>
-                    )}
-                </TabsList>
+                {/* Main tabs trigger list is hidden as it is handled by the sidebar menu */}
 
-                {/* TAB 1: CLIENT MASTER LIST */}
+                {/* TAB 1: CLIENT MASTER LIST (Lister Maitresse) */}
                 <TabsContent value="clients" className="space-y-4 outline-none">
+                    {/* Main aggregate cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <Card className="bg-zinc-900 border-zinc-800 text-zinc-100 shadow-md hover:border-zinc-700 transition-all">
+                            <CardContent className="p-4">
+                                <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                                    <Users className="h-4 w-4 text-cyan-400" />
+                                    Syndicats Actifs
+                                </span>
+                                <div className="text-2xl font-black text-white">{stats.totalSyndicates}</div>
+                                <p className="text-[10px] text-zinc-500 mt-1">Copropriétés actives</p>
+                            </CardContent>
+                        </Card>
+                        <Card className="bg-zinc-900 border-zinc-800 text-zinc-100 shadow-md hover:border-zinc-700 transition-all">
+                            <CardContent className="p-4">
+                                <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                                    <Home className="h-4 w-4 text-indigo-400" />
+                                    Nombre de Portes
+                                </span>
+                                <div className="text-2xl font-black text-white">{new Intl.NumberFormat('fr-CA').format(stats.totalDoors)}</div>
+                                <p className="text-[10px] text-zinc-500 mt-1">Unités sous gestion actives</p>
+                            </CardContent>
+                        </Card>
+                        <Card className="bg-zinc-900 border-zinc-800 text-zinc-100 shadow-md hover:border-zinc-700 transition-all">
+                            <CardContent className="p-4">
+                                <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                                    <RefreshCw className="h-4 w-4 text-emerald-400" />
+                                    Revenus Mensuels
+                                </span>
+                                <div className="text-2xl font-black text-white">
+                                    {new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(stats.totalMonthlyRevenues)}
+                                </div>
+                                <p className="text-[10px] text-zinc-500 mt-1">Volume d'honoraires actifs</p>
+                            </CardContent>
+                        </Card>
+                        <Card className="bg-zinc-900 border-zinc-800 text-zinc-100 shadow-md hover:border-zinc-700 transition-all">
+                            <CardContent className="p-4">
+                                <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                                    <RefreshCw className="h-4 w-4 text-purple-400" />
+                                    Superficie Totale
+                                </span>
+                                <div className="text-2xl font-black text-white">
+                                    {new Intl.NumberFormat('fr-CA').format(stats.totalSqFt)} pi²
+                                </div>
+                                <p className="text-[10px] text-zinc-500 mt-1">Somme des superficies déclarées</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+
                     <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 flex-1">
                             <div className="relative w-full max-w-sm">
@@ -231,23 +263,122 @@ export default function GlobalSettingsPage() {
                     </Card>
                 </TabsContent>
 
-                {/* TAB real-estate: GLOBAL REAL ESTATE STATS */}
-                <TabsContent value="real-estate" className="outline-none">
+                {/* TAB real-estate: DONNÉES IMMOBILIÈRES (under Statistics) */}
+                <TabsContent value="real-estate" className="outline-none space-y-6">
+                    {/* Sub navigation for Statistics */}
+                    <div className="border-b border-zinc-800 pb-2">
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('real-estate')}
+                                className="px-4 py-2 font-extrabold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer border-indigo-500 text-white"
+                            >
+                                Données Immobilières
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('comms-analytics')}
+                                className="px-4 py-2 font-extrabold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer border-transparent text-zinc-500 hover:text-zinc-300"
+                            >
+                                Analytics Communications
+                            </button>
+                        </div>
+                    </div>
                     <GlobalRealEstateStats data={globalStats} />
                 </TabsContent>
 
-                {/* TAB 2: SNAPSHOTS */}
-                <TabsContent value="snapshots" className="outline-none">
-                    <SnapshotWorkspace 
-                        snapshots={snapshots} 
-                        managers={managers} 
-                        existingClients={clients}
-                        currentUserRole={userRole}
+                {/* TAB comms-analytics: ANALYTICS COMMUNICATIONS (under Statistics) */}
+                <TabsContent value="comms-analytics" className="outline-none space-y-6">
+                    {/* Sub navigation for Statistics */}
+                    <div className="border-b border-zinc-800 pb-2">
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('real-estate')}
+                                className="px-4 py-2 font-extrabold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer border-transparent text-zinc-500 hover:text-zinc-300"
+                            >
+                                Données Immobilières
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('comms-analytics')}
+                                className="px-4 py-2 font-extrabold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer border-indigo-500 text-white"
+                            >
+                                Analytics Communications
+                            </button>
+                        </div>
+                    </div>
+                    <GlobalCommunicationAnalytics 
+                        stats={allCommsStats} 
+                        teams={teams}
+                        targetIndex={targetIndex}
                     />
                 </TabsContent>
 
-                {/* TAB 3: COMMUNICATIONS ANALYZER */}
-                <TabsContent value="communications" className="outline-none">
+                {/* TAB extractor: EXTRACTOR LAUCANDRIQUE (under Tools) */}
+                <TabsContent value="extractor" className="outline-none space-y-6">
+                    {/* Sub navigation for Tools */}
+                    <div className="border-b border-zinc-800 pb-2">
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('extractor')}
+                                className="px-4 py-2 font-extrabold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer border-indigo-500 text-white"
+                            >
+                                Extracteur Laucandrique
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('communications')}
+                                className="px-4 py-2 font-extrabold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer border-transparent text-zinc-500 hover:text-zinc-300"
+                            >
+                                Analyse Communications
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('snapshots')}
+                                className="px-4 py-2 font-extrabold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer border-transparent text-zinc-500 hover:text-zinc-300"
+                            >
+                                Snapshots & Synchro
+                            </button>
+                        </div>
+                    </div>
+                    <LaucandriqueExtractor 
+                        onSendToAnalyzer={(files) => {
+                            setExtractorQueue(files)
+                            handleTabChange('communications')
+                        }}
+                    />
+                </TabsContent>
+
+                {/* TAB communications: ANALYSE COMMUNICATIONS (under Tools) */}
+                <TabsContent value="communications" className="outline-none space-y-6">
+                    {/* Sub navigation for Tools */}
+                    <div className="border-b border-zinc-800 pb-2">
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('extractor')}
+                                className="px-4 py-2 font-extrabold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer border-transparent text-zinc-500 hover:text-zinc-300"
+                            >
+                                Extracteur Laucandrique
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('communications')}
+                                className="px-4 py-2 font-extrabold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer border-indigo-500 text-white"
+                            >
+                                Analyse Communications
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('snapshots')}
+                                className="px-4 py-2 font-extrabold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer border-transparent text-zinc-500 hover:text-zinc-300"
+                            >
+                                Snapshots & Synchro
+                            </button>
+                        </div>
+                    </div>
                     <CommunicationAnalyzer 
                         clients={filteredClients} 
                         stats={allCommsStats} 
@@ -257,26 +388,43 @@ export default function GlobalSettingsPage() {
                     />
                 </TabsContent>
 
-                {/* TAB extractor: LAUCANDRIQUE EXTRACTOR */}
-                <TabsContent value="extractor" className="outline-none">
-                    <LaucandriqueExtractor 
-                        onSendToAnalyzer={(files) => {
-                            setExtractorQueue(files)
-                            handleTabChange('communications')
-                        }}
+                {/* TAB snapshots: SNAPSHOTS & SYNCHRO (under Tools) */}
+                <TabsContent value="snapshots" className="outline-none space-y-6">
+                    {/* Sub navigation for Tools */}
+                    <div className="border-b border-zinc-800 pb-2">
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('extractor')}
+                                className="px-4 py-2 font-extrabold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer border-transparent text-zinc-500 hover:text-zinc-300"
+                            >
+                                Extracteur Laucandrique
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('communications')}
+                                className="px-4 py-2 font-extrabold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer border-transparent text-zinc-500 hover:text-zinc-300"
+                            >
+                                Analyse Communications
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('snapshots')}
+                                className="px-4 py-2 font-extrabold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer border-indigo-500 text-white"
+                            >
+                                Snapshots & Synchro
+                            </button>
+                        </div>
+                    </div>
+                    <SnapshotWorkspace 
+                        snapshots={snapshots} 
+                        managers={managers} 
+                        existingClients={clients}
+                        currentUserRole={userRole}
                     />
                 </TabsContent>
 
-                {/* TAB 4: GLOBAL COMMUNICATIONS ANALYTICS */}
-                <TabsContent value="comms-analytics" className="outline-none">
-                    <GlobalCommunicationAnalytics 
-                        stats={allCommsStats} 
-                        teams={teams}
-                        targetIndex={targetIndex}
-                    />
-                </TabsContent>
-
-                {/* TAB 3: ACCOUNTS MANAGEMENT */}
+                {/* TAB: ACCOUNTS MANAGEMENT (Separate top-level link for Master role) */}
                 {userRole === 'Master' && (
                     <TabsContent value="accounts" className="outline-none">
                         <AccountsManager 

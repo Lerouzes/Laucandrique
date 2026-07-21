@@ -23,15 +23,31 @@ export type SpecialAssessmentInput = {
 export async function getSyndicateStatsAction(clientId: string) {
     const supabase = await createClient()
 
-    // 1. Fetch total_square_feet from clients
-    const { data: clientData, error: clientErr } = await supabase
+    // 1. Fetch total_square_feet and construction_year from clients (with fallback)
+    let total_square_feet: number | null = null
+    let construction_year: number | null = null
+
+    const { data: clientDataBoth, error: clientErrBoth } = await supabase
         .from('clients')
-        .select('total_square_feet')
+        .select('total_square_feet, construction_year')
         .eq('id', clientId)
         .single()
 
-    if (clientErr) {
-        console.error('Error fetching client total_square_feet:', clientErr)
+    if (!clientErrBoth && clientDataBoth) {
+        total_square_feet = clientDataBoth.total_square_feet
+        construction_year = clientDataBoth.construction_year
+    } else {
+        const { data: clientDataFallback, error: clientErrFallback } = await supabase
+            .from('clients')
+            .select('total_square_feet')
+            .eq('id', clientId)
+            .single()
+        if (clientDataFallback) {
+            total_square_feet = clientDataFallback.total_square_feet
+        }
+        if (clientErrFallback) {
+            console.error('Error fetching client total_square_feet:', clientErrFallback)
+        }
     }
 
     // 2. Fetch yearly stats
@@ -57,7 +73,8 @@ export async function getSyndicateStatsAction(clientId: string) {
     }
 
     return {
-        total_square_feet: clientData?.total_square_feet || null,
+        total_square_feet,
+        construction_year,
         yearlyStats: yearlyStats || [],
         specialAssessments: specialAssessments || []
     }
@@ -66,19 +83,32 @@ export async function getSyndicateStatsAction(clientId: string) {
 export async function saveSyndicateStatsAction(
     clientId: string,
     totalSquareFeet: number | null,
+    constructionYear: number | null,
     yearlyStats: YearlyStatInput[],
     specialAssessments: SpecialAssessmentInput[]
 ) {
     const supabase = await createClient()
 
-    // 1. Update total_square_feet on public.clients
-    const { error: clientErr } = await supabase
+    // 1. Update total_square_feet and construction_year on public.clients (with fallback)
+    let clientErr: any = null
+    const { error: errBoth } = await supabase
         .from('clients')
-        .update({ total_square_feet: totalSquareFeet })
+        .update({ 
+            total_square_feet: totalSquareFeet,
+            construction_year: constructionYear
+        })
         .eq('id', clientId)
 
-    if (clientErr) {
-        throw new Error(`Failed to update total square feet: ${clientErr.message}`)
+    if (errBoth) {
+        // Fallback to only updating total_square_feet in case construction_year doesn't exist yet
+        const { error: errFallback } = await supabase
+            .from('clients')
+            .update({ total_square_feet: totalSquareFeet })
+            .eq('id', clientId)
+        clientErr = errFallback
+        if (errFallback) {
+            throw new Error(`Failed to update client stats: ${errFallback.message}`)
+        }
     }
 
     // 2. Save client_yearly_stats

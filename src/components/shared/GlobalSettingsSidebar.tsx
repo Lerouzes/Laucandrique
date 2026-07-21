@@ -12,7 +12,8 @@ import {
     Wrench,
     Settings,
     ShieldCheck,
-    MessageSquare
+    MessageSquare,
+    BarChart
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -107,11 +108,26 @@ export function GlobalSettingsSidebar({ profile }: { profile: Profile | null }) 
             {/* Nav list */}
             <nav className="flex-1 space-y-1.5 px-3 py-4 overflow-y-auto">
                 {[
-                    { name: 'Liste Maîtresse SDC', href: '/global-settings?tab=clients', key: 'clients', icon: Users },
-                    { name: 'Snapshots & Synchro', href: '/global-settings?tab=snapshots', key: 'snapshots', icon: FileSpreadsheet },
-                    { name: 'Analyse Communications', href: '/global-settings?tab=communications', key: 'communications', icon: MessageSquare }
+                    { 
+                        name: 'Lister Maitresse', 
+                        href: '/global-settings?tab=clients', 
+                        isActive: activeTab === 'clients', 
+                        icon: Users 
+                    },
+                    { 
+                        name: 'Statistiques', 
+                        href: '/global-settings?tab=real-estate', 
+                        isActive: activeTab === 'real-estate' || activeTab === 'comms-analytics', 
+                        icon: BarChart 
+                    },
+                    { 
+                        name: 'Outils', 
+                        href: '/global-settings?tab=extractor', 
+                        isActive: activeTab === 'extractor' || activeTab === 'communications' || activeTab === 'snapshots', 
+                        icon: Wrench 
+                    }
                 ].map((item) => {
-                    const isActive = pathname === '/global-settings' && activeTab === item.key
+                    const isActive = item.isActive
                     return (
                         <Link
                             key={item.name}

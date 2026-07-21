@@ -25,6 +25,7 @@ type SyndicateStatsManagerProps = {
     clientId: string
     initialStats: {
         total_square_feet: number | null
+        construction_year?: number | null
         yearlyStats: any[]
         specialAssessments: any[]
     }
@@ -36,6 +37,19 @@ export function SyndicateStatsManager({ clientId, initialStats }: SyndicateStats
     const [totalSquareFeet, setTotalSquareFeet] = useState<string>(
         initialStats.total_square_feet !== null ? String(initialStats.total_square_feet) : ''
     )
+
+    const [constructionYear, setConstructionYear] = useState<string>(
+        initialStats.construction_year !== undefined && initialStats.construction_year !== null 
+            ? String(initialStats.construction_year) 
+            : ''
+    )
+
+    const [isEditingPhysical, setIsEditingPhysical] = useState<boolean>(
+        initialStats.total_square_feet === null && 
+        (initialStats.construction_year === undefined || initialStats.construction_year === null)
+    )
+
+    const [editingYears, setEditingYears] = useState<Record<number, boolean>>({})
 
     // Keep yearly stats in state
     const [yearlyStats, setYearlyStats] = useState<YearlyStatInput[]>(() => 
@@ -87,6 +101,7 @@ export function SyndicateStatsManager({ clientId, initialStats }: SyndicateStats
         }
 
         setYearlyStats(prev => [...prev, newEntry].sort((a, b) => b.year - a.year))
+        setEditingYears(prev => ({ ...prev, [yr]: true }))
         setNewYearInput('')
         toast.success(`Année ${yr} initialisée. Saisissez ses détails ci-dessous.`)
     }
@@ -150,7 +165,10 @@ export function SyndicateStatsManager({ clientId, initialStats }: SyndicateStats
         startTransition(async () => {
             try {
                 const sqFt = totalSquareFeet.trim() !== '' ? Number(totalSquareFeet) : null
-                await saveSyndicateStatsAction(clientId, sqFt, yearlyStats, specialAssessments)
+                const constYr = constructionYear.trim() !== '' ? Number(constructionYear) : null
+                await saveSyndicateStatsAction(clientId, sqFt, constYr, yearlyStats, specialAssessments)
+                setIsEditingPhysical(false)
+                setEditingYears({})
                 toast.success("Toutes les statistiques immobilières ont été enregistrées avec succès!")
             } catch (err: any) {
                 console.error(err)
@@ -208,10 +226,14 @@ export function SyndicateStatsManager({ clientId, initialStats }: SyndicateStats
         return 'bg-purple-500/10 text-purple-400 border-purple-500/20'
     }
 
+    const formatNumber = (v: number) => {
+        return new Intl.NumberFormat('fr-CA').format(v)
+    }
+
     return (
         <div className="space-y-6">
             {/* Header info */}
-            <Card className="bg-zinc-900 border-zinc-800 text-zinc-100">
+            <Card className="bg-zinc-900 border-zinc-800 text-zinc-100 shadow-lg">
                 <CardHeader className="pb-3 border-b border-zinc-850">
                     <div className="flex justify-between items-start gap-4 flex-wrap">
                         <div>
@@ -220,7 +242,7 @@ export function SyndicateStatsManager({ clientId, initialStats }: SyndicateStats
                                 Fiche Technique & Paramètres Physiques
                             </CardTitle>
                             <CardDescription className="text-xs text-zinc-400">
-                                Saisissez la superficie totale et les budgets de la copropriété.
+                                Saisissez la superficie totale, l'année de construction et les budgets de la copropriété.
                             </CardDescription>
                         </div>
                         <Button
@@ -238,21 +260,65 @@ export function SyndicateStatsManager({ clientId, initialStats }: SyndicateStats
                     </div>
                 </CardHeader>
                 <CardContent className="pt-4 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        <div className="space-y-1.5">
-                            <Label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                                <LandPlot className="h-3.5 w-3.5 text-cyan-400" />
-                                Superficie Totale (Pieds Carrés)
-                            </Label>
-                            <Input
-                                type="number"
-                                placeholder="Ex: 45000"
-                                value={totalSquareFeet}
-                                onChange={e => setTotalSquareFeet(e.target.value)}
-                                className="bg-zinc-950 border-zinc-850 h-9 text-xs text-white"
-                            />
+                    {!isEditingPhysical ? (
+                        <div className="flex justify-between items-center bg-zinc-950/40 border border-zinc-850 p-4 rounded-xl">
+                            <div className="grid grid-cols-2 gap-8 sm:gap-16">
+                                <div>
+                                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
+                                        Superficie Totale
+                                    </span>
+                                    <span className="text-sm font-black text-white">
+                                        {totalSquareFeet ? `${formatNumber(Number(totalSquareFeet))} pi²` : 'Non renseignée'}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
+                                        Année de Construction
+                                    </span>
+                                    <span className="text-sm font-black text-white">
+                                        {constructionYear ? `${constructionYear}` : 'Non renseignée'}
+                                    </span>
+                                </div>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setIsEditingPhysical(true)}
+                                className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/20 h-8 px-3 rounded-lg text-xxs font-extrabold gap-1"
+                            >
+                                Modifier
+                            </Button>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                                    <LandPlot className="h-3.5 w-3.5 text-cyan-400" />
+                                    Superficie Totale (Pieds Carrés)
+                                </Label>
+                                <Input
+                                    type="number"
+                                    placeholder="Ex: 45000"
+                                    value={totalSquareFeet}
+                                    onChange={e => setTotalSquareFeet(e.target.value)}
+                                    className="bg-zinc-950 border-zinc-850 h-9 text-xs text-white"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                                    <Calendar className="h-3.5 w-3.5 text-cyan-400" />
+                                    Année de Construction
+                                </Label>
+                                <Input
+                                    type="number"
+                                    placeholder="Ex: 1995"
+                                    value={constructionYear}
+                                    onChange={e => setConstructionYear(e.target.value)}
+                                    className="bg-zinc-950 border-zinc-850 h-9 text-xs text-white"
+                                />
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -293,6 +359,9 @@ export function SyndicateStatsManager({ clientId, initialStats }: SyndicateStats
                         const prevYoY = getYoYComparison(y.year, 'prevention_fund_fees')
                         const insYoY = getYoYComparison(y.year, 'insurance_fund_fees')
 
+                        const isEditing = editingYears[y.year] || 
+                            (y.building_valuation === 0 && y.regular_condo_fees === 0 && y.prevention_fund_fees === 0 && y.insurance_fund_fees === 0)
+
                         // Find matching assessments for this year
                         const yearAssessments = specialAssessments.filter(s => s.year === y.year)
 
@@ -304,65 +373,116 @@ export function SyndicateStatsManager({ clientId, initialStats }: SyndicateStats
                                         <Calendar className="h-4.5 w-4.5 text-cyan-400" />
                                         <span className="font-extrabold text-white text-sm">Année {y.year}</span>
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleRemoveYear(y.year)}
-                                        className="text-rose-450 hover:text-rose-400 hover:bg-rose-950/20 h-8 px-2 rounded-lg text-xxs font-extrabold gap-1"
-                                    >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                        Supprimer l'Année
-                                    </Button>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setEditingYears(prev => ({ ...prev, [y.year]: !prev[y.year] }))}
+                                            className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/20 h-8 px-2.5 rounded-lg text-xxs font-extrabold gap-1"
+                                        >
+                                            {isEditing ? 'Terminer' : 'Modifier les Budgets'}
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleRemoveYear(y.year)}
+                                            className="text-rose-450 hover:text-rose-400 hover:bg-rose-950/20 h-8 px-2 rounded-lg text-xxs font-extrabold gap-1"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                            Supprimer l'Année
+                                        </Button>
+                                    </div>
                                 </CardHeader>
 
                                 {/* Card Content */}
                                 <CardContent className="p-5 space-y-5">
-                                    {/* Regular Budgets Fields Grid */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] text-zinc-400 font-bold uppercase">Évaluation Bâtiment ($)</Label>
-                                            <Input
-                                                type="number"
-                                                value={y.building_valuation || ''}
-                                                onChange={e => handleUpdateYearlyField(y.year, 'building_valuation', Number(e.target.value))}
-                                                className="bg-zinc-950 border-zinc-850 h-9 text-xs text-white"
-                                            />
-                                            <div className="h-4">{formatYoY(valYoY)}</div>
+                                    {/* Budgets Fields Grid (Read-only vs Edit Mode) */}
+                                    {!isEditing ? (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 bg-zinc-950/20 p-4 border border-zinc-850 rounded-xl">
+                                            <div>
+                                                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block mb-1">
+                                                    Évaluation Bâtiment
+                                                </span>
+                                                <span className="text-sm font-black text-white block">
+                                                    {y.building_valuation ? formatCurrency(y.building_valuation) : '0 $'}
+                                                </span>
+                                                <div className="h-4 mt-0.5">{formatYoY(valYoY)}</div>
+                                            </div>
+                                            <div>
+                                                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block mb-1">
+                                                    Frais Réguliers
+                                                </span>
+                                                <span className="text-sm font-black text-white block">
+                                                    {y.regular_condo_fees ? formatCurrency(y.regular_condo_fees) : '0 $'}
+                                                </span>
+                                                <div className="h-4 mt-0.5">{formatYoY(regYoY)}</div>
+                                            </div>
+                                            <div>
+                                                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block mb-1">
+                                                    Fonds Prévoyance
+                                                </span>
+                                                <span className="text-sm font-black text-white block">
+                                                    {y.prevention_fund_fees ? formatCurrency(y.prevention_fund_fees) : '0 $'}
+                                                </span>
+                                                <div className="h-4 mt-0.5">{formatYoY(prevYoY)}</div>
+                                            </div>
+                                            <div>
+                                                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block mb-1">
+                                                    Fonds Assurance
+                                                </span>
+                                                <span className="text-sm font-black text-white block">
+                                                    {y.insurance_fund_fees ? formatCurrency(y.insurance_fund_fees) : '0 $'}
+                                                </span>
+                                                <div className="h-4 mt-0.5">{formatYoY(insYoY)}</div>
+                                            </div>
                                         </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                                            <div className="space-y-1.5">
+                                                <Label className="text-[10px] text-zinc-400 font-bold uppercase">Évaluation Bâtiment ($)</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={y.building_valuation || ''}
+                                                    onChange={e => handleUpdateYearlyField(y.year, 'building_valuation', Number(e.target.value))}
+                                                    className="bg-zinc-950 border-zinc-850 h-9 text-xs text-white"
+                                                />
+                                                <div className="h-4">{formatYoY(valYoY)}</div>
+                                            </div>
 
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] text-zinc-400 font-bold uppercase">Frais Réguliers ($)</Label>
-                                            <Input
-                                                type="number"
-                                                value={y.regular_condo_fees || ''}
-                                                onChange={e => handleUpdateYearlyField(y.year, 'regular_condo_fees', Number(e.target.value))}
-                                                className="bg-zinc-950 border-zinc-850 h-9 text-xs text-white"
-                                            />
-                                            <div className="h-4">{formatYoY(regYoY)}</div>
-                                        </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-[10px] text-zinc-400 font-bold uppercase">Frais Réguliers ($)</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={y.regular_condo_fees || ''}
+                                                    onChange={e => handleUpdateYearlyField(y.year, 'regular_condo_fees', Number(e.target.value))}
+                                                    className="bg-zinc-950 border-zinc-850 h-9 text-xs text-white"
+                                                />
+                                                <div className="h-4">{formatYoY(regYoY)}</div>
+                                            </div>
 
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] text-zinc-400 font-bold uppercase">Fonds Prévoyance ($)</Label>
-                                            <Input
-                                                type="number"
-                                                value={y.prevention_fund_fees || ''}
-                                                onChange={e => handleUpdateYearlyField(y.year, 'prevention_fund_fees', Number(e.target.value))}
-                                                className="bg-zinc-950 border-zinc-850 h-9 text-xs text-white"
-                                            />
-                                            <div className="h-4">{formatYoY(prevYoY)}</div>
-                                        </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-[10px] text-zinc-400 font-bold uppercase">Fonds Prévoyance ($)</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={y.prevention_fund_fees || ''}
+                                                    onChange={e => handleUpdateYearlyField(y.year, 'prevention_fund_fees', Number(e.target.value))}
+                                                    className="bg-zinc-950 border-zinc-850 h-9 text-xs text-white"
+                                                />
+                                                <div className="h-4">{formatYoY(prevYoY)}</div>
+                                            </div>
 
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] text-zinc-400 font-bold uppercase">Fonds Assurance ($)</Label>
-                                            <Input
-                                                type="number"
-                                                value={y.insurance_fund_fees || ''}
-                                                onChange={e => handleUpdateYearlyField(y.year, 'insurance_fund_fees', Number(e.target.value))}
-                                                className="bg-zinc-950 border-zinc-850 h-9 text-xs text-white"
-                                            />
-                                            <div className="h-4">{formatYoY(insYoY)}</div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-[10px] text-zinc-400 font-bold uppercase">Fonds Assurance ($)</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={y.insurance_fund_fees || ''}
+                                                    onChange={e => handleUpdateYearlyField(y.year, 'insurance_fund_fees', Number(e.target.value))}
+                                                    className="bg-zinc-950 border-zinc-850 h-9 text-xs text-white"
+                                                />
+                                                <div className="h-4">{formatYoY(insYoY)}</div>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
 
                                     {/* Nested Special Assessments Manager */}
                                     <div className="pt-4 border-t border-zinc-850 space-y-3">
