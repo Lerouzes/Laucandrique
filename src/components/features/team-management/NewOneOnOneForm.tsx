@@ -5,11 +5,16 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
     createOneOnOneAction, 
+    updateOneOnOneAction,
     getOneOnOneSnapshotAction,
+    purgeOverdue2025AssembliesAction,
+    updateOneOnOneItemNoteAction,
+    deleteOneOnOneItemNoteAction,
     getCategoryComplaintHistoryAction,
     getSyndicateAuditDetailsAction,
     getAssemblyEvaluationDetailsAction
 } from '@/actions/team-management'
+import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -40,7 +45,14 @@ import {
     X,
     ArrowLeft,
     RefreshCw,
-    Clock
+    Clock,
+    Edit,
+    Check,
+    CheckSquare,
+    Plus,
+    ArrowUp,
+    ArrowDown,
+    Network
 } from 'lucide-react'
 import { SearchableClientSelect } from './SearchableClientSelect'
 import { SearchableManagerSelect } from './SearchableManagerSelect'
@@ -243,7 +255,11 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
     const [editingComplaintSeverity, setEditingComplaintSeverity] = useState<'low' | 'medium' | 'high' | 'critical'>('medium')
     const [editingComplaintMyNotes, setEditingComplaintMyNotes] = useState('')
     const [editingComplaintManagerNotes, setEditingComplaintManagerNotes] = useState('')
-    const [editingComplaintStatus, setEditingComplaintStatus] = useState<'not_discussed' | 'postponed' | 'resolved'>('not_discussed')
+    const [activePage, setActivePage] = useState<'page1' | 'page2'>('page1')
+    const [createdMeetingId, setCreatedMeetingId] = useState<string | null>(null)
+    const [editingItemNoteId, setEditingItemNoteId] = useState<string | null>(null)
+    const [editingItemNoteText, setEditingItemNoteText] = useState<string>('')
+    const [editingComplaintStatus, setEditingComplaintStatus] = useState<'not_discussed' | 'in_progress' | 'resolved'>('not_discussed')
 
     const [activeAudit, setActiveAudit] = useState<any | null>(null)
     const [activeAuditDetails, setActiveAuditDetails] = useState<any | null>(null)
@@ -364,9 +380,32 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
         setSelectedRiskIdx(null)
     }
 
+    const handlePurgeOverdueAssemblies = async () => {
+        if (!managerId) return
+        try {
+            setLoading(true)
+            await purgeOverdue2025AssembliesAction(managerId)
+            toast.success("Assemblées 2025 en retard purguées avec succès.")
+            const snapshot = await getOneOnOneSnapshotAction(managerId)
+            if (snapshot?.assemblyEvaluations) {
+                setAssemblyEvaluations(snapshot.assemblyEvaluations)
+            }
+        } catch (err) {
+            toast.error("Erreur lors de la purge : " + (err as Error).message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const getClientName = (id: string) => {
         const found = clientsList.find(c => c.id === id)
-        return found ? (found.company_name || found.full_name) : id
+        if (!found) return id || 'Syndicat inconnu'
+        const company = found.company_name || found.name || ''
+        const sdc = found.full_name || found.sdc || ''
+        if (company && sdc && company !== sdc) {
+            return `${company} (${sdc})`
+        }
+        return company || sdc || 'Syndicat'
     }
 
     const openComplaintModal = (c: any) => {
@@ -375,16 +414,21 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
         setEditingComplaintDesc(c.description || '')
         setEditingComplaintSeverity(c.severity || 'medium')
 
-        const state = reviewedComplaintsState[c.id] || { checked: false, my_notes: '', manager_notes: '', resolved_in_meeting: false }
+        const state = reviewedComplaintsState[c.id] || { 
+            checked: false, 
+            my_notes: c.discussion_notes || c.my_notes || '', 
+            manager_notes: c.resolution_plan || c.manager_notes || '', 
+            resolved_in_meeting: Boolean(c.resolved_in_meeting) 
+        }
         setEditingComplaintMyNotes(state.my_notes || '')
         setEditingComplaintManagerNotes(state.manager_notes || '')
         
-        if (!state.checked) {
+        if (!state.checked && !c.last_status) {
             setEditingComplaintStatus('not_discussed')
-        } else if (state.resolved_in_meeting) {
+        } else if (state.resolved_in_meeting || c.last_status === 'resolved') {
             setEditingComplaintStatus('resolved')
         } else {
-            setEditingComplaintStatus('postponed')
+            setEditingComplaintStatus('in_progress')
         }
     }
 
@@ -403,6 +447,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 my_notes: editingComplaintMyNotes,
                 manager_notes: editingComplaintManagerNotes,
                 resolved_in_meeting: isResolved,
+                status: editingComplaintStatus,
                 title: editingComplaintTitle,
                 description: editingComplaintDesc,
                 severity: editingComplaintSeverity,
@@ -416,7 +461,13 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                     ...comp,
                     title: editingComplaintTitle,
                     description: editingComplaintDesc,
-                    severity: editingComplaintSeverity
+                    severity: editingComplaintSeverity,
+                    discussion_notes: editingComplaintMyNotes,
+                    my_notes: editingComplaintMyNotes,
+                    resolution_plan: editingComplaintManagerNotes,
+                    manager_notes: editingComplaintManagerNotes,
+                    resolved_in_meeting: isResolved,
+                    status: editingComplaintStatus
                 }
             }
             return comp
@@ -818,8 +869,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 }))
             ]
 
-            const createdMeeting = await createOneOnOneAction({
-                manager_id: managerId,
+            const payload = {
                 meeting_date: meetingDate,
                 status,
                 emails_over_48h: Number(emailsOver48h),
@@ -843,7 +893,6 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 escalation_needed: '',
                 operational_blockers: '',
                 conflict_resolution: '',
-                // Redesigned fields
                 workload_notes: workloadNotes,
                 prioritization_notes: prioritizationNotes,
                 stress_notes: stressNotes,
@@ -858,12 +907,32 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 taskEmailAudits,
                 operationalRisks,
                 summary
-            })
+            }
 
-            if (createdMeeting?.id) {
-                router.push(`/team-management/one-on-ones/${createdMeeting.id}`)
+            let meetingIdToUse = createdMeetingId
+            let meetingRes
+
+            if (meetingIdToUse) {
+                meetingRes = await updateOneOnOneAction(meetingIdToUse, payload)
             } else {
-                router.push('/team-management/one-on-ones')
+                meetingRes = await createOneOnOneAction({
+                    manager_id: managerId,
+                    ...payload
+                })
+            }
+
+            const targetId = meetingRes?.id || meetingIdToUse
+            if (targetId) setCreatedMeetingId(targetId)
+
+            if (status === 'draft') {
+                toast.success("Brouillon sauvegardé avec succès. Vous pouvez continuer la modification sur cette page.")
+            } else {
+                toast.success("Alignement 1-à-1 publié avec succès.")
+                if (targetId) {
+                    router.push(`/team-management/one-on-ones/${targetId}`)
+                } else {
+                    router.push('/team-management/one-on-ones')
+                }
             }
         } catch (err) {
             alert('Erreur lors de la création de la rencontre: ' + (err as Error).message)
@@ -938,7 +1007,37 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 </div>
             </div>
 
-            {/* Summary / Overview */}
+            {/* Page Navigation Tabs */}
+            <div className="flex gap-2 border-b border-zinc-800 pb-3">
+                <button
+                    type="button"
+                    onClick={() => setActivePage('page1')}
+                    className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+                        activePage === 'page1'
+                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
+                            : 'bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800'
+                    }`}
+                >
+                    <Sliders className="h-4 w-4" />
+                    Page 1 : Alignement, Ordre du Jour &amp; Bilan
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setActivePage('page2')}
+                    className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+                        activePage === 'page2'
+                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
+                            : 'bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800'
+                    }`}
+                >
+                    <Network className="h-4 w-4" />
+                    Page 2 : Confirmation des Assemblées
+                </button>
+            </div>
+
+            {activePage === 'page1' && (
+                <div className="space-y-6">
+                    {/* Summary / Overview */}
             <Card className="bg-[#16171e]/70 border-zinc-800 shadow-md">
                 <CardHeader className="py-3 border-b border-zinc-900 bg-zinc-950/10">
                     <CardTitle className="text-xs font-bold text-white flex items-center gap-1.5 uppercase tracking-wider text-purple-400">
@@ -1620,7 +1719,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                                         isResolved ? (
                                                             <span className="text-emerald-400 font-bold flex items-center gap-0.5"><CheckCircle2 className="h-3.5 w-3.5" /> Résolu</span>
                                                         ) : (
-                                                            <span className="text-amber-400 font-bold flex items-center gap-0.5"><AlertCircle className="h-3.5 w-3.5" /> Reporté</span>
+                                                            <span className="text-amber-400 font-bold flex items-center gap-0.5"><AlertCircle className="h-3.5 w-3.5" /> En cours</span>
                                                         )
                                                     ) : (
                                                         <span className="text-zinc-500 font-semibold">Non discuté</span>
@@ -2033,6 +2132,62 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 </CardContent>
             </Card>
 
+            <div className="flex justify-end pt-4">
+                <Button 
+                    type="button"
+                    onClick={() => setActivePage('page2')}
+                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-9 px-5 rounded-xl flex items-center gap-2 shadow-lg"
+                >
+                    Confirmer la date des assemblées (Page 2) &rarr;
+                </Button>
+            </div>
+        </div>
+    )}
+
+    {activePage === 'page2' && (
+        <div className="space-y-6">
+            <Card className="bg-[#16171e]/70 border-zinc-800 shadow-md">
+                <CardHeader className="pb-3 border-b border-zinc-800/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div>
+                        <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                            <Network className="h-4.5 w-4.5 text-purple-400" />
+                            Page 2 : Confirmation des Assemblées Annuelles
+                        </CardTitle>
+                        <CardDescription className="text-[10px] text-zinc-400">
+                            Consultez les assemblées du gestionnaire et purgez les assemblées de 2025 en retard de plus de 100 jours.
+                        </CardDescription>
+                    </div>
+                    <Button
+                        onClick={handlePurgeOverdueAssemblies}
+                        disabled={loading || !managerId}
+                        variant="outline"
+                        className="bg-rose-950/30 text-rose-300 border-rose-800/50 hover:bg-rose-900/50 text-xs font-bold h-8 px-3 rounded-lg flex items-center gap-1.5 shrink-0"
+                    >
+                        <Trash2 className="h-3.5 w-3.5 text-rose-400" />
+                        Purger les assemblées 2025 en retard (&gt;100j)
+                    </Button>
+                </CardHeader>
+                <CardContent className="pt-4 text-xs">
+                    {assemblyEvaluations.length === 0 ? (
+                        <p className="italic text-zinc-500 text-xs text-center py-6">Aucune évaluation d'assemblée à afficher.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {assemblyEvaluations.map(ae => (
+                                <div key={ae.id} className="p-3 bg-zinc-950/40 border border-zinc-850 rounded-xl flex justify-between items-center">
+                                    <div>
+                                        <h4 className="font-bold text-white text-xs">{getClientName(ae.client_id)}</h4>
+                                        <p className="text-[10px] text-zinc-400">Date d'assemblée: {new Date(ae.assembly_date).toLocaleDateString('fr-CA')}</p>
+                                    </div>
+                                    <Badge variant="outline" className="bg-purple-950/20 text-purple-400 border-purple-800/40 text-[9px]">Enregistrée</Badge>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    )}
+
             {/* Complaint History Popup Modal */}
             {historyPopupComplaint && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -2185,14 +2340,14 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setEditingComplaintStatus('postponed')}
+                                        onClick={() => setEditingComplaintStatus('in_progress')}
                                         className={`flex-1 py-2 px-3 rounded-lg border text-xxs font-bold transition-all ${
-                                            editingComplaintStatus === 'postponed'
+                                            editingComplaintStatus === 'in_progress'
                                                 ? 'bg-amber-950/20 border-amber-600/30 text-amber-400'
                                                 : 'bg-transparent border-zinc-850 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/10'
                                         }`}
                                     >
-                                        Reporter (Postpone)
+                                        En cours
                                     </button>
                                     <button
                                         type="button"

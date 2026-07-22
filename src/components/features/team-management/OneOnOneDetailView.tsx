@@ -8,6 +8,9 @@ import {
     deleteOneOnOneAction,
     addOneOnOneItemNoteAction,
     getOneOnOneItemNotesAction,
+    updateOneOnOneItemNoteAction,
+    deleteOneOnOneItemNoteAction,
+    purgeOverdue2025AssembliesAction,
     getAssemblyTrackingForManagerAction,
     updateAssemblyTrackingAction,
     confirmAssemblyCompletedAction,
@@ -250,7 +253,10 @@ export function OneOnOneDetailView({
     const [editingComplaintSeverity, setEditingComplaintSeverity] = useState<'low' | 'medium' | 'high' | 'critical'>('medium')
     const [editingComplaintMyNotes, setEditingComplaintMyNotes] = useState('')
     const [editingComplaintManagerNotes, setEditingComplaintManagerNotes] = useState('')
-    const [editingComplaintStatus, setEditingComplaintStatus] = useState<'not_discussed' | 'postponed' | 'resolved'>('not_discussed')
+    const [activePage, setActivePage] = useState<'page1' | 'page2'>('page1')
+    const [editingItemNoteId, setEditingItemNoteId] = useState<string | null>(null)
+    const [editingItemNoteText, setEditingItemNoteText] = useState<string>('')
+    const [editingComplaintStatus, setEditingComplaintStatus] = useState<'not_discussed' | 'in_progress' | 'resolved'>('not_discussed')
 
     const [historyPopupComplaint, setHistoryPopupComplaint] = useState<any | null>(null)
     const [complaintHistoryList, setComplaintHistoryList] = useState<any[]>([])
@@ -428,12 +434,12 @@ export function OneOnOneDetailView({
         setEditingComplaintMyNotes(state.my_notes || '')
         setEditingComplaintManagerNotes(state.manager_notes || '')
         
-        if (!state.checked) {
+        if (!state.checked && !c.last_status) {
             setEditingComplaintStatus('not_discussed')
-        } else if (state.resolved_in_meeting) {
+        } else if (state.resolved_in_meeting || c.last_status === 'resolved') {
             setEditingComplaintStatus('resolved')
         } else {
-            setEditingComplaintStatus('postponed')
+            setEditingComplaintStatus('in_progress')
         }
     }
 
@@ -452,6 +458,7 @@ export function OneOnOneDetailView({
                 my_notes: editingComplaintMyNotes,
                 manager_notes: editingComplaintManagerNotes,
                 resolved_in_meeting: isResolved,
+                status: editingComplaintStatus,
                 title: editingComplaintTitle,
                 description: editingComplaintDesc,
                 severity: editingComplaintSeverity,
@@ -467,8 +474,11 @@ export function OneOnOneDetailView({
                     description: editingComplaintDesc,
                     severity: editingComplaintSeverity,
                     discussion_notes: editingComplaintMyNotes,
+                    my_notes: editingComplaintMyNotes,
                     resolution_plan: editingComplaintManagerNotes,
-                    resolved_in_meeting: isResolved
+                    manager_notes: editingComplaintManagerNotes,
+                    resolved_in_meeting: isResolved,
+                    status: editingComplaintStatus
                 }
             }
             return comp
@@ -876,6 +886,54 @@ export function OneOnOneDetailView({
         setNewAgreedActions(prev => prev.filter((_, i) => i !== idx))
     }
 
+    const handleStartEditItemNote = (id: string, text: string) => {
+        setEditingItemNoteId(id)
+        setEditingItemNoteText(text)
+    }
+
+    const handleSaveItemNoteEdit = async (id: string) => {
+        if (!editingItemNoteText.trim()) return
+        try {
+            await updateOneOnOneItemNoteAction(id, editingItemNoteText.trim())
+            setItemNotes(prev => prev.map(n => n.id === id ? { ...n, note_text: editingItemNoteText.trim() } : n))
+            setEditingItemNoteId(null)
+            toast.success("Note mise à jour.")
+        } catch (err) {
+            toast.error("Erreur lors de la modification de la note : " + (err as Error).message)
+        }
+    }
+
+    const handleDeleteItemNote = async (id: string) => {
+        try {
+            await deleteOneOnOneItemNoteAction(id)
+            setItemNotes(prev => prev.filter(n => n.id !== id))
+            toast.success("Note supprimée.")
+        } catch (err) {
+            toast.error("Erreur lors de la suppression de la note : " + (err as Error).message)
+        }
+    }
+
+    const handleDeletePriorityItem = (priorityId: string) => {
+        setPrioritiesList(prev => prev.filter(p => p.id !== priorityId))
+        toast.success("Sujet retiré de l'ordre du jour.")
+    }
+
+    const handlePurgeOverdueAssemblies = async () => {
+        try {
+            setLoading(true)
+            await purgeOverdue2025AssembliesAction(manager?.id)
+            toast.success("Assemblées 2025 en retard purguées avec succès.")
+            if (manager?.id) {
+                const trackings = await getAssemblyTrackingForManagerAction(manager.id)
+                setAssemblyTrackings(trackings || [])
+            }
+        } catch (err) {
+            toast.error("Erreur lors de la purge : " + (err as Error).message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const handlePrevCommitmentChange = (idx: number, field: string, value: any) => {
         setPreviousCommitments(prev => prev.map((c, i) => {
             if (i === idx) {
@@ -1262,7 +1320,13 @@ export function OneOnOneDetailView({
 
     const getClientName = (id: string) => {
         const found = clientsList.find(c => c.id === id)
-        return found ? (found.company_name || found.full_name) : 'Syndicat inconnu'
+        if (!found) return 'Syndicat inconnu'
+        const company = found.company_name || found.name || ''
+        const sdc = found.full_name || found.sdc || ''
+        if (company && sdc && company !== sdc) {
+            return `${company} (${sdc})`
+        }
+        return company || sdc || 'Syndicat'
     }
 
     return (
@@ -1351,8 +1415,37 @@ export function OneOnOneDetailView({
                     </Button>
                 </div>
             </div>
+            {/* Page Navigation Tabs */}
+            <div className="flex gap-2 border-b border-zinc-800 pb-3">
+                <button
+                    type="button"
+                    onClick={() => setActivePage('page1')}
+                    className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+                        activePage === 'page1'
+                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
+                            : 'bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800'
+                    }`}
+                >
+                    <Sliders className="h-4 w-4" />
+                    Page 1 : Alignement, Ordre du Jour &amp; Bilan
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setActivePage('page2')}
+                    className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+                        activePage === 'page2'
+                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
+                            : 'bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800'
+                    }`}
+                >
+                    <Network className="h-4 w-4" />
+                    Page 2 : Confirmation des Assemblées
+                </button>
+            </div>
 
-            {/* 1. MEETING HEADER SECTION */}
+            {activePage === 'page1' && (
+                <div className="space-y-6">
+                    {/* 1. MEETING HEADER SECTION */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <Card className="bg-zinc-900/40 border-zinc-800 shadow-md col-span-2">
                     <CardHeader className="pb-3 border-b border-zinc-800/40">
@@ -1565,30 +1658,88 @@ export function OneOnOneDetailView({
                                             
                                             {/* Historic notes list inside priorities card */}
                                             {notesForItem.length > 0 && (
-                                                <div className="mt-2.5 pt-2 border-t border-zinc-900 space-y-1.5 max-w-2xl">
+                                                <div className="mt-2.5 pt-2 border-t border-zinc-900 space-y-2 max-w-2xl">
                                                     <span className="text-[9px] font-bold text-zinc-500 block uppercase">Historique des notes :</span>
-                                                    {notesForItem.map((n) => (
-                                                        <div key={n.id} className="text-[10px] text-zinc-400 leading-normal pl-2 border-l border-purple-500/50">
-                                                            <strong className="text-zinc-300 font-semibold">{n.author_name}</strong> · <span className="text-zinc-500 text-[9px]">{new Date(n.created_at).toLocaleString('fr-CA')}</span>
-                                                            <p className="mt-0.5 text-zinc-300 font-sans">{n.note_text}</p>
-                                                        </div>
-                                                    ))}
+                                                    {notesForItem.map((n) => {
+                                                        const isEditingNote = editingItemNoteId === n.id
+                                                        return (
+                                                            <div key={n.id} className="text-xs text-zinc-300 leading-normal pl-2.5 border-l-2 border-purple-500/60 py-1 space-y-1 bg-zinc-900/30 rounded-r-md">
+                                                                <div className="flex justify-between items-center text-[10px] text-zinc-500">
+                                                                    <span>
+                                                                        <strong className="text-zinc-200 font-bold">{n.author_name}</strong> · <span>{new Date(n.created_at).toLocaleString('fr-CA')}</span>
+                                                                    </span>
+                                                                    {isEditing && (
+                                                                        <div className="flex items-center gap-1">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleStartEditItemNote(n.id, n.note_text)}
+                                                                                className="text-zinc-500 hover:text-purple-400 p-0.5 rounded transition-all"
+                                                                                title="Modifier la note"
+                                                                            >
+                                                                                <Edit className="h-3 w-3" />
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleDeleteItemNote(n.id)}
+                                                                                className="text-zinc-500 hover:text-rose-400 p-0.5 rounded transition-all"
+                                                                                title="Supprimer la note"
+                                                                            >
+                                                                                <Trash2 className="h-3 w-3" />
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                {isEditingNote ? (
+                                                                    <div className="flex items-center gap-2 mt-1">
+                                                                        <Textarea
+                                                                            value={editingItemNoteText}
+                                                                            onChange={(e) => setEditingItemNoteText(e.target.value)}
+                                                                            rows={2}
+                                                                            className="text-xs bg-zinc-950 border-zinc-800 text-white rounded-lg p-2 w-full"
+                                                                        />
+                                                                        <Button
+                                                                            size="icon"
+                                                                            type="button"
+                                                                            onClick={() => handleSaveItemNoteEdit(n.id)}
+                                                                            className="h-7 w-7 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shrink-0"
+                                                                        >
+                                                                            <Check className="h-3.5 w-3.5" />
+                                                                        </Button>
+                                                                        <Button
+                                                                            size="icon"
+                                                                            variant="ghost"
+                                                                            type="button"
+                                                                            onClick={() => setEditingItemNoteId(null)}
+                                                                            className="h-7 w-7 text-zinc-400 hover:text-white rounded-lg shrink-0"
+                                                                        >
+                                                                            <X className="h-3.5 w-3.5" />
+                                                                        </Button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <p className="text-zinc-200 whitespace-pre-wrap">{n.note_text}</p>
+                                                                )}
+                                                            </div>
+                                                        )
+                                                    })}
                                                 </div>
                                             )}
 
                                             {/* Add note field */}
                                             {isEditing && (
-                                                <div className="flex gap-2 mt-2 max-w-md">
-                                                    <Input 
+                                                <div className="space-y-2 mt-3 max-w-2xl bg-zinc-950/60 p-3 rounded-xl border border-zinc-850">
+                                                    <Label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block">Ajouter une note de suivi</Label>
+                                                    <Textarea 
                                                         value={newNoteTexts[item.id] || ''}
                                                         onChange={(e) => setNewNoteTexts(prev => ({ ...prev, [item.id]: e.target.value }))}
-                                                        placeholder="Ajouter une note de suivi..."
-                                                        className="bg-zinc-950 border-zinc-800 text-[10px] h-7 rounded"
-                                                        onKeyDown={(e) => e.key === 'Enter' && handleSaveItemNote(item.type, item.id)}
+                                                        placeholder="Saisissez des détails ou notes sur ce sujet..."
+                                                        rows={2}
+                                                        className="bg-zinc-900 border-zinc-800 text-xs text-white rounded-lg p-2.5 focus:border-purple-600"
                                                     />
-                                                    <Button onClick={() => handleSaveItemNote(item.type, item.id)} className="h-7 px-2 text-[10px] bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-800">
-                                                        Note
-                                                    </Button>
+                                                    <div className="flex justify-end">
+                                                        <Button onClick={() => handleSaveItemNote(item.type, item.id)} className="h-7 px-3 text-xs bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg flex items-center gap-1">
+                                                            <Plus className="h-3.5 w-3.5" /> Enregistrer la note
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -1618,14 +1769,17 @@ export function OneOnOneDetailView({
                                                 )}
                                             </div>
 
-                                            {/* Reorder actions */}
+                                            {/* Reorder actions & Delete */}
                                             {isEditing && (
-                                                <div className="flex gap-1">
+                                                <div className="flex gap-1 items-center">
                                                     <Button variant="outline" size="icon" className="h-7 w-7 border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white rounded" onClick={() => movePriority(idx, 'up')} disabled={idx === 0}>
                                                         <ArrowUp className="h-3.5 w-3.5" />
                                                     </Button>
                                                     <Button variant="outline" size="icon" className="h-7 w-7 border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white rounded" onClick={() => movePriority(idx, 'down')} disabled={idx === prioritiesList.length - 1}>
                                                         <ArrowDown className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                    <Button variant="outline" size="icon" className="h-7 w-7 border-zinc-800 bg-zinc-900 text-zinc-500 hover:text-rose-400 hover:bg-rose-950/20 rounded" onClick={() => handleDeletePriorityItem(item.id)} title="Supprimer ce sujet">
+                                                        <Trash2 className="h-3.5 w-3.5" />
                                                     </Button>
                                                 </div>
                                             )}
@@ -1745,16 +1899,41 @@ export function OneOnOneDetailView({
                 </CardContent>
             </Card>
 
+                    <div className="flex justify-end pt-4">
+                        <Button 
+                            type="button"
+                            onClick={() => setActivePage('page2')}
+                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-9 px-5 rounded-xl flex items-center gap-2 shadow-lg"
+                        >
+                            Confirmer la date des assemblées (Page 2) &rarr;
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             {/* 5. ANNUAL ASSEMBLIES TO TRACK SECTION */}
-            <Card className="bg-zinc-900/40 border-zinc-800 shadow-md">
-                <CardHeader className="pb-3 border-b border-zinc-800/40">
-                    <CardTitle className="text-base font-bold text-white flex items-center gap-2">
-                        <Network className="h-4 w-4 text-purple-400" />
-                        5. Suivi des Assemblées Annuelles (Track)
-                    </CardTitle>
-                    <CardDescription className="text-xs text-zinc-500">
-                        Période cible : 90 jours après la fin d'exercice fiscal (FYE) du syndicat.
-                    </CardDescription>
+            {activePage === 'page2' && (
+                <div className="space-y-6">
+                    <Card className="bg-zinc-900/40 border-zinc-800 shadow-md">
+                <CardHeader className="pb-3 border-b border-zinc-800/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div>
+                        <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+                            <Network className="h-4 w-4 text-purple-400" />
+                            5. Suivi des Assemblées Annuelles (Track)
+                        </CardTitle>
+                        <CardDescription className="text-xs text-zinc-500">
+                            Période cible : 90 jours après la fin d'exercice fiscal (FYE) du syndicat.
+                        </CardDescription>
+                    </div>
+                    <Button
+                        onClick={handlePurgeOverdueAssemblies}
+                        disabled={loading}
+                        variant="outline"
+                        className="bg-rose-950/30 text-rose-300 border-rose-800/50 hover:bg-rose-900/50 text-xs font-bold h-8 px-3 rounded-lg flex items-center gap-1.5 shrink-0"
+                    >
+                        <Trash2 className="h-3.5 w-3.5 text-rose-400" />
+                        Purger les assemblées 2025 en retard (&gt;100j)
+                    </Button>
                 </CardHeader>
                 <CardContent className="p-6">
                     {assemblyTrackings.length === 0 ? (
@@ -1956,8 +2135,12 @@ export function OneOnOneDetailView({
                     )}
                 </CardContent>
             </Card>
+                </div>
+            )}
 
-            {/* 6. ACTIVE RISKS, COMPLAINTS, AND CONCERNS SECTION */}
+            {activePage === 'page1' && (
+                <div className="space-y-6">
+                    {/* 6. ACTIVE RISKS, COMPLAINTS, AND CONCERNS SECTION */}
             <Card className="bg-zinc-900/40 border-zinc-800 shadow-md">
                 <CardHeader className="pb-3 border-b border-zinc-800/40">
                     <CardTitle className="text-base font-bold text-white flex items-center gap-2">
@@ -2455,6 +2638,8 @@ export function OneOnOneDetailView({
                     </div>
                 )}
             </div>
+        </div>
+    )}
 
             {/* Confirm assembly modal */}
             <Dialog open={confirmingAssemblyId !== null} onOpenChange={() => setConfirmingAssemblyId(null)}>
@@ -2595,14 +2780,14 @@ export function OneOnOneDetailView({
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setEditingComplaintStatus('postponed')}
+                                        onClick={() => setEditingComplaintStatus('in_progress')}
                                         className={`flex-1 py-2 px-3 rounded-lg border text-xxs font-bold transition-all ${
-                                            editingComplaintStatus === 'postponed'
+                                            editingComplaintStatus === 'in_progress'
                                                 ? 'bg-amber-950/20 border-amber-600/30 text-amber-400'
                                                 : 'bg-transparent border-zinc-850 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/10'
                                         }`}
                                     >
-                                        Reporter (Postpone)
+                                        En cours
                                     </button>
                                     <button
                                         type="button"

@@ -2379,6 +2379,35 @@ export async function getOneOnOneSnapshotAction(managerId: string, meetingDate?:
         .eq('manager_id', managerId)
         .eq('status', 'open') as any
 
+    if (openComplaints && openComplaints.length > 0) {
+        const compIds = openComplaints.map((c: any) => c.id)
+        const { data: pastNotes } = await supabase
+            .from('one_on_one_complaints')
+            .select('*')
+            .in('complaint_id', compIds)
+            .order('created_at', { ascending: false })
+
+        const lastRecMap = new Map()
+        if (pastNotes) {
+            for (const p of pastNotes) {
+                if (!lastRecMap.has(p.complaint_id)) {
+                    lastRecMap.set(p.complaint_id, p)
+                }
+            }
+        }
+
+        openComplaints.forEach((c: any) => {
+            const lastRec = lastRecMap.get(c.id)
+            if (lastRec) {
+                c.my_notes = lastRec.my_notes || lastRec.discussion_notes || ''
+                c.discussion_notes = lastRec.discussion_notes || lastRec.my_notes || ''
+                c.manager_notes = lastRec.manager_notes || lastRec.resolution_plan || ''
+                c.resolution_plan = lastRec.resolution_plan || lastRec.manager_notes || ''
+                c.last_status = (lastRec.status === 'in_progress' || lastRec.status === 'postponed' || lastRec.my_notes || lastRec.discussion_notes) ? 'in_progress' : (lastRec.status || 'not_discussed')
+            }
+        })
+    }
+
     let openComplaintsPrev = 0
     if (lastMeeting) {
         const { count } = await supabase
@@ -3733,12 +3762,76 @@ export async function getOneOnOneItemNotesAction(oneOnOneId: string) {
     return notes || []
 }
 
+export async function updateOneOnOneItemNoteAction(id: string, noteText: string) {
+    const supabase = await createClient()
+    const { data: note, error } = await supabase
+        .from('one_on_one_item_notes')
+        .update({ note_text: noteText })
+        .eq('id', id)
+        .select()
+        .single()
+
+    if (error) throw new Error(error.message)
+    return note
+}
+
+export async function deleteOneOnOneItemNoteAction(id: string) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('one_on_one_item_notes')
+        .delete()
+        .eq('id', id)
+
+    if (error) throw new Error(error.message)
+    return true
+}
+
 // ==========================================
 // 4c. ANNUAL ASSEMBLY TRACKING ACTIONS
 // ==========================================
 
+export async function purgeOverdue2025AssembliesAction(managerId?: string) {
+    const supabase = await createClient()
+    const { data: trackings } = await supabase
+        .from('client_assembly_tracking')
+        .select('id, target_date, fiscal_year_end, status, clients(manager_id)')
+
+    if (trackings && trackings.length > 0) {
+        const today = new Date()
+        const toDeleteIds: string[] = []
+        for (const item of trackings) {
+            if (managerId && (item.clients as any)?.manager_id !== managerId) continue
+            if (item.status === 'completed') continue
+
+            const fyYear = item.fiscal_year_end ? new Date(item.fiscal_year_end).getFullYear() : 0
+            const targetYear = item.target_date ? new Date(item.target_date).getFullYear() : 0
+            const targetTime = new Date(item.target_date).getTime()
+            const diffTime = targetTime - today.getTime()
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+            if ((fyYear <= 2025 || targetYear <= 2025) && diffDays < -100) {
+                toDeleteIds.push(item.id)
+            }
+        }
+        if (toDeleteIds.length > 0) {
+            await supabase
+                .from('client_assembly_tracking')
+                .delete()
+                .in('id', toDeleteIds)
+        }
+    }
+    revalidatePath('/team-management/one-on-ones')
+}
+
 export async function getAssemblyTrackingForManagerAction(managerId: string) {
     const supabase = await createClient()
+
+    // 0. Auto-purge obsolete 2025 assemblies overdue by >100 days
+    try {
+        await purgeOverdue2025AssembliesAction(managerId)
+    } catch (e) {
+        console.error("Error auto-purging overdue assemblies:", e)
+    }
 
     // 1. Fetch active clients for manager
     const { data: clients } = await supabase
