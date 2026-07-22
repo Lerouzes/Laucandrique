@@ -1748,87 +1748,95 @@ export async function updateOneOnOneAction(id: string, data: {
     }
 
     // Sync complaints discussions
-    await supabase.from('one_on_one_complaints').delete().eq('one_on_one_id', id)
-    if (data.complaints && data.complaints.length > 0) {
-        const compData = data.complaints.map(c => ({
-            one_on_one_id: id,
-            complaint_id: c.complaint_id,
-            discussion_notes: c.discussion_notes || c.my_notes || null,
-            resolution_plan: c.resolution_plan || null,
-            resolved_in_meeting: c.resolved_in_meeting || false,
-            my_notes: c.my_notes || null,
-            manager_notes: c.manager_notes || null,
-            reviewed: c.reviewed || false
-        }))
-        const { error: compErr } = await supabase.from('one_on_one_complaints').insert(compData)
-        if (compErr) throw new Error(compErr.message)
+    if (data.complaints !== undefined) {
+        await supabase.from('one_on_one_complaints').delete().eq('one_on_one_id', id)
+        if (data.complaints.length > 0) {
+            const compData = data.complaints.map(c => ({
+                one_on_one_id: id,
+                complaint_id: c.complaint_id,
+                discussion_notes: c.discussion_notes || c.my_notes || null,
+                resolution_plan: c.resolution_plan || null,
+                resolved_in_meeting: c.resolved_in_meeting || false,
+                my_notes: c.my_notes || null,
+                manager_notes: c.manager_notes || null,
+                reviewed: c.reviewed || false
+            }))
+            const { error: compErr } = await supabase.from('one_on_one_complaints').insert(compData)
+            if (compErr) throw new Error(compErr.message)
 
-        for (const c of data.complaints) {
-            const updates: Record<string, any> = {}
-            if (c.resolved_in_meeting) {
-                updates.status = 'resolved'
-                updates.resolved_date = data.meeting_date
-            }
-            if (c.title) updates.title = c.title
-            if (c.description) updates.description = c.description
-            if (c.severity) updates.severity = c.severity
-            if (c.category_id !== undefined) updates.category_id = c.category_id
+            for (const c of data.complaints) {
+                const updates: Record<string, any> = {}
+                if (c.resolved_in_meeting) {
+                    updates.status = 'resolved'
+                    updates.resolved_date = data.meeting_date
+                }
+                if (c.title) updates.title = c.title
+                if (c.description) updates.description = c.description
+                if (c.severity) updates.severity = c.severity
+                if (c.category_id !== undefined) updates.category_id = c.category_id
 
-            if (Object.keys(updates).length > 0) {
-                await supabase
-                    .from('complaints')
-                    .update(updates)
-                    .eq('id', c.complaint_id)
+                if (Object.keys(updates).length > 0) {
+                    await supabase
+                        .from('complaints')
+                        .update(updates)
+                        .eq('id', c.complaint_id)
+                }
             }
         }
     }
 
     // Sync reviewed syndicate audits
-    await supabase.from('one_on_one_syndicate_audits').delete().eq('one_on_one_id', id)
-    if (data.reviewedAudits && data.reviewedAudits.length > 0) {
-        const auditData = data.reviewedAudits.map(a => ({
-            one_on_one_id: id,
-            audit_id: a.audit_id,
-            my_notes: a.my_notes || null,
-            manager_notes: a.manager_notes || null,
-            reviewed: a.reviewed || false
-        }))
-        const { error: auditErr } = await supabase.from('one_on_one_syndicate_audits').insert(auditData)
-        if (auditErr) throw new Error(auditErr.message)
+    if (data.reviewedAudits !== undefined) {
+        await supabase.from('one_on_one_syndicate_audits').delete().eq('one_on_one_id', id)
+        if (data.reviewedAudits.length > 0) {
+            const auditData = data.reviewedAudits.map(a => ({
+                one_on_one_id: id,
+                audit_id: a.audit_id,
+                my_notes: a.my_notes || null,
+                manager_notes: a.manager_notes || null,
+                reviewed: a.reviewed || false
+            }))
+            const { error: auditErr } = await supabase.from('one_on_one_syndicate_audits').insert(auditData)
+            if (auditErr) throw new Error(auditErr.message)
+        }
     }
 
     // Sync reviewed assemblies
-    await supabase.from('one_on_one_assemblies').delete().eq('one_on_one_id', id)
-    if (data.reviewedAssemblies && data.reviewedAssemblies.length > 0) {
-        const assemblyData = data.reviewedAssemblies.map(a => ({
-            one_on_one_id: id,
-            assembly_evaluation_id: a.assembly_evaluation_id,
-            my_notes: a.my_notes || null,
-            manager_notes: a.manager_notes || null,
-            reviewed: a.reviewed || false
-        }))
-        const { error: assErr } = await supabase.from('one_on_one_assemblies').insert(assemblyData)
-        if (assErr) throw new Error(assErr.message)
+    if (data.reviewedAssemblies !== undefined) {
+        await supabase.from('one_on_one_assemblies').delete().eq('one_on_one_id', id)
+        if (data.reviewedAssemblies.length > 0) {
+            const assemblyData = data.reviewedAssemblies.map(a => ({
+                one_on_one_id: id,
+                assembly_evaluation_id: a.assembly_evaluation_id,
+                my_notes: a.my_notes || null,
+                manager_notes: a.manager_notes || null,
+                reviewed: a.reviewed || false
+            }))
+            const { error: assErr } = await supabase.from('one_on_one_assemblies').insert(assemblyData)
+            if (assErr) throw new Error(assErr.message)
+        }
     }
 
     // Sync Task/Email audits
-    await supabase.from('one_on_one_task_email_audits').delete().eq('one_on_one_id', id)
-    if (data.taskEmailAudits && data.taskEmailAudits.length > 0) {
-        const auditData = data.taskEmailAudits.map(t => ({
-            one_on_one_id: id,
-            type: t.type,
-            title: t.title,
-            client_id: t.client_id || null,
-            has_followup_date: t.has_followup_date || false,
-            has_good_description: t.has_good_description || false,
-            has_actions: t.has_actions || false,
-            has_category_selected: t.has_category_selected || false,
-            task_created_date: t.task_created_date || null,
-            complexity: t.complexity || null,
-            review_notes: t.review_notes || null
-        }))
-        const { error: taskErr } = await supabase.from('one_on_one_task_email_audits').insert(auditData)
-        if (taskErr) throw new Error(taskErr.message)
+    if (data.taskEmailAudits !== undefined) {
+        await supabase.from('one_on_one_task_email_audits').delete().eq('one_on_one_id', id)
+        if (data.taskEmailAudits.length > 0) {
+            const auditData = data.taskEmailAudits.map(t => ({
+                one_on_one_id: id,
+                type: t.type,
+                title: t.title,
+                client_id: t.client_id || null,
+                has_followup_date: t.has_followup_date || false,
+                has_good_description: t.has_good_description || false,
+                has_actions: t.has_actions || false,
+                has_category_selected: t.has_category_selected || false,
+                task_created_date: t.task_created_date || null,
+                complexity: t.complexity || null,
+                review_notes: t.review_notes || null
+            }))
+            const { error: taskErr } = await supabase.from('one_on_one_task_email_audits').insert(auditData)
+            if (taskErr) throw new Error(taskErr.message)
+        }
     }
 
     // Sync Operational Risks

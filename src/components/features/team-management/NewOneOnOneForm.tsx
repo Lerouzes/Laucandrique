@@ -392,7 +392,8 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
         if (!activeEditingComplaint) return
         
         const id = activeEditingComplaint.id
-        const isChecked = editingComplaintStatus !== 'not_discussed'
+        const hasNotes = Boolean((editingComplaintMyNotes && editingComplaintMyNotes.trim() !== '') || (editingComplaintManagerNotes && editingComplaintManagerNotes.trim() !== ''))
+        const isChecked = hasNotes || editingComplaintStatus !== 'not_discussed' || editingComplaintTitle !== activeEditingComplaint.title
         const isResolved = editingComplaintStatus === 'resolved'
 
         setReviewedComplaintsState(prev => ({
@@ -767,7 +768,13 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 }))
 
             const finalReviewedComplaints = Object.entries(reviewedComplaintsState)
-                .filter(([_, item]) => item.checked)
+                .filter(([_, item]) => (
+                    item.checked || 
+                    (item.my_notes && item.my_notes.trim() !== '') || 
+                    (item.manager_notes && item.manager_notes.trim() !== '') || 
+                    item.resolved_in_meeting || 
+                    Boolean(item.title)
+                ))
                 .map(([compId, item]) => {
                     const complaintObj = managerComplaints.find(mc => mc.id === compId)
                     return {
@@ -811,7 +818,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 }))
             ]
 
-            await createOneOnOneAction({
+            const createdMeeting = await createOneOnOneAction({
                 manager_id: managerId,
                 meeting_date: meetingDate,
                 status,
@@ -853,7 +860,11 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 summary
             })
 
-            router.push('/team-management/one-on-ones')
+            if (createdMeeting?.id) {
+                router.push(`/team-management/one-on-ones/${createdMeeting.id}`)
+            } else {
+                router.push('/team-management/one-on-ones')
+            }
         } catch (err) {
             alert('Erreur lors de la création de la rencontre: ' + (err as Error).message)
         } finally {

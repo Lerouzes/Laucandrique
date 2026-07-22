@@ -219,6 +219,43 @@ export function OneOnOneDetailView({
     const [operationalRisks, setOperationalRisks] = useState<any[]>(initialOperationalRisks || [])
     const [managerComplaints, setManagerComplaints] = useState<any[]>([])
 
+    // Reviewed items state (complaints, audits, assemblies)
+    const [reviewedComplaintsState, setReviewedComplaintsState] = useState<Record<string, {
+        checked: boolean
+        my_notes: string
+        manager_notes: string
+        resolved_in_meeting: boolean
+        title?: string
+        description?: string
+        severity?: 'low' | 'medium' | 'high' | 'critical'
+        category_id?: string
+    }>>({})
+
+    const [reviewedAuditsState, setReviewedAuditsState] = useState<Record<string, {
+        checked: boolean
+        my_notes: string
+        manager_notes: string
+    }>>({})
+
+    const [reviewedAssembliesState, setReviewedAssembliesState] = useState<Record<string, {
+        checked: boolean
+        my_notes: string
+        manager_notes: string
+    }>>({})
+
+    // Modal editing state for complaints
+    const [activeEditingComplaint, setActiveEditingComplaint] = useState<any | null>(null)
+    const [editingComplaintTitle, setEditingComplaintTitle] = useState('')
+    const [editingComplaintDesc, setEditingComplaintDesc] = useState('')
+    const [editingComplaintSeverity, setEditingComplaintSeverity] = useState<'low' | 'medium' | 'high' | 'critical'>('medium')
+    const [editingComplaintMyNotes, setEditingComplaintMyNotes] = useState('')
+    const [editingComplaintManagerNotes, setEditingComplaintManagerNotes] = useState('')
+    const [editingComplaintStatus, setEditingComplaintStatus] = useState<'not_discussed' | 'postponed' | 'resolved'>('not_discussed')
+
+    const [historyPopupComplaint, setHistoryPopupComplaint] = useState<any | null>(null)
+    const [complaintHistoryList, setComplaintHistoryList] = useState<any[]>([])
+    const [loadingHistory, setLoadingHistory] = useState(false)
+
     // Collapsible statistics
     const [statsCollapsed, setStatsCollapsed] = useState(true)
 
@@ -318,11 +355,47 @@ export function OneOnOneDetailView({
         // Set complaints
         const open = discussedComplaints.map(dc => ({
             ...dc.complaints,
+            id: dc.complaint_id,
             discussion_notes: dc.discussion_notes || dc.my_notes || '',
             resolution_plan: dc.resolution_plan || dc.manager_notes || '',
             resolved_in_meeting: dc.resolved_in_meeting
         }))
         setManagerComplaints(open)
+
+        const complaintStateMap: Record<string, any> = {}
+        discussedComplaints.forEach(dc => {
+            complaintStateMap[dc.complaint_id] = {
+                checked: dc.reviewed || dc.resolved_in_meeting || true,
+                my_notes: dc.my_notes || dc.discussion_notes || '',
+                manager_notes: dc.manager_notes || dc.resolution_plan || '',
+                resolved_in_meeting: Boolean(dc.resolved_in_meeting),
+                title: dc.complaints?.title,
+                description: dc.complaints?.description,
+                severity: dc.complaints?.severity,
+                category_id: dc.complaints?.category_id
+            }
+        })
+        setReviewedComplaintsState(complaintStateMap)
+
+        const auditStateMap: Record<string, any> = {}
+        reviewedAudits.forEach(ra => {
+            auditStateMap[ra.audit_id] = {
+                checked: ra.reviewed || true,
+                my_notes: ra.my_notes || '',
+                manager_notes: ra.manager_notes || ''
+            }
+        })
+        setReviewedAuditsState(auditStateMap)
+
+        const assemblyStateMap: Record<string, any> = {}
+        reviewedAssemblies.forEach(ra => {
+            assemblyStateMap[ra.assembly_evaluation_id] = {
+                checked: ra.reviewed || true,
+                my_notes: ra.my_notes || '',
+                manager_notes: ra.manager_notes || ''
+            }
+        })
+        setReviewedAssembliesState(assemblyStateMap)
 
         // Set audits
         setSyndicateAudits(reviewedAudits.map(ra => ({
@@ -339,6 +412,70 @@ export function OneOnOneDetailView({
             reviewed: ra.reviewed
         })))
     }, [initialCommitments, discussedComplaints, reviewedAudits, reviewedAssemblies, communicationStats, oneOnOne.meeting_date])
+
+    const openComplaintModal = (c: any) => {
+        setActiveEditingComplaint(c)
+        setEditingComplaintTitle(c.title || '')
+        setEditingComplaintDesc(c.description || '')
+        setEditingComplaintSeverity(c.severity || 'medium')
+
+        const state = reviewedComplaintsState[c.id] || { 
+            checked: false, 
+            my_notes: c.discussion_notes || c.my_notes || '', 
+            manager_notes: c.resolution_plan || c.manager_notes || '', 
+            resolved_in_meeting: Boolean(c.resolved_in_meeting) 
+        }
+        setEditingComplaintMyNotes(state.my_notes || '')
+        setEditingComplaintManagerNotes(state.manager_notes || '')
+        
+        if (!state.checked) {
+            setEditingComplaintStatus('not_discussed')
+        } else if (state.resolved_in_meeting) {
+            setEditingComplaintStatus('resolved')
+        } else {
+            setEditingComplaintStatus('postponed')
+        }
+    }
+
+    const handleSaveComplaintChanges = () => {
+        if (!activeEditingComplaint) return
+        
+        const id = activeEditingComplaint.id
+        const hasNotes = Boolean((editingComplaintMyNotes && editingComplaintMyNotes.trim() !== '') || (editingComplaintManagerNotes && editingComplaintManagerNotes.trim() !== ''))
+        const isChecked = hasNotes || editingComplaintStatus !== 'not_discussed' || editingComplaintTitle !== activeEditingComplaint.title
+        const isResolved = editingComplaintStatus === 'resolved'
+
+        setReviewedComplaintsState(prev => ({
+            ...prev,
+            [id]: {
+                checked: isChecked,
+                my_notes: editingComplaintMyNotes,
+                manager_notes: editingComplaintManagerNotes,
+                resolved_in_meeting: isResolved,
+                title: editingComplaintTitle,
+                description: editingComplaintDesc,
+                severity: editingComplaintSeverity,
+                category_id: activeEditingComplaint.category_id
+            }
+        }))
+
+        setManagerComplaints(prev => prev.map(comp => {
+            if (comp.id === id) {
+                return {
+                    ...comp,
+                    title: editingComplaintTitle,
+                    description: editingComplaintDesc,
+                    severity: editingComplaintSeverity,
+                    discussion_notes: editingComplaintMyNotes,
+                    resolution_plan: editingComplaintManagerNotes,
+                    resolved_in_meeting: isResolved
+                }
+            }
+            return comp
+        }))
+
+        setActiveEditingComplaint(null)
+    }
 
     // Dynamic Priorities Generation (Draft meeting only)
     useEffect(() => {
@@ -790,6 +927,48 @@ export function OneOnOneDetailView({
                 }))
             ]
 
+            const finalReviewedComplaints = Object.entries(reviewedComplaintsState)
+                .filter(([_, item]) => (
+                    item.checked || 
+                    (item.my_notes && item.my_notes.trim() !== '') || 
+                    (item.manager_notes && item.manager_notes.trim() !== '') || 
+                    item.resolved_in_meeting || 
+                    Boolean(item.title)
+                ))
+                .map(([compId, item]) => {
+                    const complaintObj = managerComplaints.find(mc => mc.id === compId)
+                    return {
+                        complaint_id: compId,
+                        my_notes: item.my_notes,
+                        manager_notes: item.manager_notes,
+                        reviewed: true,
+                        resolved_in_meeting: item.resolved_in_meeting,
+                        discussion_notes: item.my_notes,
+                        resolution_plan: item.manager_notes,
+                        title: item.title || complaintObj?.title,
+                        description: item.description || complaintObj?.description,
+                        severity: item.severity || complaintObj?.severity
+                    }
+                })
+
+            const finalReviewedAudits = Object.entries(reviewedAuditsState)
+                .filter(([_, item]) => item.checked || (item.my_notes && item.my_notes.trim() !== '') || (item.manager_notes && item.manager_notes.trim() !== ''))
+                .map(([auditId, item]) => ({
+                    audit_id: auditId,
+                    my_notes: item.my_notes,
+                    manager_notes: item.manager_notes,
+                    reviewed: true
+                }))
+
+            const finalReviewedAssemblies = Object.entries(reviewedAssembliesState)
+                .filter(([_, item]) => item.checked || (item.my_notes && item.my_notes.trim() !== '') || (item.manager_notes && item.manager_notes.trim() !== ''))
+                .map(([assId, item]) => ({
+                    assembly_evaluation_id: assId,
+                    my_notes: item.my_notes,
+                    manager_notes: item.manager_notes,
+                    reviewed: true
+                }))
+
             await updateOneOnOneAction(oneOnOne.id, {
                 meeting_date: meetingDate,
                 status,
@@ -840,6 +1019,9 @@ export function OneOnOneDetailView({
                 priorities: prioritiesList,
 
                 commitments: finalCommitments,
+                complaints: finalReviewedComplaints,
+                reviewedAudits: finalReviewedAudits,
+                reviewedAssemblies: finalReviewedAssemblies,
                 taskEmailAudits: initialTaskEmailAudits,
                 operationalRisks
             })
@@ -859,6 +1041,48 @@ export function OneOnOneDetailView({
     const handleRevertToDraft = async () => {
         setLoading(true)
         try {
+            const finalReviewedComplaints = Object.entries(reviewedComplaintsState)
+                .filter(([_, item]) => (
+                    item.checked || 
+                    (item.my_notes && item.my_notes.trim() !== '') || 
+                    (item.manager_notes && item.manager_notes.trim() !== '') || 
+                    item.resolved_in_meeting || 
+                    Boolean(item.title)
+                ))
+                .map(([compId, item]) => {
+                    const complaintObj = managerComplaints.find(mc => mc.id === compId)
+                    return {
+                        complaint_id: compId,
+                        my_notes: item.my_notes,
+                        manager_notes: item.manager_notes,
+                        reviewed: true,
+                        resolved_in_meeting: item.resolved_in_meeting,
+                        discussion_notes: item.my_notes,
+                        resolution_plan: item.manager_notes,
+                        title: item.title || complaintObj?.title,
+                        description: item.description || complaintObj?.description,
+                        severity: item.severity || complaintObj?.severity
+                    }
+                })
+
+            const finalReviewedAudits = Object.entries(reviewedAuditsState)
+                .filter(([_, item]) => item.checked || (item.my_notes && item.my_notes.trim() !== '') || (item.manager_notes && item.manager_notes.trim() !== ''))
+                .map(([auditId, item]) => ({
+                    audit_id: auditId,
+                    my_notes: item.my_notes,
+                    manager_notes: item.manager_notes,
+                    reviewed: true
+                }))
+
+            const finalReviewedAssemblies = Object.entries(reviewedAssembliesState)
+                .filter(([_, item]) => item.checked || (item.my_notes && item.my_notes.trim() !== '') || (item.manager_notes && item.manager_notes.trim() !== ''))
+                .map(([assId, item]) => ({
+                    assembly_evaluation_id: assId,
+                    my_notes: item.my_notes,
+                    manager_notes: item.manager_notes,
+                    reviewed: true
+                }))
+
             await updateOneOnOneAction(oneOnOne.id, {
                 meeting_date: meetingDate,
                 status: 'draft',
@@ -906,6 +1130,9 @@ export function OneOnOneDetailView({
                     ...previousCommitments.map(c => ({ ...c, carried_forward: true })),
                     ...newAgreedActions.map(c => ({ ...c, carried_forward: false }))
                 ],
+                complaints: finalReviewedComplaints,
+                reviewedAudits: finalReviewedAudits,
+                reviewedAssemblies: finalReviewedAssemblies,
                 taskEmailAudits: initialTaskEmailAudits,
                 operationalRisks
             })
@@ -1746,8 +1973,12 @@ export function OneOnOneDetailView({
                             {/* Grouped list of risks & complaints */}
                             {managerComplaints.map((comp) => {
                                 const notesForComp = itemNotes.filter(n => n.item_type === 'complaint' && n.item_id === comp.id)
+                                const state = reviewedComplaintsState[comp.id] || { checked: false, my_notes: '', manager_notes: '', resolved_in_meeting: false }
+                                const isDiscussed = state.checked || comp.discussion_notes || comp.my_notes
+                                const isResolved = state.resolved_in_meeting || comp.resolved_in_meeting
+
                                 return (
-                                    <div key={comp.id} className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-3.5">
+                                    <div key={comp.id} className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-3.5 hover:border-purple-500/40 transition-all">
                                         <div className="flex justify-between items-start gap-2.5">
                                             <div>
                                                 <div className="flex items-center gap-2">
@@ -1755,12 +1986,33 @@ export function OneOnOneDetailView({
                                                     <h4 className="text-sm font-bold text-white">{comp.title || 'Plainte client'}</h4>
                                                 </div>
                                                 <p className="text-xs text-zinc-400 mt-1">{comp.description}</p>
-                                                <span className="text-[10px] text-zinc-550 block mt-1">Syndicat : <strong className="text-zinc-400">{comp.clients?.company_name || comp.clients?.full_name}</strong></span>
+                                                <span className="text-[10px] text-zinc-550 block mt-1">Syndicat : <strong className="text-zinc-400">{comp.clients?.company_name || comp.clients?.full_name || 'Copropriété'}</strong></span>
                                             </div>
-                                            <Badge variant="outline" className="text-[8px] uppercase border-rose-900 bg-rose-950/15 text-rose-455">
-                                                {comp.severity || 'Medium'}
-                                            </Badge>
+                                            <div className="flex flex-col items-end gap-1.5">
+                                                <Badge variant="outline" className="text-[8px] uppercase border-rose-900 bg-rose-950/15 text-rose-455">
+                                                    {comp.severity || 'Medium'}
+                                                </Badge>
+                                                <Button 
+                                                    type="button"
+                                                    onClick={() => openComplaintModal(comp)} 
+                                                    className="h-6 px-2 text-[9px] font-bold bg-purple-900/30 text-purple-300 hover:bg-purple-800/40 border border-purple-800/50 rounded flex items-center gap-1"
+                                                >
+                                                    <Edit className="h-3 w-3" />
+                                                    Détails & Revue
+                                                </Button>
+                                            </div>
                                         </div>
+
+                                        {(comp.discussion_notes || comp.my_notes || comp.resolution_plan || comp.manager_notes) && (
+                                            <div className="pt-2 border-t border-zinc-900/60 pl-2 space-y-1 text-xs">
+                                                {(comp.discussion_notes || comp.my_notes) && (
+                                                    <div><span className="text-[9px] font-bold text-purple-400 uppercase">Notes Direction : </span><span className="text-zinc-300">{comp.discussion_notes || comp.my_notes}</span></div>
+                                                )}
+                                                {(comp.resolution_plan || comp.manager_notes) && (
+                                                    <div><span className="text-[9px] font-bold text-amber-400 uppercase">Plan / Notes Gestionnaire : </span><span className="text-zinc-300">{comp.resolution_plan || comp.manager_notes}</span></div>
+                                                )}
+                                            </div>
+                                        )}
 
                                         {notesForComp.length > 0 && (
                                             <div className="pt-2 border-t border-zinc-900/60 pl-2 space-y-1.5">
@@ -2234,6 +2486,160 @@ export function OneOnOneDetailView({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Complaint Edit Modal */}
+            {activeEditingComplaint && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#16171e] border border-zinc-800 rounded-2xl w-full max-w-[95vw] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-[75vw] max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6 text-xs text-zinc-300">
+                        {/* Modal Header */}
+                        <div className="flex justify-between items-start border-b border-zinc-800 pb-4">
+                            <div>
+                                <span className="text-purple-400 uppercase font-black text-[9px] tracking-widest block mb-1">Revue de Plainte Active</span>
+                                <h3 className="text-sm font-bold text-white uppercase">Détails & Modification</h3>
+                            </div>
+                            <button 
+                                type="button"
+                                onClick={() => setActiveEditingComplaint(null)} 
+                                className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {/* Complaint Edit/View Section */}
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">{activeEditingComplaint.type === 'note' ? 'Titre de la note' : 'Titre de la plainte'}</Label>
+                                    <Input 
+                                        value={editingComplaintTitle}
+                                        onChange={(e) => setEditingComplaintTitle(e.target.value)}
+                                        className="bg-[#121318] border-zinc-850 h-9 text-xs text-white"
+                                    />
+                                </div>
+                                {activeEditingComplaint.type !== 'note' && (
+                                    <div className="space-y-1">
+                                        <Label className="text-zinc-500">Gravité</Label>
+                                        <select 
+                                            value={editingComplaintSeverity}
+                                            onChange={(e) => setEditingComplaintSeverity(e.target.value as any)}
+                                            className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2 text-white outline-none focus:border-purple-600 h-9 text-xs"
+                                        >
+                                            <option value="low">Faible (Low)</option>
+                                            <option value="medium">Moyenne (Medium)</option>
+                                            <option value="high">Élevée (High)</option>
+                                            <option value="critical">Critique (Critical)</option>
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="space-y-1">
+                                <Label className="text-zinc-500">{activeEditingComplaint.type === 'note' ? 'Description de la note' : 'Description de la plainte'}</Label>
+                                <Textarea 
+                                    value={editingComplaintDesc}
+                                    onChange={(e) => setEditingComplaintDesc(e.target.value)}
+                                    className="bg-[#121318] border-zinc-800 text-xs text-white"
+                                    rows={4}
+                                />
+                            </div>
+
+                            <div className="p-3 bg-zinc-950/40 border border-zinc-900 rounded-xl space-y-1 text-xs">
+                                <span className="text-zinc-500 block font-semibold text-[10px] uppercase">Détails additionnels:</span>
+                                <div>Syndicat: <strong className="text-zinc-300">{activeEditingComplaint.clients?.company_name || activeEditingComplaint.clients?.full_name || 'Copropriété'}</strong></div>
+                                <div>Catégorie: <strong className="text-purple-400">{activeEditingComplaint.complaint_categories?.name || 'Général'}</strong></div>
+                                {activeEditingComplaint.received_date && <div>Date de réception: <strong className="text-zinc-300">{new Date(activeEditingComplaint.received_date).toLocaleDateString('fr-CA')}</strong></div>}
+                            </div>
+                        </div>
+
+                        {/* Discussion Notes Section */}
+                        <div className="space-y-4 pt-4 border-t border-zinc-850">
+                            <h4 className="font-bold text-white text-xs">Alignement & Rétroaction en Rencontre</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Notes de la Direction (Ce que j'ai dit)</Label>
+                                    <Textarea 
+                                        value={editingComplaintMyNotes}
+                                        onChange={(e) => setEditingComplaintMyNotes(e.target.value)}
+                                        placeholder="Indiquer vos notes ou directives..."
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white"
+                                        rows={3}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-zinc-500">Notes du Gestionnaire (Plan d'action)</Label>
+                                    <Textarea 
+                                        value={editingComplaintManagerNotes}
+                                        onChange={(e) => setEditingComplaintManagerNotes(e.target.value)}
+                                        placeholder="Plan de résolution ou retour du gestionnaire..."
+                                        className="bg-[#121318] border-zinc-800 text-xs text-white"
+                                        rows={3}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Resolution status buttons */}
+                            <div className="space-y-2">
+                                <Label className="text-zinc-500">Statut de discussion de la plainte</Label>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingComplaintStatus('not_discussed')}
+                                        className={`flex-1 py-2 px-3 rounded-lg border text-xxs font-bold transition-all ${
+                                            editingComplaintStatus === 'not_discussed'
+                                                ? 'bg-zinc-900 border-zinc-700 text-white'
+                                                : 'bg-transparent border-zinc-850 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/10'
+                                        }`}
+                                    >
+                                        Non discutée
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingComplaintStatus('postponed')}
+                                        className={`flex-1 py-2 px-3 rounded-lg border text-xxs font-bold transition-all ${
+                                            editingComplaintStatus === 'postponed'
+                                                ? 'bg-amber-950/20 border-amber-600/30 text-amber-400'
+                                                : 'bg-transparent border-zinc-850 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/10'
+                                        }`}
+                                    >
+                                        Reporter (Postpone)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingComplaintStatus('resolved')}
+                                        className={`flex-1 py-2 px-3 rounded-lg border text-xxs font-bold transition-all ${
+                                            editingComplaintStatus === 'resolved'
+                                                ? 'bg-emerald-950/20 border-emerald-600/30 text-emerald-400'
+                                                : 'bg-transparent border-zinc-850 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/10'
+                                        }`}
+                                    >
+                                        Résoudre (Resolve)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Action Buttons */}
+                        <div className="flex justify-end gap-3 pt-4 border-t border-zinc-850">
+                            <Button 
+                                type="button"
+                                variant="outline" 
+                                onClick={() => setActiveEditingComplaint(null)}
+                                className="bg-zinc-900 border-zinc-800 text-zinc-300 text-xs h-9 px-4"
+                            >
+                                Annuler
+                            </Button>
+                            <Button 
+                                type="button"
+                                onClick={handleSaveComplaintChanges}
+                                className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-9 px-4"
+                            >
+                                Appliquer les modifications
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Confirmation dialog for deleting meeting */}
             <ConfirmationDialog
