@@ -2701,6 +2701,179 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                 </div>
             )}
 
+            {/* Commitment Detail Modal */}
+            {activeCommitment && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#16171e] border border-zinc-800 rounded-2xl w-full max-w-[95vw] md:max-w-[75vw] lg:max-w-[65vw] xl:max-w-[55vw] max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6 text-xs text-zinc-300">
+                        {/* Header */}
+                        <div className="flex justify-between items-start border-b border-zinc-800 pb-4">
+                            <div>
+                                <span className="text-purple-400 uppercase font-black text-[9px] tracking-widest block mb-1">Suivi de l'Engagement Convenu</span>
+                                <h3 className="text-base font-bold text-white uppercase">{activeCommitment.commitment_text}</h3>
+                                <div className="text-[10px] text-zinc-400 mt-1 flex flex-wrap gap-3 font-sans">
+                                    <span>Propriétaire : <strong className="text-zinc-200">{activeCommitment.owner || 'Gestionnaire'}</strong></span>
+                                    {activeCommitment.client_id && <span>Syndicat : <strong className="text-purple-400">{getClientName(activeCommitment.client_id)}</strong></span>}
+                                    {activeCommitment.taken_at && <span>Convenu le : <strong className="text-zinc-200">{activeCommitment.taken_at}</strong></span>}
+                                </div>
+                            </div>
+                            <button 
+                                type="button"
+                                onClick={() => setActiveCommitment(null)} 
+                                className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {/* Controls: Status & Failure Reason */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-950/40 p-4 border border-zinc-850 rounded-xl">
+                            <div className="space-y-1.5">
+                                <Label className="text-zinc-400 font-semibold text-xs">Statut de Suivi</Label>
+                                <select
+                                    value={activeCommitment.status || 'Open'}
+                                    onChange={(e) => {
+                                        const newStatus = e.target.value
+                                        const idx = previousCommitments.findIndex(c => c.id === activeCommitment.id)
+                                        if (idx !== -1) handlePrevCommitmentChange(idx, 'status', newStatus)
+                                        setActiveCommitment((prev: any) => ({ ...prev, status: newStatus }))
+                                    }}
+                                    className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2.5 text-white outline-none focus:border-purple-600 text-xs font-semibold"
+                                >
+                                    <option value="Open">En attente (Open)</option>
+                                    <option value="Improved">Amélioré (Improved)</option>
+                                    <option value="Partial">Résolution Partielle (Partial)</option>
+                                    <option value="Not resolved">Non Résolu (Not resolved)</option>
+                                    <option value="Resolved">Résolu (Resolved)</option>
+                                </select>
+                            </div>
+
+                            {activeCommitment.status !== 'Resolved' && (
+                                <div className="space-y-1.5">
+                                    <Label className="text-zinc-400 font-semibold text-xs">Raison d'Échec / Bloqueur</Label>
+                                    <select
+                                        value={activeCommitment.failure_reason || 'Lack of organization'}
+                                        onChange={(e) => {
+                                            const newReason = e.target.value
+                                            const idx = previousCommitments.findIndex(c => c.id === activeCommitment.id)
+                                            if (idx !== -1) handlePrevCommitmentChange(idx, 'failure_reason', newReason)
+                                            setActiveCommitment((prev: any) => ({ ...prev, failure_reason: newReason }))
+                                        }}
+                                        className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2.5 text-white outline-none focus:border-purple-600 text-xs font-semibold"
+                                    >
+                                        <option value="Lack of organization">Manque d'organisation</option>
+                                        <option value="Lack of training">Besoin de formation</option>
+                                        <option value="Work overload">Surcharge de travail</option>
+                                        <option value="Waiting on board">Attente après le CA</option>
+                                        <option value="Waiting on supplier">Attente après fournisseur</option>
+                                        <option value="Avoidance">Évitement de tâche</option>
+                                        <option value="Prioritization issue">Problème de priorité</option>
+                                        <option value="Process/system issue">Bloqueur système/procédure</option>
+                                        <option value="External issue">Facteur externe</option>
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Multi-Note History Section */}
+                        <div className="space-y-3 pt-2">
+                            <h4 className="font-bold text-white text-xs flex items-center justify-between">
+                                Historique des Notes de Suivi
+                                <span className="text-[10px] text-zinc-500 font-normal">{commitmentNotesHistory.length} note(s)</span>
+                            </h4>
+
+                            <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                                {commitmentNotesHistory.length === 0 ? (
+                                    <p className="text-[11px] text-zinc-500 italic py-3 text-center bg-zinc-950/20 rounded-xl border border-zinc-900">
+                                        Aucune note d'historique enregistrée pour cet engagement.
+                                    </p>
+                                ) : (
+                                    commitmentNotesHistory.map((n) => (
+                                        <div key={n.id} className="p-3 bg-zinc-950/60 border border-zinc-850 rounded-xl space-y-1.5 text-xs">
+                                            <div className="flex justify-between items-center text-[10px] text-zinc-400 border-b border-zinc-900/80 pb-1">
+                                                <span className="font-semibold text-purple-300">{n.author_name}</span>
+                                                <span className="text-zinc-500">{new Date(n.created_at).toLocaleString('fr-CA')}</span>
+                                            </div>
+
+                                            {editingItemNoteId === n.id ? (
+                                                <div className="space-y-2 pt-1">
+                                                    <Textarea 
+                                                        value={editingItemNoteText}
+                                                        onChange={(e) => setEditingItemNoteText(e.target.value)}
+                                                        className="bg-zinc-900 border-zinc-700 text-xs text-white min-h-[60px]"
+                                                    />
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button size="xs" variant="outline" onClick={() => setEditingItemNoteId(null)} className="h-6 text-[10px]">
+                                                            Annuler
+                                                        </Button>
+                                                        <Button size="xs" onClick={() => handleUpdateNote('commitment', activeCommitment.id, n.id, editingItemNoteText)} className="h-6 text-[10px] bg-purple-600 hover:bg-purple-700 text-white font-bold">
+                                                            Sauvegarder
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex justify-between items-start gap-3">
+                                                    <p className="text-zinc-200 whitespace-pre-wrap leading-relaxed flex-1">{n.note_text}</p>
+                                                    <div className="flex gap-1.5 shrink-0">
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => { setEditingItemNoteId(n.id); setEditingItemNoteText(n.note_text); }}
+                                                            className="text-zinc-500 hover:text-purple-300 p-1 rounded hover:bg-zinc-900"
+                                                            title="Éditer la note"
+                                                        >
+                                                            <Edit className="h-3 w-3" />
+                                                        </button>
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleDeleteNote('commitment', n.id)}
+                                                            className="text-rose-500 hover:text-rose-300 p-1 rounded hover:bg-zinc-900"
+                                                            title="Supprimer la note"
+                                                        >
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            {/* Add New Note Box */}
+                            <div className="space-y-2 pt-3 border-t border-zinc-900">
+                                <Label className="text-zinc-400 font-semibold text-[11px]">Ajouter une note de suivi (Direction / Gestionnaire)</Label>
+                                <Textarea 
+                                    value={newCommitmentNoteText}
+                                    onChange={(e) => setNewCommitmentNoteText(e.target.value)}
+                                    placeholder="Écrire une note explicative pour cet engagement..."
+                                    className="bg-zinc-950 border-zinc-800 text-xs min-h-[65px]"
+                                />
+                                <div className="flex justify-end">
+                                    <Button 
+                                        type="button"
+                                        disabled={!newCommitmentNoteText.trim()}
+                                        onClick={() => handleAddNoteToItem('commitment', activeCommitment.id, newCommitmentNoteText)}
+                                        className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-8 px-4 rounded-lg"
+                                    >
+                                        Enregistrer la note
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="flex justify-end pt-3 border-t border-zinc-850">
+                            <Button 
+                                type="button" 
+                                onClick={() => setActiveCommitment(null)} 
+                                className="bg-zinc-900 hover:bg-zinc-850 text-white text-xs h-9 px-5 rounded-xl font-bold"
+                            >
+                                Fermer
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Complaint Edit Modal */}
             {activeEditingComplaint && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">

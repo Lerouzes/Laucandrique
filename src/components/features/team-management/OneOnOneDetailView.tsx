@@ -8,6 +8,7 @@ import {
     deleteOneOnOneAction,
     addOneOnOneItemNoteAction,
     getOneOnOneItemNotesAction,
+    getItemNotesAction,
     updateOneOnOneItemNoteAction,
     deleteOneOnOneItemNoteAction,
     purgeOverdue2025AssembliesAction,
@@ -246,7 +247,10 @@ export function OneOnOneDetailView({
         manager_notes: string
     }>>({})
 
-    // Modal editing state for complaints
+    // Modal editing state for commitments & complaints
+    const [activeCommitment, setActiveCommitment] = useState<any | null>(null)
+    const [commitmentNotesHistory, setCommitmentNotesHistory] = useState<any[]>([])
+    const [newCommitmentNoteText, setNewCommitmentNoteText] = useState('')
     const [activeEditingComplaint, setActiveEditingComplaint] = useState<any | null>(null)
     const [editingComplaintTitle, setEditingComplaintTitle] = useState('')
     const [editingComplaintDesc, setEditingComplaintDesc] = useState('')
@@ -418,6 +422,61 @@ export function OneOnOneDetailView({
             reviewed: ra.reviewed
         })))
     }, [initialCommitments, discussedComplaints, reviewedAudits, reviewedAssemblies, communicationStats, oneOnOne.meeting_date])
+
+    const openCommitmentModal = async (c: any) => {
+        setActiveCommitment(c)
+        setNewCommitmentNoteText('')
+        try {
+            const notes = await getItemNotesAction(c.id)
+            setCommitmentNotesHistory(notes || [])
+        } catch (err) {
+            setCommitmentNotesHistory([])
+        }
+    }
+
+    const handleAddNoteToItem = async (itemType: 'commitment' | 'complaint' | 'risk', itemId: string, noteText: string) => {
+        if (!noteText.trim()) return
+        try {
+            const note = await addOneOnOneItemNoteAction({
+                one_on_one_id: oneOnOne.id,
+                item_type: itemType,
+                item_id: itemId,
+                note_text: noteText.trim(),
+                author_name: oneOnOne.profiles?.full_name || 'Évaluateur'
+            })
+            if (itemType === 'commitment') {
+                setCommitmentNotesHistory(prev => [...prev, note])
+                setNewCommitmentNoteText('')
+            }
+            toast.success("Note enregistrée avec succès !")
+        } catch (err) {
+            toast.error("Erreur lors de l'enregistrement de la note")
+        }
+    }
+
+    const handleUpdateNote = async (itemType: 'commitment' | 'complaint' | 'risk', itemId: string, noteId: string, text: string) => {
+        if (!text.trim()) return
+        try {
+            await updateOneOnOneItemNoteAction(noteId, text.trim())
+            toast.success("Note modifiée avec succès !")
+            setEditingItemNoteId(null)
+            setEditingItemNoteText('')
+            const notes = await getItemNotesAction(itemId)
+            if (itemType === 'commitment') setCommitmentNotesHistory(notes)
+        } catch (err) {
+            toast.error("Erreur lors de la modification")
+        }
+    }
+
+    const handleDeleteNote = async (itemType: 'commitment' | 'complaint' | 'risk', noteId: string) => {
+        try {
+            await deleteOneOnOneItemNoteAction(noteId)
+            toast.success("Note supprimée !")
+            if (itemType === 'commitment') setCommitmentNotesHistory(prev => prev.filter(n => n.id !== noteId))
+        } catch (err) {
+            toast.error("Erreur lors de la suppression")
+        }
+    }
 
     const openComplaintModal = (c: any) => {
         setActiveEditingComplaint(c)
@@ -1800,97 +1859,45 @@ export function OneOnOneDetailView({
                         4. Suivi des engagements précédents
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="p-6">
+                <CardContent className="p-6 text-xs">
                     {previousCommitments.length === 0 ? (
                         <p className="italic text-zinc-500 text-sm text-center py-6">Aucun engagement précédent à suivre.</p>
                     ) : (
-                        <div className="space-y-4">
-                            {previousCommitments.map((comm, idx) => {
-                                const notesForComm = itemNotes.filter(n => n.item_type === 'commitment' && n.item_id === comm.id)
-                                // Suggestion: clear overdue tasks check
-                                const isOverdueTasksComm = comm.commitment_text.toLowerCase().includes("retard") || comm.commitment_text.toLowerCase().includes("tâche")
-                                const showSuggestion = isOverdueTasksComm && lateTasks === 0 && comm.status !== 'Resolved'
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {previousCommitments.map((c, idx) => {
+                                const st = c.status || 'Open'
+                                const badgeStyle = 
+                                    st === 'Resolved' ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50' :
+                                    st === 'Improved' ? 'bg-blue-950/40 text-blue-400 border-blue-800/50' :
+                                    st === 'Partial' ? 'bg-amber-950/40 text-amber-400 border-amber-800/50' :
+                                    'bg-zinc-900 text-zinc-400 border-zinc-800'
 
                                 return (
-                                    <div key={comm.id} className="p-4 bg-zinc-950/30 border border-zinc-850 rounded-xl space-y-3">
-                                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                                            <div className="space-y-0.5">
-                                                <h4 className="text-sm font-extrabold text-white">{comm.commitment_text}</h4>
-                                                <p className="text-[10px] text-zinc-500">
-                                                    Responsable : <strong className="text-zinc-350">{comm.owner}</strong> · 
-                                                    Échéance : <span className="text-zinc-400">{comm.due_date ? new Date(comm.due_date).toLocaleDateString('fr-CA') : 'Prochaine revue'}</span>
-                                                    {comm.client_id && ` · Syndicate: ${getClientName(comm.client_id)}`}
-                                                </p>
-                                            </div>
-
-                                            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                                                {isEditing ? (
-                                                    <select 
-                                                        value={comm.status} 
-                                                        onChange={(e) => handlePrevCommitmentChange(idx, 'status', e.target.value)}
-                                                        className="bg-zinc-900 border border-zinc-850 text-xs p-2 rounded-lg text-white"
-                                                    >
-                                                        <option value="Open">En cours</option>
-                                                        <option value="Resolved">Résolu (Complété)</option>
-                                                        <option value="Blocked">Bloqué</option>
-                                                        <option value="Cancelled">Annulé</option>
-                                                    </select>
-                                                ) : (
-                                                    <Badge variant="outline" className={`text-[9px] uppercase ${
-                                                        comm.status === 'Resolved' || comm.completed ? 'border-emerald-800 bg-emerald-950/20 text-emerald-400' :
-                                                        comm.status === 'Blocked' ? 'border-rose-800 bg-rose-955 bg-rose-600/10 text-rose-500 font-extrabold' :
-                                                        comm.status === 'Cancelled' ? 'border-zinc-800 text-zinc-500' :
-                                                        'border-purple-800 text-purple-400'
-                                                    }`}>
-                                                        {comm.status === 'Resolved' || comm.completed ? 'Résolu' : comm.status || 'En cours'}
-                                                    </Badge>
-                                                )}
-                                            </div>
+                                    <div 
+                                        key={c.id || idx}
+                                        onClick={() => openCommitmentModal(c)}
+                                        className="p-3.5 bg-zinc-950/40 border border-zinc-850 hover:border-purple-600/50 rounded-xl cursor-pointer transition-all space-y-2 group shadow-sm text-xs"
+                                    >
+                                        <div className="flex justify-between items-start gap-2">
+                                            <h4 className="font-bold text-zinc-200 group-hover:text-purple-300 text-xs transition-colors line-clamp-2">
+                                                {c.commitment_text}
+                                            </h4>
+                                            <Badge variant="outline" className={`text-[9px] font-bold shrink-0 ${badgeStyle}`}>
+                                                {st === 'Open' ? 'En attente' : st === 'Improved' ? 'Amélioré' : st === 'Partial' ? 'Partiel' : st === 'Not resolved' ? 'Non résolu' : 'Résolu'}
+                                            </Badge>
                                         </div>
 
-                                        {/* Suggested Closure Alert */}
-                                        {showSuggestion && (
-                                            <div className="p-2.5 bg-emerald-950/25 border border-emerald-900/40 rounded-lg flex items-center justify-between text-xs text-emerald-400">
-                                                <span>💡 Cet engagement visait à vider le retard opérationnel. Tâches en retard actuelles : <strong>0</strong>.</span>
-                                                {isEditing && (
-                                                    <Button 
-                                                        size="xs" 
-                                                        className="bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[9px] h-6 px-2.5 font-bold"
-                                                        onClick={() => handlePrevCommitmentChange(idx, 'status', 'Resolved')}
-                                                    >
-                                                        Confirmer Résolu
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        )}
+                                        <div className="text-[10px] text-zinc-500 space-y-0.5 font-sans">
+                                            <div>Propriétaire : <strong className="text-zinc-300">{c.owner || 'Gestionnaire'}</strong></div>
+                                            {c.client_id && <div>Syndicat : <strong className="text-purple-400">{getClientName(c.client_id)}</strong></div>}
+                                            {c.taken_at && <div>Convenue le : <span className="text-zinc-400">{c.taken_at}</span></div>}
+                                            {c.failure_reason && <div className="text-amber-400 font-semibold">Raison : {c.failure_reason}</div>}
+                                        </div>
 
-                                        {/* Commitment notes history */}
-                                        {notesForComm.length > 0 && (
-                                            <div className="pt-2 border-t border-zinc-900/60 space-y-1.5 pl-2 max-w-xl">
-                                                {notesForComm.map(n => (
-                                                    <div key={n.id} className="text-[10px] text-zinc-400">
-                                                        <strong className="text-zinc-350">{n.author_name}</strong> · <span className="text-[9px] text-zinc-650">{new Date(n.created_at).toLocaleString('fr-CA')}</span>
-                                                        <p className="mt-0.5 text-zinc-300 font-sans">{n.note_text}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {/* Add follow-up note inline */}
-                                        {isEditing && (
-                                            <div className="flex gap-2 max-w-md pt-1">
-                                                <Input 
-                                                    value={newNoteTexts[comm.id] || ''}
-                                                    onChange={(e) => setNewNoteTexts(prev => ({ ...prev, [comm.id]: e.target.value }))}
-                                                    placeholder="Ajouter une note de suivi..."
-                                                    className="bg-zinc-950 border-zinc-800 text-[10px] h-7 rounded"
-                                                    onKeyDown={(e) => e.key === 'Enter' && handleSaveItemNote('commitment', comm.id)}
-                                                />
-                                                <Button onClick={() => handleSaveItemNote('commitment', comm.id)} className="h-7 px-2 text-[10px] bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded">
-                                                    Note
-                                                </Button>
-                                            </div>
-                                        )}
+                                        <div className="pt-2 border-t border-zinc-900 flex justify-between items-center text-[10px] text-purple-400 group-hover:text-purple-300 font-medium">
+                                            <span>💬 Gérer les notes &amp; le statut</span>
+                                            <ArrowRightLeft className="h-3 w-3" />
+                                        </div>
                                     </div>
                                 )
                             })}
@@ -2670,7 +2677,178 @@ export function OneOnOneDetailView({
                         </Button>
                     </DialogFooter>
                 </DialogContent>
-            </Dialog>
+            {/* Commitment Detail Modal */}
+            {activeCommitment && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#16171e] border border-zinc-800 rounded-2xl w-full max-w-[95vw] md:max-w-[75vw] lg:max-w-[65vw] xl:max-w-[55vw] max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6 text-xs text-zinc-300">
+                        {/* Header */}
+                        <div className="flex justify-between items-start border-b border-zinc-800 pb-4">
+                            <div>
+                                <span className="text-purple-400 uppercase font-black text-[9px] tracking-widest block mb-1">Suivi de l'Engagement Convenu</span>
+                                <h3 className="text-base font-bold text-white uppercase">{activeCommitment.commitment_text}</h3>
+                                <div className="text-[10px] text-zinc-400 mt-1 flex flex-wrap gap-3 font-sans">
+                                    <span>Propriétaire : <strong className="text-zinc-200">{activeCommitment.owner || 'Gestionnaire'}</strong></span>
+                                    {activeCommitment.client_id && <span>Syndicat : <strong className="text-purple-400">{getClientName(activeCommitment.client_id)}</strong></span>}
+                                    {activeCommitment.taken_at && <span>Convenu le : <strong className="text-zinc-200">{activeCommitment.taken_at}</strong></span>}
+                                </div>
+                            </div>
+                            <button 
+                                type="button"
+                                onClick={() => setActiveCommitment(null)} 
+                                className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {/* Controls: Status & Failure Reason */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-950/40 p-4 border border-zinc-850 rounded-xl">
+                            <div className="space-y-1.5">
+                                <Label className="text-zinc-400 font-semibold text-xs">Statut de Suivi</Label>
+                                <select
+                                    value={activeCommitment.status || 'Open'}
+                                    onChange={(e) => {
+                                        const newStatus = e.target.value
+                                        const idx = previousCommitments.findIndex(c => c.id === activeCommitment.id)
+                                        if (idx !== -1) handlePrevCommitmentChange(idx, 'status', newStatus)
+                                        setActiveCommitment((prev: any) => ({ ...prev, status: newStatus }))
+                                    }}
+                                    className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2.5 text-white outline-none focus:border-purple-600 text-xs font-semibold"
+                                >
+                                    <option value="Open">En attente (Open)</option>
+                                    <option value="Improved">Amélioré (Improved)</option>
+                                    <option value="Partial">Résolution Partielle (Partial)</option>
+                                    <option value="Not resolved">Non Résolu (Not resolved)</option>
+                                    <option value="Resolved">Résolu (Resolved)</option>
+                                </select>
+                            </div>
+
+                            {activeCommitment.status !== 'Resolved' && (
+                                <div className="space-y-1.5">
+                                    <Label className="text-zinc-400 font-semibold text-xs">Raison d'Échec / Bloqueur</Label>
+                                    <select
+                                        value={activeCommitment.failure_reason || 'Lack of organization'}
+                                        onChange={(e) => {
+                                            const newReason = e.target.value
+                                            const idx = previousCommitments.findIndex(c => c.id === activeCommitment.id)
+                                            if (idx !== -1) handlePrevCommitmentChange(idx, 'failure_reason', newReason)
+                                            setActiveCommitment((prev: any) => ({ ...prev, failure_reason: newReason }))
+                                        }}
+                                        className="w-full bg-[#121318] border border-zinc-800 rounded-lg p-2.5 text-white outline-none focus:border-purple-600 text-xs font-semibold"
+                                    >
+                                        <option value="Lack of organization">Manque d'organisation</option>
+                                        <option value="Lack of training">Besoin de formation</option>
+                                        <option value="Work overload">Surcharge de travail</option>
+                                        <option value="Waiting on board">Attente après le CA</option>
+                                        <option value="Waiting on supplier">Attente après fournisseur</option>
+                                        <option value="Avoidance">Évitement de tâche</option>
+                                        <option value="Prioritization issue">Problème de priorité</option>
+                                        <option value="Process/system issue">Bloqueur système/procédure</option>
+                                        <option value="External issue">Facteur externe</option>
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Multi-Note History Section */}
+                        <div className="space-y-3 pt-2">
+                            <h4 className="font-bold text-white text-xs flex items-center justify-between">
+                                Historique des Notes de Suivi
+                                <span className="text-[10px] text-zinc-500 font-normal">{commitmentNotesHistory.length} note(s)</span>
+                            </h4>
+
+                            <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                                {commitmentNotesHistory.length === 0 ? (
+                                    <p className="text-[11px] text-zinc-500 italic py-3 text-center bg-zinc-950/20 rounded-xl border border-zinc-900">
+                                        Aucune note d'historique enregistrée pour cet engagement.
+                                    </p>
+                                ) : (
+                                    commitmentNotesHistory.map((n) => (
+                                        <div key={n.id} className="p-3 bg-zinc-950/60 border border-zinc-850 rounded-xl space-y-1.5 text-xs">
+                                            <div className="flex justify-between items-center text-[10px] text-zinc-400 border-b border-zinc-900/80 pb-1">
+                                                <span className="font-semibold text-purple-300">{n.author_name}</span>
+                                                <span className="text-zinc-500">{new Date(n.created_at).toLocaleString('fr-CA')}</span>
+                                            </div>
+
+                                            {editingItemNoteId === n.id ? (
+                                                <div className="space-y-2 pt-1">
+                                                    <Textarea 
+                                                        value={editingItemNoteText}
+                                                        onChange={(e) => setEditingItemNoteText(e.target.value)}
+                                                        className="bg-zinc-900 border-zinc-700 text-xs text-white min-h-[60px]"
+                                                    />
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button size="xs" variant="outline" onClick={() => setEditingItemNoteId(null)} className="h-6 text-[10px]">
+                                                            Annuler
+                                                        </Button>
+                                                        <Button size="xs" onClick={() => handleUpdateNote('commitment', activeCommitment.id, n.id, editingItemNoteText)} className="h-6 text-[10px] bg-purple-600 hover:bg-purple-700 text-white font-bold">
+                                                            Sauvegarder
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex justify-between items-start gap-3">
+                                                    <p className="text-zinc-200 whitespace-pre-wrap leading-relaxed flex-1">{n.note_text}</p>
+                                                    <div className="flex gap-1.5 shrink-0">
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => { setEditingItemNoteId(n.id); setEditingItemNoteText(n.note_text); }}
+                                                            className="text-zinc-500 hover:text-purple-300 p-1 rounded hover:bg-zinc-900"
+                                                            title="Éditer la note"
+                                                        >
+                                                            <Edit className="h-3 w-3" />
+                                                        </button>
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleDeleteNote('commitment', n.id)}
+                                                            className="text-rose-500 hover:text-rose-300 p-1 rounded hover:bg-zinc-900"
+                                                            title="Supprimer la note"
+                                                        >
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            {/* Add New Note Box */}
+                            <div className="space-y-2 pt-3 border-t border-zinc-900">
+                                <Label className="text-zinc-400 font-semibold text-[11px]">Ajouter une note de suivi (Direction / Gestionnaire)</Label>
+                                <Textarea 
+                                    value={newCommitmentNoteText}
+                                    onChange={(e) => setNewCommitmentNoteText(e.target.value)}
+                                    placeholder="Écrire une note explicative pour cet engagement..."
+                                    className="bg-zinc-950 border-zinc-800 text-xs min-h-[65px]"
+                                />
+                                <div className="flex justify-end">
+                                    <Button 
+                                        type="button"
+                                        disabled={!newCommitmentNoteText.trim()}
+                                        onClick={() => handleAddNoteToItem('commitment', activeCommitment.id, newCommitmentNoteText)}
+                                        className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-8 px-4 rounded-lg"
+                                    >
+                                        Enregistrer la note
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="flex justify-end pt-3 border-t border-zinc-850">
+                            <Button 
+                                type="button" 
+                                onClick={() => setActiveCommitment(null)} 
+                                className="bg-zinc-900 hover:bg-zinc-850 text-white text-xs h-9 px-5 rounded-xl font-bold"
+                            >
+                                Fermer
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Complaint Edit Modal */}
             {activeEditingComplaint && (
