@@ -8,6 +8,8 @@ import {
     updateOneOnOneAction,
     getOneOnOneSnapshotAction,
     purgeOverdue2025AssembliesAction,
+    getItemNotesAction,
+    addOneOnOneItemNoteAction,
     updateOneOnOneItemNoteAction,
     deleteOneOnOneItemNoteAction,
     getCategoryComplaintHistoryAction,
@@ -261,6 +263,18 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
     const [editingItemNoteText, setEditingItemNoteText] = useState<string>('')
     const [editingComplaintStatus, setEditingComplaintStatus] = useState<'not_discussed' | 'in_progress' | 'resolved'>('not_discussed')
 
+    // Interactive multi-note history states & locking
+    const [activeCommitment, setActiveCommitment] = useState<any | null>(null)
+    const [commitmentNotesHistory, setCommitmentNotesHistory] = useState<any[]>([])
+    const [newCommitmentNoteText, setNewCommitmentNoteText] = useState('')
+    const [complaintNotesHistory, setComplaintNotesHistory] = useState<any[]>([])
+    const [newComplaintNoteText, setNewComplaintNoteText] = useState('')
+    const [riskNotesHistory, setRiskNotesHistory] = useState<any[]>([])
+    const [newRiskNoteText, setNewRiskNoteText] = useState('')
+    const [assemblyTrackings, setAssemblyTrackings] = useState<any[]>([])
+    const [isLocked, setIsLocked] = useState(false)
+    const [meetingStatus, setMeetingStatus] = useState<'draft' | 'completed'>('draft')
+
     const [activeAudit, setActiveAudit] = useState<any | null>(null)
     const [activeAuditDetails, setActiveAuditDetails] = useState<any | null>(null)
     const [loadingAuditDetails, setLoadingAuditDetails] = useState(false)
@@ -318,7 +332,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
         setModalAuditNotes(audit.review_notes || '')
     }
 
-    const openRiskModal = (idx: number) => {
+    const openRiskModal = async (idx: number) => {
         const risk = operationalRisks[idx]
         if (!risk) return
         setSelectedRiskIdx(idx)
@@ -329,6 +343,68 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
         setModalRiskStatus(risk.status || 'active')
         setModalRiskResolutionNotes(risk.resolution_notes || '')
         setModalRiskResolvedDate(risk.resolved_date || '')
+        setNewRiskNoteText('')
+
+        try {
+            const notes = await getItemNotesAction(risk.id)
+            setRiskNotesHistory(notes || [])
+        } catch (err) {
+            setRiskNotesHistory([])
+        }
+    }
+
+    const handleAddNoteToItem = async (itemType: 'commitment' | 'complaint' | 'risk', itemId: string, noteText: string) => {
+        if (!noteText.trim()) return
+        try {
+            const note = await addOneOnOneItemNoteAction({
+                one_on_one_id: createdMeetingId || null,
+                item_type: itemType,
+                item_id: itemId,
+                note_text: noteText.trim(),
+                author_name: 'Direction / Gestionnaire'
+            })
+            if (itemType === 'commitment') {
+                setCommitmentNotesHistory(prev => [...prev, note])
+                setNewCommitmentNoteText('')
+            } else if (itemType === 'complaint') {
+                setComplaintNotesHistory(prev => [...prev, note])
+                setNewComplaintNoteText('')
+            } else if (itemType === 'risk') {
+                setRiskNotesHistory(prev => [...prev, note])
+                setNewRiskNoteText('')
+            }
+            toast.success("Note enregistrée avec succès !")
+        } catch (err) {
+            toast.error("Erreur lors de l'enregistrement de la note")
+        }
+    }
+
+    const handleUpdateNote = async (itemType: 'commitment' | 'complaint' | 'risk', itemId: string, noteId: string, text: string) => {
+        if (!text.trim()) return
+        try {
+            await updateOneOnOneItemNoteAction(noteId, text.trim())
+            toast.success("Note modifiée avec succès !")
+            setEditingItemNoteId(null)
+            setEditingItemNoteText('')
+            const notes = await getItemNotesAction(itemId)
+            if (itemType === 'commitment') setCommitmentNotesHistory(notes)
+            if (itemType === 'complaint') setComplaintNotesHistory(notes)
+            if (itemType === 'risk') setRiskNotesHistory(notes)
+        } catch (err) {
+            toast.error("Erreur lors de la modification")
+        }
+    }
+
+    const handleDeleteNote = async (itemType: 'commitment' | 'complaint' | 'risk', noteId: string) => {
+        try {
+            await deleteOneOnOneItemNoteAction(noteId)
+            toast.success("Note supprimée !")
+            if (itemType === 'commitment') setCommitmentNotesHistory(prev => prev.filter(n => n.id !== noteId))
+            if (itemType === 'complaint') setComplaintNotesHistory(prev => prev.filter(n => n.id !== noteId))
+            if (itemType === 'risk') setRiskNotesHistory(prev => prev.filter(n => n.id !== noteId))
+        } catch (err) {
+            toast.error("Erreur lors de la suppression")
+        }
     }
 
     const handleSaveModalAudit = () => {
@@ -408,11 +484,12 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
         return company || sdc || 'Syndicat'
     }
 
-    const openComplaintModal = (c: any) => {
+    const openComplaintModal = async (c: any) => {
         setActiveEditingComplaint(c)
         setEditingComplaintTitle(c.title || '')
         setEditingComplaintDesc(c.description || '')
         setEditingComplaintSeverity(c.severity || 'medium')
+        setNewComplaintNoteText('')
 
         const state = reviewedComplaintsState[c.id] || { 
             checked: false, 
@@ -429,6 +506,24 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
             setEditingComplaintStatus('resolved')
         } else {
             setEditingComplaintStatus('in_progress')
+        }
+
+        try {
+            const notes = await getItemNotesAction(c.id)
+            setComplaintNotesHistory(notes || [])
+        } catch (err) {
+            setComplaintNotesHistory([])
+        }
+    }
+
+    const openCommitmentModal = async (c: any) => {
+        setActiveCommitment(c)
+        setNewCommitmentNoteText('')
+        try {
+            const notes = await getItemNotesAction(c.id)
+            setCommitmentNotesHistory(notes || [])
+        } catch (err) {
+            setCommitmentNotesHistory([])
         }
     }
 
@@ -584,6 +679,7 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
             // Review items
             setSyndicateAudits(snapshot.syndicateAudits || [])
             setAssemblyEvaluations(snapshot.assemblyEvaluations || [])
+            setAssemblyTrackings(snapshot.assemblyTracking || [])
             setManagerComplaints(snapshot.openComplaints || [])
             setOperationalRisks(snapshot.operationalRisks || [])
             setClientsList(snapshot.clientsList || [])
@@ -927,12 +1023,9 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
             if (status === 'draft') {
                 toast.success("Brouillon sauvegardé avec succès. Vous pouvez continuer la modification sur cette page.")
             } else {
-                toast.success("Alignement 1-à-1 publié avec succès.")
-                if (targetId) {
-                    router.push(`/team-management/one-on-ones/${targetId}`)
-                } else {
-                    router.push('/team-management/one-on-ones')
-                }
+                toast.success("Rencontre 1-à-1 finalisée et verrouillée avec succès !")
+                setIsLocked(true)
+                setMeetingStatus('completed')
             }
         } catch (err) {
             alert('Erreur lors de la création de la rencontre: ' + (err as Error).message)
@@ -1430,77 +1523,52 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                         2. Suivi des Engagements de la Rencontre Précédente (Responsabilisation)
                     </CardTitle>
                     <CardDescription className="text-[10px] text-zinc-400">
-                        Passez en revue chaque engagement convenu. S'il n'est pas "Résolu", il sera automatiquement reporté à la prochaine rencontre.
+                        Consultez et cliquez sur les cartes des engagements convenus pour ajuster le statut, la raison d'écart et enregistrer l'historique des notes.
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="overflow-x-auto text-xs">
+                <CardContent className="text-xs">
                     {previousCommitments.length === 0 ? (
                         <p className="text-xxs text-zinc-500 italic text-center py-4">Aucun engagement de la rencontre précédente en suspens.</p>
                     ) : (
-                        <table className="w-full text-left text-xs text-zinc-300">
-                            <thead className="bg-zinc-950/40 text-zinc-450 font-bold border-b border-zinc-850">
-                                <tr>
-                                    <th className="p-2 w-1/3">Engagement Convenu</th>
-                                    <th className="p-2 text-center w-28">Statut de Suivi</th>
-                                    <th className="p-2">Raison d'Échec / Bloqueur</th>
-                                    <th className="p-2 w-1/3">Notes / Rétroaction</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-zinc-850">
-                                {previousCommitments.map((c, idx) => (
-                                    <tr key={c.id || idx} className="hover:bg-zinc-900/10">
-                                        <td className="p-2 font-semibold text-zinc-200">
-                                            {c.commitment_text}
-                                            <div className="text-[10px] text-zinc-500 mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 font-bold">
-                                                <span>Propriétaire: {c.owner || 'Manager'}</span>
-                                                {c.client_id && <span>· Syndicat: {getClientName(c.client_id)}</span>}
-                                                {c.taken_at && <span className="text-purple-400">· Discuté le: {c.taken_at}</span>}
-                                            </div>
-                                        </td>
-                                        <td className="p-2 text-center">
-                                            <select
-                                                value={c.status || 'Open'}
-                                                onChange={(e) => handlePrevCommitmentChange(idx, 'status', e.target.value)}
-                                                className="bg-[#121318] border border-zinc-850 rounded p-1 text-zinc-300 outline-none text-xs font-semibold"
-                                            >
-                                                <option value="Open">En attente (Open)</option>
-                                                <option value="Improved">Amélioré (Improved)</option>
-                                                <option value="Partial">Résolution Partielle (Partial)</option>
-                                                <option value="Not resolved">Non Résolu (Not resolved)</option>
-                                                <option value="Resolved">Résolu (Resolved)</option>
-                                            </select>
-                                        </td>
-                                        <td className="p-2">
-                                            {c.status !== 'Resolved' && (
-                                                <select
-                                                    value={c.failure_reason || 'Lack of organization'}
-                                                    onChange={(e) => handlePrevCommitmentChange(idx, 'failure_reason', e.target.value)}
-                                                    className="w-full bg-[#121318] border border-zinc-850 rounded p-1 text-xs font-semibold text-zinc-400 outline-none"
-                                                >
-                                                    <option value="Lack of organization">Manque d'organisation</option>
-                                                    <option value="Lack of training">Besoin de formation</option>
-                                                    <option value="Work overload">Surcharge de travail</option>
-                                                    <option value="Waiting on board">Attente après le CA</option>
-                                                    <option value="Waiting on supplier">Attente après fournisseur</option>
-                                                    <option value="Avoidance">Évitement de tâche</option>
-                                                    <option value="Prioritization issue">Problème de priorité</option>
-                                                    <option value="Process/system issue">Bloqueur système/procédure</option>
-                                                    <option value="External issue">Facteur externe</option>
-                                                </select>
-                                            )}
-                                        </td>
-                                        <td className="p-2">
-                                            <Textarea
-                                                placeholder="Laisser une note explicative..."
-                                                value={c.notes || ''}
-                                                onChange={(e) => handlePrevCommitmentChange(idx, 'notes', e.target.value)}
-                                                className="bg-[#121318] border-zinc-850 text-xs min-h-[50px] resize-y py-1 px-2"
-                                            />
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {previousCommitments.map((c, idx) => {
+                                const st = c.status || 'Open'
+                                const badgeStyle = 
+                                    st === 'Resolved' ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50' :
+                                    st === 'Improved' ? 'bg-blue-950/40 text-blue-400 border-blue-800/50' :
+                                    st === 'Partial' ? 'bg-amber-950/40 text-amber-400 border-amber-800/50' :
+                                    'bg-zinc-900 text-zinc-400 border-zinc-800'
+
+                                return (
+                                    <div 
+                                        key={c.id || idx}
+                                        onClick={() => openCommitmentModal(c)}
+                                        className="p-3.5 bg-zinc-950/40 border border-zinc-850 hover:border-purple-600/50 rounded-xl cursor-pointer transition-all space-y-2 group shadow-sm"
+                                    >
+                                        <div className="flex justify-between items-start gap-2">
+                                            <h4 className="font-bold text-zinc-200 group-hover:text-purple-300 text-xs transition-colors line-clamp-2">
+                                                {c.commitment_text}
+                                            </h4>
+                                            <Badge variant="outline" className={`text-[9px] font-bold shrink-0 ${badgeStyle}`}>
+                                                {st === 'Open' ? 'En attente' : st === 'Improved' ? 'Amélioré' : st === 'Partial' ? 'Partiel' : st === 'Not resolved' ? 'Non résolu' : 'Résolu'}
+                                            </Badge>
+                                        </div>
+
+                                        <div className="text-[10px] text-zinc-500 space-y-0.5 font-sans">
+                                            <div>Propriétaire : <strong className="text-zinc-300">{c.owner || 'Gestionnaire'}</strong></div>
+                                            {c.client_id && <div>Syndicat : <strong className="text-purple-400">{getClientName(c.client_id)}</strong></div>}
+                                            {c.taken_at && <div>Convenue le : <span className="text-zinc-400">{c.taken_at}</span></div>}
+                                            {c.failure_reason && <div className="text-amber-400 font-semibold">Raison : {c.failure_reason}</div>}
+                                        </div>
+
+                                        <div className="pt-2 border-t border-zinc-900 flex justify-between items-center text-[10px] text-purple-400 group-hover:text-purple-300">
+                                            <span>💬 Gérer les notes &amp; le statut</span>
+                                            <ArrowRightLeft className="h-3 w-3" />
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
                     )}
                 </CardContent>
             </Card>
@@ -2168,19 +2236,40 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                     </Button>
                 </CardHeader>
                 <CardContent className="pt-4 text-xs">
-                    {assemblyEvaluations.length === 0 ? (
-                        <p className="italic text-zinc-500 text-xs text-center py-6">Aucune évaluation d'assemblée à afficher.</p>
+                    {assemblyTrackings.length === 0 ? (
+                        <p className="italic text-zinc-500 text-xs text-center py-6">Aucun suivi d'assemblée à afficher.</p>
                     ) : (
-                        <div className="space-y-3">
-                            {assemblyEvaluations.map(ae => (
-                                <div key={ae.id} className="p-3 bg-zinc-950/40 border border-zinc-850 rounded-xl flex justify-between items-center">
-                                    <div>
-                                        <h4 className="font-bold text-white text-xs">{getClientName(ae.client_id)}</h4>
-                                        <p className="text-[10px] text-zinc-400">Date d'assemblée: {new Date(ae.assembly_date).toLocaleDateString('fr-CA')}</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {assemblyTrackings.map(at => {
+                                const statusLabel = 
+                                    at.status === 'completed' ? 'Complétée' :
+                                    at.status === 'scheduled' ? 'Planifiée' : 'À préparer'
+                                const statusBadge = 
+                                    at.status === 'completed' ? 'bg-emerald-950/30 text-emerald-400 border-emerald-800/40' :
+                                    at.status === 'scheduled' ? 'bg-blue-950/30 text-blue-400 border-blue-800/40' :
+                                    'bg-amber-950/30 text-amber-400 border-amber-800/40'
+
+                                return (
+                                    <div key={at.id} className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
+                                        <div className="flex justify-between items-start gap-2">
+                                            <div>
+                                                <h4 className="font-bold text-white text-xs">{at.clients?.company_name || at.clients?.full_name || getClientName(at.client_id)}</h4>
+                                                <p className="text-[10px] text-zinc-400 mt-0.5">
+                                                    FYE: <strong className="text-zinc-300">{at.fiscal_year_end ? new Date(at.fiscal_year_end).toLocaleDateString('fr-CA') : 'N/A'}</strong> · Date Cible: <span className="text-purple-300 font-semibold">{at.target_date ? new Date(at.target_date).toLocaleDateString('fr-CA') : 'N/A'}</span>
+                                                </p>
+                                            </div>
+                                            <Badge variant="outline" className={`text-[9px] font-bold py-0.5 px-2 ${statusBadge}`}>
+                                                {statusLabel}
+                                            </Badge>
+                                        </div>
+                                        {at.planned_date && (
+                                            <div className="text-[10px] text-zinc-300 font-semibold">
+                                                Date planifiée / tenue: {new Date(at.planned_date).toLocaleDateString('fr-CA')}
+                                            </div>
+                                        )}
                                     </div>
-                                    <Badge variant="outline" className="bg-purple-950/20 text-purple-400 border-purple-800/40 text-[9px]">Enregistrée</Badge>
-                                </div>
-                            ))}
+                                )
+                            })}
                         </div>
                     )}
                 </CardContent>
@@ -2300,25 +2389,108 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                         {/* Discussion Notes Section */}
                         <div className="space-y-4 pt-4 border-t border-zinc-850">
                             <h4 className="font-bold text-white text-xs">Alignement & Rétroaction en Rencontre</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            
+                            {/* Multi-Note History List */}
+                            <div className="space-y-3 pt-2">
+                                <h5 className="font-semibold text-zinc-300 text-xs flex items-center justify-between">
+                                    Historique des Notes d'Alignement
+                                    <span className="text-[10px] text-zinc-500 font-normal">{complaintNotesHistory.length} note(s)</span>
+                                </h5>
+
+                                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                                    {complaintNotesHistory.length === 0 ? (
+                                        <p className="text-[11px] text-zinc-500 italic py-2">Aucune note d'historique enregistrée pour cette plainte.</p>
+                                    ) : (
+                                        complaintNotesHistory.map((n) => (
+                                            <div key={n.id} className="p-2.5 bg-zinc-950/60 border border-zinc-850 rounded-xl space-y-1.5 text-xs">
+                                                <div className="flex justify-between items-center text-[10px] text-zinc-400 border-b border-zinc-900 pb-1">
+                                                    <span className="font-semibold text-purple-300">{n.author_name}</span>
+                                                    <span className="text-zinc-500">{new Date(n.created_at).toLocaleString('fr-CA')}</span>
+                                                </div>
+
+                                                {editingItemNoteId === n.id ? (
+                                                    <div className="space-y-2 pt-1">
+                                                        <Textarea 
+                                                            value={editingItemNoteText}
+                                                            onChange={(e) => setEditingItemNoteText(e.target.value)}
+                                                            className="bg-zinc-900 border-zinc-700 text-xs text-white min-h-[60px]"
+                                                        />
+                                                        <div className="flex justify-end gap-2">
+                                                            <Button size="xs" variant="outline" onClick={() => setEditingItemNoteId(null)} className="h-6 text-[10px]">
+                                                                Annuler
+                                                            </Button>
+                                                            <Button size="xs" onClick={() => handleUpdateNote('complaint', activeEditingComplaint.id, n.id, editingItemNoteText)} className="h-6 text-[10px] bg-purple-600 hover:bg-purple-700 text-white">
+                                                                Sauvegarder
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex justify-between items-start gap-3">
+                                                        <p className="text-zinc-200 whitespace-pre-wrap leading-relaxed flex-1">{n.note_text}</p>
+                                                        <div className="flex gap-1.5 shrink-0">
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => { setEditingItemNoteId(n.id); setEditingItemNoteText(n.note_text); }}
+                                                                className="text-zinc-500 hover:text-zinc-300 p-1 rounded hover:bg-zinc-900"
+                                                            >
+                                                                <Edit className="h-3 w-3" />
+                                                            </button>
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => handleDeleteNote('complaint', n.id)}
+                                                                className="text-rose-500 hover:text-rose-300 p-1 rounded hover:bg-zinc-900"
+                                                            >
+                                                                <Trash2 className="h-3 w-3" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                {/* Add New Complaint Note */}
+                                <div className="space-y-2 pt-2 border-t border-zinc-900">
+                                    <Label className="text-zinc-400 font-semibold text-[11px]">Ajouter une note de suivi (Direction / Gestionnaire)</Label>
+                                    <Textarea 
+                                        value={newComplaintNoteText}
+                                        onChange={(e) => setNewComplaintNoteText(e.target.value)}
+                                        placeholder="Saisir une nouvelle note d'alignement ou directive..."
+                                        className="bg-zinc-950 border-zinc-800 text-xs min-h-[60px]"
+                                    />
+                                    <div className="flex justify-end">
+                                        <Button 
+                                            type="button"
+                                            disabled={!newComplaintNoteText.trim()}
+                                            onClick={() => handleAddNoteToItem('complaint', activeEditingComplaint.id, newComplaintNoteText)}
+                                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-8 px-4 rounded-lg"
+                                        >
+                                            Enregistrer la note
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-zinc-900">
                                 <div className="space-y-1">
-                                    <Label className="text-zinc-500">Notes de la Direction (Ce que j'ai dit)</Label>
+                                    <Label className="text-zinc-500">Notes de la Direction (Legacy)</Label>
                                     <Textarea 
                                         value={editingComplaintMyNotes}
                                         onChange={(e) => setEditingComplaintMyNotes(e.target.value)}
                                         placeholder="Indiquer vos notes ou directives..."
                                         className="bg-[#121318] border-zinc-800 text-xs text-white"
-                                        rows={3}
+                                        rows={2}
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label className="text-zinc-500">Notes du Gestionnaire (Plan d'action)</Label>
+                                    <Label className="text-zinc-500">Notes du Gestionnaire (Legacy)</Label>
                                     <Textarea 
                                         value={editingComplaintManagerNotes}
                                         onChange={(e) => setEditingComplaintManagerNotes(e.target.value)}
-                                        placeholder="Plan de résolution ou retour du gestionnaire..."
+                                        placeholder="Plan de résolution..."
                                         className="bg-[#121318] border-zinc-800 text-xs text-white"
-                                        rows={3}
+                                        rows={2}
                                     />
                                 </div>
                             </div>
@@ -2958,9 +3130,92 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                                     value={modalRiskFutureActions}
                                     onChange={(e) => setModalRiskFutureActions(e.target.value)}
                                     placeholder="Décrivez les actions futures recommandées..."
-                                    rows={3}
+                                    rows={2}
                                     className="bg-[#121318] border-zinc-800 text-xs text-white"
                                 />
+                            </div>
+
+                            {/* Multi-Note History Section for Operational Risk */}
+                            <div className="space-y-3 pt-3 border-t border-zinc-850">
+                                <h5 className="font-semibold text-zinc-300 text-xs flex items-center justify-between">
+                                    Historique des Notes du Risque (Jusqu'à résolution)
+                                    <span className="text-[10px] text-zinc-500 font-normal">{riskNotesHistory.length} note(s)</span>
+                                </h5>
+
+                                <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                                    {riskNotesHistory.length === 0 ? (
+                                        <p className="text-[11px] text-zinc-500 italic py-2">Aucune note d'historique pour ce risque.</p>
+                                    ) : (
+                                        riskNotesHistory.map((n) => (
+                                            <div key={n.id} className="p-2.5 bg-zinc-950/60 border border-zinc-850 rounded-xl space-y-1.5 text-xs">
+                                                <div className="flex justify-between items-center text-[10px] text-zinc-400 border-b border-zinc-900 pb-1">
+                                                    <span className="font-semibold text-purple-300">{n.author_name}</span>
+                                                    <span className="text-zinc-500">{new Date(n.created_at).toLocaleString('fr-CA')}</span>
+                                                </div>
+
+                                                {editingItemNoteId === n.id ? (
+                                                    <div className="space-y-2 pt-1">
+                                                        <Textarea 
+                                                            value={editingItemNoteText}
+                                                            onChange={(e) => setEditingItemNoteText(e.target.value)}
+                                                            className="bg-zinc-900 border-zinc-700 text-xs text-white min-h-[60px]"
+                                                        />
+                                                        <div className="flex justify-end gap-2">
+                                                            <Button size="xs" variant="outline" onClick={() => setEditingItemNoteId(null)} className="h-6 text-[10px]">
+                                                                Annuler
+                                                            </Button>
+                                                            <Button size="xs" onClick={() => handleUpdateNote('risk', operationalRisks[selectedRiskIdx!].id, n.id, editingItemNoteText)} className="h-6 text-[10px] bg-purple-600 hover:bg-purple-700 text-white">
+                                                                Sauvegarder
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex justify-between items-start gap-3">
+                                                        <p className="text-zinc-200 whitespace-pre-wrap leading-relaxed flex-1">{n.note_text}</p>
+                                                        <div className="flex gap-1.5 shrink-0">
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => { setEditingItemNoteId(n.id); setEditingItemNoteText(n.note_text); }}
+                                                                className="text-zinc-500 hover:text-zinc-300 p-1 rounded hover:bg-zinc-900"
+                                                            >
+                                                                <Edit className="h-3 w-3" />
+                                                            </button>
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => handleDeleteNote('risk', n.id)}
+                                                                className="text-rose-500 hover:text-rose-300 p-1 rounded hover:bg-zinc-900"
+                                                            >
+                                                                <Trash2 className="h-3 w-3" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                {modalRiskStatus !== 'resolved' && selectedRiskIdx !== null && operationalRisks[selectedRiskIdx] && (
+                                    <div className="space-y-2 pt-2 border-t border-zinc-900">
+                                        <Label className="text-zinc-400 font-semibold text-[11px]">Ajouter une note de suivi du risque</Label>
+                                        <Textarea 
+                                            value={newRiskNoteText}
+                                            onChange={(e) => setNewRiskNoteText(e.target.value)}
+                                            placeholder="Indiquer l'évolution de la situation du risque..."
+                                            className="bg-zinc-950 border-zinc-800 text-xs min-h-[60px]"
+                                        />
+                                        <div className="flex justify-end">
+                                            <Button 
+                                                type="button"
+                                                disabled={!newRiskNoteText.trim()}
+                                                onClick={() => handleAddNoteToItem('risk', operationalRisks[selectedRiskIdx].id, newRiskNoteText)}
+                                                className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-8 px-4 rounded-lg"
+                                            >
+                                                Enregistrer la note
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

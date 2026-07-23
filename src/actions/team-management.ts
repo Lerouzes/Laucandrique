@@ -2482,6 +2482,14 @@ export async function getOneOnOneSnapshotAction(managerId: string, meetingDate?:
     
     const { data: assemblies } = await assembliesQuery
 
+    // Fetch assembly tracking schedule for manager (includes upcoming 2026 assemblies)
+    let assemblyTracking: any[] = []
+    try {
+        assemblyTracking = await getAssemblyTrackingForManagerAction(managerId)
+    } catch (err) {
+        console.error("Error fetching assembly tracking in snapshot:", err)
+    }
+
     // Fetch operational risks for manager
     const { data: risks } = await supabase
         .from('manager_operational_risks')
@@ -2539,6 +2547,7 @@ export async function getOneOnOneSnapshotAction(managerId: string, meetingDate?:
         openComplaints: openComplaints || [],
         syndicateAudits,
         assemblyEvaluations: assemblies || [],
+        assemblyTracking: assemblyTracking || [],
         operationalRisks: risks || [],
         clientsList: clientsList || [],
         callsHistory: callsHistory || [],
@@ -3726,7 +3735,7 @@ export async function getManagerTaskCountsAction(managerId: string) {
 // ==========================================
 
 export async function addOneOnOneItemNoteAction(data: {
-    one_on_one_id: string
+    one_on_one_id?: string | null
     item_type: 'metric' | 'risk' | 'complaint' | 'audit' | 'assembly' | 'commitment'
     item_id: string
     note_text: string
@@ -3736,7 +3745,7 @@ export async function addOneOnOneItemNoteAction(data: {
     const { data: note, error } = await supabase
         .from('one_on_one_item_notes')
         .insert({
-            one_on_one_id: data.one_on_one_id,
+            one_on_one_id: data.one_on_one_id || null,
             item_type: data.item_type,
             item_id: data.item_id,
             note_text: data.note_text,
@@ -3746,8 +3755,22 @@ export async function addOneOnOneItemNoteAction(data: {
         .single()
 
     if (error) throw new Error(error.message)
-    revalidatePath(`/team-management/one-on-ones/${data.one_on_one_id}`)
+    if (data.one_on_one_id) {
+        revalidatePath(`/team-management/one-on-ones/${data.one_on_one_id}`)
+    }
     return note
+}
+
+export async function getItemNotesAction(itemId: string) {
+    const supabase = await createClient()
+    const { data: notes, error } = await supabase
+        .from('one_on_one_item_notes')
+        .select('*')
+        .eq('item_id', itemId)
+        .order('created_at', { ascending: true })
+
+    if (error) return []
+    return notes || []
 }
 
 export async function getOneOnOneItemNotesAction(oneOnOneId: string) {
