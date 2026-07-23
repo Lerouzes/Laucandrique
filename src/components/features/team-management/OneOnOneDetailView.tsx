@@ -2677,6 +2677,8 @@ export function OneOnOneDetailView({
                         </Button>
                     </DialogFooter>
                 </DialogContent>
+            </Dialog>
+
             {/* Commitment Detail Modal */}
             {activeCommitment && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
