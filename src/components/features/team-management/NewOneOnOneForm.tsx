@@ -14,7 +14,11 @@ import {
     deleteOneOnOneItemNoteAction,
     getCategoryComplaintHistoryAction,
     getSyndicateAuditDetailsAction,
-    getAssemblyEvaluationDetailsAction
+    getAssemblyEvaluationDetailsAction,
+    getAssemblyTrackingForManagerAction,
+    updateAssemblyTrackingAction,
+    confirmAssemblyCompletedAction,
+    deleteAssemblyTrackingAction
 } from '@/actions/team-management'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -272,6 +276,11 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
     const [riskNotesHistory, setRiskNotesHistory] = useState<any[]>([])
     const [newRiskNoteText, setNewRiskNoteText] = useState('')
     const [assemblyTrackings, setAssemblyTrackings] = useState<any[]>([])
+    const [assemblyNotesTexts, setAssemblyNotesTexts] = useState<Record<string, string>>({})
+    const [editingNoteIndex, setEditingNoteIndex] = useState<Record<string, number | null>>({})
+    const [editingNoteText, setEditingNoteText] = useState('')
+    const [confirmingAssemblyId, setConfirmingAssemblyId] = useState<string | null>(null)
+    const [actualAssemblyDate, setActualAssemblyDate] = useState('')
     const [isLocked, setIsLocked] = useState(false)
     const [meetingStatus, setMeetingStatus] = useState<'draft' | 'completed'>('draft')
 
@@ -404,6 +413,183 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
             if (itemType === 'risk') setRiskNotesHistory(prev => prev.filter(n => n.id !== noteId))
         } catch (err) {
             toast.error("Erreur lors de la suppression")
+        }
+    }
+
+    const getAssemblyIndicator = (assembly: any) => {
+        if (assembly.status === 'completed') {
+            return { label: 'Complétée', color: 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50', dot: 'bg-emerald-400' }
+        }
+        const targetDate = new Date(assembly.target_date)
+        const today = new Date()
+        const diffTime = targetDate.getTime() - today.getTime()
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+        if (diffDays < 0) {
+            return { label: 'En retard', color: 'bg-rose-950/40 text-rose-400 border-rose-800/50', dot: 'bg-rose-500' }
+        } else if (diffDays <= 30) {
+            return { label: 'Urgent (<30j)', color: 'bg-amber-950/40 text-amber-400 border-amber-800/50', dot: 'bg-amber-400' }
+        } else if (assembly.planned_date) {
+            return { label: 'Planifiée', color: 'bg-blue-950/40 text-blue-400 border-blue-800/50', dot: 'bg-blue-400' }
+        }
+        return { label: 'À préparer', color: 'bg-zinc-900 text-zinc-400 border-zinc-800', dot: 'bg-zinc-500' }
+    }
+
+    const handleAssemblyDateChange = async (assembly: any, newDate: string) => {
+        const oldDate = assembly.planned_date || 'Non défini'
+        const changedBy = 'Direction / Gestionnaire'
+        const timestamp = new Date().toISOString()
+        const newHistory = [...(assembly.date_history || []), {
+            old_date: oldDate,
+            new_date: newDate,
+            changed_by: changedBy,
+            timestamp
+        }]
+
+        const trackingNotes = [...(assembly.notes || []), {
+            note: `Date planifiée modifiée de ${oldDate} à ${newDate} par ${changedBy}.`,
+            author: changedBy,
+            timestamp
+        }]
+
+        try {
+            await updateAssemblyTrackingAction(assembly.id, {
+                planned_date: newDate || null,
+                notes: trackingNotes,
+                date_history: newHistory
+            })
+            setAssemblyTrackings(prev => prev.map(a => a.id === assembly.id ? { ...a, planned_date: newDate || null, notes: trackingNotes, date_history: newHistory } : a))
+            toast.success("Date planifiée de l'assemblée mise à jour.")
+        } catch (err) {
+            toast.error("Erreur lors de la mise à jour de la date: " + (err as Error).message)
+        }
+    }
+
+    const handleAssemblyStatusChange = async (assembly: any, nextStatus: any) => {
+        const changedBy = 'Direction / Gestionnaire'
+        const timestamp = new Date().toISOString()
+        const trackingNotes = [...(assembly.notes || []), {
+            note: `Statut modifié à "${nextStatus}" par ${changedBy}.`,
+            author: changedBy,
+            timestamp
+        }]
+
+        try {
+            await updateAssemblyTrackingAction(assembly.id, {
+                status: nextStatus,
+                notes: trackingNotes
+            })
+            setAssemblyTrackings(prev => prev.map(a => a.id === assembly.id ? { ...a, status: nextStatus, notes: trackingNotes } : a))
+            toast.success("Statut de l'assemblée mis à jour.")
+        } catch (err) {
+            toast.error("Erreur lors de la mise à jour du statut: " + (err as Error).message)
+        }
+    }
+
+    const handleAddAssemblyNote = async (assembly: any) => {
+        const text = assemblyNotesTexts[assembly.id] || ''
+        if (!text.trim()) return
+
+        const author = 'Direction / Gestionnaire'
+        const timestamp = new Date().toISOString()
+        const nextNotes = [...(assembly.notes || []), {
+            note: text.trim(),
+            author,
+            timestamp
+        }]
+
+        try {
+            await updateAssemblyTrackingAction(assembly.id, {
+                notes: nextNotes
+            })
+            setAssemblyTrackings(prev => prev.map(a => a.id === assembly.id ? { ...a, notes: nextNotes } : a))
+            setAssemblyNotesTexts(prev => ({ ...prev, [assembly.id]: '' }))
+            toast.success("Note ajoutée à l'assemblée.")
+        } catch (err) {
+            toast.error("Erreur lors de l'ajout de la note: " + (err as Error).message)
+        }
+    }
+
+    const handleEditAssemblyNoteStart = (assemblyId: string, index: number, currentText: string) => {
+        setEditingNoteIndex(prev => ({ ...prev, [assemblyId]: index }))
+        setEditingNoteText(currentText)
+    }
+
+    const handleCancelAssemblyNoteEdit = (assemblyId: string) => {
+        setEditingNoteIndex(prev => ({ ...prev, [assemblyId]: null }))
+        setEditingNoteText('')
+    }
+
+    const handleSaveAssemblyNote = async (assembly: any, index: number) => {
+        if (!editingNoteText.trim()) return
+
+        const updatedNotes = (assembly.notes || []).map((n: any, idx: number) => {
+            if (idx === index) {
+                return { ...n, note: editingNoteText.trim(), timestamp: new Date().toISOString() }
+            }
+            return n
+        })
+
+        try {
+            await updateAssemblyTrackingAction(assembly.id, {
+                notes: updatedNotes
+            })
+            setAssemblyTrackings(prev => prev.map(a => a.id === assembly.id ? { ...a, notes: updatedNotes } : a))
+            setEditingNoteIndex(prev => ({ ...prev, [assembly.id]: null }))
+            setEditingNoteText('')
+            toast.success("Note de l'assemblée mise à jour.")
+        } catch (err) {
+            toast.error("Erreur lors de la mise à jour de la note: " + (err as Error).message)
+        }
+    }
+
+    const handleDeleteAssemblyNote = async (assembly: any, index: number) => {
+        if (!confirm("Voulez-vous supprimer cette note ?")) return
+
+        const updatedNotes = (assembly.notes || []).filter((_: any, idx: number) => idx !== index)
+
+        try {
+            await updateAssemblyTrackingAction(assembly.id, {
+                notes: updatedNotes
+            })
+            setAssemblyTrackings(prev => prev.map(a => a.id === assembly.id ? { ...a, notes: updatedNotes } : a))
+            toast.success("Note de l'assemblée supprimée.")
+        } catch (err) {
+            toast.error("Erreur lors de la suppression de la note: " + (err as Error).message)
+        }
+    }
+
+    const handleDeleteAssemblyTracking = async (assemblyId: string) => {
+        if (!confirm("Voulez-vous supprimer définitivement ce suivi d'assemblée ? Cette action est irréversible et supprimera le suivi pour cette année fiscale.")) return
+
+        try {
+            await deleteAssemblyTrackingAction(assemblyId)
+            setAssemblyTrackings(prev => prev.filter(a => a.id !== assemblyId))
+            toast.success("Suivi d'assemblée supprimé.")
+        } catch (err) {
+            toast.error("Erreur lors de la suppression du suivi: " + (err as Error).message)
+        }
+    }
+
+    const handleConfirmAssemblyCompleted = async () => {
+        if (!confirmingAssemblyId || !actualAssemblyDate) return
+
+        try {
+            await confirmAssemblyCompletedAction(confirmingAssemblyId, {
+                actual_assembly_date: actualAssemblyDate,
+                confirmed_by: 'Direction / Gestionnaire'
+            })
+            
+            if (managerId) {
+                const trackings = await getAssemblyTrackingForManagerAction(managerId)
+                setAssemblyTrackings(trackings || [])
+            }
+            
+            setConfirmingAssemblyId(null)
+            setActualAssemblyDate('')
+            toast.success("Assemblée confirmée comme complétée et nouvelle période ouverte.")
+        } catch (err) {
+            toast.error("Erreur lors de la complétion: " + (err as Error).message)
         }
     }
 
@@ -2240,31 +2426,183 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                         <p className="italic text-zinc-500 text-xs text-center py-6">Aucun suivi d'assemblée à afficher.</p>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {assemblyTrackings.map(at => {
-                                const statusLabel = 
-                                    at.status === 'completed' ? 'Complétée' :
-                                    at.status === 'scheduled' ? 'Planifiée' : 'À préparer'
-                                const statusBadge = 
-                                    at.status === 'completed' ? 'bg-emerald-950/30 text-emerald-400 border-emerald-800/40' :
-                                    at.status === 'scheduled' ? 'bg-blue-950/30 text-blue-400 border-blue-800/40' :
-                                    'bg-amber-950/30 text-amber-400 border-amber-800/40'
+                            {assemblyTrackings.map((assembly) => {
+                                const ind = getAssemblyIndicator(assembly)
+                                const targetDate = new Date(assembly.target_date)
+                                const today = new Date()
+                                const diffTime = targetDate.getTime() - today.getTime()
+                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                                const dateLogs = assembly.date_history || []
 
                                 return (
-                                    <div key={at.id} className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-2">
-                                        <div className="flex justify-between items-start gap-2">
-                                            <div>
-                                                <h4 className="font-bold text-white text-xs">{at.clients?.company_name || at.clients?.full_name || getClientName(at.client_id)}</h4>
-                                                <p className="text-[10px] text-zinc-400 mt-0.5">
-                                                    FYE: <strong className="text-zinc-300">{at.fiscal_year_end ? new Date(at.fiscal_year_end).toLocaleDateString('fr-CA') : 'N/A'}</strong> · Date Cible: <span className="text-purple-300 font-semibold">{at.target_date ? new Date(at.target_date).toLocaleDateString('fr-CA') : 'N/A'}</span>
+                                    <div key={assembly.id} className="p-4 bg-zinc-950/40 border border-zinc-850 rounded-xl space-y-3.5 hover:border-zinc-800 transition-colors">
+                                        <div className="flex justify-between items-start gap-2.5">
+                                            <div className="space-y-0.5">
+                                                <h4 className="text-sm font-bold text-white">{assembly.clients?.company_name || assembly.clients?.full_name || getClientName(assembly.client_id)}</h4>
+                                                <p className="text-[10px] text-zinc-500">
+                                                    Fin d'exercice fiscal : <strong className="text-zinc-400">{assembly.fiscal_year_end ? new Date(assembly.fiscal_year_end).toLocaleDateString('fr-CA') : 'N/A'}</strong> · 
+                                                    Période cible : <span className="text-zinc-400">{assembly.target_date ? new Date(assembly.target_date).toLocaleDateString('fr-CA') : 'N/A'}</span>
                                                 </p>
                                             </div>
-                                            <Badge variant="outline" className={`text-[9px] font-bold py-0.5 px-2 ${statusBadge}`}>
-                                                {statusLabel}
-                                            </Badge>
+                                            <div className="flex items-center gap-1.5">
+                                                <Badge variant="outline" className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1 ${ind.color}`}>
+                                                    <span className={`h-1.5 w-1.5 rounded-full ${ind.dot}`} />
+                                                    {ind.label}
+                                                </Badge>
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    onClick={() => handleDeleteAssemblyTracking(assembly.id)}
+                                                    className="h-6 w-6 text-zinc-500 hover:text-rose-400 hover:bg-rose-950/20 rounded"
+                                                    title="Supprimer ce suivi"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
                                         </div>
-                                        {at.planned_date && (
-                                            <div className="text-[10px] text-zinc-300 font-semibold">
-                                                Date planifiée / tenue: {new Date(at.planned_date).toLocaleDateString('fr-CA')}
+
+                                        <div className="grid grid-cols-2 gap-3.5 text-xs border-t border-zinc-900 pt-3">
+                                            <div>
+                                                <span className="text-zinc-500 block">Jours restants / retard :</span>
+                                                <strong className={`font-mono text-sm ${diffDays < 0 ? 'text-rose-500' : 'text-zinc-200'}`}>
+                                                    {diffDays < 0 ? `${Math.abs(diffDays)}j retard` : `${diffDays}j restants`}
+                                                </strong>
+                                            </div>
+                                            <div>
+                                                <span className="text-zinc-500 block">Date planifiée :</span>
+                                                {assembly.status !== 'completed' ? (
+                                                    <Input 
+                                                        type="date" 
+                                                        value={assembly.planned_date || ''} 
+                                                        onChange={(e) => handleAssemblyDateChange(assembly, e.target.value)}
+                                                        className="bg-zinc-950 border-zinc-800 text-[10px] h-7 mt-0.5 p-1 text-white rounded"
+                                                    />
+                                                ) : (
+                                                    <strong className="font-mono text-sm text-zinc-200">
+                                                        {assembly.planned_date ? new Date(assembly.planned_date).toLocaleDateString('fr-CA') : 'Non planifiée'}
+                                                    </strong>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Status dropdown */}
+                                        {assembly.status !== 'completed' && (
+                                            <div className="space-y-1 pt-1">
+                                                <Label className="text-zinc-500 text-[9px] uppercase block font-bold">Changer le statut :</Label>
+                                                <select 
+                                                    value={assembly.status}
+                                                    onChange={(e) => handleAssemblyStatusChange(assembly, e.target.value)}
+                                                    className="w-full bg-zinc-900 border border-zinc-850 rounded text-xs p-1.5 text-white outline-none"
+                                                >
+                                                    <option value="to_prepare">À préparer (Brouillon)</option>
+                                                    <option value="scheduled">Planifiée / Date fixée</option>
+                                                </select>
+                                            </div>
+                                        )}
+
+                                        {/* Date modification logs */}
+                                        {dateLogs.length > 0 && (
+                                            <div className="bg-zinc-900/20 p-2 border border-zinc-850 rounded text-[9px] space-y-1 text-zinc-400 font-mono">
+                                                <span className="text-zinc-500 block font-bold uppercase text-[8px] tracking-wider mb-1">Historique des dates :</span>
+                                                {dateLogs.map((log: any, lIdx: number) => (
+                                                    <div key={lIdx} className="flex justify-between items-center gap-1.5">
+                                                        <span>{new Date(log.timestamp).toLocaleDateString('fr-CA')} : de <strong className="text-zinc-400">{log.old_date}</strong> à <strong className="text-zinc-200">{log.new_date}</strong></span>
+                                                        <span className="text-zinc-500">par {log.changed_by}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Assembly Notes list */}
+                                        {assembly.notes && assembly.notes.length > 0 && (
+                                            <div className="pt-2 border-t border-zinc-900/40 space-y-1.5">
+                                                <span className="text-[9px] font-bold text-zinc-500 uppercase block">Notes de suivi :</span>
+                                                <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                                                    {assembly.notes.map((n: any, nIdx: number) => {
+                                                        const isEditingThisNote = editingNoteIndex[assembly.id] === nIdx
+                                                        return (
+                                                            <div key={nIdx} className="text-xs text-zinc-400 pl-2 border-l border-purple-500/40 py-1 space-y-1">
+                                                                <div className="flex justify-between items-center text-[10px] text-zinc-500">
+                                                                    <span>
+                                                                        <strong className="text-zinc-300">{n.author}</strong> · <span>{new Date(n.timestamp).toLocaleDateString('fr-CA')}</span>
+                                                                    </span>
+                                                                    {assembly.status !== 'completed' && (
+                                                                        <div className="flex items-center gap-1">
+                                                                            <button
+                                                                                onClick={() => handleEditAssemblyNoteStart(assembly.id, nIdx, n.note)}
+                                                                                className="text-zinc-500 hover:text-purple-400 p-0.5 rounded transition-all"
+                                                                                title="Modifier la note"
+                                                                            >
+                                                                                <Edit className="h-2.5 w-2.5" />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleDeleteAssemblyNote(assembly, nIdx)}
+                                                                                className="text-zinc-500 hover:text-rose-400 p-0.5 rounded transition-all"
+                                                                                title="Supprimer la note"
+                                                                            >
+                                                                                <Trash2 className="h-2.5 w-2.5" />
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                {isEditingThisNote ? (
+                                                                    <div className="flex items-center gap-1.5 mt-1">
+                                                                        <Input
+                                                                            value={editingNoteText}
+                                                                            onChange={(e) => setEditingNoteText(e.target.value)}
+                                                                            className="h-7 text-xs bg-zinc-950 border-zinc-800 text-white rounded px-2 w-full"
+                                                                        />
+                                                                        <Button
+                                                                            size="icon"
+                                                                            onClick={() => handleSaveAssemblyNote(assembly, nIdx)}
+                                                                            className="h-7 w-7 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shrink-0"
+                                                                        >
+                                                                            <Check className="h-3 w-3" />
+                                                                        </Button>
+                                                                        <Button
+                                                                            size="icon"
+                                                                            variant="ghost"
+                                                                            onClick={() => handleCancelAssemblyNoteEdit(assembly.id)}
+                                                                            className="h-7 w-7 text-zinc-400 hover:text-white rounded-lg shrink-0"
+                                                                        >
+                                                                            <X className="h-3.5 w-3.5" />
+                                                                        </Button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <p className="text-zinc-200 break-words leading-normal">{n.note}</p>
+                                                                )}
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Add assembly note field */}
+                                        {assembly.status !== 'completed' && (
+                                            <div className="flex gap-2 pt-1.5">
+                                                <Input 
+                                                    value={assemblyNotesTexts[assembly.id] || ''}
+                                                    onChange={(e) => setAssemblyNotesTexts(prev => ({ ...prev, [assembly.id]: e.target.value }))}
+                                                    placeholder="Saisir note de suivi..."
+                                                    className="bg-zinc-950 border-zinc-800 text-xs h-8 rounded"
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleAddAssemblyNote(assembly)}
+                                                />
+                                                <Button onClick={() => handleAddAssemblyNote(assembly)} className="h-8 px-3 text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded font-bold">
+                                                    Note
+                                                </Button>
+                                            </div>
+                                        )}
+
+                                        {/* Assembly completion action */}
+                                        {assembly.status !== 'completed' && (
+                                            <div className="pt-2 border-t border-zinc-900">
+                                                <Button 
+                                                    onClick={() => setConfirmingAssemblyId(assembly.id)} 
+                                                    className="w-full h-7 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold"
+                                                >
+                                                    Confirmer complétée
+                                                </Button>
                                             </div>
                                         )}
                                     </div>
@@ -2274,6 +2612,50 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Confirm Assembly Completed Modal */}
+            {confirmingAssemblyId && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#16171e] border border-zinc-800 rounded-2xl w-full max-w-[90vw] md:max-w-[450px] p-6 space-y-4 shadow-2xl text-xs text-zinc-300">
+                        <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+                            <h3 className="text-sm font-bold text-white uppercase flex items-center gap-2">
+                                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                                Confirmer la Tenue de l'Assemblée
+                            </h3>
+                            <button onClick={() => setConfirmingAssemblyId(null)} className="text-zinc-500 hover:text-white">
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        <p className="text-[11px] text-zinc-400">
+                            Indiquez la date réelle à laquelle l'assemblée annuelle a été tenue. Cela fermera le cycle actuel et planifiera automatiquement le suivi pour la prochaine année fiscale.
+                        </p>
+
+                        <div className="space-y-1.5">
+                            <Label className="text-zinc-300 font-semibold text-xs">Date réelle de l'assemblée tenue</Label>
+                            <Input 
+                                type="date"
+                                value={actualAssemblyDate || new Date().toISOString().substring(0, 10)}
+                                onChange={(e) => setActualAssemblyDate(e.target.value)}
+                                className="bg-zinc-950 border-zinc-800 text-xs text-white"
+                            />
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-3 border-t border-zinc-850">
+                            <Button variant="outline" onClick={() => setConfirmingAssemblyId(null)} className="bg-zinc-900 border-zinc-800 text-zinc-300 h-8 text-xs">
+                                Annuler
+                            </Button>
+                            <Button 
+                                onClick={handleConfirmAssemblyCompleted} 
+                                disabled={!actualAssemblyDate}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-8 text-xs"
+                            >
+                                Valider &amp; Compléter
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )}
 
