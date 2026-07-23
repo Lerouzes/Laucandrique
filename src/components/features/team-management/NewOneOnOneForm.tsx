@@ -646,12 +646,10 @@ export function NewOneOnOneForm({ managers }: { managers: any[] }) {
         if (!managerId) return
         try {
             setLoading(true)
-            await purgeOverdue2025AssembliesAction(managerId)
-            toast.success("Assemblées 2025 en retard purguées avec succès.")
-            const snapshot = await getOneOnOneSnapshotAction(managerId)
-            if (snapshot?.assemblyEvaluations) {
-                setAssemblyEvaluations(snapshot.assemblyEvaluations)
-            }
+            const purgedCount = await purgeOverdue2025AssembliesAction(managerId)
+            toast.success(`${purgedCount || 0} assemblée(s) en retard (>100j) purguée(s) avec succès.`)
+            const trackings = await getAssemblyTrackingForManagerAction(managerId)
+            setAssemblyTrackings(trackings || [])
         } catch (err) {
             toast.error("Erreur lors de la purge : " + (err as Error).message)
         } finally {

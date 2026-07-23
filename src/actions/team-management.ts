@@ -3826,24 +3826,28 @@ export async function purgeOverdue2025AssembliesAction(managerId?: string) {
             if (managerId && (item.clients as any)?.manager_id !== managerId) continue
             if (item.status === 'completed') continue
 
-            const fyYear = item.fiscal_year_end ? new Date(item.fiscal_year_end).getFullYear() : 0
-            const targetYear = item.target_date ? new Date(item.target_date).getFullYear() : 0
-            const targetTime = new Date(item.target_date).getTime()
-            const diffTime = targetTime - today.getTime()
+            const targetDateStr = item.target_date || item.fiscal_year_end
+            if (!targetDateStr) continue
+
+            const targetDate = new Date(targetDateStr)
+            const diffTime = targetDate.getTime() - today.getTime()
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-            if ((fyYear <= 2025 || targetYear <= 2025) && diffDays < -100) {
+            if (diffDays < -100) {
                 toDeleteIds.push(item.id)
             }
         }
         if (toDeleteIds.length > 0) {
-            await supabase
+            const { error } = await supabase
                 .from('client_assembly_tracking')
                 .delete()
                 .in('id', toDeleteIds)
+            if (error) console.error("Error purging overdue assemblies:", error)
         }
+        revalidatePath('/team-management/one-on-ones')
+        return toDeleteIds.length
     }
-    revalidatePath('/team-management/one-on-ones')
+    return 0
 }
 
 export async function getAssemblyTrackingForManagerAction(managerId: string) {

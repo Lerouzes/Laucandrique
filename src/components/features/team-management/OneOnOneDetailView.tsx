@@ -921,8 +921,8 @@ export function OneOnOneDetailView({
     const handlePurgeOverdueAssemblies = async () => {
         try {
             setLoading(true)
-            await purgeOverdue2025AssembliesAction(manager?.id)
-            toast.success("Assemblées 2025 en retard purguées avec succès.")
+            const purgedCount = await purgeOverdue2025AssembliesAction(manager?.id)
+            toast.success(`${purgedCount || 0} assemblée(s) en retard (>100j) purguée(s) avec succès.`)
             if (manager?.id) {
                 const trackings = await getAssemblyTrackingForManagerAction(manager.id)
                 setAssemblyTrackings(trackings || [])
